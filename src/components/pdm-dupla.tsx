@@ -195,7 +195,9 @@ export function PdmDupla({
             Plano de desenvolvimento
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            o documento vivo da dupla: visão, metas e o caminho até elas
+            o documento vivo da dupla: visão, metas e o caminho até elas.
+            As respostas dos instrumentos Visão, Metas e PDM viram itens
+            aqui; o resto se escreve à mão.
           </p>
         </div>
         {tudoAtingido && (

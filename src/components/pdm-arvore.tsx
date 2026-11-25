@@ -61,6 +61,15 @@ export type PdmArvoreAcoes = {
 
 const NIVEL_MAX_RECUO = 3; // a partir do 4º nível: recuo fixo + chip
 
+// 526 — proveniência: o doc mistura itens projetados das respostas dos
+// instrumentos e escrita à mão; a marca "vinda do instrumento" separa os
+// dois sem tirar a editabilidade de nenhum
+const ORIGEM_INSTRUMENTO = {
+  metas: "Metas",
+  pdm: "PDM",
+  visao: "Visão",
+} as const;
+
 export function PdmArvore({
   nos,
   irmaos,
@@ -341,6 +350,11 @@ function NoPdm({
               <Badge variant="outline" className="text-[10px] font-medium">
                 {no.areaVida}
               </Badge>
+            )}
+            {no.origem !== "manual" && (
+              <span className="inline-flex items-center gap-1 italic">
+                vinda do instrumento {ORIGEM_INSTRUMENTO[no.origem]}
+              </span>
             )}
             {no.indicador && (
               <span className="inline-flex min-w-0 max-w-full items-center gap-1">

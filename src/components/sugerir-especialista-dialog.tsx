@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Collapsible } from "@base-ui/react/collapsible";
 import { Sparkle } from "@phosphor-icons/react";
 import { toast } from "@/lib/toast";
 import { sugerirEspecialistaMentor } from "@/lib/actions-especialista";
@@ -54,6 +55,11 @@ export function SugerirEspecialistaDialog({
   const [pending, start] = useTransition();
   const [demandaLen, setDemandaLen] = useState(0);
   const [esp, setEsp] = useState(QUALQUER);
+  // 526: lista do seletor aberta → o topo respondido cede pra dar área útil
+  // ao pool; fecha, restaura (campos nunca cedem com a demanda vazia — um
+  // obrigatório escondido não explicaria o submit bloqueado)
+  const [poolAberto, setPoolAberto] = useState(false);
+  const topoCede = poolAberto && demandaLen >= 10;
   const router = useRouter();
   const primeiro = nomeJovem.split(" ")[0];
 
@@ -119,43 +125,57 @@ export function SugerirEspecialistaDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between gap-2">
-              <Label htmlFor="sug-mentor-demanda">Tema ou necessidade</Label>
-              <span
-                aria-hidden
-                className="text-xs tabular-nums text-muted-foreground"
-              >
-                {demandaLen}/1.000
-              </span>
-            </div>
-            <Textarea
-              id="sug-mentor-demanda"
-              name="demanda"
-              required
-              minLength={10}
-              maxLength={1000}
-              rows={3}
-              onChange={(e) => setDemandaLen(e.target.value.length)}
-              placeholder="ex.: vai concorrer a uma vaga e trava na entrevista"
-            />
-            <p className="text-xs text-muted-foreground">
-              Escreva como quem conversou com {primeiro}: é o que ela/ele lê
-              ao decidir.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="sug-mentor-objetivo">
-              O que a trilha destrava (opcional)
-            </Label>
-            <Textarea
-              id="sug-mentor-objetivo"
-              name="objetivo"
-              maxLength={500}
-              rows={2}
-              placeholder="ex.: passar na entrevista do jovem aprendiz"
-            />
-          </div>
+          {/* topo cedendo (526): aberto o pool, os campos respondidos
+              recolhem por height; keepMounted segura o FormData dos
+              textareas não-controlados */}
+          <Collapsible.Root open={!topoCede}>
+            <Collapsible.Panel
+              keepMounted
+              className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden"
+            >
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <Label htmlFor="sug-mentor-demanda">
+                      Tema ou necessidade
+                    </Label>
+                    <span
+                      aria-hidden
+                      className="text-xs tabular-nums text-muted-foreground"
+                    >
+                      {demandaLen}/1.000
+                    </span>
+                  </div>
+                  <Textarea
+                    id="sug-mentor-demanda"
+                    name="demanda"
+                    required
+                    minLength={10}
+                    maxLength={1000}
+                    rows={3}
+                    onChange={(e) => setDemandaLen(e.target.value.length)}
+                    placeholder="ex.: vai concorrer a uma vaga e trava na entrevista"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Escreva como quem conversou com {primeiro}: é o que
+                    ela/ele lê ao decidir.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sug-mentor-objetivo">
+                    O que a trilha destrava (opcional)
+                  </Label>
+                  <Textarea
+                    id="sug-mentor-objetivo"
+                    name="objetivo"
+                    maxLength={500}
+                    rows={2}
+                    placeholder="ex.: passar na entrevista do jovem aprendiz"
+                  />
+                </div>
+              </div>
+            </Collapsible.Panel>
+          </Collapsible.Root>
           <EspecialistaSeletor
             idBase="sug-mentor-esp"
             label="Pensando em alguém? (opcional)"
@@ -164,8 +184,10 @@ export function SugerirEspecialistaDialog({
             catalogo={especialistas}
             selecionado={esp === QUALQUER ? null : esp}
             onSelecionar={(id) => setEsp(id ?? QUALQUER)}
+            linkPerfil={(e) => `/pessoas/${e.id}`}
+            onAbertoChange={setPoolAberto}
           />
-          <DialogFooter>
+          <DialogFooter sticky>
             <Button
               type="button"
               variant="outline"

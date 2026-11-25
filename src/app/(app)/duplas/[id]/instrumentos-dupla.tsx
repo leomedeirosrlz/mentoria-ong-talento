@@ -120,6 +120,7 @@ function LinhaInstrumento({
   podeEnviar,
   jornadaViva,
   remetenteMentorNome,
+  souMentor,
   rodaPar,
   checklistPar,
 }: {
@@ -143,6 +144,10 @@ function LinhaInstrumento({
   /** Quando quem vê é o mentor: a msg do link sai na voz dele ("seu
    *  mentor"), não "a equipe" — o texto vai do número dele. */
   remetenteMentorNome?: string;
+  /** quem vê é o mentor da dupla — no checklist de competências a linha
+   *  vira a ação dele (responde o próprio link), não a de enviar
+   *  (REALIZA-526). */
+  souMentor: boolean;
   /** pares antes × depois já derivados das entregas (REALIZA-18 / -359) */
   rodaPar: ReturnType<typeof parRoda<InstrumentoEntrega>>;
   checklistPar: ReturnType<typeof parChecklist<InstrumentoEntrega>>;
@@ -251,6 +256,11 @@ function LinhaInstrumento({
   const destWhatsapp =
     sistema === "competencias_mentor" ? mentorWhatsapp : mentoradoWhatsapp;
 
+  // 526 — o checklist do mentor na mão do próprio mentor: "Copiar link" e
+  // "Enviar no WhatsApp" descreviam um gesto de terceiro (mandar pra si
+  // mesmo não existe). Pra ele a linha vira a ação de responder o link.
+  const checklistProprio = sistema === "competencias_mentor" && souMentor;
+
   // payload do momento anterior pra leitura comparada — só quando a
   // entrega exibida é a ponta do fim (a inicial sozinha não compara)
   const respostasAnterior: Record<string, RespostaValor> | null =
@@ -314,7 +324,13 @@ function LinhaInstrumento({
       </Badge>
     ) : temPendente ? (
       <Badge className="bg-[var(--warn)]/15 text-[var(--warn-text)]">
-        {pendenteJovem ? "pedido pelo jovem" : "link enviado"}
+        {pendenteJovem
+          ? "pedido pelo jovem"
+          : checklistProprio
+            ? "pra você responder"
+            : sistema === "competencias_mentor"
+              ? "aguardando o mentor"
+              : "link enviado"}
       </Badge>
     ) : status === "expirado" ? (
       <Badge variant="secondary">link expirado</Badge>
@@ -351,7 +367,9 @@ function LinhaInstrumento({
       toast.success(
         r.reutilizado
           ? "Este link já estava pendente. Reaproveitado."
-          : "Link gerado. Copie ou envie pelo WhatsApp."
+          : checklistProprio
+            ? "Link gerado. Responda quando puder."
+            : "Link gerado. Copie ou envie pelo WhatsApp."
       );
       router.refresh();
     });
@@ -425,6 +443,12 @@ function LinhaInstrumento({
               {/* a janela do guia era um segundo badge — virou metadado
                   (a informação fica, o chrome de badge sai) */}
               <span>{GUIA_ENCONTRO[sistema].chip}</span>
+              {/* 526 — ownership sempre à vista: o resumo já diz, mas na
+                  hora do "quem responde o quê" o metadado não depende de
+                  a pessoa ler o parágrafo */}
+              {sistema === "competencias_mentor" && (
+                <span>{souMentor ? "responde você" : "responde o mentor"}</span>
+              )}
               {status === "respondido" && entrega?.respondido_em && (
                 <span className="tabular-nums">
                   Respondido em {formatDate(entrega.respondido_em)}
@@ -433,7 +457,15 @@ function LinhaInstrumento({
               {/* o link vivo do respondido não é mais badge: o estado
                   segue legível como metadado e as ações dele estão no ⋯ */}
               {status === "respondido" && temPendente && (
-                <span>{pendenteJovem ? "pedido pelo jovem" : "link enviado"}</span>
+                <span>
+                  {pendenteJovem
+                    ? "pedido pelo jovem"
+                    : checklistProprio
+                      ? "link aberto pra você"
+                      : sistema === "competencias_mentor"
+                        ? "aguardando o mentor"
+                        : "link enviado"}
+                </span>
               )}
             </p>
           )}
@@ -475,7 +507,30 @@ function LinhaInstrumento({
           </Dialog>
         )}
 
-        {status === "pendente" && tokenVivo && jornadaViva && (
+        {/* 526 — o checklist na mão do mentor vira ação dele: "Responder
+            agora" abre o /f/ vivo em vez de copiar link pra mandar pra si
+            mesmo. Vale pro pendente puro e pro respondido+outra ponta
+            aberta (a 2ª marcação chega junto do "Ver resposta") */}
+        {checklistProprio && tokenVivo && jornadaViva && (
+          <motion.span
+            {...fade}
+            transition={T.enter}
+            className="inline-flex"
+          >
+            <Button
+              size="sm"
+              render={<Link href={`/f/${tokenVivo}`} prefetch={false} />}
+            >
+              <ListChecks aria-hidden />
+              Responder agora
+            </Button>
+          </motion.span>
+        )}
+
+        {status === "pendente" &&
+          tokenVivo &&
+          jornadaViva &&
+          !checklistProprio && (
           <motion.span
             {...fade}
             transition={T.enter}
@@ -542,13 +597,16 @@ function LinhaInstrumento({
           <DropdownMenuContent align="end" className="w-56">
             {/* o link vivo do respondido não disputa com a primária "Ver
                 resposta": copiar e mandar no WhatsApp ficam aqui no ⋯ */}
-            {status === "respondido" && linkNoMenu && (
+            {linkNoMenu && (status === "respondido" || checklistProprio) && (
               <DropdownMenuItem onClick={() => copiarLink(true)}>
                 <CopySimple aria-hidden data-icon="inline-start" />
                 Copiar link
               </DropdownMenuItem>
             )}
-            {linkNoMenu && (
+            {/* o nudge pro próprio WhatsApp queimaria cooldown à toa
+                (526): no checklist na mão do mentor o item some; pra
+                coord segue valendo mandar pro mentor */}
+            {linkNoMenu && !checklistProprio && (
               <DropdownMenuItem
                 disabled={!hrefNudge}
                 render={
@@ -669,6 +727,7 @@ export function InstrumentosDupla({
   podeEnviar,
   jornadaViva,
   remetenteMentorNome,
+  souMentor,
   className,
 }: {
   duplaId: string;
@@ -685,6 +744,9 @@ export function InstrumentosDupla({
   jornadaViva: boolean;
   /** Voz do link de WhatsApp: nome quando quem envia é o mentor da dupla. */
   remetenteMentorNome?: string;
+  /** quem vê é o mentor da dupla — no checklist a linha vira "Responder
+   *  agora" pra ele, não gesto de envio (REALIZA-526). */
+  souMentor: boolean;
   className?: string;
 }) {
   if (!itens.length) return null;
@@ -707,7 +769,8 @@ export function InstrumentosDupla({
       <h2 className="text-base font-semibold">Instrumentos da jornada</h2>
       <p className="mt-1 text-xs text-muted-foreground">
         Os exercícios oficiais do guia: o jovem responde por link único, sem
-        login, e o resultado volta estruturado aqui.
+        login, e o resultado volta estruturado aqui. O checklist de
+        competências é a exceção: quem responde é o mentor.
       </p>
       <ul className="mt-2 divide-y divide-border/60">
         {INSTRUMENTOS_DUPLA_SISTEMA.map((s) => (
@@ -723,6 +786,7 @@ export function InstrumentosDupla({
             podeEnviar={podeEnviar}
             jornadaViva={jornadaViva}
             remetenteMentorNome={remetenteMentorNome}
+            souMentor={souMentor}
             rodaPar={rodaPar}
             checklistPar={checklistPar}
           />

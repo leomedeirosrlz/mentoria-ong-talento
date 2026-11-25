@@ -5,11 +5,11 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
   useTransition,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { Collapsible } from "@base-ui/react/collapsible";
 import {
   ArrowLeft,
   ArrowRight,
@@ -56,7 +56,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Etapa, useTrocaDeEtapa } from "@/components/ui/etapa";
+import { Etapa, FadeTroca, useTrocaDeEtapa } from "@/components/ui/etapa";
+import { useDesktop } from "@/lib/use-desktop";
 
 // "Combinar o plano" (518): a superfície que leva a dupla a UM gesto de
 // proposta — uma pergunta por tela (ritmo livre, recesso, grade) e a
@@ -66,14 +67,6 @@ import { Etapa, useTrocaDeEtapa } from "@/components/ui/etapa";
 // Proposta de lado da dupla já nasce valendo; a da equipe espera um
 // aceite. A decisão de recesso é só da dupla — staff vê o estado e o
 // "Combinar" espera a resposta deles (a RPC recusa com o motivo honesto).
-
-const MQ_DESKTOP = "(min-width: 768px)";
-const assinaDesktop = (cb: () => void) => {
-  const mq = window.matchMedia(MQ_DESKTOP);
-  mq.addEventListener("change", cb);
-  return () => mq.removeEventListener("change", cb);
-};
-const medeDesktop = () => window.matchMedia(MQ_DESKTOP).matches;
 
 type PassoId = "ritmo" | "recesso" | "grade" | "sessao" | "confirmar";
 type Sim = Extract<SimulacaoPlano, { ok: true }>;
@@ -157,7 +150,7 @@ export function CombinarPlano({
     onAberto?.(o);
   };
 
-  const desktop = useSyncExternalStore(assinaDesktop, medeDesktop, () => true);
+  const desktop = useDesktop();
 
   const [sim, setSim] = useState<Sim | null>(null);
   const [erroSim, setErroSim] = useState<string | null>(null);
@@ -471,7 +464,7 @@ export function CombinarPlano({
         </div>
       </fieldset>
       {ritmoSel === "outro" && (
-        <div className="mt-3">
+        <div className="animate-enter mt-3">
           <Input
             inputMode="numeric"
             placeholder="Ex.: 8"
@@ -737,12 +730,31 @@ export function CombinarPlano({
     simular({ fusao: grupos });
   };
 
+  // 526: o nome do encontro é o título do passo do guia — já viaja no
+  // payload (PassoPlano.titulo); o número sozinho não dizia nada a quem
+  // lia "juntar o 5º com o 6º"
+  const tituloDoPasso = (n: number) =>
+    passosComData.find((p) => p.numero === n)?.titulo ?? `${n}º encontro`;
+  const dataDoPasso = (n: number) =>
+    passosComData.find((p) => p.numero === n)?.data ?? "";
+  const listaTitulos = (g: readonly number[]) => {
+    const l = g.map((n) => `“${tituloDoPasso(n)}”`);
+    if (l.length <= 2) return l.join(" e ");
+    return `${l.slice(0, -1).join(", ")} e ${l.at(-1)}`;
+  };
+  // feedback honesto da fusão (526): a caminhada não recomputa o "em
+  // dia" (a fusão só carimba sessão), então o efeito que se promete é o
+  // de calendário — cada grupo de k encontros vira 1 sessão, k−1 dias a
+  // menos ocupados
+  const encontrosFundidos = gruposFusao.reduce((s, g) => s + g.length, 0);
+  const diasAMenos = encontrosFundidos - gruposFusao.length;
+
   // um gesto, duas partes: o aviso diz o que se perde (a semana de
   // prática entre os encontros) e o que fazer (a prática migra pras
   // reflexões do registro). Só some com o "Continuar mesmo assim".
   const avisoPratica = precisaAvisoPratica &&
     avisoReconhecido !== assinaturaFusao && (
-      <div className="mt-3 space-y-2 rounded-lg border border-[var(--warn-border)] bg-[var(--warn-bg)] px-3.5 py-3">
+      <div className="animate-enter mt-3 space-y-2 rounded-lg border border-[var(--warn-border)] bg-[var(--warn-bg)] px-3.5 py-3">
         <p className="flex items-start gap-1.5 text-sm text-[var(--warn-text)]">
           <Warning size={14} aria-hidden className="mt-0.5 shrink-0" />
           <span>
@@ -809,17 +821,28 @@ export function CombinarPlano({
                     : "border-border bg-card has-data-checked:bg-muted"
                 )}
               >
-                <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  Juntar o {n}º e o {n + 1}º na mesma sessão
-                  {estado.tom === "otima" ? (
-                    <span className="ml-auto rounded-full border border-[var(--ok-border)] bg-[var(--ok-bg)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--ok-text)]">
-                      boa pra juntar
-                    </span>
-                  ) : (
-                    <span className="ml-auto text-xs font-normal text-muted-foreground">
-                      {estado.motivo}
-                    </span>
-                  )}
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    Juntar o {n}º e o {n + 1}º na mesma sessão
+                    {estado.tom === "otima" ? (
+                      <span className="ml-auto rounded-full border border-[var(--ok-border)] bg-[var(--ok-bg)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--ok-text)]">
+                        boa pra juntar
+                      </span>
+                    ) : (
+                      <span className="ml-auto text-xs font-normal text-muted-foreground">
+                        {estado.motivo}
+                      </span>
+                    )}
+                  </span>
+                  {/* número + nome do guia + a data sugerida — o "5º e 6º"
+                      sozinho não dizia quais encontros eram (526) */}
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    {n}º · {tituloDoPasso(n)} · {diaCurto(dataDoPasso(n))}
+                  </span>
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    {n + 1}º · {tituloDoPasso(n + 1)} ·{" "}
+                    {diaCurto(dataDoPasso(n + 1))}
+                  </span>
                 </span>
               </CheckboxLinha>
             );
@@ -827,18 +850,31 @@ export function CombinarPlano({
         </div>
       </fieldset>
       {gruposFusao.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {gruposFusao.map((g) => (
-            <li
-              key={g.join("-")}
-              className="text-xs text-muted-foreground"
-            >
-              {listaEncontros(g)} saem juntos
-              {dataDoGrupo(g) ? ` em ${diaCurto(dataDoGrupo(g))}` : ""} ·
-              sessão de 2h
-            </li>
-          ))}
-        </ul>
+        <div className="animate-enter mt-2 space-y-1">
+          <ul className="space-y-1">
+            {gruposFusao.map((g) => (
+              <li
+                key={g.join("-")}
+                className="text-xs text-muted-foreground"
+              >
+                {listaTitulos(g)} saem juntos
+                {dataDoGrupo(g) ? ` em ${diaCurto(dataDoGrupo(g))}` : ""} ·
+                sessão de 2h
+              </li>
+            ))}
+          </ul>
+          {/* o efeito real da fusão é de calendário (526): N encontros
+              viram M sessões e M−N dias a menos ocupados. O "em dia" a
+              projeção não recomputa — dizer que adianta seria mentira */}
+          <p role="status" className="text-xs font-medium text-foreground">
+            {encontrosFundidos}{" "}
+            {encontrosFundidos === 1 ? "encontro vira" : "encontros viram"}{" "}
+            {gruposFusao.length}{" "}
+            {gruposFusao.length === 1 ? "sessão" : "sessões"} de 2h:{" "}
+            {diasAMenos} {diasAMenos === 1 ? "dia" : "dias"} a menos no
+            calendário. O dia de ficar em dia segue o mesmo.
+          </p>
+        </div>
       )}
       {avisoPratica}
     </div>
@@ -917,8 +953,9 @@ export function CombinarPlano({
         )}
         {gruposFusao.map((g) => (
           <li key={`fusao-${g.join("-")}`} className="text-muted-foreground">
-            {listaEncontros(g)} encontros na mesma sessão de 2h
-            {dataDoGrupo(g) ? `, em ${diaCurto(dataDoGrupo(g))}` : ""}.
+            {listaTitulos(g)} na mesma sessão de 2h
+            {dataDoGrupo(g) ? `, em ${diaCurto(dataDoGrupo(g))}` : ""} (
+            {listaEncontros(g)} encontros).
           </li>
         ))}
       </ul>
@@ -926,27 +963,31 @@ export function CombinarPlano({
           vai propor — a mesma montagem do doc persistido, com o escopo
           projetado do wizard */}
       {docPreview && (
-        <details className="group/doc mt-3 rounded-lg border border-border/60 px-3.5 py-2.5">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+        <Collapsible.Root className="mt-3 rounded-lg border border-border/60 px-3.5 py-2.5">
+          <Collapsible.Trigger className="flex w-full cursor-pointer items-center justify-between gap-2 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring [&[aria-expanded=true]>svg]:rotate-180">
             Ler o documento do combinado
             <CaretDown
               aria-hidden
-              className="size-3.5 transition-transform group-open/doc:rotate-180"
+              className="size-3.5 shrink-0 transition-transform"
             />
-          </summary>
-          <div className="mt-3">
-            <DocBlocos blocos={docPreview} tom="lima" />
-          </div>
-        </details>
+          </Collapsible.Trigger>
+          {/* transition-[height] é a exceção canonizada da 028 — o doc é
+              alto demais pra aparecer de uma vez (526) */}
+          <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+            <div className="mt-3">
+              <DocBlocos blocos={docPreview} tom="lima" />
+            </div>
+          </Collapsible.Panel>
+        </Collapsible.Root>
       )}
       {avisoPratica}
       {faltaDecisao && (
-        <p role="status" className="mt-2 text-sm text-[var(--warn-text)]">
+        <p role="status" className="animate-enter mt-2 text-sm text-[var(--warn-text)]">
           Falta a dupla confirmar o recesso.
         </p>
       )}
       {aplicavel && !aplicavel.emDia && aplicavel.dataRecuperacao == null && (
-        <p role="status" className="mt-2 text-sm text-[var(--warn-text)]">
+        <p role="status" className="animate-enter mt-2 text-sm text-[var(--warn-text)]">
           {ritmoNum != null
             ? `Com ${rotuloRitmo(ritmoNum)} o plano não fecha até o encerramento.`
             : "O plano não fecha até o encerramento."}{" "}
@@ -979,7 +1020,14 @@ export function CombinarPlano({
           A dupla está em dia. Não tem plano pra combinar.
         </p>
       ) : (
-        <div className="mt-1.5 space-y-1.5">
+        // a projeção reage a cada resposta (526): o texto novo não corta
+        // seco — esmaece enquanto a simulação roda (o role=status segue)
+        <div
+          className={cn(
+            "mt-1.5 space-y-1.5 transition-opacity",
+            simulando && "opacity-60"
+          )}
+        >
           <p role="status" className="text-sm font-medium">
             {simulando && <span className="sr-only">Atualizando. </span>}
             {aplicavel.dataRecuperacao ? (
@@ -1104,66 +1152,72 @@ export function CombinarPlano({
 
   const idx = passos.indexOf(passoId);
 
+  // a troca de fase (carregando → wizard/terminal → erro) é crossfade do
+  // kit — só no nível das fases: desmontar a Etapa perderia o rascunho
+  // dos fieldsets montados sob `hidden` (gramática 028)
+  const fase = erroSim ? "erro" : sim ? "conteudo" : "carregando";
   const corpo = (
-    <>
-      {!sim && !erroSim && (
-        <div
-          className="flex items-center gap-2 text-sm text-muted-foreground"
-          role="status"
-        >
-          <SpinnerGap size={16} aria-hidden className="animate-spin" />
-          Montando a projeção…
-        </div>
-      )}
-      {erroSim && (
-        <div className="space-y-2">
-          <p className="text-sm text-destructive">{erroSim}</p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => simular()}
+    <FadeTroca chave={fase}>
+      <div>
+        {!sim && !erroSim && (
+          <div
+            className="flex items-center gap-2 text-sm text-muted-foreground"
+            role="status"
           >
-            Tentar de novo
-          </Button>
-        </div>
-      )}
-      {sim &&
-        (terminal ? (
-          <div className="space-y-4">{conteudoTerminal}</div>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-xs font-medium text-muted-foreground">
-              Pergunta {idx + 1} de {passos.length}
-            </p>
-            {/* perguntas montadas: a inativa leva `hidden` — voltar não
-                perde estado do DOM (a <details> do aviso, a grade editada).
-                Um passo fora da lista fica inativo pra sempre: `ativa` é
-                quem filtra, o conteúdo não é recondicionado */}
-            <Etapa ativa={passoId === "ritmo"} direcao={direcao}>
-              {perguntaRitmo}
-            </Etapa>
-            <Etapa ativa={passoId === "recesso"} direcao={direcao}>
-              {perguntaRecesso}
-            </Etapa>
-            <Etapa ativa={passoId === "grade"} direcao={direcao}>
-              {perguntaGrade}
-            </Etapa>
-            <Etapa ativa={passoId === "sessao"} direcao={direcao}>
-              {perguntaSessao}
-            </Etapa>
-            <Etapa ativa={passoId === "confirmar"} direcao={direcao}>
-              {perguntaConfirmar}
-            </Etapa>
-            {painel}
-            {erroEnvio && (
-              <p role="status" className="text-sm text-destructive">
-                {erroEnvio}
-              </p>
-            )}
+            <SpinnerGap size={16} aria-hidden className="animate-spin" />
+            Montando a projeção…
           </div>
-        ))}
-    </>
+        )}
+        {erroSim && (
+          <div className="space-y-2">
+            <p className="text-sm text-destructive">{erroSim}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => simular()}
+            >
+              Tentar de novo
+            </Button>
+          </div>
+        )}
+        {sim &&
+          (terminal ? (
+            <div className="space-y-4">{conteudoTerminal}</div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-xs font-medium text-muted-foreground">
+                Pergunta {idx + 1} de {passos.length}
+              </p>
+              {/* perguntas montadas: a inativa leva `hidden` — voltar não
+                  perde estado do DOM (o disclosure do aviso, a grade
+                  editada). Um passo fora da lista fica inativo pra sempre:
+                  `ativa` é quem filtra, o conteúdo não é recondicionado */}
+              <Etapa ativa={passoId === "ritmo"} direcao={direcao}>
+                {perguntaRitmo}
+              </Etapa>
+              <Etapa ativa={passoId === "recesso"} direcao={direcao}>
+                {perguntaRecesso}
+              </Etapa>
+              <Etapa ativa={passoId === "grade"} direcao={direcao}>
+                {perguntaGrade}
+              </Etapa>
+              <Etapa ativa={passoId === "sessao"} direcao={direcao}>
+                {perguntaSessao}
+              </Etapa>
+              <Etapa ativa={passoId === "confirmar"} direcao={direcao}>
+                {perguntaConfirmar}
+              </Etapa>
+              {painel}
+              {erroEnvio && (
+                <p role="status" className="text-sm text-destructive">
+                  {erroEnvio}
+                </p>
+              )}
+            </div>
+          ))}
+      </div>
+    </FadeTroca>
   );
 
   const rodape = (
@@ -1240,7 +1294,10 @@ export function CombinarPlano({
             Uma pergunta por vez. O combinado só sai no último passo.
           </p>
         </div>
-        <div className="mt-4 min-h-0 flex-1">{corpo}</div>
+        {/* sem min-h-0 (526): a caixa encolhia pra área livre e o conteúdo
+            transbordava atrás do footer sticky — "botões no meio do texto".
+            O scrollport é a folha inteira; o pb dá respiro acima do rodapé */}
+        <div className="mt-4 flex-1 pb-6">{corpo}</div>
         <div className="sticky bottom-0 -mx-4 -mb-4 mt-4 border-t bg-sidebar p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           {rodape}
         </div>

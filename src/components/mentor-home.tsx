@@ -432,7 +432,17 @@ export async function MentorHome({
             {/* -mt cobre o py do Card — o banner ink encosta no topo;
                 pt/pb devolvem o respiro interno; a keyline lime na base é
                 a única faixa de marca da tela (uma por tela) */}
-            <CardHeader className="-mt-(--card-spacing) border-b-2 border-[var(--brand-lime)] bg-[var(--brand-ink)] pb-(--card-spacing) pt-(--card-spacing) text-white">
+            <CardHeader className="relative -mt-(--card-spacing) border-b-2 border-[var(--brand-lime)] bg-[var(--brand-ink)] pb-(--card-spacing) pt-(--card-spacing) text-white">
+              {/* o banner inteiro navega pra ficha (REALIZA-526): stretched
+                  link cobre o header — o "Abrir dupla" fica por cima como
+                  affordance redundante (relative) e o resto é texto inerte.
+                  O stretch NÃO desce pro CardContent: lá dentro vivem CTAs */}
+              <Link
+                href={`/duplas/${dupla.id}`}
+                prefetch={false}
+                aria-label={`Abrir ficha da dupla de ${(dupla.mentorado.nome_social ?? dupla.mentorado.nome).split(" ")[0]}`}
+                className="absolute inset-0 transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand-lime)]"
+              />
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   {/* "Sua dupla" vira redundante com várias — o nome do
@@ -482,13 +492,14 @@ export async function MentorHome({
                       Pausada
                     </span>
                   )}
-                  {/* o card todo não é link — a saída pra ficha precisa de
-                      affordance própria, visível mesmo sem pendência */}
+                  {/* affordance redundante sobre o stretched link — o
+                      sinal de "isso navega" fica visível mesmo sem pendência;
+                      o relative o mantém clicável acima do cobertor */}
                   <Link
                     href={`/duplas/${dupla.id}`}
                     className={cn(
                       buttonVariants({ variant: "ghost", size: "sm" }),
-                      "group text-white/80 hover:bg-white/10 hover:text-white focus-visible:ring-[var(--brand-lime)]"
+                      "group relative text-white/80 hover:bg-white/10 hover:text-white focus-visible:ring-[var(--brand-lime)]"
                     )}
                   >
                     Abrir dupla
@@ -822,8 +833,16 @@ export async function MentorHome({
             return (
               <div
                 key={dupla.id}
-                className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
+                className="relative rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
               >
+                {/* mesmo gesto do banner das duplas ativas: o card inteiro
+                    navega, o "Abrir dupla" sobe como affordance redundante */}
+                <Link
+                  href={`/duplas/${dupla.id}`}
+                  prefetch={false}
+                  aria-label={`Abrir ficha da dupla de ${(dupla.mentorado.nome_social ?? dupla.mentorado.nome).split(" ")[0]}`}
+                  className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">
@@ -844,7 +863,7 @@ export async function MentorHome({
                     href={`/duplas/${dupla.id}`}
                     className={cn(
                       buttonVariants({ variant: "ghost", size: "sm" }),
-                      "group text-muted-foreground"
+                      "group relative text-muted-foreground"
                     )}
                   >
                     Abrir dupla
