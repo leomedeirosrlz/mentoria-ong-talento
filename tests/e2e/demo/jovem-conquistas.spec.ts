@@ -383,6 +383,9 @@ test.describe("demo — conquistas do jovem", () => {
     await selo.click();
     const parado = page.getByRole("dialog").locator("canvas").first();
     const h = () => parado.evaluate((c: HTMLCanvasElement) => c.toDataURL());
+    // o canvas só pinta depois do efeito de montagem; deixa o primeiro
+    // frame de repouso aparecer antes de comparar
+    await page.waitForTimeout(250);
     const a = await h();
     await page.waitForTimeout(700);
     expect(await h()).toBe(a);
