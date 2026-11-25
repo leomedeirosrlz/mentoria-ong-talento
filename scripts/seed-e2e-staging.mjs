@@ -515,14 +515,19 @@ if (!coord.user_id) {
   }
 }
 
-// ---- mentor reserva: tem a 2ª dupla; sem auth user (nunca loga) ----
-const [reserva] = await rest(`profiles?select=id&id=eq.${IDS.mentorReserva}`);
+// ---- mentor reserva: tem a 2ª dupla e LOGA ----
+// `plano-roteiros` usa o JWT dele como "mentor de fora da dupla"; sem auth
+// user o signInWithPassword dava 400 e 5 specs morriam no login.
+const RESERVA_EMAIL = "e2e-mentor-reserva@realiza.test";
+let [reserva] = await rest(
+  `profiles?select=id,user_id&id=eq.${IDS.mentorReserva}`
+);
 if (!reserva) {
   await rest("profiles", {
     method: "POST",
     body: JSON.stringify({
       id: IDS.mentorReserva,
-      email: "e2e-mentor-reserva@realiza.test",
+      email: RESERVA_EMAIL,
       nome: "Mentor E2E Reserva",
       role: "mentor_dpp",
       ativo: true,
@@ -530,7 +535,11 @@ if (!reserva) {
     }),
   });
   console.log("mentor reserva criado");
+  [reserva] = await rest(
+    `profiles?select=id,user_id&id=eq.${IDS.mentorReserva}`
+  );
 }
+await vincularAuth(reserva, RESERVA_EMAIL);
 
 // ---- mentor livre pro import CSV — profile sem dupla, sem auth ----
 const [mImport] = await rest(`profiles?select=id&id=eq.${IDS.mentorImport}`);

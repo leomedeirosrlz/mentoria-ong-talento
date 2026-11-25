@@ -303,6 +303,9 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
     await page.keyboard.press("Escape");
 
     // e a senha devolvida abre o gate público de verdade
+    // o router.refresh() do Compartilhar/Redefinir ainda pode estar em voo:
+    // navegar antes disso faz o goto morrer em ERR_ABORTED
+    await page.waitForLoadState("networkidle");
     await page.goto(`/resumo/${slug}`);
     await expect(
       page.getByRole("heading", { name: "Relatório protegido" })
@@ -342,6 +345,9 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
     await dialog.getByRole("button", { name: "Concluir" }).click();
 
     // a senha escolhida abre o gate — o cookie fica com ela
+    // o router.refresh() do Compartilhar/Redefinir ainda pode estar em voo:
+    // navegar antes disso faz o goto morrer em ERR_ABORTED
+    await page.waitForLoadState("networkidle");
     await page.goto(`/resumo/${slug}`);
     await page.getByLabel("Senha do relatório").fill("secreta-2026");
     await page.getByRole("button", { name: "Abrir relatório" }).click();
@@ -376,6 +382,9 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
     expect(novaSenha).toMatch(/^[a-z2-9]{4}-[a-z2-9]{4}$/);
 
     // cookie tem a senha VELHA: recarregar a página revalida e cai no form
+    // o router.refresh() do Compartilhar/Redefinir ainda pode estar em voo:
+    // navegar antes disso faz o goto morrer em ERR_ABORTED
+    await page.waitForLoadState("networkidle");
     await page.goto(`/resumo/${slug}`);
     await expect(
       page.getByRole("heading", { name: "Relatório protegido" })
@@ -424,6 +433,9 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
     await dialog.getByRole("button", { name: "Concluir" }).click();
 
     // sem cookie, sem senha: a página pública abre direto o relatório
+    // o router.refresh() do Compartilhar/Redefinir ainda pode estar em voo:
+    // navegar antes disso faz o goto morrer em ERR_ABORTED
+    await page.waitForLoadState("networkidle");
     await page.goto(`/resumo/${slug}`);
     await expect(
       page.getByRole("heading", { name: "E2E Sem senha" })
@@ -449,6 +461,9 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
       timeout: 15_000,
     });
 
+    // o router.refresh() do Compartilhar/Redefinir ainda pode estar em voo:
+    // navegar antes disso faz o goto morrer em ERR_ABORTED
+    await page.waitForLoadState("networkidle");
     await page.goto(`/resumo/${slug}`);
     await expect(page.getByText("não está mais disponível")).toBeVisible({
       timeout: 15_000,
