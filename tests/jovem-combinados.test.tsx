@@ -26,6 +26,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { JovemCombinados } from "@/components/jovem-combinados";
+import type { JovemEncaminhamento } from "@/lib/types";
 import { assentar, montar } from "./dom";
 
 const ITEM = {
@@ -34,7 +35,9 @@ const ITEM = {
   status: "pendente",
   prazo: "2026-12-05",
   responsavel: "mentorado",
-} as never;
+  dupla_id: null,
+  created_at: null,
+} as JovemEncaminhamento & { id: string };
 
 function marcar(alvo: ParentNode) {
   const caixa = alvo.querySelector<HTMLElement>('[role="checkbox"]');
