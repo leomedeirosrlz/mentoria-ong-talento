@@ -63,10 +63,10 @@ export function JovemCombinados({
     setPendingId(t.id);
     start(async () => {
       try {
-        const res = await marcarCombinadoFeito(t.id, !feito);
+        const res = await marcarCombinadoFeito(t.id, feito);
         if (res?.error) toast.error(res.error);
         else {
-          if (!feito) toast.success("Combinado marcado como feito.");
+          if (feito) toast.success("Combinado marcado como feito.");
           router.refresh();
         }
       } catch {
@@ -207,6 +207,16 @@ export function JovemCombinados({
             "group flex min-w-0 flex-1 cursor-pointer items-start gap-3 py-3 transition-colors",
             pending && pendingId === t.id && "opacity-60"
           )}
+          onClick={(e) => {
+            // o Checkbox do kit é span role=checkbox — <label> não encaminha
+            // clique pra ele como fazia com o input nativo. Sem isto, tocar
+            // no texto do combinado não marcava nada.
+            if ((e.target as HTMLElement).closest('[role="checkbox"]')) return;
+            e.preventDefault();
+            e.currentTarget
+              .querySelector<HTMLElement>('[role="checkbox"]')
+              ?.click();
+          }}
         >
           {/* checkbox do kit dentro da label — teclado e clique no texto de
               graça (mesmo padrão da lista de staff) */}

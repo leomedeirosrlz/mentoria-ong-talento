@@ -84,6 +84,14 @@ function CheckboxLinha({
         "has-data-disabled:cursor-default",
         className
       )}
+      onClick={(e) => {
+        // o primitive é um span role=checkbox: <label> só encaminha clique
+        // pra controle nativo (input/select/textarea), não pra ele. Quem
+        // toca no texto perderia o gesto — o clique vai pro controle.
+        if ((e.target as HTMLElement).closest('[role="checkbox"]')) return;
+        e.preventDefault();
+        e.currentTarget.querySelector<HTMLElement>('[role="checkbox"]')?.click();
+      }}
     >
       <Checkbox
         tom={tom}
