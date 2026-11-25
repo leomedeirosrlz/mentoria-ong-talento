@@ -16,7 +16,8 @@ import {
   Trophy,
   UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
-import { BadgeImagem } from "@/components/badge-imagem";
+import { SeloCanvas } from "@/components/selos/selo-canvas";
+import type { MovimentoSelo } from "@/components/selos/selo-canvas";
 import { InstrumentoIcone } from "@/components/instrumento-icone";
 import { arteDoGlifo } from "@/lib/badges";
 import type {
@@ -27,19 +28,20 @@ import type {
 } from "@/lib/conquistas";
 import { cn } from "@/lib/utils";
 
-/** O emblema da conquista (016): a ilustração isométrica da casa
- *  (public/badges) quando o glifo tem desenho; o squircle de antes —
- *  mesma razão do InstrumentoEmblema, glifo a ~57% do lado — quando não
- *  tem ou o arquivo não carrega. `ganho` em cor; o não ganho é apagado e
- *  NUNCA cadeado — o `proximo` (primeiro não ganho) carrega só o anel
+/** O emblema da conquista: o selo isométrico animado da casa
+ *  (src/lib/selos, REALIZA-529) quando o glifo tem desenho; o squircle de
+ *  antes — mesma razão do InstrumentoEmblema, glifo a ~57% do lado —
+ *  quando não tem. `ganho` em cor; o não ganho é apagado e NUNCA cadeado,
+ *  e fica parado — o `proximo` (primeiro não ganho) carrega só o anel
  *  --destaque, o "próximo passo" da casa. Sem "use client": serve a
- *  estante (cliente, Dialog) e a faixa (server). `className` vai no
- *  desenho — é onde a animação do chamador pousa. */
+ *  estante (cliente, Dialog) e a faixa (server); o canvas é a folha
+ *  cliente. `movimento` escolhe quando a peça se mexe (ver SeloCanvas). */
 export function ConquistaEmblema({
   glifo,
   tom,
   size = 44,
   estado = "ganho",
+  movimento = "entra",
   className,
 }: {
   glifo: ConquistaGlifo;
@@ -47,6 +49,7 @@ export function ConquistaEmblema({
   tom: { cor: string; tinta: string };
   size?: number;
   estado?: "ganho" | "proximo" | "futuro";
+  movimento?: MovimentoSelo;
   className?: string;
 }) {
   const ganho = estado === "ganho";
@@ -64,10 +67,10 @@ export function ConquistaEmblema({
       className={cn("grid shrink-0 place-items-center rounded-[28%]", anel)}
       style={{ width: size, height: size }}
     >
-      <BadgeImagem
-        src={arte}
+      <SeloCanvas
+        arte={arte}
         size={size}
-        fallback={squircle}
+        movimento={ganho ? movimento : "quieto"}
         className={cn(!ganho && "opacity-55 grayscale", className)}
       />
     </span>

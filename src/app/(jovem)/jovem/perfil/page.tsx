@@ -14,12 +14,19 @@ import {
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import { getPdmDaDupla } from "@/lib/queries-pdm";
 import { conquistasDoJovem } from "@/lib/conquistas";
+import {
+  SELOS_COOKIE,
+  lerEscolha,
+  opcaoDoSelo,
+  pecasEscolhiveis,
+  selosDoPerfil,
+} from "@/lib/selos-perfil";
 import { papelLabel } from "@/lib/ciclo";
 import { getMe } from "@/lib/queries";
 import { getChamados, getChamadoDetalhe } from "@/lib/queries-chamados";
 import { JovemChamados } from "@/components/jovem-chamados";
 import { ConquistasCard } from "./conquistas-card";
-import { SeloNivel } from "./selo-nivel";
+import { VitrineSelos } from "./vitrine-selos";
 import { NivelNotifier } from "@/components/nivel-notifier";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { gravatarUrlSeExiste } from "@/lib/gravatar";
@@ -140,6 +147,18 @@ export default async function JovemPerfil({
       : null,
   });
 
+  // os selos do perfil (529): até 3, os que o jovem escolheu — sem escolha,
+  // a faixa atual e as duas conquistas mais recentes. O cookie é dele
+  // (dono = id da ficha), então outra pessoa no mesmo navegador não herda
+  const pecasSelo = pecasEscolhiveis(conq.nivel, conq.conquistas);
+  const escolha = lerEscolha(
+    (await cookies()).get(SELOS_COOKIE)?.value,
+    perfil?.id ?? me.id
+  );
+  const selosPerfil = selosDoPerfil(pecasSelo, escolha);
+  const opcoesSelo = pecasSelo.map(opcaoDoSelo);
+  const chavesNoPerfil = selosPerfil.map((p) => p.chave);
+
   const meta = [
     perfil?.ong_origem?.trim() || null,
     me.cidade && me.uf
@@ -178,9 +197,8 @@ export default async function JovemPerfil({
         />
         <div className="px-4 pb-5 sm:px-6 sm:pb-6">
           {/* justify-start + wrap: com a foto o ghost fica colado no
-              avatar e o selo (ml-auto) cai pra linha de baixo em vez de
-              espremer ilegível em 390px — em uma linha só quando cabe,
-              idêntico ao justify-between de antes */}
+              avatar e os selos (ml-auto) caem pra linha de baixo em vez de
+              espremer em 390px — em uma linha só quando cabe */}
           <div className="flex flex-wrap items-end justify-start gap-3">
             <FotoPerfil
               nome={nomeTela}
@@ -188,9 +206,16 @@ export default async function JovemPerfil({
               src={avatarUrl}
               fallbackSrc={demo ? null : await gravatarUrlSeExiste(me.email)}
             />
-            {/* o selo "Seu nível" (024) — a faixa atual na mão do avatar;
-                abre o mesmo detalhe da régua do card de conquistas */}
-            {conq.nivel && <SeloNivel nivel={conq.nivel} />}
+            {/* os selos do perfil (529): só as peças, sem caixa; o lápis
+                abre a escolha de até 3 */}
+            {conq.temJornada || opcoesSelo.length > 0 ? (
+              <VitrineSelos
+                pecas={selosPerfil}
+                opcoes={opcoesSelo}
+                escolhidas={chavesNoPerfil}
+                nivel={conq.nivel}
+              />
+            ) : null}
           </div>
           <h1 className="mt-3 text-xl font-semibold tracking-tight sm:text-2xl">
             {nomeTela}
@@ -297,6 +322,8 @@ export default async function JovemPerfil({
               conquistas={conq.conquistas}
               futuras={conq.futuras}
               nivel={conq.nivel}
+              opcoes={opcoesSelo}
+              escolhidas={chavesNoPerfil}
             />
           )}
 

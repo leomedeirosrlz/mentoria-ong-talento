@@ -13,64 +13,14 @@ import type {
   NiveisJornada,
   NivelJornada,
 } from "@/lib/conquistas";
-import { cn } from "@/lib/utils";
 
-// O detalhe das faixas de nível, compartilhado entre o bloco "Seu nível"
-// do card de conquistas e o selo do header do perfil (024): a mesma peça
-// grande, a mesma ficha e a mesma régua do que falta — um Dialog só.
+// O detalhe das faixas de nível, compartilhado entre o card de conquistas e
+// os selos do header do perfil: a mesma peça grande, a mesma ficha e a
+// mesma régua do que falta — um Dialog só.
 
-/** As assinaturas de faixa (024) em literais — o scanner do Tailwind só
- *  emite o que lê no fonte, nada de `nivel-${chave}` dinâmico. */
-const MOTION_NIVEL: Record<string, string> = {
-  inicio: "nivel-inicio",
-  constancia: "nivel-constancia",
-  veterania: "nivel-veterania",
-  completa: "nivel-completa",
-};
-
-/** A classe de motion da peça: a faixa de nível tem assinatura própria
- *  (nivel-<faixa>-*, 024 — pop, pulso duplo, flicker elétrico e burst) e
- *  ela dispara UMA vez por gatilho — `abre` no mount da vitrine e na
- *  abertura do detalhe ganho. A faixa não ganha entra com o fade simples
- *  (nivel-fade), sem celebração emprestada; selo e régua ficam no settle
- *  curto (nivel-chega, `passa`) e o hover/foco do tile é o feedback da
- *  casa, nunca a assinatura. O resto da estante segue o salto de sempre. */
-export function classeMotionPeca(
-  glifo: ConquistaGlifo,
-  gatilho: "abre" | "passa",
-  estado: "ganho" | "proximo" | "futuro" = "ganho"
-): string {
-  if (glifo.tipo !== "nivel")
-    return gatilho === "abre"
-      ? "badge-salta"
-      : "group-hover:badge-salta group-focus-visible:badge-salta";
-  if (gatilho === "passa") return "nivel-chega";
-  return estado === "ganho" ? MOTION_NIVEL[glifo.chave] : "nivel-fade";
-}
-
-/** O brilho do kit (spark de 4 pontas) — estoura na batida do salto. */
-export function Brilho({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="-12 -12 24 24"
-      aria-hidden
-      className={cn("pointer-events-none absolute overflow-visible", className)}
-    >
-      <path
-        d="M0 -10Q2.8 -2.8 10 0Q2.8 2.8 0 10Q-2.8 2.8 -10 0Q-2.8 -2.8 0 -10Z"
-        fill="white"
-        stroke="var(--brand-ink)"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-/** A peça grande do detalhe: a faixa de nível entra com a assinatura dela
- *  quando ganha — a completa é a única cuja assinatura inclui os brilhos
- *  (o burst dela) — e com fade simples quando ainda não; as demais peças
- *  saltam como na estante. */
+/** A peça grande do detalhe: o selo em loop enquanto o detalhe está
+ *  aberto (a cena do kit fun-isometric, no relógio da página). Peça ainda
+ *  não ganha fica parada e apagada. */
 export function PecaDetalhe({
   glifo,
   tom,
@@ -80,24 +30,15 @@ export function PecaDetalhe({
   tom: { cor: string; tinta: string };
   estado: "ganho" | "proximo" | "futuro";
 }) {
-  const brilho =
-    estado === "ganho" &&
-    (glifo.tipo !== "nivel" || glifo.chave === "completa");
   return (
-    <div className="relative mx-auto grid size-28 place-items-center">
+    <div className="relative mx-auto grid size-32 place-items-center">
       <ConquistaEmblema
         glifo={glifo}
         tom={tom}
-        size={112}
+        size={128}
         estado={estado}
-        className={classeMotionPeca(glifo, "abre", estado)}
+        movimento="vivo"
       />
-      {brilho && (
-        <>
-          <Brilho className="badge-brilho -top-1 right-0 size-6" />
-          <Brilho className="badge-brilho bottom-4 -left-1 size-4 [animation-delay:980ms]" />
-        </>
-      )}
     </div>
   );
 }

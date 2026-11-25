@@ -1,11 +1,12 @@
+import type { Page } from "@playwright/test";
 import { entrarNaDemo, expect, test } from "../helpers";
 
-// 016 (REALIZA-516) + 024 — "Suas conquistas" no perfil do jovem: nível
-// por tempo de programa (régua das 4 faixas + selo no header), estante
-// earned-only com as ilustrações isométricas de public/badges, famílias
-// com tiers (o maior degrau na estante, a escada no detalhe) e a área
-// "Ainda por vir" separada, apagada e sem cadeado. Toda peça abre o
-// detalhe.
+// 016 + 024 + REALIZA-529 — "Suas conquistas" no perfil do jovem: nível
+// por tempo de programa, estante earned-only, famílias com tiers e a área
+// "Ainda por vir" apagada e sem cadeado, tudo atrás de expansões (a página
+// não cresce com a coleção). Os selos são cenas isométricas em canvas
+// (src/lib/selos); o jovem escolhe até 3 pra mostrar ao lado da foto, sem
+// caixa em volta. Toda peça abre o detalhe.
 //
 // Fixture da persona mentorado (Bia, dupla DPP com o Ricardo): a dupla
 // começou uma semana antes do 1º encontro e o 5º cai nesta semana — entre
@@ -25,6 +26,15 @@ test.describe("demo — conquistas do jovem", () => {
     await entrarNaDemo(page, "mentorado");
   });
 
+  /** Abre uma expansão do card pelo título (fechadas por padrão). */
+  async function abrir(page: Page, titulo: string) {
+    const card = page.locator("section#conquistas");
+    const gatilho = card.getByRole("button", { name: new RegExp(`^${titulo}`) });
+    if ((await gatilho.getAttribute("aria-expanded")) !== "true")
+      await gatilho.click();
+    return card;
+  }
+
   test("nível: Constância, régua das 4 faixas e o que falta em contagem", async ({
     page,
   }) => {
@@ -33,18 +43,6 @@ test.describe("demo — conquistas do jovem", () => {
     await expect(
       card.getByRole("button", { name: /^Seu nível Constância Desde/ })
     ).toBeVisible();
-
-    const regua = card.getByRole("list", { name: "Faixas de nível" });
-    const faixas = regua.getByRole("listitem");
-    await expect(faixas).toHaveCount(4);
-    for (const [i, titulo] of FAIXAS.entries())
-      await expect(faixas.nth(i)).toContainText(titulo);
-    // estado sempre em texto, nunca só pela cor
-    await expect(faixas.nth(0)).toContainText("Alcançada");
-    await expect(faixas.nth(1)).toContainText("Seu nível");
-    await expect(faixas.nth(2)).toContainText("Próxima");
-    await expect(faixas.nth(3)).toContainText("Ainda por vir");
-
     await expect(card.getByText("Próximo nível: Veterania")).toBeVisible();
     await expect(
       card.getByText("3 meses de programa e 8 encontros com seu mentor")
@@ -55,12 +53,21 @@ test.describe("demo — conquistas do jovem", () => {
     await expect(
       card.getByRole("progressbar", { name: /^Tempo de programa: \d+ de 90 dias$/ })
     ).toBeVisible();
-    // o que falta é contagem — nenhuma data projetada
-    await expect(
-      card.getByText(/^Faltam 4 encontros e \d+ dias$/)
-    ).toBeVisible();
+    await expect(card.getByText(/^Faltam 4 encontros e \d+ dias$/)).toBeVisible();
 
-    // cada faixa abre o detalhe com critério e estado
+    await abrir(page, "Faixas de nível");
+    const faixas = card
+      .getByRole("list", { name: "Faixas de nível" })
+      .getByRole("listitem");
+    await expect(faixas).toHaveCount(4);
+    for (const [i, titulo] of FAIXAS.entries())
+      await expect(faixas.nth(i)).toContainText(titulo);
+    // estado sempre em texto, nunca só pela cor
+    await expect(faixas.nth(0)).toContainText("Alcançada");
+    await expect(faixas.nth(1)).toContainText("Seu nível");
+    await expect(faixas.nth(2)).toContainText("Próxima");
+    await expect(faixas.nth(3)).toContainText("Ainda por vir");
+
     await faixas.nth(3).getByRole("button").click();
     const dialog = page.getByRole("dialog");
     await expect(
@@ -72,40 +79,59 @@ test.describe("demo — conquistas do jovem", () => {
     ).toBeVisible();
   });
 
-  test("estante earned-only e futuras separadas, apagadas e sem cadeado", async ({
+  test("a lista não toma scroll: estante e futuras nascem fechadas e abrem sob demanda", async ({
     page,
   }) => {
     await page.goto("/jovem/perfil");
     const card = page.locator("section#conquistas");
+    await expect(card.getByRole("list", { name: "Estante" })).toHaveCount(0);
+    await expect(card.getByRole("list", { name: "Ainda por vir" })).toHaveCount(0);
 
+    const fechado = (await card.boundingBox())!.height;
+    await abrir(page, "Estante");
     const estante = card.getByRole("list", { name: "Estante" });
     await expect(estante.getByText("Primeiro encontro")).toBeVisible();
     await expect(estante.getByText("Metade do caminho")).toHaveCount(0);
 
+    await abrir(page, "Ainda por vir");
     const futuras = card.getByRole("list", { name: "Ainda por vir" });
     await expect(futuras.getByText("Metade do caminho")).toBeVisible();
     await expect(futuras.getByText("Reta final")).toBeVisible();
     await expect(futuras.getByText("Primeiro encontro")).toHaveCount(0);
-
-    // ilustração local (public/badges), nada de CDN
-    const imgs = card.locator("img");
-    expect(await imgs.count()).toBeGreaterThan(0);
-    for (const src of await imgs.evaluateAll((els) =>
-      els.map((e) => e.getAttribute("src") ?? "")
-    ))
-      expect(src).toMatch(/^\/badges\/[a-z0-9-]+\.svg$/);
-
-    // futura apagada (filtro), estante em cor
-    await expect(futuras.locator("img").first()).toHaveClass(/grayscale/);
-    await expect(estante.locator("img").first()).not.toHaveClass(/grayscale/);
+    expect((await card.boundingBox())!.height).toBeGreaterThan(fechado + 200);
     await expect(card.getByText(/cadeado|bloquead/i)).toHaveCount(0);
+  });
+
+  test("selos são canvas locais: ganho em cor, futuro apagado e parado", async ({
+    page,
+  }) => {
+    await page.goto("/jovem/perfil");
+    const card = await abrir(page, "Estante");
+    await abrir(page, "Ainda por vir");
+    const estante = card.getByRole("list", { name: "Estante" });
+    const futuras = card.getByRole("list", { name: "Ainda por vir" });
+
+    // nenhum <img> externo: o desenho nasce no canvas, sem CDN
+    await expect(card.locator("img")).toHaveCount(0);
+    expect(await estante.locator("canvas").count()).toBeGreaterThan(3);
+    await expect(futuras.locator("canvas").first()).toHaveClass(/grayscale/);
+    await expect(estante.locator("canvas").first()).not.toHaveClass(/grayscale/);
+
+    // o canvas pintou de verdade (não ficou em branco)
+    const pintou = await estante.locator("canvas").first().evaluate((c: HTMLCanvasElement) => {
+      const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return true;
+      return false;
+    });
+    expect(pintou).toBe(true);
   });
 
   test("detalhe da peça: data, critério e estado; futura sem data", async ({
     page,
   }) => {
     await page.goto("/jovem/perfil");
-    const card = page.locator("section#conquistas");
+    const card = await abrir(page, "Estante");
+    await abrir(page, "Ainda por vir");
 
     await card.getByRole("button", { name: /^Primeiro encontro/ }).click();
     let dialog = page.getByRole("dialog");
@@ -130,56 +156,139 @@ test.describe("demo — conquistas do jovem", () => {
     page,
   }) => {
     await page.goto("/jovem/perfil");
-    const card = page.locator("section#conquistas");
+    const card = await abrir(page, "Estante");
+    await abrir(page, "Ainda por vir");
     await expect(
       card.getByRole("button", { name: /^Primeiro encontro Conquistada em \d{2} de / })
     ).toBeVisible();
     await expect(
       card.getByRole("button", { name: /^Metade do caminho Ainda por vir\. Faltam 4/ })
     ).toBeVisible();
-    // o desenho é decorativo: alt vazio e fora da árvore de acessibilidade
-    for (const alt of await card.locator("img").evaluateAll((els) =>
-      els.map((e) => [e.getAttribute("alt"), e.getAttribute("aria-hidden")])
+    // o desenho é decorativo e fica fora da árvore de acessibilidade
+    for (const oculto of await card.locator("canvas").evaluateAll((els) =>
+      els.map((e) => e.getAttribute("aria-hidden"))
     ))
-      expect(alt).toEqual(["", "true"]);
+      expect(oculto).toBe("true");
   });
 
-  test("arquivo que falta cai no emblema de antes, sem quebrar a estante", async ({
+  test("selos do perfil: sem caixa, até 3, um por vez abre o detalhe", async ({
     page,
   }) => {
-    await page.route("**/badges/marco-primeiro.svg", (route) =>
-      route.fulfill({ status: 404, body: "" })
-    );
     await page.goto("/jovem/perfil");
-    const peca = page
-      .locator("section#conquistas")
-      .getByRole("button", { name: /^Primeiro encontro/ });
-    await expect(peca.locator('img[src="/badges/marco-primeiro.svg"]')).toHaveCount(0);
-    // o squircle do glifo Phosphor assume no mesmo box
-    await expect(peca.locator("span[aria-hidden] svg").first()).toBeVisible();
-    await expect(peca).toContainText("Primeiro encontro");
-  });
+    const grupo = page.locator("header").getByRole("group", { name: "Selos do perfil" });
+    // padrão da casa: a faixa atual e as 2 conquistas mais recentes
+    const selos = grupo.locator("button[aria-label$='Abrir detalhe']");
+    await expect(selos).toHaveCount(3);
+    await expect(selos.first()).toHaveAttribute("aria-label", /^Constância\./);
+    // minimalista: nenhuma borda nem fundo em volta da peça
+    const estilo = await selos.first().evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return [cs.borderTopWidth, cs.backgroundColor, cs.boxShadow];
+    });
+    expect(estilo).toEqual(["0px", "rgba(0, 0, 0, 0)", "none"]);
 
-  test("arte de faixa que falta cai no raio Phosphor, sem quebrar o selo", async ({
-    page,
-  }) => {
-    await page.route("**/badges/nivel-constancia.svg", (route) =>
-      route.fulfill({ status: 404, body: "" })
-    );
-    await page.goto("/jovem/perfil");
-    const selo = page
-      .locator("header")
-      .getByRole("button", { name: /^Seu nível: Constância/ });
-    await expect(selo).toBeVisible();
+    await selos.first().click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: "Constância" })).toBeVisible();
+    await expect(dialog.getByText(/^Seu nível desde \d{2} de /)).toBeVisible();
     await expect(
-      selo.locator('img[src="/badges/nivel-constancia.svg"]')
-    ).toHaveCount(0);
-    // o squircle do Lightning (FR-004) assume no mesmo box
-    await expect(selo.locator("span[aria-hidden] svg").first()).toBeVisible();
-    await selo.click();
-    await expect(
-      page.getByRole("dialog").getByRole("heading", { name: "Constância" })
+      dialog.getByText("1 mês de programa e 4 encontros com seu mentor")
     ).toBeVisible();
+  });
+
+  test("escolher até 3: limite, ordem, persistência no reload e sugestão da casa", async ({
+    page,
+  }) => {
+    await page.goto("/jovem/perfil");
+    await page.getByRole("button", { name: "Escolher os selos do perfil" }).click();
+    const dialog = page.getByRole("dialog", { name: "Selos do perfil" });
+    const opcoes = dialog.getByRole("list", { name: "Selos que você já tem" });
+    await expect(dialog.getByText("3 de 3. Solte um para trocar.")).toBeVisible();
+
+    // solta os 3 e escolhe em outra ordem
+    const marcadas = opcoes.getByRole("button", { pressed: true });
+    while ((await marcadas.count()) > 0) await marcadas.first().click();
+    await expect(dialog.getByText("0 de 3 escolhidos")).toBeVisible();
+    await opcoes.getByRole("button", { name: /^Construindo a sua Visão/ }).click();
+    await opcoes.getByRole("button", { name: /^Constância/ }).click();
+    await opcoes.getByRole("button", { name: /^Primeiro encontro/ }).click();
+    // com 3 marcadas as outras travam
+    const quarta = opcoes.getByRole("button", { name: /^Início/ });
+    await expect(quarta).toHaveAttribute("aria-disabled", "true");
+    await quarta.click({ force: true });
+    await expect(quarta).toHaveAttribute("aria-pressed", "false");
+    await expect(opcoes.getByRole("button", { pressed: true })).toHaveCount(3);
+
+    await dialog.getByRole("button", { name: "Salvar" }).click();
+    await expect(dialog).toHaveCount(0);
+
+    const selos = page
+      .locator("header")
+      .getByRole("group", { name: "Selos do perfil" })
+      .locator("button[aria-label$='Abrir detalhe']");
+    const nomes = () =>
+      selos.evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
+    await expect.poll(nomes).toEqual([
+      "Construindo a sua Visão. Abrir detalhe",
+      "Constância. Abrir detalhe",
+      "Primeiro encontro. Abrir detalhe",
+    ]);
+    // persiste: vem do cookie, sem piscar no reload
+    await page.goto("/jovem/perfil");
+    await expect.poll(nomes).toEqual([
+      "Construindo a sua Visão. Abrir detalhe",
+      "Constância. Abrir detalhe",
+      "Primeiro encontro. Abrir detalhe",
+    ]);
+
+    // volta à sugestão da casa
+    await page.getByRole("button", { name: "Escolher os selos do perfil" }).click();
+    await page.getByRole("button", { name: "Usar sugestão" }).click();
+    await expect.poll(async () => (await nomes())[0]).toBe("Constância. Abrir detalhe");
+  });
+
+  test("escolha vazia é respeitada: perfil sem selos, só o lápis", async ({
+    page,
+  }) => {
+    await page.goto("/jovem/perfil");
+    await page.getByRole("button", { name: "Escolher os selos do perfil" }).click();
+    const dialog = page.getByRole("dialog", { name: "Selos do perfil" });
+    const marcadas = dialog
+      .getByRole("list", { name: "Selos que você já tem" })
+      .getByRole("button", { pressed: true });
+    while ((await marcadas.count()) > 0) await marcadas.first().click();
+    await dialog.getByRole("button", { name: "Salvar" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(
+      page.locator("header").locator("button[aria-label$='Abrir detalhe']")
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Escolher os selos do perfil" })
+    ).toBeVisible();
+  });
+
+  test("mobile 390: header alinhado e a página sem rolagem lateral", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/jovem/perfil");
+    const selos = page
+      .locator("header")
+      .getByRole("group", { name: "Selos do perfil" });
+    await expect(selos).toBeVisible();
+    const caixa = (await selos.boundingBox())!;
+    expect(caixa.x).toBeGreaterThanOrEqual(0);
+    expect(caixa.x + caixa.width).toBeLessThanOrEqual(390);
+    const sobra = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(sobra).toBe(0);
+    // visual: o header do perfil em reduced-motion fica no quadro de repouso
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.waitForTimeout(400);
+    await page.locator("header").last().screenshot({
+      path: "test-results/selos-header-390.png",
+    });
   });
 
   test("demo: nenhum toast de level-up, mesmo com a baseline zerada", async ({
@@ -197,7 +306,7 @@ test.describe("demo — conquistas do jovem", () => {
     });
     await page.goto("/jovem/perfil");
     await expect(
-      page.locator("header").getByRole("button", { name: /^Seu nível: Constância/ })
+      page.locator("header").getByRole("button", { name: /^Constância\./ })
     ).toBeVisible();
     // o efeito do notifier roda no mount — assert negativo pede um
     // respiro pra não passar antes da hidratação
@@ -205,41 +314,17 @@ test.describe("demo — conquistas do jovem", () => {
     await expect(page.getByText(/Subiu de nível/)).toHaveCount(0);
   });
 
-  test("selo 'Seu nível' no header abre o mesmo detalhe da faixa", async ({
-    page,
-  }) => {
-    await page.goto("/jovem/perfil");
-    const selo = page
-      .locator("header")
-      .getByRole("button", { name: /^Seu nível: Constância/ });
-    await expect(selo).toBeVisible();
-    // a peça da faixa é a ilustração local do raio (public/badges)
-    await expect(selo.locator('img[src="/badges/nivel-constancia.svg"]')).toBeVisible();
-
-    await selo.click();
-    const dialog = page.getByRole("dialog");
-    await expect(
-      dialog.getByRole("heading", { name: "Constância" })
-    ).toBeVisible();
-    await expect(dialog.getByText(/^Seu nível desde \d{2} de /)).toBeVisible();
-    await expect(
-      dialog.getByText("1 mês de programa e 4 encontros com seu mentor")
-    ).toBeVisible();
-  });
-
   test("famílias com tiers: maior degrau na estante, escada no detalhe", async ({
     page,
   }) => {
     await page.goto("/jovem/perfil");
-    const card = page.locator("section#conquistas");
+    const card = await abrir(page, "Estante");
+    await abrir(page, "Ainda por vir");
     const estante = card.getByRole("list", { name: "Estante" });
 
     // tiers ganhos da Bia: presença 1 (4 seguidos) e perfil (ficha cheia)
     await expect(estante.getByText("Não faltou")).toBeVisible();
     await expect(estante.getByText("Cara do lugar")).toBeVisible();
-    // as ilustrações das famílias são as arte fam-*-<tier> geradas
-    await expect(estante.locator('img[src="/badges/fam-presenca-1.svg"]')).toBeVisible();
-    await expect(estante.locator('img[src="/badges/fam-perfil-1.svg"]')).toBeVisible();
 
     // o detalhe mostra a escada inteira: ganho carimbado, próximo com a
     // linha honesta e o topo só com o critério
@@ -259,8 +344,7 @@ test.describe("demo — conquistas do jovem", () => {
     ).toBeVisible();
     await page.keyboard.press("Escape");
 
-    // futura da família mostra o PRÓXIMO tier com o progresso honesto —
-    // a Bia já tem as 5 do primeiro degrau, então a promessa é o tier 2
+    // futura da família mostra o PRÓXIMO tier com o progresso honesto
     const futuras = card.getByRole("list", { name: "Ainda por vir" });
     await futuras.getByRole("button", { name: /^Voz constante/ }).click();
     const d2 = page.getByRole("dialog");
@@ -274,78 +358,33 @@ test.describe("demo — conquistas do jovem", () => {
     await expect(d2.getByRole("list", { name: "Degraus da conquista" })).toBeVisible();
   });
 
-  test("movimento: salto curto no detalhe e nada com reduced-motion", async ({
+  test("movimento: o selo do detalhe repinta em loop e reduced-motion congela", async ({
     page,
   }) => {
     await page.goto("/jovem/perfil");
-    const card = page.locator("section#conquistas");
-    await card.getByRole("button", { name: /^Primeiro encontro/ }).click();
-    const salto = page.getByRole("dialog").locator(".badge-salta").first();
-    const anim = await salto.evaluate((el) => {
-      const cs = getComputedStyle(el);
-      return { nome: cs.animationName, dur: cs.animationDuration };
-    });
-    expect(anim.nome).toContain("badge-salto-p");
-    expect(parseFloat(anim.dur)).toBeLessThan(2);
-
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    // a media query é viva: emulateMedia já re-avalia os estilos — não
-    // precisa navegar (o reload em dev caía na race ERR_ABORTED do stream)
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await page
-      .locator("section#conquistas")
-      .getByRole("button", { name: /^Primeiro encontro/ })
-      .click();
-    const dur = await page
-      .getByRole("dialog")
-      .locator(".badge-salta")
-      .first()
-      .evaluate((el) => getComputedStyle(el).animationDuration);
-    // o guard global zera (serializado em segundos: 0.01ms → "1e-05s")
-    expect(parseFloat(dur)).toBeLessThan(0.05);
-  });
-
-  test("movimento: a faixa tem assinatura própria; reduced-motion troca por fade", async ({
-    page,
-  }) => {
-    await page.goto("/jovem/perfil");
-    const card = page.locator("section#conquistas");
-    // a Constância abre com o pulso duplo (024) — nunca o salto da estante
-    await card
-      .getByRole("list", { name: "Faixas de nível" })
-      .getByRole("listitem")
-      .nth(1)
-      .getByRole("button")
-      .click();
-    const peca = page.getByRole("dialog").locator(".nivel-constancia").first();
-    const anim = await peca.evaluate((el) => {
-      const cs = getComputedStyle(el);
-      return { nome: cs.animationName, dur: cs.animationDuration };
-    });
-    expect(anim.nome).toContain("nivel-constancia-pulso");
-    expect(parseFloat(anim.dur)).toBeLessThan(0.8);
+    const selo = page
+      .locator("header")
+      .locator("button[aria-label^='Constância']");
+    await selo.click();
+    const canvas = page.getByRole("dialog").locator("canvas").first();
+    const hash = () =>
+      canvas.evaluate((c: HTMLCanvasElement) => c.toDataURL().length + ":" + c.toDataURL().slice(-80));
+    const amostras = new Set<string>();
+    for (let i = 0; i < 8; i++) {
+      amostras.add(await hash());
+      await page.waitForTimeout(180);
+    }
+    // a cena anda (salto e brilhos) — pelo menos dois quadros distintos
+    expect(amostras.size).toBeGreaterThan(1);
 
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page
-      .locator("section#conquistas")
-      .getByRole("list", { name: "Faixas de nível" })
-      .getByRole("listitem")
-      .nth(1)
-      .getByRole("button")
-      .click();
-    const reduzida = await page
-      .getByRole("dialog")
-      .locator(".nivel-constancia")
-      .first()
-      .evaluate((el) => {
-        const cs = getComputedStyle(el);
-        return { nome: cs.animationName, dur: cs.animationDuration };
-      });
-    // Tier 2 da acessibilidade: o pulso vira o fade compartilhado ≤200ms
-    expect(reduzida.nome).toBe("nivel-fade");
-    expect(parseFloat(reduzida.dur)).toBeLessThan(0.25);
+    await selo.click();
+    const parado = page.getByRole("dialog").locator("canvas").first();
+    const h = () => parado.evaluate((c: HTMLCanvasElement) => c.toDataURL());
+    const a = await h();
+    await page.waitForTimeout(700);
+    expect(await h()).toBe(a);
   });
 });
