@@ -30,11 +30,11 @@ Rodada de copy nas superfícies diárias (jovem + mentor), fechando a voz
   Button)
 - `pnpm test` — 3296 passed, 1 skipped
 - `pnpm guard` — 11/11
-- e2e local (`docs/convencoes/ci-e2e.md`): specs das superfícies tocadas
-  (demo: `sua-semana`, `jovem-combinado`, `jovem-especialistas`,
-  `plano-em-dia`; app: `jovem-agenda`, `agenda-views`, `plano-em-dia`,
-  `plano-roteiros`, `plano-acordo`, `combinados-encontro`) — resultado
-  abaixo no PR quando o run fechar.
+- e2e local (`docs/convencoes/ci-e2e.md`): **65 passed** nos specs das
+  superfícies tocadas (demo: `sua-semana`, `jovem-combinado`,
+  `jovem-especialistas`, `plano-em-dia`; app: `jovem-agenda`,
+  `agenda-views`, `plano-em-dia`, `plano-roteiros`, `plano-acordo`,
+  `combinados-encontro`).
 
 ## Test plan
 

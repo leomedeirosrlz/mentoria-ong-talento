@@ -129,8 +129,20 @@ só de texto assertado, comportamento intacto.
 1 skipped · `pnpm guard` 11/11 (R8 recuperada: `next-env.d.ts` restaurado
 após `next typegen`).
 
+E2E local (`docs/convencoes/ci-e2e.md`, Supabase local + `pnpm start` na
+:3100 com `NEXT_PUBLIC_*`, `SUPABASE_SERVICE_ROLE_KEY` e `IA_BOLHA=1`):
+**65 passed** nos 10 specs das superfícies tocadas (demo `sua-semana`,
+`jovem-combinado`, `jovem-especialistas`, `plano-em-dia`; app
+`jovem-agenda`, `agenda-views`, `plano-em-dia`, `plano-roteiros`,
+`plano-acordo`, `combinados-encontro`). Ajustes de spec: asserts de copy
+nova (`35b05320`) e locator do badge que hoje existe 2× no DOM
+(mobile/desktop) mirando a instância visível (`68a450c7`) — nenhum
+comportamento relaxado.
+
 Commits: `2ef5bd8c` jovem-home · `f9eda421` jovem-agenda · `4513c2a0`
 mentor-agenda · `48b89c79` dupla-registro · `84176625` auditoria ·
 `56058a52` jovem · `2c65442c` mentor · `9b24005f` plano · `03c4b1da` plano ·
 `aa249dcf` rename "pra ficar em dia" · `95a88b4f` jovem-agenda ·
-`ee979677` jovem-perfil.
+`ee979677` jovem-perfil · `a498319d` auditoria · `806e11ee` corpo do PR ·
+`b7a927fc` recesso só-leitura · `35b05320` asserts e2e copy ·
+`68a450c7` locators e2e.
