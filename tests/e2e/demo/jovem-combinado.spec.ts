@@ -27,7 +27,7 @@ test.describe("o combinado — jovem confirma a sugestão", () => {
     ).toBeVisible();
     await expect(c.getByText("até 2 encontros por semana")).toBeVisible();
     // passo aplicado lê a data marcada e não volta a formulário
-    await expect(c.getByText("5º encontro", { exact: true })).toBeVisible();
+    await expect(c.getByText(/^5º encontro( · |$)/)).toBeVisible();
     await expect(
       c.getByText(/marcado pra \w{3} \d{2}\/\d{2} às \d{2}:\d{2}/)
     ).toBeVisible();
@@ -56,7 +56,12 @@ test.describe("o combinado — jovem confirma a sugestão", () => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/agenda");
     const c = card(page);
-    await c.getByRole("button", { name: "Outra data" }).click();
+    // "Outra data" mora no ⋯ do passo (526): um CTA à vista
+    await c
+      .getByRole("button", { name: /Ações do \d+º encontro/ })
+      .first()
+      .click();
+    await page.getByRole("menuitem", { name: "Outra data" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(
@@ -92,7 +97,7 @@ test.describe("o combinado — staff", () => {
     await expect(
       regiao.getByText(/De \d{2}\/\d{2} a \d{2}\/\d{2}/)
     ).toBeVisible();
-    await expect(regiao.getByText("6º encontro", { exact: true })).toBeVisible();
+    await expect(regiao.getByText(/^6º encontro( · |$)/)).toBeVisible();
     await expect(
       regiao.getByRole("button", { name: "Confirmar" })
     ).toBeVisible();
@@ -106,7 +111,7 @@ test.describe("o combinado — staff", () => {
     const regiao = page.getByRole("region", {
       name: "Acordos e intervenções",
     });
-    await expect(regiao.getByText("6º encontro", { exact: true })).toBeVisible();
+    await expect(regiao.getByText(/^6º encontro( · |$)/)).toBeVisible();
     await expect(
       regiao.getByText(/sugestão \w{3} \d{2}\/\d{2} às \d{2}:\d{2}/)
     ).toBeVisible();
