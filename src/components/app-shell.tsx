@@ -326,15 +326,7 @@ export function AppShell({
       </div>
 
       {/* bottom nav — só mobile */}
-      <nav aria-label="Navegação principal" className={cn(
-        "fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] md:hidden",
-        // a faixa direita é da Liza quando ela existe: o FAB dela encaixa
-        // na barra (505) e nenhum item fica por baixo dele. Sem assistente
-        // a nav volta a usar a largura toda
-        assistente
-          ? "pr-[max(4.25rem,calc(env(safe-area-inset-right)+3.25rem))]"
-          : "pr-[max(1rem,env(safe-area-inset-right))]"
-      )}>
+      <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:hidden">
         <div className="flex">
           {visiveis.map((item) => {
             const ativo = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);

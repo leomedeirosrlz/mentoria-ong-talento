@@ -98,7 +98,7 @@ export type AgendaItem = {
   tom: AgendaTom | null;
   /** Item é da agenda de outra pessoa (sessão esp / evento do jovem). */
   convidado: boolean;
-  /** Texto da tag de escopo — "agenda de Ana — você não participa". */
+  /** Texto da tag de escopo — "agenda de Ana". */
   notaConvidado: string | null;
   duplaId: string | null;
   encontro: Encontro | null;
@@ -699,7 +699,7 @@ function itensDaDupla(
         convidado: true,
         // a projeção não traz link de propósito — o mentor acompanha, a
         // sessão é do jovem com o especialista. Nunca entra ação de chamada.
-        notaConvidado: `agenda de ${nome1}: você não participa`,
+        notaConvidado: `agenda de ${nome1}`,
         duplaId: d.id,
         encontro: null,
         numero: s.numero,
@@ -937,7 +937,7 @@ function itensPassadosDaDupla(
         meta: [],
         tom: s.status === "realizado" ? "ok" : "muted",
         convidado: true,
-        notaConvidado: `agenda de ${nome1}: você não participa`,
+        notaConvidado: `agenda de ${nome1}`,
         duplaId: d.id,
         encontro: null,
         numero: s.numero,

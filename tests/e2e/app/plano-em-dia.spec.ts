@@ -7,6 +7,7 @@ import {
   expect,
   inserirViaServiceRole,
   limparEncontrosDaDupla,
+  limparViaServiceRole,
   loginComSenha,
   test,
 } from "../helpers";
@@ -40,12 +41,18 @@ function criarEncontro(numero: number, status: string, emDiasAtras: number) {
 test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () => {
   test.beforeEach(async ({ page }) => {
     if (DUPLA_ID) await limparEncontrosDaDupla(DUPLA_ID);
+    // um 'aceito' pendurado (run anterior) cala a projeção do card — o
+    // teste lê "Combinado valendo" toda vez, então o piso é plano limpo
+    if (DUPLA_ID)
+      await limparViaServiceRole("dupla_planos", `dupla_id=eq.${DUPLA_ID}`);
     if (DUPLA_ID) await convergirDuplaAtiva(DUPLA_ID);
     await loginComSenha(page, EMAIL, SENHA);
   });
 
   test.afterEach(async () => {
     if (DUPLA_ID) await limparEncontrosDaDupla(DUPLA_ID);
+    if (DUPLA_ID)
+      await limparViaServiceRole("dupla_planos", `dupla_id=eq.${DUPLA_ID}`);
   });
 
   test("mentor combina o plano na superfície — uma pergunta por tela até o gesto", async ({
@@ -108,6 +115,9 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
       for (const r of await dialog
         .locator("label", { hasText: "Vamos seguir nos encontrando" })
         .all()) {
+        // o wizard monta todas as etapas e esconde a inativa — a pergunta
+        // de recesso de outra tela casa o hasText mas não é clicável
+        if (!(await r.isVisible())) continue;
         if (
           !(await r
             .locator('input[type="radio"]')

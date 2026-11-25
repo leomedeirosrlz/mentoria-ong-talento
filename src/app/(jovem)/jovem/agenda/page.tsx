@@ -580,14 +580,17 @@ export default async function JovemAgenda() {
                 atual={null}
               />
             )}
-          {duplaDpp?.id && numerosRetro.length > 0 && (
+          {/* 530: sempre visível ao lado do Agendar — sem passo elegível
+              o dialog abre o empty-state que explica a fronteira (o que
+              falta é passo não-vencido ou o encerramento, que é do mentor) */}
+          {duplaDpp?.id && (
             <JovemRetroativoDialog
               duplaId={duplaDpp.id}
               numeros={numerosRetro}
               trigger={
                 <Button variant="outline" size="sm">
                   <ClockCounterClockwise size={15} aria-hidden />
-                  Registrar encontro já realizado
+                  Registrar encontro
                 </Button>
               }
             />
@@ -606,6 +609,18 @@ export default async function JovemAgenda() {
             numeros={numerosLivres.map((x) => x.numero)}
             comQuem={nomeDaDupla(duplaDpp.id, false)}
             sugestoes={sugestoesAgendar}
+            retro={
+              <JovemRetroativoDialog
+                duplaId={duplaDpp.id}
+                numeros={numerosRetro}
+                trigger={
+                  <Button variant="ghost" size="sm">
+                    <ClockCounterClockwise size={15} aria-hidden />
+                    Registrar encontro
+                  </Button>
+                }
+              />
+            }
           />
         )}
 
@@ -875,6 +890,9 @@ export default async function JovemAgenda() {
                       duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
                       trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
                       rotulo={rotuloDaLinha(e)}
+                      sugestoes={
+                        e.dupla_id === duplaDpp?.id ? sugestoesAgendar : null
+                      }
                     />
                   ))}
                 </CardContent>
@@ -917,6 +935,11 @@ export default async function JovemAgenda() {
                         nota={notaSessaoCoberta(e)}
                         meId={me?.id ?? null}
                         temMedia={mediaPorDupla.get(e.dupla_id) ?? false}
+                        sugestoes={
+                          e.dupla_id === duplaDpp?.id
+                            ? sugestoesAgendar
+                            : null
+                        }
                       />
                     ),
                   };

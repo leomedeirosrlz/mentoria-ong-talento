@@ -112,6 +112,24 @@ export async function assentar() {
   }
 }
 
+/** Espera `ms` reais dentro de act — cobre o que um setTimeout(0) não
+ *  alcança: o rAF do showPicker (jsdom agenda em ~16ms) e animações de
+ *  popup do Base UI que escalonam o mount. */
+export async function esperar(ms = 50) {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, ms));
+  });
+}
+
+/** Item de Select/Base UI: o click sozinho é tratado como "virtual" e
+ *  só commita num item já destacado — o gesto completo do mouse é
+ *  pointerdown (marca o item como clicável) → mouseup → click. */
+export function clicarItem(el: Element) {
+  el.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+  el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+}
+
 /** Botão do rodapé fixo pelo texto visível. */
 export function botao(alvo: ParentNode, texto: string): HTMLButtonElement {
   const btn = [...alvo.querySelectorAll("button")].find(

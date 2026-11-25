@@ -2,10 +2,11 @@ import type { Page } from "@playwright/test";
 import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
 
 // REALIZA-505 — a Liza fora da zona de ação a 390px: no celular o FAB
-// encaixa na faixa que a bottom-nav reserva e o balão de fala não abre
-// sozinho (a apresentação/dica viram o ponto de atenção no FAB; o
-// "Respondi" vira ponto + status sr-only). Antes, o FAB flutuava sobre a
-// banda de conteúdo e o balão cobria CTA, aba, aviso e rodapé sticky.
+// flutua colado logo ACIMA da bottom-nav (530 tirou o encaixe de dentro
+// da faixa e devolveu o padding dela) e o balão de fala não abre sozinho
+// (a apresentação/dica viram o ponto de atenção no FAB; o "Respondi" vira
+// ponto + status sr-only). Antes, o FAB flutuava sobre a banda de
+// conteúdo e o balão cobria CTA, aba, aviso e rodapé sticky.
 // Público, sem writes.
 
 const FAB = '[aria-controls="painel-assistente"]';
@@ -13,10 +14,13 @@ const FAB = '[aria-controls="painel-assistente"]';
 // registrar — mesma fixture do registro-rota
 const DUPLA_T2C = "de000000-0000-4000-8000-000000001549";
 
-/** Retângulo do FAB × alvos interativos em tela: conteúdo de main (links,
- *  botões, campos, abas, avisos role=status/alert), itens das navs e
- *  rodapés. O esperado é sempre []: encaixado na faixa da bottom-nav, o
- *  FAB não pode cobrir nada em nenhum scroll. */
+/** Retângulo do FAB × alvos que NÃO podem sair debaixo dele rolando:
+ *  itens das navs, rodapés e qualquer elemento dentro de um ancestral
+ *  fixed/sticky (rodapé do wizard, barra de ação, header colado). O
+ *  esperado é sempre [] — conteúdo de main que rola com o documento
+ *  passa por baixo do disco e sempre pode ser trazido de volta ao
+ *  scroll, como qualquer FAB flutuante; o que não rola é o que ele não
+ *  pode cobrir em nenhum momento. */
 function colisoesDoFab(page: Page) {
   return page.evaluate((sel) => {
     const fab = document.querySelector(sel);
@@ -35,21 +39,34 @@ function colisoesDoFab(page: Page) {
         "footer a[href], footer button",
       ].join(",")
     );
-    // O FAB mora dentro da bottom-nav: alvo que já nasce abaixo do topo da
-    // nav está coberto pela nav (e só aparece ao rolar), não pelo FAB.
+    // não escapa rolando: o próprio elemento ou um ancestral é
+    // fixed/sticky (a bottom-nav, o rodapé do wizard, barras de ação)
+    const preso = (el: HTMLElement) => {
+      for (let n: HTMLElement | null = el; n; n = n.parentElement) {
+        const p = getComputedStyle(n).position;
+        if (p === "fixed" || p === "sticky") return true;
+      }
+      return false;
+    };
+    // O FAB flutua logo acima da bottom-nav: alvo que já nasce abaixo do
+    // topo da nav está coberto pela nav (e só aparece ao rolar), não pelo
+    // FAB — o filtro pelo navTop segue valendo com o dock flutuante.
+    // `.fixed.bottom-0` distingue a bottom-nav da sidebar desktop, que
+    // divide o mesmo aria-label e mora antes no DOM.
     const nav = document.querySelector<HTMLElement>(
-      'nav[aria-label="Navegação principal"]'
+      'nav[aria-label="Navegação principal"].fixed.bottom-0'
     );
     const navTop = nav?.getBoundingClientRect().top ?? Infinity;
     return [...alvos]
       .filter((el) => !fab.contains(el) && !el.contains(fab))
       .map((el) => ({ el, r: el.getBoundingClientRect() }))
       .filter(
-        ({ r }) =>
+        ({ el, r }) =>
           r.width > 0 &&
           r.height > 0 &&
           r.top < navTop &&
-          toca(r)
+          toca(r) &&
+          preso(el)
       )
       .map(({ el }) =>
         (el.getAttribute("aria-label") ?? el.textContent ?? el.tagName)
@@ -83,9 +100,21 @@ test.describe("liza — fora da zona de ação (390px)", () => {
     await page.waitForTimeout(2300); // > FALA_ATRASO_MS (1,8s)
     await semBalao(page);
 
+    // o FAB flutua colado ACIMA da nav (530): a base dele não passa do
+    // topo da nav — antes ele morava dentro da faixa dela
+    const nav = page.locator(
+      'nav[aria-label="Navegação principal"].fixed.bottom-0'
+    );
+    const [fabBox, navBox] = await Promise.all([
+      fab.boundingBox(),
+      nav.boundingBox(),
+    ]);
+    expect(fabBox && navBox && fabBox.y + fabBox.height <= navBox.y + 2)
+      .toBeTruthy();
+
     // o print do 505: o FAB não toca o "Não aconteceu" nem nada clicável
     expect(await colisoesDoFab(page)).toEqual([]);
-    // idem no fim da página — o dock acompanha a nav, não o conteúdo
+    // idem no fim da página — o dock flutua preso à nav, não ao conteúdo
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     expect(await colisoesDoFab(page)).toEqual([]);
 

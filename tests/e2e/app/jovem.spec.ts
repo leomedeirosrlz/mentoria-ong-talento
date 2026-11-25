@@ -208,7 +208,9 @@ test.describe("mentorado — shell /jovem", () => {
     const encontros = page.locator(
       'section[aria-labelledby="proximo-titulo"]'
     );
-    await expect(encontros.getByText(/\d+º encontro/)).toBeVisible();
+    // o hero "Nº encontro com {nome}" e os links de roteiro ("Roteiro do
+    // Nº encontro") casam o mesmo padrão — o primeiro match é o hero
+    await expect(encontros.getByText(/\d+º encontro/).first()).toBeVisible();
 
     const docs = page.locator('section[aria-labelledby="docs-titulo"]');
     await expect(

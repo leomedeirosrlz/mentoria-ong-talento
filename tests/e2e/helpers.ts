@@ -619,6 +619,39 @@ export const MCP_PAT = {
   semPapel: "rlz_mcp_e2e_sem_papel_4444444444444444444444444444444",
 } as const;
 
+/** Dia+hora no SeletorDiaHora (530): o #data_hora datetime-local virou dois
+ *  campos nativos — input[type=date] pro dia e input[type=time] pra hora
+ *  (step 900). Quando o motor manda sugestões os chips cobrem os campos:
+ *  "Outro dia"/"Outro horário" revelam o input nativo (o chip é role=radio
+ *  e o campo nasce preenchido). `localDT` segue no formato dos helpers
+ *  emDias/naTerca ("YYYY-MM-DDTHH:mm"): a fatia do dia vai pro primeiro, a
+ *  da hora pro segundo — a ordem importa porque escolher o dia pode
+ *  re-selecionar um chip de hora e esconder o input de novo. */
+export async function preencherDiaHora(dialog: Locator, localDT: string) {
+  const dia = dialog.locator('input[type="date"]');
+  if (!(await dia.isVisible().catch(() => false))) {
+    await dialog.getByRole("radio", { name: /Outro dia/ }).click();
+  }
+  await dia.fill(localDT.slice(0, 10));
+  const hora = dialog.locator('input[type="time"]');
+  if (!(await hora.isVisible().catch(() => false))) {
+    await dialog.getByRole("radio", { name: /Outro horário/ }).click();
+  }
+  await hora.fill(localDT.slice(11, 16));
+}
+
+/** Ações secundárias da linha do encontro moram no ⋯ "Ações do encontro"
+ *  (530): a linha guarda UM gesto primário e o resto vira menuitem — um
+ *  toque no trigger abre o popup. No-op quando já aberto: dentro do
+ *  agirComConfirma a repetição do gesto não fecha o que já abriu. */
+export async function abrirMenuEncontro(page: Page, linha: Locator) {
+  if (!(await page.getByRole("menu").isVisible().catch(() => false))) {
+    await linha
+      .getByRole("button", { name: "Ações do encontro" })
+      .click();
+  }
+}
+
 /** Confirma o AgendarEncontroDialog do mentor. Quando o horário cai fora da
  *  grade de disponibilidade de alguém, o primeiro clique só mostra o aviso
  *  ("Quer agendar mesmo assim?") e o botão vira "… mesmo assim" — o segundo

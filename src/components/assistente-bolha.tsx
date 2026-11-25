@@ -67,20 +67,19 @@ import { cn } from "@/lib/utils";
 import { trackProduto } from "@/components/produto-telemetry";
 import type { AppRole } from "@/lib/types";
 
-// mobile: dentro da faixa da bottom-nav — a nav reserva o canto direito
-// (pe condicional nos shells) e a bolha encosta ali, inteira abaixo do
-// topo da barra (~57px + safe-area): fora da banda de conteúdo, o FAB não
-// intersecta nenhum elemento interativo em nenhum scroll (505). No
-// desktop segue no canto, acima do rodapé da página. z-40: fica sob
-// sheet/dialog/popover (z-50) e infinitamente sob o toaster
+// mobile: flutuante acima da bottom-nav (~57px + safe-area) — a Liza não
+// mora mais na barra (530): o disco paira sobre o conteúdo como sempre
+// fez, fora da faixa dos itens de navegação. O toaster usa 4.5rem e a
+// pill da demo 4.75rem — mesma vizinhança. No desktop segue no canto,
+// acima do rodapé da página. z-40: fica sob sheet/dialog/popover (z-50)
+// e infinitamente sob o toaster
 const FAB_POS =
-  "fixed z-40 right-[max(1rem,env(safe-area-inset-right))] bottom-[calc(0.375rem+env(safe-area-inset-bottom))] md:bottom-6 print:hidden";
+  "fixed z-40 right-[max(1rem,env(safe-area-inset-right))] bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 print:hidden";
 
-// size-11 no celular: 44px cabem folgados na barra (~57px) e seguem alvo
-// de toque confortável; o disco enche o espaço reservado sem invadir a
-// banda de conteúdo. md:size-14 = o FAB generoso de sempre no desktop
+// size-12 no celular: o disco flutuante cobre pouco conteúdo e segue alvo
+// de toque confortável; md:size-14 = o FAB generoso de sempre no desktop
 const FAB_CLS =
-  "group/fab grid size-11 md:size-14 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)] outline-none transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 hover:shadow-[var(--shadow-modal)] active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-offset-2";
+  "group/fab grid size-12 md:size-14 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)] outline-none transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 hover:shadow-[var(--shadow-modal)] active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-offset-2";
 
 // tamanho vem de --painel-w/--painel-h (inline, redimensionável); o min()
 // segura viewport estreita e o --available-height do positioner segura
