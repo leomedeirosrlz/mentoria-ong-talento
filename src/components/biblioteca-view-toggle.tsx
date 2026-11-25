@@ -94,7 +94,10 @@ const VIEW_LABEL: Record<ViewBiblioteca, string> = {
  *  cada botão é aria-pressed; a região de status anuncia modo + total
  *  quando mudam (live region — o texto inicial não é lido). Visual: o idioma
  *  canônico de toggle de lista (filterChipCls — pill escuro ativo,
- *  min-h-11 no toque / sm:min-h-8 no desktop), não um segmentado novo. */
+ *  min-h-11 no toque / sm:min-h-8 no desktop), não um segmentado novo.
+ *  528: abaixo de sm o rótulo some do layout (sr-only sm:not-sr-only) —
+ *  o controle encolhe pra dois ícones e o nome acessível continua no
+ *  botão. */
 export function BibliotecaViewToggle({
   superficie,
   total,
@@ -123,7 +126,7 @@ export function BibliotecaViewToggle({
           className={filterChipCls(view === id)}
         >
           <Icone size={15} aria-hidden />
-          {rotulo}
+          <span className="sr-only sm:not-sr-only">{rotulo}</span>
         </button>
       ))}
       <span role="status" className="sr-only">

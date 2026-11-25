@@ -13,23 +13,23 @@ import { linkSeguro } from "@/lib/ciclo";
 import { hrefMaterial, refDoMaterial } from "@/lib/materiais";
 import { Badge } from "@/components/ui/badge";
 import { LinkComLeitura } from "@/components/material-leitura";
-import { MaterialThumb } from "@/components/material-thumb";
-import { PreviewLink } from "@/components/material-preview-pdf";
+import { CapaMaterial } from "@/components/material-capa";
 import { HighlightText } from "@/components/highlight-text";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-// Card do material na view Cartões (spec 029): a anatomia nasceu no
-// acervo do jovem (capa borda-a-borda + a linha de sempre embaixo) e é
-// compartilhada com a biblioteca do staff — jovem, mentor e coordenação
-// veem o mesmo card, sem uma terceira anatomia. A capa segue a tríade:
-// documento nativo → faixa "documento"; arquivo → MaterialThumb (1ª
-// página do PDF lazy por IO / imagem, fallback de ícone quando o browser
-// não embute); link externo → faixa do domínio; sem destino → faixa de
-// ícone (o card do jovem nunca chega aí — os "em breve" moram no grupo
-// "A caminho"). O card INTEIRO é o link quando há destino e os gestos
-// secundários (`acoes`) ficam FORA do <a>, flutuando no canto da capa —
-// botão dentro de link seria HTML inválido e comeria o toque.
+// Card do material na view Cartões (spec 029 + REALIZA-528): a anatomia
+// nasceu no acervo do jovem (capa borda-a-borda + a linha de sempre
+// embaixo) e é compartilhada com a biblioteca do staff — jovem, mentor
+// e coordenação veem o mesmo card, sem uma terceira anatomia. A capa é a
+// CapaMaterial: tipográfica, derivada do título (a tríade doc → faixa /
+// arquivo → iframe do PDF / link → domínio morreu — não pintava no
+// Android e 96px de recorte era ilegível); imagem segue <img> real; sem
+// destino fica na faixa de ícone (o card do jovem nunca chega aí — os
+// "em breve" moram no grupo "A caminho"). O card INTEIRO é o link
+// quando há destino e os gestos secundários (`acoes`) ficam FORA do <a>,
+// flutuando no canto da capa — botão dentro de link seria HTML inválido
+// e comeria o toque.
 
 export const TIPO_ICONE = {
   guia: BookOpen,
@@ -97,31 +97,7 @@ export function MaterialCard({
   const href = hrefMaterial(m, docBase);
   const externo = !ehDoc;
 
-  const faixa = (conteudo: ReactNode) => (
-    <div
-      aria-hidden
-      className="grid h-24 place-items-center bg-muted/60 text-muted-foreground"
-    >
-      <span className="flex flex-col items-center gap-1.5">{conteudo}</span>
-    </div>
-  );
-  const capa = ehDoc ? (
-    faixa(
-      <>
-        <FileText size={20} weight="duotone" aria-hidden />
-        <span className="text-[11px] font-medium">documento</span>
-      </>
-    )
-  ) : m.path ? (
-    <MaterialThumb
-      m={m}
-      fallback={faixa(<Icone size={20} weight="duotone" aria-hidden />)}
-    />
-  ) : urlOk ? (
-    <PreviewLink m={m} />
-  ) : (
-    faixa(<Icone size={20} weight="duotone" aria-hidden />)
-  );
+  const capa = <CapaMaterial m={m} Icone={Icone} />;
 
   const interno = (
     <>

@@ -1,6 +1,7 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
+import { Collapsible } from "@base-ui/react/collapsible";
 import {
   CaretDown,
   FolderOpen,
@@ -10,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { diaMesCurto, linkSeguro } from "@/lib/ciclo";
 import { materialLiberadoParaJovem } from "@/lib/jornada";
 import type { Material } from "@/lib/types";
-import { Linha } from "@/components/biblioteca-lista";
+import { ContagemTitulo, Linha } from "@/components/biblioteca-lista";
 import {
   MaterialCard,
   TIPO_ICONE,
@@ -19,14 +20,17 @@ import {
 import { MaterialMenu } from "@/components/material-actions";
 import { useViewBiblioteca } from "@/components/biblioteca-view-toggle";
 
-// Acervo do jovem (spec 029): a mesma biblioteca de sempre com as duas
-// gramáticas — Cartões (a estante com capa/preview, anatomia do
-// MaterialCard compartilhado) e Lista (as linhas da BibliotecaLista, sem
-// iframe nenhum). O alternador mora no header da seção (Acervo) e o
-// estado vem do mesmo store por superfície ("jovem"); mentorado sem
-// dupla cai aqui pelo fallback da página e vê o mesmo controle. Os
-// grupos "A caminho" e "Mais adiante na jornada" não mudam de forma —
-// já são linhas.
+// Acervo do jovem (spec 029 + 528): a mesma biblioteca de sempre com as
+// duas gramáticas — Cartões (a estante com capa tipográfica, anatomia do
+// MaterialCard compartilhado) e Lista (as linhas da BibliotecaLista).
+// O alternador mora no header da seção (Acervo) e o estado vem do mesmo
+// store por superfície ("jovem"); mentorado sem dupla cai aqui pelo
+// fallback da página e vê o mesmo controle. Cada grupo vira uma seção
+// colapsável (a régua compacta do mobile) com contagem no rótulo — o
+// estado fica neste componente, fora da subárvore re-keyed por
+// `${rotulo}:${view}`, pra troca de view não zerar a dobra. O grupo
+// "Mais adiante na jornada" segue sendo <details> fechado — ele já é o
+// recap de trancados, não uma seção da biblioteca.
 
 const GRUPO_TIPO = {
   guia: "Guias",
@@ -83,6 +87,21 @@ export function MateriaisLista({
   datasEnc?: Map<number, string> | null;
 }) {
   const [view] = useViewBiblioteca("jovem");
+  // grupos colapsáveis (528): o estado mora aqui, fora da subárvore
+  // re-keyed por `${rotulo}:${view}` — trocar Cartões/Lista não zera a
+  // dobra. Set de rótulos FECHADOS: tudo aberto por padrão e o gesto do
+  // usuário é o que dobra. "A caminho" e "Mais adiante" não entram: o
+  // primeiro já é apagado por desenho, o segundo é <details>.
+  const [fechados, setFechados] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+  const alternaGrupo = (rotulo: string, aberto: boolean) =>
+    setFechados((s) => {
+      const n = new Set(s);
+      if (aberto) n.delete(rotulo);
+      else n.add(rotulo);
+      return n;
+    });
   // REALIZA-162: o que já dá pra abrir vira grid; o "em breve" (sem path e
   // sem url — material real que a coordenação ainda não subiu) sai da
   // vitrine e fecha o acervo no grupo apagado "A caminho" — de-emphasized,
@@ -124,33 +143,55 @@ export function MateriaisLista({
           className="animate-enter space-y-2"
           style={{ "--i": Math.min(i, 10) } as CSSProperties}
         >
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            {rotulo}
-          </h3>
-          {view === "cards" ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {itens.map((m) => (
-                <MaterialCardJovem key={m.id} m={m} />
-              ))}
-            </div>
-          ) : (
-            <ul className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card py-1 shadow-[var(--shadow-border)]">
-              {itens.map((m, j) => (
-                <Linha
-                  key={m.id}
-                  m={m}
-                  ehCoord={false}
-                  vigente={null}
-                  indice={j}
-                  docBase={DOC_BASE_JOVEM}
-                  rastrear={false}
-                  menu={
-                    <MaterialMenu material={m} docBase={DOC_BASE_JOVEM} />
-                  }
+          <Collapsible.Root
+            open={!fechados.has(rotulo)}
+            onOpenChange={(o) => alternaGrupo(rotulo, o)}
+          >
+            {/* trigger dentro do h3: a região segue nomeada por heading e
+                a linha toda vira alvo de toque ≥44px no mobile */}
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <Collapsible.Trigger className="group flex min-h-11 w-full items-center gap-1.5 rounded-lg px-2 -mx-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-7">
+                <span className="min-w-0 flex-1">
+                  {rotulo}
+                  <ContagemTitulo n={itens.length} />
+                </span>
+                <CaretDown
+                  size={14}
+                  aria-hidden
+                  className="shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
                 />
-              ))}
-            </ul>
-          )}
+              </Collapsible.Trigger>
+            </h3>
+            <Collapsible.Panel
+              hiddenUntilFound
+              className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden"
+            >
+              {view === "cards" ? (
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {itens.map((m) => (
+                    <MaterialCardJovem key={m.id} m={m} />
+                  ))}
+                </div>
+              ) : (
+                <ul className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card py-1 shadow-[var(--shadow-border)]">
+                  {itens.map((m, j) => (
+                    <Linha
+                      key={m.id}
+                      m={m}
+                      ehCoord={false}
+                      vigente={null}
+                      indice={j}
+                      docBase={DOC_BASE_JOVEM}
+                      rastrear={false}
+                      menu={
+                        <MaterialMenu material={m} docBase={DOC_BASE_JOVEM} />
+                      }
+                    />
+                  ))}
+                </ul>
+              )}
+            </Collapsible.Panel>
+          </Collapsible.Root>
         </section>
       ))}
       {aCaminho.length > 0 && (

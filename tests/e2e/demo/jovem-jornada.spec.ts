@@ -52,13 +52,11 @@ test.describe("demo — Materiais do mentorado", () => {
     await expect(
       page.getByRole("img", { name: "5 de 7 entregas feitas" })
     ).toBeVisible();
-    // próxima parada = primeira estação trancada (nenhuma a_fazer na
-    // fixture): a aplicação formal da roda, que abre no encontro 12
-    await expect(
-      page.getByText(
-        /Próxima parada: Roda da Vida · aplicação formal · libera no encontro 12/
-      )
-    ).toBeVisible();
+    // REALIZA-528 — a linha "Próxima parada" morreu: a estante logo
+    // abaixo já mostra a estação trancada com a mesma data de liberação
+    // (a roda formal, que abre no encontro 12 — o teste de trancados
+    // cobre). Uma linha de próximo passo só: o "Próximo marco".
+    await expect(page.getByText(/Próxima parada:/)).toHaveCount(0);
 
     // REALIZA-515 — a faixa virou "Próximo marco": SÓ o primeiro marco
     // ainda não ganho aparece. A Ana tem 1º encontro + avaliações + PDM
@@ -304,13 +302,16 @@ test.describe("demo — Materiais do mentorado", () => {
     ).toHaveAttribute("aria-pressed", "true");
 
     // a grade dos prontos — no dataset demo o grupo visível é "Links"
-    // (2 materiais); os demais entram nos mesmos contêineres de grid
+    // (2 materiais); os demais entram nos mesmos contêineres de grid.
+    // 528: o heading do grupo é dobrável e carrega a contagem no nome
+    // ("Links 2 itens") — o match é por prefixo
     const grupoLinks = acervo.locator("section", {
-      has: page.getByRole("heading", { name: "Links", exact: true }),
+      has: page.getByRole("heading", { name: /^Links/ }),
     });
-    // :scope > — a capa do card de link (PreviewLink) também é div.grid;
-    // sem o filho direto o locator conta as 2 capas junto da grade
-    const grade = grupoLinks.locator(":scope > div.grid");
+    // a grade mora dentro do painel do collapse — e nenhuma capa é
+    // div.grid (as capas tipográficas do 528 são flex), então o
+    // descendente já é único
+    const grade = grupoLinks.locator("div.grid");
     await expect(grade).toHaveCount(1);
     const trilhos = () =>
       grade.evaluate(
