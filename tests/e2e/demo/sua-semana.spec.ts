@@ -52,7 +52,7 @@ test.describe("Sua semana — mentor", () => {
     await expect(semana.getByText("Pra ficar em dia")).toBeVisible();
     // o mentor propôs — "você combinou", nunca o próprio nome
     await expect(
-      semana.getByText(/encontro do plano que você combinou\./)
+      semana.getByText(/encontro é passo do combinado com você\./)
     ).toBeVisible();
     await expect(
       semana.getByRole("link", { name: "Ver o combinado" })
