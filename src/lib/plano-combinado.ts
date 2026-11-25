@@ -151,6 +151,8 @@ export type PlanoCombinado = {
       numero: number;
       data: string;
       acao?: string;
+      /** Nome do encontro (526) — ausente nos planos gravados antes. */
+      titulo?: string;
       /** Marca de sessão combinada (018) — mesmo valor = mesma sessão. */
       sessao?: string;
       /** Duração da sessão combinada em min (120 = 2h, o padrão). */
@@ -240,6 +242,8 @@ export function combinadoDoJovem(p: {
         numero: number;
         data: string;
         acao?: string;
+        /** Nome do encontro (526) — opcional nos planos antigos. */
+        titulo?: string;
         sessao?: string;
         duracao_min?: number;
       }[]
@@ -273,6 +277,7 @@ export function combinadoDoJovem(p: {
         numero: s.numero,
         data: s.data,
         acao: s.acao,
+        titulo: s.titulo,
         sessao: s.sessao,
         duracao_min: s.duracao_min,
       })),

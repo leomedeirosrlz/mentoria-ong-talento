@@ -510,6 +510,8 @@ export type JovemPlano = {
     numero: number;
     data: string;
     acao: string;
+    /** Nome do encontro no guia (526) — ausente nos planos antigos. */
+    titulo?: string;
     /** Marca de sessão combinada (018) — vem verbatim do escopo. */
     sessao?: string;
     duracao_min?: number;

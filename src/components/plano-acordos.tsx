@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { BookOpenText, Check, X, CalendarPlus } from "@phosphor-icons/react";
+import { BookOpenText, CalendarDots, Check, X, CalendarPlus } from "@phosphor-icons/react";
 import {
   aplicarPassoPlano,
   aplicarSessaoPlano,
@@ -33,6 +33,7 @@ import {
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AcoesMenu } from "@/components/acoes-menu";
 import {
   SeletorDiaHora,
   ddmm,
@@ -435,7 +436,9 @@ export function PlanoAcordosCard({
                 <span className="font-medium">
                   {ehAncora
                     ? `${listaEncontros(grupo)} encontros`
-                    : `${p.numero}º encontro`}
+                    : p.titulo
+                      ? `${p.numero}º encontro · ${p.titulo}`
+                      : `${p.numero}º encontro`}
                 </span>
                 {aplicado ? (
                   <span className="text-muted-foreground">
@@ -483,35 +486,46 @@ export function PlanoAcordosCard({
                             <CalendarPlus aria-hidden />
                             {ehAncora ? "Marcar sessão" : "Confirmar"}
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={pendente}
-                            onClick={() => {
-                              setErroPasso(null);
-                              if (sugestoes) {
-                                setEditando(null);
-                                setSeletor((s) => ({
-                                  numero: p.numero,
-                                  sessao: (s?.sessao ?? 0) + 1,
-                                  grupo: ehAncora ? grupo : undefined,
-                                }));
-                              } else {
-                                setDatas((d) => ({
-                                  ...d,
-                                  [p.numero]: d[p.numero] ?? {
-                                    dia: sug.data,
-                                    hora: sug.hora,
-                                  },
-                                }));
-                                setEditando((e) =>
-                                  e === p.numero ? null : p.numero
-                                );
-                              }
-                            }}
-                          >
-                            Outra data
-                          </Button>
+                          {/* 526: um CTA à vista; trocar a data é exceção e
+                              mora no ⋯ (mesmo AcoesMenu dos cards) */}
+                          <AcoesMenu
+                            label={
+                              ehAncora
+                                ? "Ações da sessão"
+                                : `Ações do ${p.numero}º encontro`
+                            }
+                            className="max-sm:w-9"
+                            itens={[
+                              {
+                                id: "outra-data",
+                                rotulo: "Outra data",
+                                icone: <CalendarDots aria-hidden className="size-4 shrink-0 text-muted-foreground" />,
+                                onEscolher: () => {
+                                  if (pendente) return;
+                                  setErroPasso(null);
+                                  if (sugestoes) {
+                                    setEditando(null);
+                                    setSeletor((s) => ({
+                                      numero: p.numero,
+                                      sessao: (s?.sessao ?? 0) + 1,
+                                      grupo: ehAncora ? grupo : undefined,
+                                    }));
+                                  } else {
+                                    setDatas((d) => ({
+                                      ...d,
+                                      [p.numero]: d[p.numero] ?? {
+                                        dia: sug.data,
+                                        hora: sug.hora,
+                                      },
+                                    }));
+                                    setEditando((e) =>
+                                      e === p.numero ? null : p.numero
+                                    );
+                                  }
+                                },
+                              },
+                            ]}
+                          />
                         </span>
                       )}
                   </>

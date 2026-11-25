@@ -33,6 +33,24 @@ import { assentar, botao, clicar, digitar, montar } from "./dom";
 const HOJE = "2026-11-21"; // sábado
 const JANELA = { inicio: "2026-11-21", fim: "2026-12-19" };
 
+/** "Outra data" desceu pro ⋯ do passo (526): abre o menu e clica o item. */
+async function outraData(li: ParentNode) {
+  const gatilho = li.querySelector<HTMLElement>(
+    'button[aria-label^="Ações do"]'
+  );
+  if (!gatilho) throw new Error("⋯ do passo não achado");
+  act(() => clicar(gatilho));
+  await assentar();
+  const popup = document.querySelector('[data-slot="dropdown-menu-content"]');
+  if (!popup) throw new Error("popup do ⋯ não abriu");
+  const item = [...popup.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+    (i) => i.textContent?.trim() === "Outra data"
+  );
+  if (!item) throw new Error("item Outra data não achado");
+  act(() => clicar(item));
+  await assentar();
+}
+
 const SUGESTOES: SeletorSugestoes = {
   datas: [], // o card recalcula por passo via datasDoPasso
   perfil: perfilDeEncontros([], new Date("2026-11-21T12:00:00-03:00")),
@@ -95,10 +113,9 @@ describe("sugestões dos passos pendentes (507)", () => {
     // o 4º nasce sugerindo qua 02/12 às 19:00
     expect(linhas(alvo)[1].textContent).toContain("qua 02/12 às 19:00");
 
-    // move o 3º pra esse mesmo instante pelo seletor ("Outra data")
+    // move o 3º pra esse mesmo instante pelo seletor ("Outra data" no ⋯)
     const li3 = linhas(alvo)[0];
-    act(() => clicar(botao(li3, "Outra data")));
-    await assentar();
+    await outraData(li3);
     const dlg = document.querySelector('[role="dialog"], [data-slot="sheet-content"]') ?? document.body;
     act(() => clicar(botao(dlg as ParentNode, "Outro dia")));
     await assentar();
@@ -142,8 +159,7 @@ describe("sugestões dos passos pendentes (507)", () => {
     await assentar();
 
     // abre o seletor do 4º e vai pro dia do confirmado: 19:00 vira choque
-    act(() => clicar(botao(linhas(alvo)[1], "Outra data")));
-    await assentar();
+    await outraData(linhas(alvo)[1]);
     const dlg = document.querySelector('[role="dialog"], [data-slot="sheet-content"]') ?? document.body;
     act(() => clicar(botao(dlg as ParentNode, "Outro dia")));
     await assentar();

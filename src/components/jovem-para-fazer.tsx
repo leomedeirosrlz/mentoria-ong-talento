@@ -230,6 +230,9 @@ function acoesPendencia({
 
     case "registro_retroativo":
       if (retro.duplaId == null) return null;
+      // sem candidato no guia a RPC recusaria: o botão prometia um gesto
+      // impossível (o texto da pendência já explica a fronteira)
+      if (retro.numeros.length === 0) return null;
       return (
         <JovemRetroativoDialog
           duplaId={retro.duplaId}

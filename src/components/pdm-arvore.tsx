@@ -351,7 +351,7 @@ function NoPdm({
                 {no.areaVida}
               </Badge>
             )}
-            {no.origem !== "manual" && (
+            {no.origem !== "manual" && ORIGEM_INSTRUMENTO[no.origem] && (
               <span className="inline-flex items-center gap-1 italic">
                 vinda do instrumento {ORIGEM_INSTRUMENTO[no.origem]}
               </span>

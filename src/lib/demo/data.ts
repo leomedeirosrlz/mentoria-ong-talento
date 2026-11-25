@@ -2415,8 +2415,8 @@ function build(): DemoData {
         fim: addDias(HOJE, 26).toISOString().slice(0, 10),
       },
       passos: [
-        { numero: 5, data: ymd(addDias(diaEncontro(5), 9)), acao: "remarcar" },
-        { numero: 6, data: addDias(HOJE, 9).toISOString().slice(0, 10), acao: "remarcar" },
+        { numero: 5, titulo: "Primeiros resultados", data: ymd(addDias(diaEncontro(5), 9)), acao: "remarcar" },
+        { numero: 6, titulo: "Superando barreiras", data: addDias(HOJE, 9).toISOString().slice(0, 10), acao: "remarcar" },
       ],
     },
     versao: 1,
@@ -2641,6 +2641,7 @@ function build(): DemoData {
           passos: [
             {
               numero: 5,
+              titulo: "Primeiros resultados",
               data: ymd(addDias(HOJE, 5)),
               acao: "agendar",
             },
@@ -2749,8 +2750,8 @@ function build(): DemoData {
             fim: ymd(addDias(HOJE, 12)),
           },
           passos: [
-            { numero: 3, data: ymd(addDias(HOJE, -4)), acao: "agendar" },
-            { numero: 4, data: ymd(addDias(HOJE, 2)), acao: "agendar" },
+            { numero: 3, titulo: "Metas e checagem SMART", data: ymd(addDias(HOJE, -4)), acao: "agendar" },
+            { numero: 4, titulo: "Submetas e compromisso", data: ymd(addDias(HOJE, 2)), acao: "agendar" },
           ],
         },
         versao: 1,

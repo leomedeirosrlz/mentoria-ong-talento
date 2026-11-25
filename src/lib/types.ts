@@ -588,6 +588,8 @@ export type DuplaPlanoEscopo = {
     numero: number;
     data: string;
     acao: string;
+    /** Nome do encontro no guia (526) — ausente nos planos antigos. */
+    titulo?: string;
     /** Marca da sessão combinada (018): passos com o mesmo valor foram
      *  fundidos pela dupla numa sessão só — a plano_aplicar_sessao
      *  carimba data_hora/duracao/sessao_id do grupo de uma vez. */

@@ -153,7 +153,7 @@ export default async function JovemEspecialistasPage() {
     // sem ficha de mentorado a RPC negaria — a página diz por que em vez de
     // prometer um gesto impossível (mesma régua da home)
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <header>
           <h1 className="text-xl font-semibold">Especialistas</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -171,7 +171,7 @@ export default async function JovemEspecialistasPage() {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <header>
         <h1 className="text-xl font-semibold">Especialistas</h1>
         <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted-foreground">

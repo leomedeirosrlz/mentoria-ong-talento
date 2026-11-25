@@ -180,6 +180,8 @@ export default async function JovemAgenda() {
   // cada slot é um "pedir esse horário" — a sessão só nasce quando o
   // especialista aceita (RPC 0074). Um pedido em aberto pro mesmo
   // especialista substitui os chips: a dedup é do banco, a UI mostra a mesa.
+  // o mapa cobre TODAS as trilhas de especialista (inclusive encerradas):
+  // o histórico continua sendo "Sessão 3 com Sofia", não o fallback
   const duplasEsp = duplas.filter(
     (d) =>
       d.status === "ativa" && d.trilha === "especialista" && d.mentor_id != null
@@ -204,38 +206,40 @@ export default async function JovemAgenda() {
   const dispJovem =
     (perfil?.disponibilidade as Disponibilidade | null | undefined) ?? null;
   const espPorDupla = new Map(
-    duplasEsp.map((d) => {
-      // a view rotula por trilha desde a 0076: na dupla esp o contato do
-      // titular chega como 'especialista' ('mentor' é o papel da DPP)
-      const contato = contatos.find(
-        (c) =>
-          c.dupla_id === d.id &&
-          (c.papel === "especialista" || c.papel === "mentor")
-      );
-      const nome =
-        contato?.nome_social ||
-        contato?.nome ||
-        d.mentor_nome_social ||
-        d.mentor_nome ||
-        null;
-      const primeiro = nome?.split(" ")[0] ?? null;
-      return [
-        d.id!,
-        {
-          // `quem` entra inteiro depois de "com"/"de" — primeiro nome ou a
-          // frase de fallback, nunca os dois truncados igual ("com seu")
-          nome: nome ?? "seu especialista",
-          primeiro,
-          quem: primeiro ?? "seu especialista",
-          deQuem: primeiro ? `de ${primeiro}` : "do seu especialista",
-          avatar_path: contato?.avatar_path ?? d.mentor_avatar_path,
-          wa: waLink(
-            contato?.whatsapp,
-            `Olá${primeiro ? `, ${primeiro}` : ""}! Sou ${primeiroNome}, seu mentorado(a). Quero combinar nosso próximo encontro.`
-          ),
-        },
-      ] as const;
-    })
+    duplas
+      .filter((d) => d.trilha === "especialista" && d.mentor_id != null)
+      .map((d) => {
+        // a view rotula por trilha desde a 0076: na dupla esp o contato do
+        // titular chega como 'especialista' ('mentor' é o papel da DPP)
+        const contato = contatos.find(
+          (c) =>
+            c.dupla_id === d.id &&
+            (c.papel === "especialista" || c.papel === "mentor")
+        );
+        const nome =
+          contato?.nome_social ||
+          contato?.nome ||
+          d.mentor_nome_social ||
+          d.mentor_nome ||
+          null;
+        const primeiro = nome?.split(" ")[0] ?? null;
+        return [
+          d.id!,
+          {
+            // `quem` entra inteiro depois de "com"/"de" — primeiro nome ou a
+            // frase de fallback, nunca os dois truncados igual ("com seu")
+            nome: nome ?? "seu especialista",
+            primeiro,
+            quem: primeiro ?? "seu especialista",
+            deQuem: primeiro ? `de ${primeiro}` : "do seu especialista",
+            avatar_path: contato?.avatar_path ?? d.mentor_avatar_path,
+            wa: waLink(
+              contato?.whatsapp,
+              `Olá${primeiro ? `, ${primeiro}` : ""}! Sou ${primeiroNome}, seu mentorado(a). Quero combinar nosso próximo encontro.`
+            ),
+          },
+        ] as const;
+      })
   );
   // passo da sessão = rank do encontro entre os realizados da MESMA dupla
   // (e.numero é a tentativa — a 3ª tentativa pode ser a 2ª sessão; "Sessão N"
@@ -583,7 +587,7 @@ export default async function JovemAgenda() {
           {/* 530: sempre visível ao lado do Agendar — sem passo elegível
               o dialog abre o empty-state que explica a fronteira (o que
               falta é passo não-vencido ou o encerramento, que é do mentor) */}
-          {duplaDpp?.id && (
+          {duplaDpp?.id && numerosRetro.length > 0 && (
             <JovemRetroativoDialog
               duplaId={duplaDpp.id}
               numeros={numerosRetro}
@@ -610,16 +614,18 @@ export default async function JovemAgenda() {
             comQuem={nomeDaDupla(duplaDpp.id, false)}
             sugestoes={sugestoesAgendar}
             retro={
-              <JovemRetroativoDialog
-                duplaId={duplaDpp.id}
-                numeros={numerosRetro}
-                trigger={
-                  <Button variant="ghost" size="sm">
-                    <ClockCounterClockwise size={15} aria-hidden />
-                    Registrar encontro
-                  </Button>
-                }
-              />
+              numerosRetro.length > 0 ? (
+                <JovemRetroativoDialog
+                  duplaId={duplaDpp.id}
+                  numeros={numerosRetro}
+                  trigger={
+                    <Button variant="ghost" size="sm">
+                      <ClockCounterClockwise size={15} aria-hidden />
+                      Registrar encontro
+                    </Button>
+                  }
+                />
+              ) : null
             }
           />
         )}

@@ -999,6 +999,8 @@ export type EscopoProposta = {
     numero: number;
     data: string;
     acao: "agendar" | "remarcar";
+    /** Nome do encontro no guia (526) — opcional; planos antigos não têm. */
+    titulo?: string;
     /** Marca da sessão combinada (018): mesmo valor = mesma sessão. */
     sessao?: string;
     /** Duração da sessão combinada em min — 120 (2h) é o padrão. */
@@ -1060,6 +1062,10 @@ export function escopoDaProposta(
           numero: p.numero,
           data: sessao ? (sessaoData.get(sessao) ?? p.data) : p.data,
           acao: p.acao,
+          // 526: o nome do encontro viaja junto (o número sozinho não
+          // dizia nada no combinado). Opcional: planos antigos no banco
+          // não têm a chave e caem no número.
+          ...(p.titulo ? { titulo: p.titulo } : {}),
           ...(sessao
             ? { sessao, duracao_min: DURACAO_SESSAO_MIN }
             : {}),

@@ -178,7 +178,9 @@ export function JovemAgendarSugestao({
           <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
             {numero}º encontro com {comQuem}
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">Sem data ainda</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Sugestão pra destravar o próximo passo
+          </p>
 
           <div className="mt-3 space-y-1.5">
             <p className="flex items-center gap-2 text-sm font-medium">

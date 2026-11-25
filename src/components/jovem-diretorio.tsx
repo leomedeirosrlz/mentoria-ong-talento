@@ -504,17 +504,14 @@ function DiretorioCard({
               size={44}
             />
             <span className="min-w-0 flex-1">
-              <span
-                className="block truncate font-medium underline-offset-4 transition-colors group-hover:underline"
-                title={nome}
-              >
+              <span className="block truncate font-medium underline-offset-4 transition-colors group-hover:underline" title={nome}>
                 {marca ? (
                   <HighlightText texto={nome} query={marca} />
                 ) : (
                   nome
                 )}
               </span>
-              <span className="block truncate text-sm text-muted-foreground">
+              <span className="line-clamp-2 text-sm text-muted-foreground">
                 {[meta, p.selo].filter(Boolean).join(" · ")}
               </span>
               {lugar && (
@@ -525,17 +522,8 @@ function DiretorioCard({
               )}
             </span>
           </Link>
-          {p.rede && (
-            <Badge
-              variant="outline"
-              className="shrink-0 border-[var(--ok)]/50 font-normal text-[var(--ok-text)]"
-            >
-              Sua rede
-            </Badge>
-          )}
           <WaIconLink p={p} nomeJovem={nomeJovem} />
         </div>
-
         {chips.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {chips.slice(0, 4).map((c) => (

@@ -90,8 +90,11 @@ export function FormSurface({
         closeLabel="Fechar"
         // h-auto: a folha cresce com o form — a submeta de 3 campos não
         // boia numa folha de 85dvh — e capa em 85dvh pros densos; dentro,
-        // o rodapé sticky cobre o resto (molde do seletor-dia-hora)
-        className="h-auto max-h-[85dvh] p-4"
+        // o rodapé sticky cobre o resto (molde do seletor-dia-hora).
+        // pb-0: o respiro do pé mora no próprio rodapé; sem isso o p-4
+        // do sheet deixava uma faixa de 16px onde o conteúdo rolava à
+        // mostra por baixo do "Aplicar".
+        className="h-auto max-h-[85dvh] p-4 pb-0"
       >
         <div className="pr-8">
           <SheetTitle>{titulo}</SheetTitle>
@@ -108,7 +111,7 @@ export function FormSurface({
           // mesma gramática do combinar-plano: faixa colada no pé do
           // scrollport sangrando o p-4 do SheetContent, com respiro pro
           // indicador do iPhone
-          <div className="sticky bottom-0 -mx-4 -mb-4 mt-4 flex flex-col-reverse gap-2 border-t bg-sidebar p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end">
+          <div className="sticky bottom-0 -mx-4 mt-4 flex flex-col-reverse gap-2 border-t bg-sidebar p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end">
             {footer}
           </div>
         ) : null}

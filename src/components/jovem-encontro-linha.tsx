@@ -95,7 +95,7 @@ export function EncontroLinha({
     e.data_hora != null &&
     new Date(e.data_hora).getTime() <= agora;
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 sm:px-5">
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-4 py-2.5 sm:px-5">
       <span
         aria-hidden
         className={cn(
@@ -129,11 +129,11 @@ export function EncontroLinha({
           <p className="mt-0.5 text-xs text-muted-foreground">{nota}</p>
         )}
       </div>
-      {/* no celular as ações que não cabem caem numa linha própria
-          alinhada no texto (ps-12 = ícone + gap) — o ms-auto sozinho
-          empurrava pro canto e deixava o buraco à esquerda; badge/strela
-          que ainda cabe segue na mesma linha. Em sm+ volta pra direita */}
-      <div className="flex flex-wrap items-center justify-start gap-2 ps-12 sm:ms-auto sm:justify-end sm:ps-0">
+      {/* o ⋯ e o status sobem pro topo à direita no celular (mesma norma
+          do card da dupla): a linha própria com ps-12 deixava o botão
+          solto no meio do card. Em sm+ a fileira volta a crescer à
+          direita, alinhada ao texto */}
+      <div className="order-2 ml-auto flex flex-wrap items-start justify-end gap-2 sm:order-none sm:items-center">
         {aval && (
           <VerAvaliacaoButton
             quiet
