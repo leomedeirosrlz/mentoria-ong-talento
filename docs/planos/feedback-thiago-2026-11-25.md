@@ -3,6 +3,8 @@
 > Registro bruto para o pipeline `feedback → recon → issues → specs → implementação → review`.
 > Nada aqui foi implementado ainda. As imagens citadas são as do feedback enviado no chat.
 
+**Issues Jira abertas (25/11):** REALIZA-525 (mobile Pessoas/Especialistas/self view), REALIZA-530 (agenda/retroativo/CTAs), REALIZA-528 (materiais), REALIZA-526 (ficha/plano/especialista/combinados), REALIZA-527 (Liza), REALIZA-529 (badges 2.0 — Claude).
+
 ## 1. Badges, nível e ilustrações (frente autoral do Claude)
 
 - A badge atual ficou **poluída**. Quero algo **minimalista**: só a badge, sem o bloco/caixa em volta.
