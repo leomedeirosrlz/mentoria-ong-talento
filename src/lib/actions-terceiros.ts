@@ -6,7 +6,8 @@ import { DEMO_MSG } from "./demo/shared";
 import { erroAmigavel } from "./utils";
 import { normWhatsapp } from "./importar";
 
-// Actions da avaliação por terceiros (0103 — guia DPP semana 1→2).
+// Actions da avaliação por terceiros (0103 — guia DPP semana 1→2; régua
+// flexibilizada na 0195: mistura livre até 9, sem cap por vínculo).
 // O respondente externo submete por bearer token + RPC definer; dentro da
 // app, contato se cadastra por INSERT direto (token se auto-minta) e tudo
 // que mexe em status/token sai só pelas RPCs — o grant de coluna e a RLS
@@ -16,6 +17,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TOKEN_RE = /^[A-Za-z0-9_-]{20,128}$/;
 const VINCULOS = new Set(["amigo", "familiar", "colega", "outro"]);
+const VIAS_COLETA = new Set(["telefone", "presencial", "papel", "outro"]);
 
 async function meEDupla(duplaId: string) {
   const supabase = await createClient();
@@ -58,16 +60,22 @@ function saneiaWhatsapp(v: unknown): string | null | undefined {
 }
 
 function traduzErro(message: string): string {
+  // 0195 (REALIZA-387): only the total of 9 is still raised by the DB;
+  // the per-vínculo cap became a composition suggestion in copy
   if (/9 pessoas/.test(message))
-    return "O guia prevê até 9 pessoas indicadas (3 amigos, 3 familiares, 3 colegas).";
-  if (/3 pessoas por vínculo/.test(message))
-    return "O guia prevê até 3 pessoas por vínculo — distribua entre amigos, familiares e colegas.";
+    return "Dá pra indicar até 9 pessoas por dupla.";
   if (/usado ou expirou/.test(message))
     return "Este link já foi respondido ou expirou.";
   if (/antes de publicar/.test(message))
     return "Escreva a consolidação antes de publicar.";
   if (/convite não encontrado/.test(message))
-    return "Convite não encontrado — recarregue a página.";
+    return "Convite não encontrado. Recarregue a página.";
+  if (/já respondeu/.test(message))
+    return "Esta pessoa já respondeu. A resposta não pode ser alterada.";
+  if (/autorizou o registro/.test(message))
+    return "Confirme que a pessoa autorizou o registro da resposta.";
+  if (/como a resposta foi coletada/.test(message))
+    return "Informe como a resposta foi coletada.";
   if (/não encontrada|not found/i.test(message)) return "Dupla não encontrada.";
   if (/pontos fortes|a melhorar|aspectos/i.test(message)) return message;
   return erroAmigavel({ message } as never);
@@ -87,7 +95,7 @@ export async function criarContatoTerceiro(
     return { error: "Escolha o vínculo: amigo, familiar, colega ou outro." };
   const whatsapp = saneiaWhatsapp(dados?.whatsapp);
   if (whatsapp === undefined)
-    return { error: "WhatsApp inválido — use o número com DDD." };
+    return { error: "WhatsApp inválido. Use o número com DDD." };
 
   const ctx = await meEDupla(duplaId);
   if ("error" in ctx) return { error: ctx.error };
@@ -120,7 +128,7 @@ export async function atualizarContatoTerceiro(
   }
   if (dados?.whatsapp !== undefined) {
     const w = saneiaWhatsapp(dados.whatsapp);
-    if (w === undefined) return { error: "WhatsApp inválido — use o número com DDD." };
+    if (w === undefined) return { error: "WhatsApp inválido. Use o número com DDD." };
     patch.whatsapp = w;
   }
   if (!Object.keys(patch).length) return { error: "Nada pra atualizar." };
@@ -197,6 +205,69 @@ export async function salvarConsolidadoTerceiros(
   return { ok: true as const };
 }
 
+/** Registro manual da resposta (0216 — REALIZA-449/463): a fala colhida
+ *  fora da plataforma (telefone, presencial, papel…) entra como resposta
+ *  com origem 'manual' + quem registrou + via + consentimento declarado.
+ *  Contato novo ("pessoa nova") nasce pelo insert de sempre — a RPC faz a
+ *  transição atômica pendente|expirado→respondido e recusa replay. */
+export async function registrarRespostaTerceiroManual(
+  duplaId: string,
+  dados: {
+    contatoId?: string | null;
+    nome?: string;
+    vinculo?: string;
+    pontosFortes: string;
+    aMelhorar: string;
+    coletadoVia: string;
+    consentimento: boolean;
+  }
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  if (!UUID_RE.test(duplaId)) return { error: "Dados inválidos." };
+  const fortes = String(dados?.pontosFortes ?? "");
+  const melhorar = String(dados?.aMelhorar ?? "");
+  if (!fortes.trim() || fortes.length > 4000)
+    return { error: "Responda os pontos fortes (até 4000 caracteres)." };
+  if (!melhorar.trim() || melhorar.length > 4000)
+    return { error: "Responda os aspectos a melhorar (até 4000 caracteres)." };
+  if (!VIAS_COLETA.has(dados?.coletadoVia))
+    return { error: "Informe como a resposta foi coletada." };
+  if (dados?.consentimento !== true)
+    return { error: "Confirme que a pessoa autorizou o registro da resposta." };
+  if (dados?.contatoId != null && !UUID_RE.test(dados.contatoId))
+    return { error: "Dados inválidos." };
+
+  const ctx = await meEDupla(duplaId);
+  if ("error" in ctx) return { error: ctx.error };
+  if (ctx.dupla.status !== "ativa" && ctx.dupla.status !== "pausada")
+    return { error: "A dupla não está mais ativa." };
+
+  let contatoId = dados.contatoId ?? null;
+  if (!contatoId) {
+    const nome = saneiaNome(dados?.nome);
+    if (!nome) return { error: "Informe o nome da pessoa (2 a 120 letras)." };
+    if (!VINCULOS.has(dados?.vinculo ?? ""))
+      return { error: "Escolha o vínculo: amigo, familiar, colega ou outro." };
+    const { data, error } = await ctx.supabase
+      .from("terceiros_contatos")
+      .insert({ dupla_id: duplaId, nome, vinculo: dados.vinculo!, whatsapp: null })
+      .select("id")
+      .single();
+    if (error) return { error: traduzErro(error.message) };
+    contatoId = data.id;
+  }
+
+  const { error } = await ctx.supabase.rpc("registrar_resposta_terceiro_manual", {
+    p_contato_id: contatoId,
+    p_pontos_fortes: fortes,
+    p_a_melhorar: melhorar,
+    p_coletado_via: dados.coletadoVia,
+    p_consentimento: true,
+  });
+  if (error) return { error: traduzErro(error.message) };
+  return { ok: true as const };
+}
+
 // ---------- público (/t/<token>) ----------
 
 export async function submeterRespostaTerceiro(
@@ -211,7 +282,7 @@ export async function submeterRespostaTerceiro(
   if (!token || !TOKEN_RE.test(token))
     return { error: "Este link não é válido." };
   if (String(pontosFortes ?? "").length > 4000 || String(aMelhorar ?? "").length > 4000)
-    return { error: "Resposta longa demais — até 4000 caracteres por campo." };
+    return { error: "Resposta longa demais: até 4000 caracteres por campo." };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("submeter_resposta_terceiro", {

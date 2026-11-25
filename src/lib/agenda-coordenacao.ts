@@ -1,14 +1,17 @@
 import {
   ORDEM_SEMAFORO,
   bucketsDoEncontro,
+  cobertosDaDupla,
   comparaNome,
   cronogramasOpcoes,
   diaSemanaDe,
   duplasSemEncontroDoNumero,
   emLimbo,
+  encontroTemConteudo,
   eventoDaSemana,
   eventosDoCronograma,
   lembreteBloqueadoAte,
+  registroTemConteudo,
   resumoSemanaDe,
   saudadeDaDupla,
   semanaBounds,
@@ -20,7 +23,7 @@ import {
 import { primeiroNomeDaDupla } from "./agenda-minha";
 import { guiaDoEncontro } from "./como-conduzir";
 import { turmaCurta, turmaLonga } from "./turma";
-import { ehConcluida, ehDesistente } from "./dupla-desfecho";
+import { situacaoDaDupla } from "./dupla-desfecho";
 import type {
   CicloEvento,
   Cronograma,
@@ -117,12 +120,15 @@ function metaTurma(duplasAtivas: Dupla[], vig: EventoDatado | null): string {
  *  em limbo ou realizado há >24h sem registro, menor número primeiro). O
  *  DuplaSaude expõe o sinal, não a row — o contexto precisa do número. */
 function pendenciaDeRegistro(d: Dupla, agoraMs: number): Encontro | null {
+  // sessão combinada (018): o coberto já tem conteúdo via âncora — sem o
+  // mapa a coordenação cobraria registro de um passo entregue
+  const cobertos = cobertosDaDupla(d.encontros);
   return (
     d.encontros
       .filter(
         (e) =>
-          !e.registro &&
-          (emLimbo(e, agoraMs) ||
+          !encontroTemConteudo(e, cobertos) &&
+          (emLimbo(e, agoraMs, cobertos) ||
             (e.status === "realizado" &&
               agoraMs - new Date(e.data_hora ?? 0).getTime() > 24 * 3600 * 1000))
       )
@@ -263,7 +269,7 @@ export type ItemParaAcompanhar = {
   turma: string;
   saude: DuplaSaude;
   motivos: MotivoAcompanhar[];
-  /** Linha pronta: "Encontro 8 · T1 — ainda sem data (prazo: dom 12)". */
+  /** Linha pronta: "Encontro 8 · T1 — ainda sem agendamento (prazo: dom 12)". */
   contexto: string;
   /** As partes do contexto reordenadas (REALIZA-161): [0] é o caso
    *  decisório — o motivo que pôs a dupla na fila (pendência > atraso >
@@ -280,10 +286,11 @@ export type ItemParaAcompanhar = {
 };
 
 /** Linha de contexto do card "Para acompanhar" — as combinações do mock:
- *  sem_data puro ("Encontro 8 · T1 — ainda sem data nesta semana (prazo:
- *  dom 12)"), atraso dominando ("2 encontros atrasados — sem data para o
- *  8"), registro solto ("Encontro 5 · T2 agendado qua 8, 19h — registro do
- *  4 pendente"). Devolve o texto pronto E as partes: a fila nova
+ *  sem_data puro ("Encontro 8 · T1 — ainda sem agendamento nesta semana
+ *  (prazo: dom 12)"), atraso dominando ("2 encontros atrasados — sem
+ *  agendamento pro 8"), registro solto ("Encontro 5 · T2 agendado qua 8,
+ *  19h — registro do 4 pendente"). Devolve o texto pronto E as partes: a
+ *  fila nova
  *  (REALIZA-161) destaca a primeira como "caso" decisório — por isso as
  *  partes são reordenadas (a pendência encabeça; o `contexto` legado
  *  mantém a ordem de montagem) — sem re-duplicar a montagem na tela. */
@@ -326,8 +333,8 @@ function contextoAcompanhar(
       novaNaTurma
         ? `${rotuloEnc} ${vig.numero}${daTurma(d.turma)}. Dupla nova: 1º agendamento pendente`
         : lead
-          ? `Sem data para o ${vig.numero}`
-          : `${rotuloEnc} ${vig.numero}${daTurma(d.turma)} ainda sem data${
+          ? `Sem agendamento pro ${vig.numero}`
+          : `${rotuloEnc} ${vig.numero}${daTurma(d.turma)} ainda sem agendamento${
               nestaSemana
                 ? " nesta semana"
                 : ` para ${vig.data.slice(8, 10)}/${vig.data.slice(5, 7)}`
@@ -765,138 +772,6 @@ export function itensDaSemanaPrograma(
   );
 }
 
-/** "Minha agenda" do mentor (faixa v8b): os mesmos cards da semana, mas
- *  recortados na agenda DELE — um card por encontro oficial vigente ×
- *  dupla ativa dele (duas duplas na mesma turma geram dois cards, porque
- *  cada uma marca a sua) e as formações/eventos oficiais dos cronogramas
- *  dele. A roda/encerramento entra como
- *  convidado ("você não participa") — o mock explicita o caso.
- *
- *  `cobertos` (chaves `duplaId:numero`, de `encontrosCobertos`) suprime o
- *  card do encontro que a lista cronológica já apresenta — ela carrega
- *  hora e as ações da dupla (entrar, remarcar, agendar, registrar), então
- *  o encontro mora lá e a faixa não repete. O que sobra na faixa é o
- *  compromisso do programa e o encontro oficial ainda fora do radar
- *  (sem item nem aviso — o "por agendar" que ninguém olhou). */
-export function itensSemanaProgramaMentor(
-  duplas: Dupla[],
-  eventos: CicloEvento[],
-  cronogramas: Cronograma[],
-  hoje: Date = new Date(),
-  agoraMs: number = hoje.getTime(),
-  cobertos?: ReadonlySet<string>
-): ItemPrograma[] {
-  const { seg, dom } = semanaBounds(hoje);
-  const cronos = new Map(cronogramas.map((c) => [c.id, c]));
-  const itens: ItemPrograma[] = [];
-
-  // cronogramas das duplas DPP vivas do mentor — a chave do recorte
-  const minhas = duplas.filter(
-    (d) =>
-      d.trilha !== "especialista" &&
-      d.cronograma_id != null &&
-      (d.status === "ativa" || d.status === "pausada")
-  );
-  const cronosIds = [...new Set(minhas.map((d) => d.cronograma_id!))];
-
-  for (const cronId of cronosIds) {
-    const c = cronos.get(cronId);
-    if (c && c.status !== "ativo") continue;
-    const turma = turmaCurta(c?.turma ?? minhas.find((d) => d.cronograma_id === cronId)?.turma);
-    const turmaNome = turmaLonga(c?.turma ?? minhas.find((d) => d.cronograma_id === cronId)?.turma);
-    for (const ev of eventosDoCronograma(eventos, cronId)) {
-      // mesma janela com overlap da versão coordenação — recesso/retiro
-      // que atravessa a semana aparece no dia de início
-      if (ev.data == null || ev.data > dom || (ev.data_fim ?? ev.data) < seg)
-        continue;
-      if (ev.tipo === "encontro" && ev.numero != null) {
-        // um card por dupla — cada dupla marca o seu encontro
-        for (const d of minhas.filter((x) => x.cronograma_id === cronId)) {
-          // encontro já coberto pela Minha agenda (item ou aviso): a cópia
-          // da faixa sai — o encontro aparece uma vez só, na lista, com as
-          // ações que o card não tem
-          if (cobertos?.has(`${d.id}:${ev.numero}`)) continue;
-          const row = d.encontros.find((e) => e.numero === ev.numero);
-          const limbo = row != null && emLimbo(row, agoraMs);
-          const faltaRegistro =
-            row?.status === "realizado" && !row.registro;
-          const detalhe = row?.data_hora
-            ? `${horaCurta(row.data_hora)} · ${row.link ? "chamada de vídeo" : "local a combinar"}`
-            : null;
-          // o aviso compõe: "local a confirmar" (agendado sem link) coexiste
-          // com "registro pendente" — menos no limbo, onde o agendamento já
-          // venceu e o local é informação morta
-          const semLocal =
-            row != null &&
-            row.status === "agendado" &&
-            row.link == null &&
-            !limbo;
-          itens.push({
-            id: `ev-${ev.id}-${d.id}`,
-            diaKey: row?.data_hora
-              ? toDateStr(new Date(row.data_hora))
-              : ev.data,
-            titulo: `Encontro ${ev.numero}${turmaNome ? ` · ${turmaNome}` : ""}, com ${primeiroNomeDaDupla(d)}`,
-            detalhe,
-            tipoItem: "encontro",
-            eventoId: null,
-            numero: ev.numero,
-            turma: turma || null,
-            tema: temaDoEvento(ev),
-            guia: guiaDeNumero(ev.numero),
-            nota:
-              row?.status === "nao_aconteceu" || row?.status === "cancelado"
-                ? "não aconteceu, vale remarcar"
-                : null,
-            aviso:
-              row == null
-                ? "por agendar"
-                : [
-                      faltaRegistro || limbo ? "registro pendente" : null,
-                      semLocal ? "local a confirmar" : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ") || null,
-            convidado: false,
-            duplaId: d.id,
-          });
-        }
-      } else {
-        const convidado = ev.tipo === "evento_encerramento";
-        itens.push({
-          id: `ev-${ev.id}-${cronId}`,
-          diaKey: ev.data,
-          titulo: `${ev.titulo}${turmaNome ? ` · ${turmaNome}` : ""}`,
-          detalhe: ev.observacao,
-          tipoItem: ev.tipo === "formacao" ? "formacao" : "evento",
-          eventoId: null,
-          numero: null,
-          turma: turma || null,
-          tema: null,
-          guia: null,
-          // "você participa" só onde o mentor de fato vai: formação e
-          // encerramento são dele; recesso e etapa não chamam presença
-          nota:
-            ev.tipo === "formacao" || ev.tipo === "evento_encerramento"
-              ? convidado
-                ? "você não participa"
-                : "você participa"
-              : null,
-          aviso: null,
-          convidado,
-          duplaId: null,
-        });
-      }
-    }
-  }
-
-  return itens.sort(
-    (a, b) =>
-      a.diaKey.localeCompare(b.diaKey) ||
-      a.titulo.localeCompare(b.titulo, "pt-BR")
-  );
-}
-
 // ---------- "Números da semana" (v8b · agregação server-side) ----------
 
 /** Cobertura honesta do encontro vigente de um cronograma: cada fatia é
@@ -973,9 +848,13 @@ function coberturaDoVigente(
  *  - `risco` + `atencao` + `emDia` PARTICIONAM `emAndamento` pelo semáforo.
  *  - `apoio` é SOBREPOSIÇÃO: conta pedido de apoio aberto (ativa ou pausada)
  *    à parte e nunca tira a dupla da sua situação.
- *  - `pausadas`, `concluidas` (concluída com êxito) e `desistentes`
- *    (encerrada / desistência / remanejada / outro) ficam fora da régua.
- *  - `total` = emAndamento + pausadas + concluidas + desistentes: o denominador da barra. */
+ *  - `pausadas`, `concluidas` (concluída com êxito) e `encerradas` ficam
+ *    fora da régua. Encerrada é o balde único dos fechamentos sem êxito:
+ *    desistência do jovem/mentor (+ legado sem desfecho) e fechamento
+ *    formal (remanejada/outro) — o desfecho distingue na linha, não na
+ *    contagem.
+ *  - `total` = emAndamento + pausadas + concluidas + encerradas:
+ *    o denominador da barra. */
 export type SaudeRecorte = {
   emAndamento: number;
   risco: number;
@@ -984,7 +863,7 @@ export type SaudeRecorte = {
   apoio: number;
   pausadas: number;
   concluidas: number;
-  desistentes: number;
+  encerradas: number;
   total: number;
 };
 
@@ -994,6 +873,19 @@ export function saudeDoRecorte(
   hoje: Date,
   cronogramaId: string | null = null
 ): SaudeRecorte {
+  return saudeRecorteDeItens(
+    duplas
+      .filter((d) => cronogramaId == null || d.cronograma_id === cronogramaId)
+      .map((dupla) => ({ dupla, saude: saudadeDaDupla(dupla, eventos, hoje) }))
+  );
+}
+
+/** A mesma contagem do saudeDoRecorte sobre saúdes JÁ derivadas — quem já
+ *  calculou saudadeDaDupla por outro motivo (o resumo de aderência do hub)
+ *  não repassa pela derivação só pra contar. Uma régua só. */
+export function saudeRecorteDeItens(
+  itens: readonly { dupla: Dupla; saude: DuplaSaude }[]
+): SaudeRecorte {
   const s: SaudeRecorte = {
     emAndamento: 0,
     risco: 0,
@@ -1002,27 +894,24 @@ export function saudeDoRecorte(
     apoio: 0,
     pausadas: 0,
     concluidas: 0,
-    desistentes: 0,
+    encerradas: 0,
     total: 0,
   };
-  for (const d of duplas) {
-    if (cronogramaId != null && d.cronograma_id !== cronogramaId) continue;
-    const saude = saudadeDaDupla(d, eventos, hoje);
+  for (const { dupla: d, saude } of itens) {
     if (saude.apoio.aberto) s.apoio++;
     if (d.status === "ativa") {
       s.emAndamento++;
       if (saude.semaforo === "risco") s.risco++;
       else if (saude.semaforo === "atencao") s.atencao++;
       else s.emDia++;
-    } else if (d.status === "pausada") {
-      s.pausadas++;
-    } else if (ehConcluida({ desfecho: d.desfecho }) || d.status === "concluida") {
-      s.concluidas++;
-    } else if (ehDesistente({ desfecho: d.desfecho, status: d.status }) || d.status === "encerrada") {
-      s.desistentes++;
+    } else {
+      const sit = situacaoDaDupla(d);
+      if (sit === "pausada") s.pausadas++;
+      else if (sit === "concluida") s.concluidas++;
+      else s.encerradas++;
     }
   }
-  s.total = s.emAndamento + s.pausadas + s.concluidas + s.desistentes;
+  s.total = s.emAndamento + s.pausadas + s.concluidas + s.encerradas;
   return s;
 }
 
@@ -1035,7 +924,7 @@ export type RecorteFatia =
   | "andamento"
   | "pausada"
   | "concluida"
-  | "desistente"
+  | "encerrada"
   | "apoio";
 
 export const RECORTES_FATIA: readonly RecorteFatia[] = [
@@ -1044,9 +933,29 @@ export const RECORTES_FATIA: readonly RecorteFatia[] = [
   "andamento",
   "pausada",
   "concluida",
-  "desistente",
+  "encerrada",
   "apoio",
 ];
+
+/** Valores legados de `?recorte=` → a fatia atual. Deep links antigos de
+ *  "desistente" (época do chip próprio) aterrissam em "encerrada" — o
+ *  balde que cobre desistência + fechamento formal. */
+const RECORTE_ALIAS: Record<string, RecorteFatia> = {
+  desistente: "encerrada",
+};
+
+/** `?recorte=` cru → fatia válida (ou null quando desconhecida). Valores
+ *  fora do vocabulário não viram chip fantasma — caem fora como ausência
+ *  de recorte, o mesmo contrato de sempre. */
+export function resolveRecorteFatia(
+  param: string | null | undefined
+): RecorteFatia | null {
+  if (!param) return null;
+  // own-property: `in` casaria toString/constructor e devolveria uma
+  // Function no lugar da fatia (param forjado à mão)
+  if (Object.hasOwn(RECORTE_ALIAS, param)) return RECORTE_ALIAS[param];
+  return RECORTES_FATIA.find((r) => r === param) ?? null;
+}
 
 /** Pulso de registro da semana — encontros realizados nos últimos 14 dias
  *  (a janela do mock) das duplas do recorte: entregue × aguardando + a
@@ -1095,6 +1004,10 @@ function pulsoDoRecorte(
   let soma = 0;
   for (const d of duplas) {
     if (!idsRecorte.has(d.id)) continue;
+    // sessão combinada (018): "entregues" conta a entrega real (1 por
+    // sessão, na âncora); "aguardando" não pode contar o coberto — a
+    // sessão dele já tem conteúdo
+    const cobertos = cobertosDaDupla(d.encontros);
     for (const e of d.encontros) {
       if (e.status !== "realizado") continue;
       const quando = e.realizado_em ?? e.data_hora;
@@ -1102,8 +1015,8 @@ function pulsoDoRecorte(
       const t = new Date(quando).getTime();
       if (t > agoraMs || t < limiteMs) continue;
       p.realizados++;
-      if (e.registro) p.registrosEntregues++;
-      else p.aguardandoRegistro++;
+      if (registroTemConteudo(e.registro)) p.registrosEntregues++;
+      else if (!encontroTemConteudo(e, cobertos)) p.aguardandoRegistro++;
       const estrelas = e.avaliacao_jovem?.estrelas;
       if (typeof estrelas === "number" && estrelas > 0) {
         soma += estrelas;

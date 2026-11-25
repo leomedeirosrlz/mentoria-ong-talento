@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { motion, useTransform, type MotionValue, type Transition } from "motion/react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
+import { useMedida } from "@/lib/use-medida";
 import type { LizaEstado, LizaProps } from "./tipos";
 import {
   EASE,
@@ -208,10 +209,21 @@ function useBichinho(ativo: boolean) {
 function poseDe(estado: LizaEstado, momento: boolean, detalhe: boolean): Pose {
   switch (estado) {
     case "atento":
-      // escuta: espicha pra cima e os olhos abrem bem — a pálpebra recolhe
-      // e o topo arredonda; a boca fica discreta (olho atento é o "oi,
-      // posso ajudar?"). Um "o" de susto a cada hover lia como sobressalto
-      return { ...BASE, sx: 1.06, sy: 1.1, palpebra: -0.6, olhoTopo: 1.06, bocaEscala: 1, corpo: { sx: 0.97, sy: 1.04, rotate: 0 } };
+      // escuta: a atenção vem do corpo inclinado para quem fala e do olhar
+      // subindo pro título, não do olho maior. sx/sy ficam em 1 (o grupo do
+      // olho tem 31% da largura do rosto; escalá-lo lia como susto). A
+      // pálpebra desce um tico — foco, não espanto — e o sorriso é discreto.
+      return {
+        ...BASE,
+        alvo: { x: 0.2, y: -0.25 },
+        sx: 1,
+        sy: 1,
+        palpebra: -0.3,
+        olhoTopo: 1,
+        olhoBaixo: 0.95,
+        bocaEscala: 0.9,
+        corpo: { sx: 1, sy: 1, rotate: 5 },
+      };
     case "aberto":
       return momento
         ? { ...BASE, alvo: { x: 0, y: -0.2 }, forma: "arco", boca: "aberta" }
@@ -421,7 +433,9 @@ function movimentoDoCorpo({
   return estatico;
 }
 
-export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: LizaProps) {
+/** O SVG de fato — tamanho em px resolvido. Quem pede tamanho de
+ *  container não chama isto: chama `LizaBlob` com `responsivo`. */
+function BlobSvg({ estado, tamanho, seguirCursor = true, className }: LizaProps) {
   const ref = useRef<SVGSVGElement>(null);
   const clipId = `liza-blob-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const reduzido = useReduzido();
@@ -469,26 +483,18 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
   const tagarela = useTagarelar(detalhe && pose.boca === "falando", reduzido);
   const inclina = useAlvoMola(efetivo === "atento" ? 1 : 0, reduzido);
 
-  // os olhos crescem na proporção do rosto conforme a mascote encolhe —
-  // abaixo de 64px eles interpolam até as medidas do mini (as do <28),
-  // senão o FAB do celular (44) e o header (34) liam como pontinhos.
-  // k: 0 aos 28px (medidas do mini) → 1 aos 64px+ (medidas cheias)
-  const kOlho = Math.min(1, Math.max(0, (tamanho - 28) / 36));
-  // olhos ~17% maiores que a primeira versão (feedback de design: a
-  // expressão era genérica) e mais ~15% na escala cheia: com o olho menor o
-  // disco sobrava embaixo e a Liza lia como gordinha. No mini continuam
-  // legíveis sem encostar um no outro
-  const olhoDims = detalhe
-    ? {
-        rx: 12.8 - 0.7 * kOlho,
-        ry: 15.8 - 1 * kOlho,
-        cy: 48.5 - 3 * kOlho,
-        dx: 19 - 0.4 * kOlho,
-      }
-    : { rx: 12.8, ry: 15.8, cy: 48.5, dx: 19 };
-  // cílios em todas as escalas: acima de 40 o par fino; abaixo, um traço
-  // só mais grosso — o par fino lia como borrão no header (34) e nos
-  // avatares da conversa (22/24)
+  // a proporção do olho no rosto é constante em toda a escala: a
+  // interpolação por tamanho (kOlho 28→64px) encolhia o olho conforme o
+  // slot media — o px medido ainda amarrava a cara à largura da viewport e
+  // no desktop (empty state expandido) ele lia pequeno demais (26% da
+  // largura). Agora o olho é sempre 31% da largura e o par ocupa ~18% da
+  // área do rosto. O espaçamento entre os olhos (2·dx-2·rx = 11) é o mesmo
+  // de antes da mudança (~2,4px no avatar de 22px) — os olhos crescem pra
+  // margem, não um contra o outro, e não encostam nem no mini.
+  const olhoDims = { rx: 15.5, ry: 18.5, cy: 48.5, dx: 21 };
+  // cílios em todas as escalas: no mini o par continua, mas mais grosso e
+  // mais afastado — as mesmas duas hastes do grande fundiriam num borrão
+  // nos avatares da conversa (22/24) e no header (34)
   const ciliosMini = tamanho < 40;
   // o olho inteiro viaja no rosto (raio) e o reflexo faz um contra-movimento
   // (hx) — o clássico de mascote; a boca anda ~metade: o rosto "vira" em 3D
@@ -681,6 +687,32 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
   );
 }
 
+/** `responsivo` (REALIZA-447) liga o modo por container: em vez de receber
+ *  `tamanho` decidido por viewport/matchMedia, o blob mede o slot que o
+ *  envolve via ResizeObserver (useMedida) e alimenta o detalhe/cílios com
+ *  o px real. `className` passa a ser do
+ *  wrapper medido — as classes de tamanho moram nele — e `tamanho` vira
+ *  o fallback do primeiro frame/SSR. */
+export function LizaBlob({
+  responsivo,
+  ...p
+}: LizaProps & { responsivo?: boolean }) {
+  if (!responsivo) return <BlobSvg {...p} />;
+  return <BlobResponsivo {...p} />;
+}
+
+function BlobResponsivo({ tamanho, className, ...p }: LizaProps) {
+  const { ref, px } = useMedida(tamanho);
+  return (
+    <span
+      ref={ref}
+      className={cn("inline-grid place-items-center", className)}
+    >
+      <BlobSvg {...p} tamanho={px} />
+    </span>
+  );
+}
+
 function BocaForma({
   ativa,
   transicao,
@@ -763,7 +795,7 @@ function Olho({
   const borda = (fator: number) => -fator * ry + 2 * ry * palp;
   const r1x = lado * 0.88 * rx * pose.sx;
   const r1y = Math.max(-0.51 * ry * topo * pose.sy, borda(0.86));
-  const r2x = lado * 0.69 * rx * pose.sx;
+  const r2x = lado * (ciliosMini ? 0.55 : 0.69) * rx * pose.sx;
   const r2y = Math.max(-0.75 * ry * topo * pose.sy, borda(0.85));
   const cilio1 = `M${r1x} ${r1y}q${lado * 1.5} ${-1.5} ${lado * 3.8} ${-1.3}`;
   const cilio2 = `M${r2x} ${r2y}q${lado * 1.1} ${-1.8} ${lado * 2.8} ${-2.4}`;
@@ -853,20 +885,18 @@ function Olho({
             transition={transicao}
             fill="none"
             stroke={TINTA}
-            strokeWidth={ciliosMini ? 2.7 : 1.9}
+            strokeWidth={ciliosMini ? 2.5 : 1.9}
             strokeLinecap="round"
           />
-          {!ciliosMini && (
-            <motion.path
-              initial={false}
-              animate={{ d: cilio2 }}
-              transition={transicao}
-              fill="none"
-              stroke={TINTA}
-              strokeWidth={1.7}
-              strokeLinecap="round"
-            />
-          )}
+          <motion.path
+            initial={false}
+            animate={{ d: cilio2 }}
+            transition={transicao}
+            fill="none"
+            stroke={TINTA}
+            strokeWidth={ciliosMini ? 2.2 : 1.7}
+            strokeLinecap="round"
+          />
         </motion.g>
       </motion.g>
 

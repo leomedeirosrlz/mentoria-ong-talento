@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Sparkle, X } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { CaretRight, Check, Sparkle, X } from "@phosphor-icons/react";
+import { toast } from "@/lib/toast";
 import {
   confirmarSugestaoEspecialista,
   dispensarSugestaoEspecialista,
@@ -11,6 +12,7 @@ import {
 import { avatarPublicUrl } from "@/lib/avatar";
 import type { JovemEspecialista, SolicitacaoEspecialista } from "@/lib/types";
 import { Avatar } from "@/components/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,15 +24,67 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { EspecialistaSeletor } from "@/components/especialista-seletor";
 
 const QUALQUER = "qualquer";
+
+/** Prévia do especialista indicado (REALIZA-515) — foto, profissão/áreas e
+ *  experiência, o mesmo recorte público da view `jovem_especialistas` (sem
+ *  documentos nem contato: isso só abre depois que a trilha começa). O
+ *  bloco inteiro leva ao perfil em /jovem/pessoas — decidir sem ver quem
+ *  é era apostar às cegas. */
+function EspecialistaPreview({ e }: { e: JovemEspecialista }) {
+  const nome = e.nome_social || e.nome;
+  const atuacao = [e.cargo, e.empresa].filter(Boolean).join(" · ");
+  const experiencia = e.experiencia_previa ?? e.bio;
+  return (
+    <Link
+      href={`/jovem/pessoas/${e.id}`}
+      aria-label={`Ver perfil de ${nome}`}
+      className="flex items-start gap-3 rounded-lg border border-border/60 bg-card/60 p-3 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <Avatar
+        nome={nome}
+        src={e.avatar_path ? avatarPublicUrl(e.avatar_path) : null}
+        size={40}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium leading-tight">
+          {nome}
+        </span>
+        {atuacao && (
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+            {atuacao}
+          </span>
+        )}
+        {!!e.areas?.length && (
+          <span className="mt-1.5 flex flex-wrap gap-1">
+            {e.areas.slice(0, 3).map((a) => (
+              <Badge key={a} variant="secondary" className="font-normal">
+                {a}
+              </Badge>
+            ))}
+            {e.areas.length > 3 && (
+              <Badge variant="secondary" className="font-normal">
+                +{e.areas.length - 3}
+              </Badge>
+            )}
+          </span>
+        )}
+        {experiencia && (
+          <span className="mt-1.5 line-clamp-2 block break-words text-xs leading-relaxed text-muted-foreground">
+            {experiencia}
+          </span>
+        )}
+      </span>
+      <CaretRight
+        size={15}
+        aria-hidden
+        className="mt-0.5 shrink-0 text-muted-foreground"
+      />
+    </Link>
+  );
+}
 
 /** Card da sugestão registrada pelo mentor DPP (WP6): a demanda é do jovem —
  *  confirmar vira pedido de verdade ('aberta', entra nos tetos e no mural);
@@ -51,7 +105,9 @@ export function SugestaoEspecialistaCard({
   const router = useRouter();
 
   const autor = s.solicitante?.nome ?? "Seu mentor";
-  const escolhido = catalogo.find((e) => e.id === esp);
+  const sugerido = s.especialista_desejado_id
+    ? catalogo.find((e) => e.id === s.especialista_desejado_id)
+    : undefined;
 
   function confirmar() {
     start(async () => {
@@ -104,18 +160,32 @@ export function SugestaoEspecialistaCard({
           <p className="text-sm font-semibold">
             {autor} sugeriu um especialista pra você
           </p>
-          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-1 text-sm leading-relaxed break-words text-muted-foreground">
             {s.demanda}
           </p>
           {s.motivo && (
-            <p className="mt-1.5 text-sm leading-relaxed">
+            <p className="mt-1.5 text-sm leading-relaxed break-words">
               <span className="font-medium">Objetivo:</span> {s.motivo}
             </p>
           )}
-          {s.desejado?.nome && (
-            <p className="mt-1.5 text-sm">
+          {sugerido ? (
+            <div className="mt-1.5">
+              <p className="text-sm font-medium">Pensando em:</p>
+              <div className="mt-1.5">
+                <EspecialistaPreview e={sugerido} />
+              </div>
+            </div>
+          ) : s.desejado?.nome ? (
+            // indicado fora do catálogo (inativo/removido): nome sem ficha
+            // inventada — o resto o diálogo resolve na seleção
+            <p className="mt-1.5 text-sm break-words">
               <span className="font-medium">Pensando em:</span>{" "}
               {s.desejado.nome}
+            </p>
+          ) : (
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Sem nome ainda: a coordenação conecta você com quem faz
+              sentido pro tema.
             </p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
@@ -168,50 +238,21 @@ export function SugestaoEspecialistaCard({
                 placeholder="O que você quer destravar com essa trilha?"
               />
             </div>
-            <div className="space-y-2">
-              <Label id="sug-esp-label">Especialista (opcional)</Label>
-              <Select
-                value={esp}
-                onValueChange={(v) => setEsp(v ?? QUALQUER)}
-                items={{
-                  [QUALQUER]: "Qualquer especialista disponível",
-                  ...Object.fromEntries(
-                    catalogo.map((e) => [e.id, e.nome_social || e.nome])
-                  ),
-                }}
-              >
-                <SelectTrigger
-                  id="sug-esp"
-                  aria-labelledby="sug-esp-label sug-esp"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={QUALQUER}>
-                    Qualquer especialista disponível
-                  </SelectItem>
-                  {catalogo.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      <span className="flex items-center gap-2">
-                        <Avatar
-                          nome={e.nome_social || e.nome}
-                          src={
-                            e.avatar_path ? avatarPublicUrl(e.avatar_path) : null
-                          }
-                          size={20}
-                        />
-                        {e.nome_social || e.nome}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {escolhido && (
-                <p className="text-xs text-muted-foreground">
-                  O pedido vai direto pra {escolhido.nome_social || escolhido.nome}.
-                </p>
-              )}
-            </div>
+            <EspecialistaSeletor
+              idBase="sug-esp"
+              label="Especialista (opcional)"
+              rotuloQualquer="Qualquer especialista disponível"
+              catalogo={catalogo}
+              selecionado={esp === QUALQUER ? null : esp}
+              onSelecionar={(id) => setEsp(id ?? QUALQUER)}
+              linkPerfil={(e) => `/jovem/pessoas/${e.id}`}
+            />
+            {esp === QUALQUER && (
+              <p className="text-xs text-muted-foreground">
+                Sem nome ainda: a coordenação conecta você com quem faz
+                sentido pro tema.
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>

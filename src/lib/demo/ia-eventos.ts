@@ -5,9 +5,9 @@
 // (mentor_dpp 0003) e Sofia (especialista 0004) — os mesmos do dataset demo.
 
 import type { IaEventoRow } from "@/lib/ia/metricas";
-import type { PlanoIa } from "@/lib/ia/config";
+import type { IaConfig, PlanoIa } from "@/lib/ia/config";
 
-const uid = (n: number): string =>
+export const uid = (n: number): string =>
   `de000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
 const PESSOAS = [uid(1), uid(2), uid(3), uid(4)];
@@ -51,8 +51,9 @@ const TOOLS = [
   { t: "agenda_do_periodo", peso: 0.1 },
 ] as const;
 
-/** PRNG determinístico (mulberry32) — mesma seed, mesma sequência. */
-function rng(seed: number) {
+/** PRNG determinístico (mulberry32) — mesma seed, mesma sequência.
+ *  Exportado pros datasets irmãos (evals demo) derivarem do mesmo motor. */
+export function demoRng(seed: number) {
   let a = seed;
   return () => {
     a |= 0;
@@ -85,7 +86,7 @@ export function demoIaEventos(dias: number): IaEventoRow[] {
     d.setDate(d.getDate() - i);
     const iso = d.toISOString().slice(0, 10);
     const diaNum = Number(iso.replace(/-/g, ""));
-    const r = rng(diaNum);
+    const r = demoRng(diaNum);
     // fim de semana quase não tem uso; dia útil varia 8-19 perguntas e
     // os dias de pico multiplicam
     const dow = d.getDay();
@@ -162,3 +163,59 @@ export function demoIaPlano(): PlanoIa {
   d.setDate(d.getDate() - 12);
   return { plano: "go", diaRenovacao: Math.min(d.getDate(), 28), tetos: {} };
 }
+
+/** Config viva da demo — o que a aba de ajustes da bolha mostra quando
+ *  `demo` (REALIZA-382). Espelha o seed da 0148 com um toque de uso: o
+ *  balanceado já tem um fallback configurado e o esforço está ajustado
+ *  por tier, então cada controle do painel aparece com valor de exemplo
+ *  (o seed cru deixaria os três em "medio" e as cadeias vazias). */
+export function demoIaConfig(): IaConfig {
+  return {
+    modelos: {
+      rapido: "glm-5.3-flash",
+      balanceado: "deepseek-v4.1-flash",
+      forte: "deepseek-v4-pro",
+      fallbacks: {
+        rapido: [],
+        balanceado: ["mimo-v2.6-flash"],
+        forte: [],
+      },
+    },
+    esforco: { rapido: "baixo", balanceado: "medio", forte: "alto" },
+    roteamento: true,
+    busca: "hibrida",
+    plano: demoIaPlano(),
+  };
+}
+
+/** Catálogo de slugs que a aba de ajustes lista em demo — recorte da
+ *  tabela do plano (os usados nos eventos + vizinhos prováveis). */
+export const DEMO_IA_CATALOGO: string[] = [
+  "claude-haiku-5-5",
+  "deepseek-v4-pro",
+  "deepseek-v4.1-flash",
+  "gemini-4-argon",
+  "glm-5.2",
+  "glm-5.3-flash",
+  "gpt-6-luna",
+  "kimi-k3",
+  "longcat-2.0",
+  "mimo-v2.5",
+  "mimo-v2.6-flash",
+  "mimo-v2.6-pro",
+  "minimax-m3.1-flash",
+  "qwen3.8-flash",
+];
+
+/** Probe de saúde por slug em demo — os três tiers sadios nos tempos que
+ *  o seed da 0148 registra (~0,9s / ~2,2s / ~2,4s) e o fallback lento
+ *  (ttft ~10s no eval de out/2026) marcando âmbar de propósito. */
+export const DEMO_IA_SAUDE: Record<
+  string,
+  { ok: boolean; ms: number; status: number }
+> = {
+  "glm-5.3-flash": { ok: true, ms: 890, status: 200 },
+  "deepseek-v4.1-flash": { ok: true, ms: 2180, status: 200 },
+  "deepseek-v4-pro": { ok: true, ms: 2410, status: 200 },
+  "mimo-v2.6-flash": { ok: true, ms: 9820, status: 200 },
+};

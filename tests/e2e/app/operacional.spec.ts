@@ -5,10 +5,12 @@ import {
   buscarViaServiceRole,
   expect,
   inserirViaServiceRole,
+  jwtDoUsuario,
   limparDuplas,
   limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
+  restComoUsuario,
   test,
 } from "../helpers";
 
@@ -24,6 +26,9 @@ const COORD_EMAIL = process.env.E2E_COORD_EMAIL ?? "e2e-coord@realiza.test";
 const COORD_SENHA = process.env.E2E_COORD_PASSWORD ?? "";
 const DUPLA2_ID =
   process.env.E2E_DUPLA2_ID ?? "e2e00000-0000-4000-8000-000000000070";
+// capacidade que o spec de risco pode subir — restaurada via coordenação
+// (o guard de mentor_profiles bloqueia PATCH da service role)
+let capacidadeMentorTocada: string | null = null;
 
 const IDS = {
   mentor: "e2e00000-0000-4000-8000-000000000010",
@@ -86,13 +91,41 @@ async function limparDuplasComLinks(filtro: string) {
 /** Devolve o staging ao estado do seed — idempotente, vale tanto pro
  *  afterEach quanto pro pre-clean de um staging que sobrou de run quebrado. */
 async function restaurarFixtures() {
+  // o card de risco pode subir a capacidade do primeiro mentor cheio; o
+  // guard de mentor_profiles recusa service role, então restaura como coord
+  if (capacidadeMentorTocada) {
+    const nome = capacidadeMentorTocada;
+    capacidadeMentorTocada = null;
+    const [perfil] = await buscarViaServiceRole<{ id: string }[]>(
+      "profiles",
+      `select=id&nome=eq.${encodeURIComponent(nome)}`
+    );
+    if (perfil) {
+      const jwt = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
+      await restComoUsuario(
+        `mentor_profiles?profile_id=eq.${perfil.id}`,
+        jwt,
+        { method: "PATCH", body: { capacidade: 1 } }
+      );
+    }
+  }
   // sucessora criada pelo remanejo (carrega remanejada_de=dupla2) e qualquer
   // vínculo do mentorado livre — depois a dupla2 volta a "ativa"
   await limparDuplasComLinks(`remanejada_de=eq.${DUPLA2_ID}`);
   await limparDuplasComLinks(`mentorado_id=eq.${IDS.mentoradoLivre}`);
   await atualizarViaServiceRole("duplas", `id=eq.${DUPLA2_ID}`, {
     status: "ativa",
+    encerrada_em: null,
+    motivo_encerramento: null,
+    // 0217: o rematch DPP carimba desfecho* na ficha e a linha 'desfecho'
+    // no ledger — a restauração apaga os dois pra devolver o seed "ativa"
+    desfecho: null,
+    desfecho_motivo: null,
+    desfecho_obs: null,
+    desfecho_em: null,
+    desfecho_por: null,
   });
+  await limparViaServiceRole("dupla_eventos", `dupla_id=eq.${DUPLA2_ID}`);
   // risco plantado pelo spec da sugestão de remanejo (encontro + registro
   // com precisa_apoio) — filhos da 0071 primeiro, igual ao seed
   await limparEncontrosDaDupla(DUPLA2_ID);
@@ -138,7 +171,7 @@ test.describe("coordenação — fluxos operacionais", () => {
     await restaurarFixtures();
   });
 
-  test("pessoas: fila 'Aguardando par' abre fechada e lista o mentorado sem par", async ({
+  test("pessoas: fila 'Aguardando par' abre aberta com a contagem separada e lista o mentorado sem par", async ({
     page,
   }) => {
     await page.goto("/pessoas");
@@ -146,10 +179,14 @@ test.describe("coordenação — fluxos operacionais", () => {
     const fila = page.locator(
       'section[aria-labelledby="fila-espera-titulo"]'
     );
-    // a tela abre com o card fechado — a coord expande se precisar
-    const gatilho = fila.getByRole("button", { name: /Aguardando par ·/ });
-    await expect(gatilho).toHaveAttribute("aria-expanded", "false");
-    await gatilho.click();
+    // REALIZA-446: com gente esperando o card já abre — a fila é a
+    // chamada de entrada, e o título separa os dois lados ("o que falta
+    // pra parear" fica legível sem expandir nada)
+    const gatilho = fila.getByRole("button", { name: /Aguardando par/ });
+    await expect(gatilho).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      fila.getByText(/\d+ mentorado(s)? · \d+ mentor(es)? com vaga/)
+    ).toBeVisible();
     // a mentorada fixture nunca teve dupla — espera na coluna de mentorados
     await expect(
       fila.getByRole("link", { name: "Abrir perfil de Mentorada E2E Livre" })
@@ -163,12 +200,23 @@ test.describe("coordenação — fluxos operacionais", () => {
     // — combinada com restore+login+dialog isso passa dos 60s do projeto
     test.setTimeout(90_000);
     await page.goto(`/duplas/${DUPLA2_ID}`);
-    // REALIZA-343: "Remanejar dupla" é botão em linha no header no desktop
-    // (no celular segue no "Mais"). Quando a dupla está em risco a sugestão
-    // da 115 também cria botões "Remanejar" por candidato — o exact separa
-    await page.getByRole("button", { name: "Remanejar dupla", exact: true }).click();
+    // review 21/11 (#9): "Remanejar dupla" virou item do ⋯ em todo
+    // viewport (a 343 punha em linha no desktop). Quando a dupla está em
+    // risco a sugestão da 115 também cria botões "Remanejar" por
+    // candidato — o exact separa. O gesto composto é seguro de repetir
+    const maisMenu = page.getByRole("button", { name: "Mais ações da dupla" });
+    const itemRemanejo = page.getByRole("menuitem", {
+      name: "Remanejar dupla",
+      exact: true,
+    });
     const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
+    await agirComConfirma(
+      async () => {
+        await maisMenu.click();
+        await itemRemanejo.click();
+      },
+      () => dialog.isVisible()
+    );
 
     // quem sai: o mentorado da dupla (o radio mora dentro do label clicável)
     await dialog
@@ -186,8 +234,8 @@ test.describe("coordenação — fluxos operacionais", () => {
     // confirmar
     await expect(dialog.getByText(/será encerrada/)).toBeVisible();
     // clique pré-hidratação é no-op silencioso — repete até o botão entrar
-    // em pending ("Remanejando…") ou a página já ter virado (a action
-    // também fecha o dialog no sucesso). Rematch é idempotente do ponto de
+    // em pending ("Remanejando…") ou a página já ter virado (o redirect da
+    // action desmonta o dialog no sucesso). Rematch é idempotente do ponto de
     // vista do spec: se o 1º clique submeteu, o botão desabilita e um 2º
     // nem dispara; se errou, o alert embaixo explica em vez de estourar
     // cego no waitForURL.
@@ -203,14 +251,17 @@ test.describe("coordenação — fluxos operacionais", () => {
         !page.url().includes(`/duplas/${DUPLA2_ID}`)
     );
 
-    // a action empurra pra ficha da dupla nova (URL ≠ da antiga). Se a RPC
+    // a action empurra pra ficha da dupla nova (URL ≠ da antiga) com o
+    // flash do remanejo (506) — o predicado lê a URL no instante da
+    // navegação, antes do replaceState que limpa o parâmetro. Se a RPC
     // recusou, o alert inline do dialog é a resposta — a corrida falha com
     // a mensagem real em vez de um timeout de navegação que não diz nada.
     const alvo = page.waitForURL(
       (url) =>
         /^\/duplas\/[0-9a-f-]{36}$/.test(url.pathname) &&
-        !url.pathname.includes(DUPLA2_ID),
-      // action pesada (RPC + sinos + revalidate) + router.push em preview frio
+        !url.pathname.includes(DUPLA2_ID) &&
+        url.searchParams.get("remanejada") === "1",
+      // action pesada (RPC + sinos + revalidate) + redirect em preview frio
       { timeout: 45_000 }
     );
     const recusa = dialog
@@ -229,6 +280,20 @@ test.describe("coordenação — fluxos operacionais", () => {
       alvo.catch(() => {});
       recusa.catch(() => {});
     }
+    // 506: a confirmação do remanejo é o banner da ficha sucessora — o
+    // NEXT_REDIRECT corta o cliente do dialog antes de qualquer toast
+    const flash = page.getByRole("status").filter({ hasText: "Dupla remanejada" });
+    await expect(flash).toBeVisible({ timeout: 15_000 });
+    await expect(
+      flash.getByRole("link", { name: "Ver a ficha de origem" })
+    ).toHaveAttribute("href", `/duplas/${DUPLA2_ID}`);
+    // one-shot: o parâmetro sai da URL via replaceState e um refresh não
+    // repete o aviso
+    await expect(async () => {
+      expect(page.url()).not.toContain("remanejada=");
+    }).toPass({ timeout: 10_000 });
+    await page.reload();
+    await expect(page.getByText("Dupla remanejada")).toHaveCount(0);
     await expect(
       page.getByRole("heading", { name: /Mentorada E2E Livre/ })
     ).toBeVisible({ timeout: 15_000 });
@@ -392,6 +457,9 @@ test.describe("coordenação — fluxos operacionais", () => {
       avaliacao: "baixa",
       dificuldade: "participacao",
       precisa_apoio: true,
+      // registroTemConteudo ignora row só com os enums; sem texto ele não
+      // vira o "último registro" e o card lê o atraso no lugar do combo
+      reflexoes: "Risco plantado pelo e2e: avaliação baixa e dificuldade.",
     });
 
     await page.goto(`/duplas/${DUPLA2_ID}`);
@@ -415,15 +483,22 @@ test.describe("coordenação — fluxos operacionais", () => {
       card.getByText(/Avaliação baixa e dificuldade de participação.*Se a conversa não destravar/)
     ).toBeVisible();
 
-    // pool de mentores: o import (sem dupla) tem vaga e leva Remanejar;
-    // o colega (dupla PAUSADA, cap implícita 1) aparece cheio — a saída
-    // dele é ajustar a capacidade, não desaparecer
+    // pool de mentores: o import (sem dupla) tem vaga e leva Remanejar.
+    // O card corta a lista de cheios em 3; o "colega" da dupla pausada pode
+    // ficar no "…e mais" conforme o ranking, então o fluxo de capacidade
+    // usa o primeiro cheio visível (mesma régua 1/1 · sem vaga).
     const linhaImport = card.locator("li", { hasText: "Mentor E2E Import" });
     await expect(linhaImport).toBeVisible();
-    const linhaColega = card.locator("li", { hasText: "Mentor E2E Colega" });
-    await expect(linhaColega.getByText(/1\/1 · sem vaga/)).toBeVisible();
+    const linhaCheia = card
+      .locator("li")
+      .filter({ hasText: /1\/1 · sem vaga/ })
+      .first();
+    await expect(linhaCheia).toBeVisible();
+    const nomeCheio = (await linhaCheia.locator("p").first().innerText())
+      .split(" 1/1")[0]
+      .trim();
     await expect(
-      linhaColega.getByRole("button", { name: /aumentar capacidade/ })
+      linhaCheia.getByRole("button", { name: /aumentar capacidade/ })
     ).toBeVisible();
 
     // lado do mentorado: a fila "Aguardando par" ranqueada — a Mentorada
@@ -450,7 +525,8 @@ test.describe("coordenação — fluxos operacionais", () => {
 
     // a saída do cheio: o ajuste sobe a capacidade e o nome dele sai de
     // "sem vaga" pra candidato — o card re-renderiza pelo refresh
-    await linhaColega
+    capacidadeMentorTocada = nomeCheio;
+    await linhaCheia
       .getByRole("button", { name: /aumentar capacidade/ })
       .click();
     // accessible name vem do título do dialog ("Capacidade de Mentor…")
@@ -461,15 +537,18 @@ test.describe("coordenação — fluxos operacionais", () => {
     // dev server compila a action no 1º hit — a janela de write em staging
     // pede folga maior que a dos cliques read-only
     await expect(capDialog).not.toBeVisible({ timeout: 30_000 });
+    const linhaCheiaAgora = card.locator("li", {
+      hasText: `${nomeCheio} 1/2`,
+    });
     await expect(
-      card.locator("li", { hasText: "Mentor E2E Colega" }).getByRole("button", {
+      linhaCheiaAgora.getByRole("button", {
         name: "Remanejar",
         exact: true,
       })
     ).toBeVisible({ timeout: 30_000 });
-    // o colega saiu de 1/1 cheio pra 1/2 — outros mentores seguem sem vaga
-    await expect(linhaColega.getByText(/sem vaga/)).not.toBeVisible();
-    await expect(linhaColega.getByText(/1\/2/)).toBeVisible();
+    // o mentor saiu de 1/1 cheio pra 1/2 — outros seguem sem vaga
+    await expect(linhaCheiaAgora.getByText(/sem vaga/)).not.toBeVisible();
+    await expect(linhaCheiaAgora.getByText(/1\/2/)).toBeVisible();
   });
 
   // REALIZA-116 + rodada fev/2026 — o matching virou um estado do card
@@ -486,10 +565,13 @@ test.describe("coordenação — fluxos operacionais", () => {
     const card = page.locator(
       'section[aria-labelledby="fila-espera-titulo"]'
     );
-    await expect(card.getByText(/Aguardando par · \d+/)).toBeVisible();
-    // o card abre fechado por padrão — expande antes de entrar no Parear
+    await expect(
+      card.getByText(/Aguardando par/)
+    ).toBeVisible();
+    // com espera na fila o card já abre — a guarda só cobre o caso
+    // de fila vazia (total 0 = fechado por padrão)
     const gatilho = card.getByRole("button", {
-      name: /Aguardando par ·/,
+      name: /Aguardando par/,
     });
     if ((await gatilho.getAttribute("aria-expanded")) === "false") {
       await gatilho.click();

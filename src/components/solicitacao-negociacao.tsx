@@ -9,7 +9,7 @@ import {
   WhatsappLogo,
   XCircle,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 /** corrida de aceite → copy humana (o erro cru da RPC virava toast técnico;
  *  onErro segue recebendo a mensagem original — marcarTomada testa nela) */
@@ -60,6 +60,10 @@ import {
   tempoRelativo,
   toDateStr,
 } from "@/lib/ciclo";
+import {
+  ocupadoEmChoque,
+  type OcupadoRotulado,
+} from "@/lib/sugestoes-encontro";
 import { cn, ERRO_JA_ACEITA } from "@/lib/utils";
 
 /** "19:00" da grade do especialista — derivado do formatDiaHora pra ficar
@@ -166,10 +170,11 @@ function Thread({ propostas, s, meuId, agoraMs }: {
  *  Seleção em grade por dia (mock v6 .days): cada horário livre é um radio;
  *  quando o caller passa a `disponibilidade` de quem escolhe, o slot que
  *  encaixa na grade dele ganha o destaque âmbar "encaixa com você". */
-function ContraPropostaForm({
+export function ContraPropostaForm({
   solicitacaoId,
   slots,
   disponibilidade,
+  ocupados,
   onFechar,
   onErro,
 }: {
@@ -178,6 +183,10 @@ function ContraPropostaForm({
   /** Grade de quem escolhe (o jovem na mesa dele) — pinta os encaixes;
    *  sem a prop os slots renderizam neutros. */
   disponibilidade?: Disponibilidade | null;
+  /** Agenda de quem escolhe — o slot que encaixa na grade mas choca com
+   *  um compromisso não pode prometer "encaixa" (507: o aceite dele já
+   *  seria barrado pelo choque); fica neutro e avisa "ocupado". */
+  ocupados?: OcupadoRotulado[] | null;
   onFechar: () => void;
   /** opcional — o chamador observa erros de domínio (ex.: aceite em corrida). */
   onErro?: (mensagem: string) => void;
@@ -191,9 +200,14 @@ function ContraPropostaForm({
     const dia = toDateStr(new Date(sl));
     (porDia.get(dia) ?? porDia.set(dia, []).get(dia)!).push(sl);
   }
-  const algumCompat =
+  const choqueEm = (sl: string) =>
+    ocupados?.length ? ocupadoEmChoque(new Date(sl), ocupados) : null;
+  // encaixa = grade + agenda livre — um choque não pode herdar o âmbar
+  const encaixa = (sl: string) =>
     disponibilidade != null &&
-    slots.some((sl) => slotCompativel(disponibilidade, sl));
+    slotCompativel(disponibilidade, sl) &&
+    !choqueEm(sl);
+  const algumCompat = slots.some(encaixa);
 
   if (slots.length === 0) {
     return (
@@ -221,9 +235,8 @@ function ContraPropostaForm({
               </span>
             </span>
             {slotsDia.map((sl) => {
-              const compat = disponibilidade
-                ? slotCompativel(disponibilidade, sl)
-                : false;
+              const compat = encaixa(sl);
+              const choque = choqueEm(sl);
               return (
                 <label key={sl} className="inline-flex flex-col items-center">
                   <input
@@ -233,10 +246,16 @@ function ContraPropostaForm({
                     checked={slot === sl}
                     onChange={() => setSlot(sl)}
                     className="peer sr-only"
-                    aria-label={`${rotuloSlot(sl)}${compat ? " · encaixa com você" : ""}`}
+                    aria-label={`${rotuloSlot(sl)}${compat ? " · encaixa com você" : choque ? " · você já tem algo nesse horário" : ""}`}
                   />
                   <span
-                    title={compat ? "encaixa com você" : undefined}
+                    title={
+                      compat
+                        ? "encaixa com você"
+                        : choque
+                          ? "Você já tem algo nesse horário"
+                          : undefined
+                    }
                     className={cn(
                       "inline-flex min-h-11 min-w-14 cursor-pointer items-center justify-center rounded-lg border border-input bg-card px-2 text-sm font-semibold tabular-nums transition-colors",
                       "peer-checked:border-foreground peer-checked:bg-foreground peer-checked:text-background peer-hover:bg-muted peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50",
@@ -252,6 +271,14 @@ function ContraPropostaForm({
                       className="mt-0.5 text-[10px] leading-none font-medium text-[var(--warn-text)]"
                     >
                       encaixa
+                    </span>
+                  )}
+                  {choque && (
+                    <span
+                      aria-hidden
+                      className="mt-0.5 text-[10px] leading-none font-medium text-muted-foreground"
+                    >
+                      ocupado
                     </span>
                   )}
                 </label>
@@ -376,6 +403,7 @@ export function SolicitacaoNegociacao({
   equipe,
   nomeJovem,
   disponibilidade,
+  ocupados,
   mentoradosProprios,
   onAceito,
   onErro,
@@ -400,6 +428,10 @@ export function SolicitacaoNegociacao({
    *  é a dele (jovem_perfil.disponibilidade); pinta "encaixa com você" nos
    *  slots da grade de dias da contra-proposta. Null/ausente = sem destaque. */
   disponibilidade?: Disponibilidade | null;
+  /** Compromissos já marcados de quem aceita — só o jovem alimenta (a mesa
+   *  dele recebe ocupadosDoJovem com rótulo). Uma proposta em choque não
+   *  grava: o aviso inline aponta o encontro antes do aceite (481). */
+  ocupados?: OcupadoRotulado[];
   /** opcional — chamado com a dupla criada/efetivada quando o aceite fecha
    *  (o mural navega pra ficha da nova dupla). */
   onAceito?: (duplaId?: string) => void;
@@ -417,6 +449,12 @@ export function SolicitacaoNegociacao({
   const [slotAceite, setSlotAceite] = useState<string | null>(null);
   // cancelar via item do ⋯ (REALIZA-186) — o confirm é controlado
   const [cancelando, setCancelando] = useState(false);
+  // o choque que o último "Aceitar" barrou — ligado ao slot na mesa, some
+  // sozinho quando a proposta na mesa troca
+  const [avisoChoque, setAvisoChoque] = useState<{
+    slot: string;
+    rotulo: string;
+  } | null>(null);
 
   const efetivo = s.status_efetivo ?? s.status;
   const emNegociacao = efetivo === "aberta" || efetivo === "contra_proposta";
@@ -664,6 +702,7 @@ export function SolicitacaoNegociacao({
               solicitacaoId={s.id}
               slots={slots}
               disponibilidade={disponibilidade}
+              ocupados={ocupados}
               onFechar={() => setAbrindo(null)}
               onErro={onErro}
             />
@@ -694,7 +733,25 @@ export function SolicitacaoNegociacao({
                 <Button
                   size="sm"
                   disabled={pendente}
-                  onClick={() =>
+                  onClick={() => {
+                    // 481: o aceite que colide com a agenda dele não grava —
+                    // o aviso inline nomeia o choque e a contra-proposta é
+                    // a saída (a RPC segue como rede de segurança)
+                    const choque = ocupadoEmChoque(
+                      new Date(s.slot_proposto!),
+                      ocupados
+                    );
+                    if (choque) {
+                      setAvisoChoque({
+                        slot: s.slot_proposto!,
+                        rotulo:
+                          choque.rotuloArtigo ||
+                          choque.rotulo ||
+                          "outro compromisso",
+                      });
+                      return;
+                    }
+                    setAvisoChoque(null);
                     start(async () => {
                       const r = await aceitarProposta(s.id);
                       if (r.error) {
@@ -704,8 +761,8 @@ export function SolicitacaoNegociacao({
                         toast.success("Horário aceito. Sessão marcada.");
                         onAceito?.(r.duplaId);
                       }
-                    })
-                  }
+                    });
+                  }}
                 >
                   <CheckCircle size={15} />
                   Aceitar {rotuloSlot(s.slot_proposto)}
@@ -780,11 +837,18 @@ export function SolicitacaoNegociacao({
               />
             </div>
           )}
+          {avisoChoque && avisoChoque.slot === s.slot_proposto && (
+            <p role="status" className="text-sm text-destructive">
+              Nesse horário você tem {avisoChoque.rotulo}. Propõe outro
+              horário.
+            </p>
+          )}
           {abrindo === "proposta" && (
             <ContraPropostaForm
               solicitacaoId={s.id}
               slots={slots}
               disponibilidade={disponibilidade}
+              ocupados={ocupados}
               onFechar={() => setAbrindo(null)}
               onErro={onErro}
             />

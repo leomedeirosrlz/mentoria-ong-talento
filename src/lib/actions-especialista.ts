@@ -119,8 +119,8 @@ export async function criarSolicitacao(formData: FormData) {
     }
   }
 
-  // "em aberto" v2 (0074): aguardando triagem ou em negociação também ocupam
-  // o pedido — e um slot vencido (status_efetivo 'expirada') libera de novo
+  // "em aberto" v2 (0074): negociação em curso também ocupa o pedido — e um
+  // slot vencido (status_efetivo 'expirada') libera de novo
   const agora = new Date().toISOString();
   const { data: aberta } = await supabase
     .from("solicitacoes_especialista")
@@ -143,46 +143,32 @@ export async function criarSolicitacao(formData: FormData) {
   });
   if (error) return { error: erroAmigavel(error) };
 
-  // pings: o especialista escolhido ou todos os ativos + a coordenação.
-  // notificar() filtra o autor — se o solicitante for coord, ele não se pinga.
-  const [esps, coords, mentorado] = await Promise.all([
-    desejado
-      ? Promise.resolve({ data: [{ id: desejado }] })
-      : // broadcast vai pra quem TEM o papel, não só pro primário (WP6b)
-        supabase
-          .from("profiles")
-          .select("id, profile_papeis!inner(papel)")
-          .eq("profile_papeis.papel", "mentor_especialista")
-          .eq("ativo", true),
-    supabase.from("profiles").select("id").eq("role", "coordenacao").eq("ativo", true),
-    supabase.from("mentorados").select("nome").eq("id", dupla.mentorado_id).maybeSingle(),
-  ]);
-  const nomeMentorado = mentorado.data?.nome;
+  // ping só pra quem atende: o especialista escolhido ou todos os ativos. A
+  // coordenação acompanha pelo mural e pelo card da home, sem sino de
+  // triagem (0158: o pedido nasce no mural).
+  const esps = desejado
+    ? Promise.resolve({ data: [{ id: desejado }] })
+    : // broadcast vai pra quem TEM o papel, não só pro primário (WP6b)
+      supabase
+        .from("profiles")
+        .select("id, profile_papeis!inner(papel)")
+        .eq("profile_papeis.papel", "mentor_especialista")
+        .eq("ativo", true);
+  const { data: especialistas } = await esps;
   // o !inner devolve UMA linha de profile por linha de papel — o papel em
   // múltiplos escopos duplicaria o especialista e o ping chegaria em dobro
   const espIds = [
-    ...new Set((esps.data ?? []).map((d: { id: string }) => d.id)),
+    ...new Set((especialistas ?? []).map((d: { id: string }) => d.id)),
   ];
   await notificar(
     supabase,
-    [
-      ...espIds.map((id) => ({
-        profile_id: id,
-        tipo: "demanda_especialista",
-        titulo: "Novo pedido de mentoria especializada",
-        corpo: resumo(demanda),
-        href: "/",
-      })),
-      ...(coords.data ?? []).map((c: { id: string }) => ({
-        profile_id: c.id,
-        tipo: "solicitacao_registrada",
-        titulo: "Solicitação de especialista registrada",
-        corpo: nomeMentorado
-          ? `${eu.nome} pediu um especialista pra ${nomeMentorado}.`
-          : `${eu.nome} pediu um especialista.`,
-        href: `/duplas/${dupla_dpp_id}`,
-      })),
-    ],
+    espIds.map((id) => ({
+      profile_id: id,
+      tipo: "demanda_especialista",
+      titulo: "Novo pedido de mentoria especializada",
+      corpo: resumo(demanda),
+      href: "/",
+    })),
     eu.id
   );
 
@@ -214,31 +200,8 @@ export async function aceitarSolicitacao(
     return { error: error ? erroAmigavel(error) : "Não foi possível concluir. Tente de novo." };
   }
 
-  // a RPC avisa autor/jovem/mentor DPP mas não a coordenação — quem gerencia
-  // o programa precisa ver o aceite (link direto pra dupla nova, que é do
-  // escopo deles). Quem pediu sendo coord não duplica.
-  const [{ data: s }, { data: coords }] = await Promise.all([
-    supabase
-      .from("solicitacoes_especialista")
-      .select("created_by")
-      .eq("id", solicitacaoId)
-      .single(),
-    supabase.from("profiles").select("id").eq("role", "coordenacao").eq("ativo", true),
-  ]);
-  await notificar(
-    supabase,
-    (coords ?? [])
-      .filter((c: { id: string }) => c.id !== s?.created_by)
-      .map((c: { id: string }) => ({
-        profile_id: c.id,
-        tipo: "especialista_aceitou",
-        titulo: "Pedido de especialista aceito",
-        corpo: `${eu.nome} assumiu. A sessão foi marcada.`,
-        href: `/duplas/${duplaId}`,
-      })),
-    eu.id
-  );
-
+  // a RPC avisa autor, jovem e mentor DPP. A coordenação não recebe sino: o
+  // aceite aparece na trilha, que é o painel dela.
   revalidarMural();
   return { ok: true, duplaId };
 }
@@ -379,7 +342,7 @@ const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
 function erroAgenda(e: { message: string; code?: string }): string {
   // unique(profile_id, dia_semana, hora_inicio) — a janela repetida
   if (/especialista_grade_profile_id_dia_semana_hora_inicio_key/i.test(e.message)) {
-    return "Já existe uma janela começando nesse horário nesse dia.";
+    return "Já existe uma faixa começando nesse horário nesse dia.";
   }
   return erroAmigavel(e);
 }
@@ -402,10 +365,10 @@ export async function adicionarJanela(formData: FormData) {
     return { error: "Escolha o dia da semana." };
   }
   if (!HORA_RE.test(horaInicio) || !HORA_RE.test(horaFim)) {
-    return { error: "Confira os horários da janela." };
+    return { error: "Confira os horários da faixa." };
   }
   if (horaFim <= horaInicio) {
-    return { error: "O fim da janela precisa ser depois do início." };
+    return { error: "O fim da faixa precisa ser depois do início." };
   }
 
   const { error } = await supabase.from("especialista_grade").insert({
@@ -423,7 +386,7 @@ export async function removerJanela(id: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (!id) return { error: "Janela não informada." };
+  if (!id) return { error: "Faixa não informada." };
 
   const { error } = await supabase
     .from("especialista_grade")

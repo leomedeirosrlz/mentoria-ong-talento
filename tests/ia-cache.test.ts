@@ -187,12 +187,18 @@ describe("audiência dos guias (frontmatter → fontes.json)", () => {
     expect(guiaVisivel("guia-sumido", coord)).toBe(true);
   });
 
-  it("jovem não recebe trecho de instrumento DPP e o cache não vaza entre recortes", async () => {
+  it("jovem recebe instrumento aberto a ela e o cache não vaza entre recortes", async () => {
+    // REALIZA-386: os instrumentos passaram a servir o mentorado (ele
+    // executa a Roda/PDM com o mentor) — o frontmatter manda e o
+    // manifest regenerado reflete isso
     const sb = clienteFalso();
-    expect(await buscarNosGuias(sb, "roda da vida", "fts", jovem)).toEqual([]);
+    const doJovem = await buscarNosGuias(sb, "roda da vida", "fts", jovem);
+    expect(doJovem.map((f) => f.guia)).toEqual(["instrumento-roda-da-vida"]);
     const doMentor = await buscarNosGuias(sb, "roda da vida", "fts", dpp);
     expect(doMentor.map((f) => f.guia)).toEqual(["instrumento-roda-da-vida"]);
-    expect(await buscarNosGuias(sb, "roda da vida", "fts", jovem)).toEqual([]);
+    expect(
+      (await buscarNosGuias(sb, "roda da vida", "fts", jovem)).map((f) => f.guia)
+    ).toEqual(["instrumento-roda-da-vida"]);
   });
 
   it("catálogo do jovem esconde guia fora da audiência", async () => {

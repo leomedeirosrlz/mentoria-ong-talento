@@ -8,12 +8,21 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { rotearTier } from "@/lib/ia/roteador";
+import { rotearTier, type TarefaIa } from "@/lib/ia/roteador";
 import { executarTool, IA_TOOLS } from "@/lib/ia/tools";
 import { systemPromptIa } from "@/lib/ia/prompts";
 import type { AppRole } from "@/lib/types";
 
-type CasoTier = { id: string; msg: string; opts?: { posTool?: boolean }; espera: string };
+type CasoTier = {
+  id: string;
+  msg: string;
+  opts?: {
+    posTool?: boolean;
+    papel?: AppRole | AppRole[] | null;
+    tarefa?: TarefaIa;
+  };
+  espera: string;
+};
 type CasoGate = {
   id: string;
   papeis: string[];

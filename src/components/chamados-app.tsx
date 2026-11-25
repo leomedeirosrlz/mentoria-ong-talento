@@ -36,13 +36,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import { NovoChamadoDialog } from "@/components/novo-chamado-dialog";
 import { ChamadoDetalhe } from "@/components/chamado-detalhe";
 import {
   ChamadoStatusBadge,
   UrgenciaMarca,
   relTempo,
+  rotuloAberturaChamado,
   type Equipe,
 } from "@/components/chamados-shared";
 
@@ -135,7 +136,8 @@ export function ChamadosApp({
           c.numero.toLowerCase().includes(q) ||
           (c.assunto ?? "").toLowerCase().includes(q) ||
           (c.autor_nome ?? "").toLowerCase().includes(q) ||
-          (c.contexto ?? "").toLowerCase().includes(q)
+          (c.contexto ?? "").toLowerCase().includes(q) ||
+          (c.mentorado_nome ?? "").toLowerCase().includes(q)
       );
     }
     return l;
@@ -194,10 +196,14 @@ export function ChamadosApp({
       duplas={duplas}
       trigger={
         // com um chamado aberto a ação da tela é a do detalhe (Assumir,
-        // Resolver): "Novo chamado" recua pra contorno — um lima por tela
-        <Button variant={sel ? "outline" : "default"} className="max-md:hidden">
+        // Resolver): a de abertura recua pra contorno — um lima por tela
+        <Button
+          variant={sel ? "outline" : "default"}
+          className="max-md:hidden"
+          data-telemetry-alvo="novo-chamado"
+        >
           <Plus aria-hidden />
-          Novo chamado
+          {rotuloAberturaChamado(papel)}
         </Button>
       }
     />
@@ -216,9 +222,12 @@ export function ChamadosApp({
       papel={papel}
       duplas={duplas}
       trigger={
-        <Button className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-30 h-12 rounded-full px-4 shadow-[var(--shadow-overlay)] md:hidden">
+        <Button
+          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-30 h-12 rounded-full px-4 shadow-[var(--shadow-overlay)] md:hidden"
+          data-telemetry-alvo="novo-chamado"
+        >
           <Plus aria-hidden />
-          Novo chamado
+          {rotuloAberturaChamado(papel)}
         </Button>
       }
     />,
@@ -289,7 +298,7 @@ export function ChamadosApp({
                   <legend className="text-xs font-medium text-muted-foreground">
                     Categoria
                   </legend>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  <FilterChipRow className="mt-2 gap-1.5">
                     {(["todas", ...categoriasPresentes] as const).map((v) => (
                       <Button
                         key={v}
@@ -301,7 +310,7 @@ export function ChamadosApp({
                         {v === "todas" ? "Todas" : CHAMADO_CATEGORIA_LABEL[v]}
                       </Button>
                     ))}
-                  </div>
+                  </FilterChipRow>
                 </fieldset>
               )}
               <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm md:min-h-8">
@@ -394,7 +403,14 @@ export function ChamadosApp({
             ? [CHAMADO_CATEGORIA_LABEL[c.categoria], relTempo(c.created_at)]
             : staff
               ? [c.autor_nome, c.contexto, relTempo(c.created_at)]
-              : [c.contexto, relTempo(c.updated_at)];
+              : [
+                  // na fila do autor o contexto vem null — o mentorado é a
+                  // âncora da dupla (pro jovem é ele mesmo: omite)
+                  papel !== "mentorado" && c.mentorado_nome
+                    ? `Mentorado: ${c.mentorado_nome}`
+                    : c.contexto,
+                  relTempo(c.updated_at),
+                ];
           return (
             <li
               key={c.id}

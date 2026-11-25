@@ -40,7 +40,15 @@ import {
   normTitulo,
   tomDeFase,
   tomSemantico,
+  totalSumario,
 } from "@/lib/materiais/corpus-doc";
+import { sistemaDoDoc } from "@/lib/como-conduzir";
+import { INSTRUMENTO_INFO } from "@/lib/forms/schema";
+import {
+  InstrumentoEmblema,
+  instrumentoVars,
+} from "@/components/instrumento-icone";
+import { buttonVariants } from "@/components/ui/button";
 import type { DocTom } from "@/lib/materiais-documentos";
 import { cn } from "@/lib/utils";
 import { SumarioPill } from "./sumario-pill";
@@ -50,15 +58,17 @@ import {
   LinkSecao,
   TOM_DOC,
 } from "./material-documento";
+import { PedirLizaPersonalizar } from "./pedir-liza-personalizar";
 
 // RAG corpus document (docs/rag/*.md) rendered natively — the PDF guide's
 // visual grammar: ink hero, keyword icons and the full-width lime rule on
 // h2, rotating phase bands for the journey's month groups, the clickable
 // 16-dot journey strip, encounter cards, callouts, charcoal tables and a
-// TOC with tone markers + dotted leader (sticky collapsible pill below xl,
-// sticky rail at xl on long guides). The per-section anchor (id = secaoAnchor)
-// is the same slug the assistant uses to cite the source — headings link
-// to their own anchor, no JS.
+// two-level TOC with tone markers + dotted leader (sticky collapsible pill
+// below xl, sticky rail at xl on long guides): um item por ## e os ### sob
+// ele — no guia DPP é o que torna os 16 encontros navegáveis um a um. The
+// per-section anchor (id = secaoAnchor) is the same slug the assistant uses
+// to cite the source — headings link to their own anchor, no JS.
 
 const TOC_MINIMO = 8; // above 8 sections the TOC shows at the top
 
@@ -83,10 +93,25 @@ function capitalizar(s: string): string {
 
 /** "PDM · Onde fica na plataforma" → eyebrow "PDM" + title "Onde fica na
  *  plataforma". The corpus ` · ` separator always marks parent·child
- *  (phase, instrument, chapter); a title without it has no eyebrow. */
-function eyebrowDe(titulo: string): { eyebrow: string | null; resto: string } {
+ *  (phase, instrument, chapter); a title without it has no eyebrow.
+ *  The eyebrow is dropped when it adds nothing in this doc: repeating
+ *  the doc's own subject ("Roda da Vida · …" inside the Roda da Vida
+ *  doc — every section stamped alike tires reading) or a bare chapter
+ *  number ("01 · Carta…" — grupos already carry their own numbering). */
+function eyebrowDe(
+  titulo: string,
+  docTitulo?: string
+): { eyebrow: string | null; resto: string } {
   const m = /^(.{1,40}?)\s+·\s+(.+)$/.exec(titulo);
-  return m ? { eyebrow: m[1], resto: m[2] } : { eyebrow: null, resto: titulo };
+  if (!m) return { eyebrow: null, resto: titulo };
+  const [, eyebrow, resto] = m;
+  if (/^\d+$/.test(eyebrow.trim())) return { eyebrow: null, resto };
+  if (
+    docTitulo &&
+    normTitulo(docTitulo).includes(normTitulo(eyebrow))
+  )
+    return { eyebrow: null, resto };
+  return { eyebrow, resto };
 }
 
 // h2 icon by exact keyword in the normalized title (word boundary) — the
@@ -136,8 +161,16 @@ function iconeTitulo(titulo: string, className: string): ReactNode {
  *  PDF's full-width band — tinted bg of the rotating tone + caps eyebrow +
  *  icon + title + the tone's accent bar; regular sections keep the caps
  *  lime eyebrow + navy bold title + the full-width lime rule. */
-function TituloGrupo({ grupo, num }: { grupo: CorpusGrupo; num: number }) {
-  const { eyebrow, resto } = eyebrowDe(grupo.titulo);
+function TituloGrupo({
+  grupo,
+  num,
+  docTitulo,
+}: {
+  grupo: CorpusGrupo;
+  num: number;
+  docTitulo?: string;
+}) {
+  const { eyebrow, resto } = eyebrowDe(grupo.titulo, docTitulo);
   const tom = grupo.fase != null ? TOM_DOC[tomDeFase(grupo.fase)] : null;
   // número do capítulo na posição do eyebrow — "05 · PDM" ou só "05"
   const rotulo = `${String(num).padStart(2, "0")}${eyebrow ? ` · ${eyebrow}` : ""}`;
@@ -193,8 +226,14 @@ function TituloGrupo({ grupo, num }: { grupo: CorpusGrupo; num: number }) {
 
 /** h3: navy bold, no rule (the eyebrow applies here too — "Momento N · …"
  *  and the routes' "Nº encontro · …" come out in caps lime). */
-function TituloSub({ s }: { s: CorpusSecao }) {
-  const { eyebrow, resto } = eyebrowDe(s.titulo);
+function TituloSub({
+  s,
+  docTitulo,
+}: {
+  s: CorpusSecao;
+  docTitulo?: string;
+}) {
+  const { eyebrow, resto } = eyebrowDe(s.titulo, docTitulo);
   return (
     <h3 id={s.anchor} className="group scroll-mt-20 md:scroll-mt-8">
       {eyebrow ? (
@@ -217,17 +256,19 @@ function GrupoSecao({
   grupo,
   num,
   trilha,
+  docTitulo,
 }: {
   grupo: CorpusGrupo;
   num: number;
   trilha?: ReactNode;
+  docTitulo?: string;
 }) {
   // semantic tone of the numbered chips (the PDF's pill diagram) — the sub
   // inherits the parent section's tone when it has no dimension of its own
   const tomGrupo = tomSemantico(grupo.titulo) ?? undefined;
   return (
     <section>
-      <TituloGrupo grupo={grupo} num={num} />
+      <TituloGrupo grupo={grupo} num={num} docTitulo={docTitulo} />
       {trilha}
       {grupo.intro ? (
         <div className="mt-3 space-y-3">
@@ -243,7 +284,7 @@ function GrupoSecao({
               <DocBlocos blocos={s.blocos} tom={tomSub} />
             ) : (
               <>
-                <TituloSub s={s} />
+                <TituloSub s={s} docTitulo={docTitulo} />
                 <div className="mt-2 space-y-3">
                   <DocBlocos blocos={s.blocos} tom={tomSub} />
                 </div>
@@ -256,23 +297,42 @@ function GrupoSecao({
   );
 }
 
+/** Texto do sumário: com o eyebrow informativo fica o título inteiro;
+ *  redundante (assunto do doc ou número cru) mostra só o resto. */
+function rotuloDe(titulo: string, docTitulo?: string): string {
+  const { eyebrow, resto } = eyebrowDe(titulo, docTitulo);
+  return eyebrow ? titulo : resto;
+}
+
 /** TOC item: tone marker (the phase's own color on bands, lime elsewhere)
- *  + title + dotted leader — the guide's printed TOC rite. */
+ *  + title + dotted leader — the guide's printed TOC rite. `sub` é a linha
+ *  de ### sob o grupo: recuada, menor e apagada, sem número de capítulo. */
 function SumarioItem({
   anchor,
   titulo,
   tom,
   num,
+  docTitulo,
+  sub = false,
 }: {
   anchor: string;
   titulo: string;
   tom?: DocTom;
   num?: number;
+  docTitulo?: string;
+  /** item de 2º nível (### do grupo) — rótulo já diz o número quando é
+   *  encontro/momento ("1º encontro · …") */
+  sub?: boolean;
 }) {
   return (
     <a
       href={`#${anchor}`}
-      className="flex items-baseline gap-2.5 rounded-md px-3 py-2.5 text-sm hover:bg-muted/60"
+      className={cn(
+        "flex items-baseline gap-2.5 rounded-md hover:bg-muted/60",
+        sub
+          ? "py-1.5 pl-4 pr-3 text-[13px] leading-snug text-muted-foreground hover:text-foreground"
+          : "px-3 py-2.5 text-sm"
+      )}
     >
       {num != null ? (
         // capítulo: número no lugar do marcador
@@ -289,12 +349,13 @@ function SumarioItem({
         <span
           aria-hidden
           className={cn(
-            "size-1.5 shrink-0 self-center rounded-full",
+            "shrink-0 self-center rounded-full",
+            sub ? "size-1" : "size-1.5",
             tom ? TOM_DOC[tom].barra : "bg-[var(--brand-lime)]"
           )}
         />
       )}
-      <span className="min-w-0">{titulo}</span>
+      <span className="min-w-0">{rotuloDe(titulo, docTitulo)}</span>
       <span
         aria-hidden
         className="ml-1 min-w-4 flex-1 border-b border-dotted border-muted-foreground/40"
@@ -303,7 +364,13 @@ function SumarioItem({
   );
 }
 
-function SumarioLista({ grupos }: { grupos: CorpusGrupo[] }) {
+function SumarioLista({
+  grupos,
+  docTitulo,
+}: {
+  grupos: CorpusGrupo[];
+  docTitulo?: string;
+}) {
   return (
     <ol className="space-y-1">
       {grupos.map((g, i) => (
@@ -313,7 +380,25 @@ function SumarioLista({ grupos }: { grupos: CorpusGrupo[] }) {
             titulo={g.titulo}
             num={i + 1}
             tom={g.fase != null ? tomDeFase(g.fase) : undefined}
+            docTitulo={docTitulo}
           />
+          {/* 2º nível: cada ### vira item clicável sob o capítulo — nos
+              guias são os encontros/momentos que o H2 escondia; o trilho
+              lateral guia o olho de volta ao grupo na lista longa */}
+          {g.subs.length > 0 ? (
+            <ol className="mb-1 ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2.5">
+              {g.subs.map((s) => (
+                <li key={s.anchor}>
+                  <SumarioItem
+                    anchor={s.anchor}
+                    titulo={s.titulo}
+                    sub
+                    docTitulo={docTitulo}
+                  />
+                </li>
+              ))}
+            </ol>
+          ) : null}
         </li>
       ))}
     </ol>
@@ -325,10 +410,18 @@ function SumarioLista({ grupos }: { grupos: CorpusGrupo[] }) {
  *  nativo esconde o conteúdo na hora e não deixa animar o fechamento). A
  *  lista é renderizada no server e chega como children. Escondido no xl
  *  (rail lateral assume) e no print, onde as seções já saem abertas. */
-function Sumario({ grupos, total }: { grupos: CorpusGrupo[]; total: number }) {
+function Sumario({
+  grupos,
+  total,
+  docTitulo,
+}: {
+  grupos: CorpusGrupo[];
+  total: number;
+  docTitulo?: string;
+}) {
   return (
     <SumarioPill total={total}>
-      <SumarioLista grupos={grupos} />
+      <SumarioLista grupos={grupos} docTitulo={docTitulo} />
     </SumarioPill>
   );
 }
@@ -338,9 +431,11 @@ function Sumario({ grupos, total }: { grupos: CorpusGrupo[]; total: number }) {
 function SumarioRail({
   grupos,
   total,
+  docTitulo,
 }: {
   grupos: CorpusGrupo[];
   total: number;
+  docTitulo?: string;
 }) {
   return (
     <nav
@@ -354,7 +449,7 @@ function SumarioRail({
         </span>
       </p>
       <div className="mt-3">
-        <SumarioLista grupos={grupos} />
+        <SumarioLista grupos={grupos} docTitulo={docTitulo} />
       </div>
     </nav>
   );
@@ -434,9 +529,18 @@ export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
   const grupos = gruposCorpus(doc.secoes);
   const jornada = jornadaCorpus(grupos);
   const longo = doc.secoes.length > TOC_MINIMO;
+  // contagem do sumário = itens clicáveis dele (grupos + subs) — difere de
+  // doc.secoes quando um ## não tem intro (o h2 ancora sem virar seção)
+  const total = totalSumario(grupos);
   return (
     <div className={cn("mt-5", longo && "xl:grid xl:grid-cols-[15rem_minmax(0,1fr)] xl:gap-10")}>
-      {longo ? <SumarioRail grupos={grupos} total={doc.secoes.length} /> : null}
+      {longo ? (
+        <SumarioRail
+          grupos={grupos}
+          total={total}
+          docTitulo={doc.titulo}
+        />
+      ) : null}
       <div className="min-w-0">
         {doc.lede.length > 0 ? (
           <section
@@ -448,7 +552,13 @@ export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
           </section>
         ) : null}
 
-        {longo ? <Sumario grupos={grupos} total={doc.secoes.length} /> : null}
+        {longo ? (
+          <Sumario
+            grupos={grupos}
+            total={total}
+            docTitulo={doc.titulo}
+          />
+        ) : null}
 
         <div className="mt-6 space-y-8">
           {grupos.map((g, i) => (
@@ -459,6 +569,7 @@ export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
               <GrupoSecao
                 grupo={g}
                 num={i + 1}
+                docTitulo={doc.titulo}
                 trilha={
                   jornada && jornada.home === g.anchor ? (
                     <JornadaStrip jornada={jornada} />
@@ -476,22 +587,34 @@ export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
 export function CorpusDocumento({
   doc,
   voltar,
+  lizaPergunta,
+  ponte,
 }: {
   doc: CorpusDoc;
   voltar: { href: string; rotulo: string };
+  /** quando setada (só a rota de staff, com a bolha ligada), mostra o CTA
+   *  "Pedir pra Liza personalizar" — os templates de mensagem chegam por
+   *  este renderer (docs/rag/mensagem-*.md, tipo: template) */
+  lizaPergunta?: string;
+  /** Ponte doc → instrumento ao vivo (REALIZA-386): o destino do "Abrir
+   *  instrumento" + a frase que diz onde ele mora na casa de quem lê.
+   *  Renderiza só nos docs de instrumento de sistema (sistemaDoDoc) —
+   *  roteiros, guias e templates a ignoram. */
+  ponte?: { href: string; rotulo: string; dica: string };
 }) {
+  const sistema = sistemaDoDoc(doc.slug);
   const meta = [
     // the frontmatter version carries parenthesized editorial notes
     // ("documento nativo em /materiais/...") — meta shows only the status
     doc.versao ? capitalizar(doc.versao.replace(/\s*\([^)]*\)/g, "").trim()) : null,
     doc.natureza ? (NATUREZA_ROTULO[doc.natureza] ?? null) : null,
-    `${doc.secoes.length} seções`,
+    `${totalSumario(gruposCorpus(doc.secoes))} seções`,
   ]
     .filter(Boolean)
     .join(" · ");
 
   return (
-    <main
+    <div
       className={cn(
         "mx-auto max-w-3xl px-4 py-6 print:px-0",
         // wider reading surface on desktop — long docs also carry a 15rem
@@ -514,11 +637,43 @@ export function CorpusDocumento({
         meta={meta}
       />
 
+      {/* a outra ponta do cross-link: este doc acompanha um instrumento
+          oficial — a régua da ficha que emite o link e recebe a resposta */}
+      {sistema && ponte && (
+        <div
+          style={instrumentoVars(sistema)}
+          className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-card px-4 py-3 shadow-[var(--shadow-border)] print:hidden"
+        >
+          <InstrumentoEmblema instrumento={sistema} size={34} />
+          <div className="min-w-0 flex-1 basis-48">
+            <p className="text-sm font-semibold leading-snug">
+              {INSTRUMENTO_INFO[sistema].titulo}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {ponte.dica}
+            </p>
+          </div>
+          <Link
+            href={ponte.href}
+            prefetch={false}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            {ponte.rotulo}
+          </Link>
+        </div>
+      )}
+
       <CorpusDocBody doc={doc} />
+
+      {lizaPergunta ? (
+        <div className="mt-6">
+          <PedirLizaPersonalizar pergunta={lizaPergunta} />
+        </div>
+      ) : null}
 
       <footer className="mt-8 border-t border-border/60 pt-3 text-xs text-muted-foreground">
         Fonte: {doc.fonte}.
       </footer>
-    </main>
+    </div>
   );
 }

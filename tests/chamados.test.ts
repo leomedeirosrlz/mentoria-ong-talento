@@ -12,6 +12,12 @@ import {
   CHAMADO_STATUS_LABEL,
   duplasOpcoesChamado,
 } from "@/lib/ciclo";
+import {
+  rotuloAberturaChamado,
+  rotuloEnvioChamado,
+} from "@/components/chamados-shared";
+import { rotuloPedidoAutor } from "@/lib/email-templates";
+import { vozChamado } from "@/lib/types";
 import type { ChamadoCategoria, ChamadoStatus } from "@/lib/types";
 
 // 0084 — regras puras dos chamados: o escopo do modo demo replica a RLS,
@@ -23,6 +29,9 @@ const NUM = {
   jovem: "CHA-000142", // pedido do Caio pela avaliação (urgencia)
   agenda: "CHA-000143", // do Ricardo, em atendimento com a Marina
   plataforma: "CHA-000144", // da Ana (autora jovem logada)
+  jovemFeriado: "CHA-000147", // da Ana, em atendimento com a Marina (489)
+  jovemGuia: "CHA-000148", // da Ana, com dono e sem resposta pública (504)
+  jovemResolvido: "CHA-000149", // da Ana, resolvido com resposta pública (504)
   metodo: "CHA-000145", // aberto pela coord, atribuído ao Paulo
   devolutiva: "CHA-000136", // da Sofia, resolvido
   urgenciaAntiga: "CHA-000129", // do João Pedro, resolvido
@@ -69,7 +78,26 @@ describe("demoChamadosFila — escopo por papel", () => {
 
   it("mentorado vê só os da própria ficha", () => {
     const fila = demoChamadosFila("mentorado");
-    expect(fila.map((c) => c.numero)).toEqual([NUM.plataforma]);
+    // ordem da fila: aberto → em atendimento (recente em cima) → resolvido
+    expect(fila.map((c) => c.numero)).toEqual([
+      NUM.plataforma,
+      NUM.jovemFeriado,
+      NUM.jovemGuia,
+      NUM.jovemResolvido,
+    ]);
+  });
+
+  it("tem_resposta_equipe marca só a pública de quem não é o autor (504)", () => {
+    // a Marina escreveu na trilha do feriado e do resolvido; no do guia
+    // só há eventos de sistema, e no de plataforma nada ainda
+    expect(item("mentorado", NUM.jovemFeriado)!.tem_resposta_equipe).toBe(true);
+    expect(item("mentorado", NUM.jovemResolvido)!.tem_resposta_equipe).toBe(true);
+    expect(item("mentorado", NUM.jovemGuia)!.tem_resposta_equipe).toBe(false);
+    expect(item("mentorado", NUM.plataforma)!.tem_resposta_equipe).toBe(false);
+    // o recorte da equipe não deriva a flag — a fila real também não
+    // preenche (pendência de chamado é peça do autor)
+    expect(item("coordenacao", NUM.jovemFeriado)!.tem_resposta_equipe).toBeUndefined();
+    expect(item("supervisor", NUM.jovemFeriado)!.tem_resposta_equipe).toBeUndefined();
   });
 
   it("a fila ordena aberto → em atendimento → resolvido, recente em cima", () => {
@@ -269,5 +297,37 @@ describe("labels", () => {
     const stats: ChamadoStatus[] = ["aberto", "em_atendimento", "resolvido"];
     for (const c of cats) expect(CHAMADO_CATEGORIA_LABEL[c]).toBeTruthy();
     for (const s of stats) expect(CHAMADO_STATUS_LABEL[s]).toBeTruthy();
+  });
+});
+
+describe("voz por papel (R15) — jovem pede ajuda, mentor pede apoio, equipe fala chamado", () => {
+  it("vozChamado resolve o papel — mentorado antes do prefixo 'mentor'", () => {
+    expect(vozChamado("mentorado")).toBe("jovem");
+    expect(vozChamado("mentor_dpp")).toBe("mentor");
+    expect(vozChamado("mentor_especialista")).toBe("mentor");
+    expect(vozChamado("coordenacao")).toBe("equipe");
+    expect(vozChamado("supervisor")).toBe("equipe");
+    expect(vozChamado(null)).toBe("equipe");
+  });
+
+  it("o verbo de abertura é o da entrada e do título do dialog", () => {
+    expect(rotuloAberturaChamado("mentorado")).toBe("Pedir ajuda");
+    expect(rotuloAberturaChamado("mentor_dpp")).toBe("Pedir apoio");
+    expect(rotuloAberturaChamado("mentor_especialista")).toBe("Pedir apoio");
+    expect(rotuloAberturaChamado("coordenacao")).toBe("Novo chamado");
+    expect(rotuloAberturaChamado("supervisor")).toBe("Novo chamado");
+  });
+
+  it("o envio é 'pedido' pro autor e 'chamado' pra equipe", () => {
+    expect(rotuloEnvioChamado("mentorado")).toBe("Enviar pedido");
+    expect(rotuloEnvioChamado("mentor_dpp")).toBe("Enviar pedido");
+    expect(rotuloEnvioChamado("coordenacao")).toBe("Abrir chamado");
+  });
+
+  it("o e-mail ao autor nomeia o ticket na voz dele", () => {
+    expect(rotuloPedidoAutor("mentorado")).toBe("pedido de ajuda");
+    expect(rotuloPedidoAutor("mentor_dpp")).toBe("pedido de apoio");
+    expect(rotuloPedidoAutor("coordenacao")).toBe("chamado");
+    expect(rotuloPedidoAutor(null)).toBe("chamado");
   });
 });

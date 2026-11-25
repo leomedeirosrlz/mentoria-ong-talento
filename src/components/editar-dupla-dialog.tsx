@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PencilSimple } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
 import { deleteDupla, updateDupla } from "@/lib/actions";
 import type { Dupla, DuplaStatus } from "@/lib/types";
@@ -42,16 +42,33 @@ const NENHUM = "__nenhum";
 const papeisDe = (m: Opt | null | undefined): AppRole[] =>
   m?.papeis?.length ? m.papeis : m?.role ? [m.role as AppRole] : [];
 
-// sem items o trigger fechado mostra o value cru (UUID/enum)
+// sem items o trigger fechado mostra o value cru (UUID/enum). Rótulo do
+// ENUM (o valor que o form grava), não a situação derivada — quem lê o
+// desfecho pra separar Desistente × Encerrada é o SITUACAO_DUPLA_LABEL.
 const STATUS_DUPLA: Record<string, string> = {
   ativa: "Ativa",
   pausada: "Pausada",
   concluida: "Concluída",
-  encerrada: "Desistente",
+  encerrada: "Encerrada",
 };
 
-export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
-  const [open, setOpen] = useState(false);
+export function EditarDuplaDialog({
+  dupla,
+  trigger,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+}: {
+  dupla: Dupla;
+  /** null = controlled mode, no own trigger (a menu item owns the open
+   *  state — same convention as RemanejarDuplaDialog). undefined = default
+   *  "Editar" trigger. */
+  trigger?: React.ReactElement | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [openInt, setOpenInt] = useState(false);
+  const open = openProp ?? openInt;
+  const setOpen = onOpenChangeProp ?? setOpenInt;
   const [delOpen, setDelOpen] = useState(false);
   const [mentores, setMentores] = useState<Opt[]>([]);
   const [mentorados, setMentorados] = useState<Opt[]>([]);
@@ -91,6 +108,23 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
   );
   const [pending, start] = useTransition();
   const router = useRouter();
+  // estado fresco por abertura — edição abortada não pode vazar seleção pra
+  // próxima vez. Ajuste durante o render na borda de subida do `open` (sem
+  // frame de seleção velha): no modo controlado o item de menu abre de fora
+  // e o Base UI não chama onOpenChange — a transição da prop é o evento
+  // confiável (mesmo padrão do RemanejarDuplaDialog)
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (open !== abertoAntes) {
+    setAbertoAntes(open);
+    if (open) {
+      setStatusSel(dupla.status);
+      setMentorSel(dupla.mentor.id);
+      setDesfechoSel(dupla.desfecho ?? "");
+      setMotivoSel(dupla.desfecho_motivo ?? "");
+      setTrilhaEsc(dupla.trilha === "especialista" ? "especialista" : "dpp");
+      setFalha(false);
+    }
+  }
   // 1ª carga com skeleton; refetch de reabertura usa o cache — falha ali vira
   // toast, não bloqueio (as opções já carregadas continuam valendo)
   const carregou = useRef(false);
@@ -359,21 +393,20 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
 
   return (
     <>
-      <Dialog
-        open={open}
-        onOpenChange={(o) => {
-          setOpen(o);
-          // Select desmonta com o dialog e volta ao defaultValue — alinha a nota
-          if (o) {
-            setStatusSel(dupla.status);
-            setMentorSel(dupla.mentor.id);
-            setDesfechoSel(dupla.desfecho ?? "");
-            setMotivoSel(dupla.desfecho_motivo ?? "");
-            setFalha(false);
-          }
-        }}
-      >
-        <DialogTrigger render={<Button variant="outline" size="sm"><PencilSimple size={15} /> Editar</Button>} />
+      {/* o reset por abertura é o ajuste no render acima — aqui só flui o
+          pedido de mudança do Base UI (fechar por Esc/backdrop/trigger) */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        {trigger !== null && (
+          <DialogTrigger
+            render={
+              trigger ?? (
+                <Button variant="outline" size="sm">
+                  <PencilSimple size={15} /> Editar
+                </Button>
+              )
+            }
+          />
+        )}
         <DialogContent size="xl">
           <DialogHeader>
             <DialogTitle>Editar dupla</DialogTitle>
@@ -682,7 +715,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                   <Select
                     name="desfecho"
                     required
-                    value={desfechoSel || undefined}
+                    value={desfechoSel}
                     items={Object.fromEntries(
                       DESFECHOS.map((d) => [d, DESFECHO_LABEL[d]])
                     )}
@@ -707,64 +740,84 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                     </SelectContent>
                   </Select>
                 </div>
-                {desfechoSel &&
-                  (DESFECHO_MOTIVOS[desfechoSel as keyof typeof DESFECHO_MOTIVOS] ?? [])
-                    .length > 0 && (
-                    <div className="space-y-2">
-                      <Label id="edit-desfecho-motivo-label">Motivo</Label>
-                      <Select
-                        key={desfechoSel}
-                        name="desfecho_motivo"
-                        required
-                        value={motivoSel || undefined}
-                        items={Object.fromEntries(
-                          (
-                            DESFECHO_MOTIVOS[
-                              desfechoSel as keyof typeof DESFECHO_MOTIVOS
-                            ] ?? []
-                          ).map((m) => [m, m])
-                        )}
-                        onValueChange={(v) => setMotivoSel(v ?? "")}
-                      >
-                        <SelectTrigger
-                          id="edit-desfecho-motivo-select"
-                          aria-labelledby="edit-desfecho-motivo-label edit-desfecho-motivo-select"
+                {desfechoSel && desfechoSel !== "concluida" && (
+                  <div className="space-y-2">
+                    {(DESFECHO_MOTIVOS[
+                      desfechoSel as keyof typeof DESFECHO_MOTIVOS
+                    ] ?? []).length > 0 ? (
+                      <>
+                        <Label id="edit-desfecho-motivo-label">Motivo</Label>
+                        <Select
+                          key={desfechoSel}
+                          name="desfecho_motivo"
+                          required
+                          value={motivoSel}
+                          items={Object.fromEntries(
+                            (
+                              DESFECHO_MOTIVOS[
+                                desfechoSel as keyof typeof DESFECHO_MOTIVOS
+                              ] ?? []
+                            ).map((m) => [m, m])
+                          )}
+                          onValueChange={(v) => setMotivoSel(v ?? "")}
                         >
-                          <SelectValue placeholder="Selecione o motivo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(
-                            DESFECHO_MOTIVOS[
-                              desfechoSel as keyof typeof DESFECHO_MOTIVOS
-                            ] ?? []
-                          ).map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {m}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                          <SelectTrigger
+                            id="edit-desfecho-motivo-select"
+                            aria-labelledby="edit-desfecho-motivo-label edit-desfecho-motivo-select"
+                          >
+                            <SelectValue placeholder="Selecione o motivo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(
+                              DESFECHO_MOTIVOS[
+                                desfechoSel as keyof typeof DESFECHO_MOTIVOS
+                              ] ?? []
+                            ).map((m) => (
+                              <SelectItem key={m} value={m}>
+                                {m}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    ) : (
+                      // desfecho sem vocabulário ('outro'): o motivo é
+                      // texto livre OBRIGATÓRIO no mesmo campo — antes a
+                      // Observação assumia o papel e o motivo saía vazio.
+                      // `key` re-inicializa ao trocar de desfecho; o
+                      // prefill só vale quando o desfecho salvo é o mesmo
+                      // ('legado' é o sentinela do backfill 0140, não motivo)
+                      <>
+                        <Label htmlFor="edit-desfecho-motivo-input">
+                          Motivo
+                        </Label>
+                        <Input
+                          key={desfechoSel}
+                          id="edit-desfecho-motivo-input"
+                          name="desfecho_motivo"
+                          required
+                          maxLength={300}
+                          placeholder="Descreva o motivo"
+                          defaultValue={
+                            desfechoSel === (dupla.desfecho ?? "") &&
+                            dupla.desfecho_motivo !== "legado"
+                              ? (dupla.desfecho_motivo ?? "")
+                              : ""
+                          }
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="edit-desfecho-obs">Observação</Label>
                   <Textarea
                     id="edit-desfecho-obs"
                     name="desfecho_obs"
                     rows={3}
-                    required={desfechoSel === "outro"}
                     defaultValue={dupla.desfecho_obs ?? ""}
-                    placeholder={
-                      desfechoSel === "outro"
-                        ? "Descreva o motivo"
-                        : "Observações (opcional)"
-                    }
+                    placeholder="Observações (opcional)"
                   />
-                  {desfechoSel === "outro" && (
-                    <p className="text-xs text-muted-foreground">
-                      Obrigatório quando o desfecho é “Outro motivo”.
-                    </p>
-                  )}
                 </div>
               </div>
             )}

@@ -18,16 +18,38 @@ export const PRIVACIDADE_AVALIACAO: Record<TrilhaAvaliacao | "ambas", string> = 
     "Suas respostas ficam entre você e a equipe da Realiza.vc. Seu mentor vê só a média das notas e lê uma resposta só se você liberar. Nas sessões com especialista, seu mentor e seu especialista veem só a nota da sessão.",
 };
 
-/** Trilha que não é especialista cai na DPP, o mesmo default da página. */
-export function privacidadeAvaliacao(trilha: string | null | undefined): string {
-  return trilha === "especialista"
-    ? PRIVACIDADE_AVALIACAO.especialista
-    : PRIVACIDADE_AVALIACAO.dpp;
+/** 027 (FR-003): com menos de 3 respostas na dupla a média ainda não
+ *  existe — "vê só a média" seria mentira dos dois lados do lote. */
+export const PRIVACIDADE_AVALIACAO_SEM_MEDIA: Record<"dpp" | "ambas", string> = {
+  dpp: "Suas respostas ficam entre você e a equipe da Realiza.vc. Seu mentor só lê uma resposta se você liberar; a média das notas aparece a partir de 3 avaliações.",
+  ambas:
+    "Suas respostas ficam entre você e a equipe da Realiza.vc. Seu mentor só lê uma resposta se você liberar; a média das notas aparece a partir de 3 avaliações. Nas sessões com especialista, seu mentor e seu especialista veem só a nota da sessão.",
+};
+
+/** Trilha que não é especialista cai na DPP, o mesmo default da página.
+ *  `temMedia` = a dupla já tem ≥3 respostas (o lote da RPC
+ *  avaliacao_media_dpp); sem saber, assume que sim — todo call site que
+ *  conhece a contagem passa o valor real. */
+export function privacidadeAvaliacao(
+  trilha: string | null | undefined,
+  temMedia = true
+): string {
+  if (trilha === "especialista") return PRIVACIDADE_AVALIACAO.especialista;
+  return temMedia
+    ? PRIVACIDADE_AVALIACAO.dpp
+    : PRIVACIDADE_AVALIACAO_SEM_MEDIA.dpp;
 }
 
 /** Uma frase só para a lista de avaliações: a da trilha, ou a combinada quando
  *  as trilhas do jovem são duas. */
-export function privacidadeAvaliacoes(trilhas: readonly (string | null | undefined)[]): string {
+export function privacidadeAvaliacoes(
+  trilhas: readonly (string | null | undefined)[],
+  temMedia = true
+): string {
   const tipos = new Set(trilhas.map((t) => (t === "especialista" ? "especialista" : "dpp")));
-  return tipos.size > 1 ? PRIVACIDADE_AVALIACAO.ambas : privacidadeAvaliacao(trilhas[0]);
+  if (tipos.size > 1)
+    return temMedia
+      ? PRIVACIDADE_AVALIACAO.ambas
+      : PRIVACIDADE_AVALIACAO_SEM_MEDIA.ambas;
+  return privacidadeAvaliacao(trilhas[0], temMedia);
 }

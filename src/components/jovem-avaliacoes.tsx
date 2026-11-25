@@ -9,7 +9,7 @@ import {
   HandHeart,
   Star,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { definirVisibilidadeAvaliacao } from "@/lib/actions-avaliacao";
 import type { JovemAvaliacao } from "@/lib/queries-avaliacao";
 import {
@@ -17,9 +17,11 @@ import {
   SENTIMENTO_AVALIACAO_LABEL,
   TEMA_AVALIACAO_LABEL,
   formatDiaMes,
+  formatDiaSemanaHora,
   formatDateTime,
 } from "@/lib/ciclo";
 import { privacidadeAvaliacao, privacidadeAvaliacoes } from "@/lib/avaliacao-privacidade";
+import { listaEncontros } from "@/lib/plano-combinado";
 import { AvaliacaoEncontroForm } from "@/components/avaliacao-encontro-form";
 import { Estrelas } from "@/components/estrelas";
 import { Badge } from "@/components/ui/badge";
@@ -47,8 +49,14 @@ export type AvaliacaoPendente = {
   realizado_em: string | null;
   /** 'dpp' | 'especialista' — decide o toggle de visibilidade do mentor. */
   trilha: string;
+  /** dupla da pendência — decide se a média (lote ≥3) já existe na copy
+   *  de privacidade (027). */
+  duplaId?: string;
   /** "5º encontro com Ricardo" ou "3ª sessão com Sofia", montado na página. */
   rotulo?: string;
+  /** Sessão combinada (018): nºs do grupo que esta resposta cobre, âncora
+   *  inclusa — >1 vira "a sessão cobre os encontros …" no dialog. */
+  sessao?: number[];
 };
 
 /** Avaliação enviada + a trilha da dupla (resolvida na página — a tabela
@@ -68,11 +76,15 @@ export function AvaliarPendenteButton({
   primeiroNome,
   variant = "default",
   size = "sm",
+  temMedia = true,
 }: {
   pendente: AvaliacaoPendente;
   primeiroNome: string;
   variant?: "default" | "outline";
   size?: "sm" | "xs";
+  /** A dupla já tem ≥3 avaliações (lote da média) — a copy promete média
+   *  só quando ela existe (027/FR-003). */
+  temMedia?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -83,21 +95,33 @@ export function AvaliarPendenteButton({
         Avaliar
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        {/* md: form de coluna única (estrelas, chips, cartões empilhados) —
-            acima disso sobrava fundo ocioso lateral */}
-        <DialogContent size="md">
+        {/* xl: 576px no desktop — largura de leitura pro form (010);
+            confirmações curtas seguem nos tamanhos menores */}
+        <DialogContent size="xl">
           <DialogHeader>
+            {/* data+dia primeiro: com várias pendentes na fila, é o que
+                distingue qual encontro está sendo avaliado (REALIZA-524) */}
             <DialogTitle>
-              {pendente.numero}º encontro: como foi?
+              {formatDiaSemanaHora(pendente.realizado_em)} ·{" "}
+              {pendente.rotulo ?? `${pendente.numero}º encontro`}: como foi?
             </DialogTitle>
             <DialogDescription>
-              1 minuto. {privacidadeAvaliacao(pendente.trilha)}
+              1 minuto. {privacidadeAvaliacao(pendente.trilha, temMedia)}
+              {pendente.sessao && pendente.sessao.length > 1 && (
+                <>
+                  {" "}
+                  A sessão cobre os encontros{" "}
+                  {listaEncontros(pendente.sessao)}. Uma resposta vale
+                  pelos {pendente.sessao.length}.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <AvaliacaoEncontroForm
             embutido
             encontroId={pendente.encontroId}
             trilha={pendente.trilha}
+            temMedia={temMedia}
             primeiroNome={primeiroNome}
             onEnviado={({ pedirApoio }) => {
               setOpen(false);
@@ -116,36 +140,58 @@ export function AvaliarPendenteButton({
 }
 
 /** Botão "ver resposta" + dialog do que o jovem escreveu — com o toggle
- *  de visibilidade do mentor (DPP) dentro. */
+ *  de visibilidade do mentor (DPP) dentro. `quiet` é a versão sem moldura
+ *  da linha de histórico: as estrelas já dizem o resultado, o clique só
+ *  abre o detalhe (aria-label carrega a affordance que a borda carregava). */
 export function VerAvaliacaoButton({
   avaliacao,
   label = "Ver resposta",
+  quiet = false,
+  temMedia = true,
 }: {
   avaliacao: AvaliacaoFeita;
   label?: React.ReactNode;
+  quiet?: boolean;
+  /** a dupla da avaliação já tem o lote da média (≥3 respostas) — a copy
+   *  do toggle e os toasts não prometem média que não existe (027/FR-003). */
+  temMedia?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <Eye size={15} aria-hidden />
-        {label}
-      </Button>
+      {quiet ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Ver sua avaliação"
+          title="Ver sua avaliação"
+          className="inline-flex min-h-11 items-center rounded-md px-1.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
+        >
+          {label}
+        </button>
+      ) : (
+        <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+          <Eye size={15} aria-hidden />
+          {label}
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         {/* xl: leitura da resposta (resumo + comentário em largura cheia);
             o md fica pro FORM de avaliar, coluna única com menos ar */}
         <DialogContent size="xl">
           <DialogHeader>
             <DialogTitle>
-              {avaliacao.encontro?.numero
-                ? `Sua avaliação do ${avaliacao.encontro.numero}º encontro`
-                : "Sua avaliação"}
+              {avaliacao.rotulo
+                ? `Sua avaliação: ${avaliacao.rotulo}`
+                : avaliacao.encontro?.numero
+                  ? `Sua avaliação do ${avaliacao.encontro.numero}º encontro`
+                  : "Sua avaliação"}
             </DialogTitle>
             <DialogDescription>
               Enviada em {formatDateTime(avaliacao.created_at)}
             </DialogDescription>
           </DialogHeader>
-          <DetalheAvaliacao a={avaliacao} />
+          <DetalheAvaliacao a={avaliacao} temMedia={temMedia} />
         </DialogContent>
       </Dialog>
     </>
@@ -156,25 +202,22 @@ function instante(iso: string | null | undefined): number {
   return iso ? Date.parse(iso) || 0 : 0;
 }
 
-/** Suas avaliações do /jovem (REALIZA-109): o histórico. As pendentes ficam
- *  recolhidas (a ação delas já está em "Para fazer agora"), as duas respostas
- *  mais recentes à vista, as demais em "Ver todas as avaliações" e a
- *  privacidade em "Quem vê suas respostas?". O toggle "meu mentor pode ler"
- *  mora no detalhe de cada uma. */
+/** Suas avaliações do /jovem (REALIZA-109): só o histórico — as pendentes
+ *  moram na lista única "Para fazer agora" (REALIZA-493), sem repetir o
+ *  pedido em duas seções. As duas respostas mais recentes ficam à vista,
+ *  as demais em "Ver todas as avaliações" e a privacidade em "Quem vê
+ *  suas respostas?". O toggle "meu mentor pode ler" mora no detalhe. */
 export function JovemAvaliacoes({
   pendentes,
   feitas,
-  primeiroNome,
 }: {
+  /** Só alimenta a frase de privacidade — o gesto "Avaliar" é da lista
+   *  única "Para fazer agora" (REALIZA-493). */
   pendentes: AvaliacaoPendente[];
   feitas: AvaliacaoFeita[];
-  primeiroNome: string;
 }) {
   if (!pendentes.length && !feitas.length) return null;
 
-  const pendentesOrdenadas = [...pendentes].sort(
-    (a, b) => instante(b.realizado_em) - instante(a.realizado_em)
-  );
   const feitasOrdenadas = [...feitas].sort(
     (a, b) =>
       instante(b.encontro?.realizado_em ?? b.created_at) -
@@ -182,32 +225,18 @@ export function JovemAvaliacoes({
   );
   const recentes = feitasOrdenadas.slice(0, RECENTES);
   const anteriores = feitasOrdenadas.slice(RECENTES);
+  // a média é por dupla e só existe no lote de ≥3 (FR-003): a copy do
+  // toggle e o texto de privacidade prometem média só quando ela existe
+  const dppPorDupla = new Map<string, number>();
+  for (const a of feitas)
+    if (a.trilha !== "especialista")
+      dppPorDupla.set(a.dupla_id, (dppPorDupla.get(a.dupla_id) ?? 0) + 1);
+  const temMediaDe = (duplaId: string) => (dppPorDupla.get(duplaId) ?? 0) >= 3;
   // uma frase só: a da trilha única, ou a combinada quando há as duas
-  const privacidade = privacidadeAvaliacoes([
-    ...pendentes.map((p) => p.trilha),
-    ...feitas.map((a) => a.trilha),
-  ]);
-
-  function renderPendente(p: AvaliacaoPendente) {
-    return (
-      <li key={`p-${p.encontroId}`} className="flex items-center gap-3 py-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">
-            {p.rotulo ?? `${p.numero}º encontro`}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {p.realizado_em ? formatDiaMes(p.realizado_em) + " · " : ""}
-            aguardando sua resposta
-          </p>
-        </div>
-        <AvaliarPendenteButton
-          pendente={p}
-          primeiroNome={primeiroNome}
-          variant="outline"
-        />
-      </li>
-    );
-  }
+  const privacidade = privacidadeAvaliacoes(
+    [...pendentes.map((p) => p.trilha), ...feitas.map((a) => a.trilha)],
+    [...dppPorDupla.values()].some((n) => n >= 3)
+  );
 
   function renderFeita(a: AvaliacaoFeita) {
     return (
@@ -231,36 +260,16 @@ export function JovemAvaliacoes({
             )}
           </p>
         </div>
-        <VerAvaliacaoButton avaliacao={a} />
+        <VerAvaliacaoButton avaliacao={a} temMedia={temMediaDe(a.dupla_id)} />
       </li>
     );
   }
 
-  // as pendentes já moram em "Para fazer agora" (com "e mais N"): aqui ficam
-  // recolhidas, pra seção ser o histórico e não repetir seis botões
   const trigger =
     "flex min-h-11 w-full items-center justify-between gap-2 px-4 text-left text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50 [&[aria-expanded=true]>svg]:rotate-180";
 
   return (
     <div>
-      {pendentesOrdenadas.length > 0 && (
-        <Collapsible.Root className="border-b border-border/60">
-          <Collapsible.Trigger className={trigger}>
-            <span className="text-foreground">
-              {pendentesOrdenadas.length === 1
-                ? "1 esperando sua resposta"
-                : `${pendentesOrdenadas.length} esperando sua resposta`}
-            </span>
-            <CaretDown size={16} aria-hidden className="ms-auto shrink-0 transition-transform" />
-          </Collapsible.Trigger>
-          <Collapsible.Panel>
-            <ul className="divide-y divide-border/60 px-4 pb-1">
-              {pendentesOrdenadas.map(renderPendente)}
-            </ul>
-          </Collapsible.Panel>
-        </Collapsible.Root>
-      )}
-
       {recentes.length > 0 && (
         <ul className="divide-y divide-border/60 px-4 pt-1">
           {recentes.map(renderFeita)}
@@ -301,7 +310,15 @@ export function JovemAvaliacoes({
   );
 }
 
-function DetalheAvaliacao({ a }: { a: AvaliacaoFeita }) {
+function DetalheAvaliacao({
+  a,
+  temMedia = true,
+}: {
+  a: AvaliacaoFeita;
+  /** a dupla já tem o lote da média (≥3) — sem ele, "valer só na média"
+   *  é promessa vazia (027/FR-003). */
+  temMedia?: boolean;
+}) {
   const [visivel, setVisivel] = useState(a.avaliacao_visivel_mentor);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -318,7 +335,9 @@ function DetalheAvaliacao({ a }: { a: AvaliacaoFeita }) {
         toast.success(
           v
             ? "Seu mentor agora lê esta avaliação."
-            : "Voltou a valer só na média."
+            : temMedia
+              ? "Voltou a valer só na média."
+              : "Seu mentor deixa de ver esta avaliação. Ainda não há média para ele ver."
         );
         router.refresh();
       }
@@ -407,11 +426,12 @@ function DetalheAvaliacao({ a }: { a: AvaliacaoFeita }) {
             />
             <span>
               <span className="font-medium">
-                Meu mentor pode ler esta avaliação
+                Meu mentor pode ler esta avaliação:
               </span>{" "}
               <span className="text-muted-foreground">
-                : normalmente ele só vê a média de vocês. Com a chave
-                ligada, ele lê esta resposta inteira.
+                {temMedia
+                  ? "normalmente ele só vê a média de vocês. Com a chave ligada, ele lê esta resposta inteira."
+                  : "ele não vê suas avaliações; a média só aparece a partir de 3 respostas. Com a chave ligada, ele lê esta resposta inteira."}
               </span>
             </span>
           </label>

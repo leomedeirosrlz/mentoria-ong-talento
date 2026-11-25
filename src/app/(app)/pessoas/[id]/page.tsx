@@ -44,6 +44,11 @@ import { avatarPublicUrl } from "@/lib/avatar";
 import { gravatarUrlSeExiste } from "@/lib/gravatar";
 import { demoRole } from "@/lib/demo/mode";
 import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+  type DuplaDesfecho,
+} from "@/lib/dupla-desfecho";
+import {
   COR_RACA_LABELS,
   disponibilidadeTexto,
   ESCOLARIDADE_LABELS,
@@ -56,7 +61,7 @@ import {
   papelLabelComposto,
   PREF_GENERO_LABELS,
   SITUACAO_MENTORADO_LABEL,
-  waLink,
+  waChatLink,
 } from "@/lib/ciclo";
 import { temPapel } from "@/lib/types";
 import type { DadosCivis } from "@/lib/types";
@@ -85,12 +90,10 @@ export async function generateMetadata({
   return { title: perfil ? perfil.pessoa.nome : "Pessoa" };
 }
 
-const STATUS_DUPLA: Record<string, string> = {
-  ativa: "ativa",
-  pausada: "pausada",
-  concluida: "concluída",
-  encerrada: "desistente",
-};
+/** Situação da dupla na linha do perfil — minúscula pra correr no meta
+ *  ("em andamento · desde 12/03"), rótulo único do mapa canônico. */
+const situacaoTxt = (d: { status: string; desfecho?: DuplaDesfecho | null }) =>
+  SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)].toLowerCase();
 
 /** Campo da ficha — ícone de escaneio + rótulo uppercase pequeno sobre o
  *  valor: leitura de perfil, não de resposta de formulário. Some quando o
@@ -248,7 +251,7 @@ export default async function PessoaPerfilPage({
     !demo && !ehMentorado && "email" in p && p.email
       ? await gravatarUrlSeExiste(p.email)
       : null;
-  const wa = p.whatsapp ? waLink(p.whatsapp, "") : null;
+  const wa = waChatLink(p.whatsapp);
 
   // apresentação profissional (0030) — só profiles têm; o card some quando
   // nada foi preenchido (perfil vazio não é um estado a exibir)
@@ -332,21 +335,22 @@ export default async function PessoaPerfilPage({
   const dispTxt = disponibilidadeTexto(mp?.disponibilidade);
   const dispMentoradoTxt = disponibilidadeTexto(ment?.disponibilidade);
   // documentos do intake (0054) — coord-only; pra outro papel a query
-  // nem dispara
+  // nem dispara. Na conta de um jovem o alvo é a ficha canônica: sem o
+  // apontador a seção ofereceria o pool de documentos de staff
+  const docTipo = ehMentorado || perfil.fichaJovem ? "mentorado" : "profile";
+  const docId = perfil.fichaJovem?.id ?? p.id;
   const documentos = souCoord
-    ? await getDocumentosPessoa(perfil.tipo, p.id)
+    ? await getDocumentosPessoa(docTipo, docId)
     : [];
   // dados civis + responsável (0046) — chegam null fora da coordenação
   // (view *_pessoal); renderizam fechados num Collapsible no fim do Cadastro
   const civis = p.dados_civis ?? null;
   const resp = ment?.responsavel ?? null;
-  const anamneseRef = ehMentorado && "notas" in p ? p.notas : null;
   const temFicha = Boolean(
     p.nome_social || local || interesses.length || p.origem ||
     nascimentoTxt || p.genero || p.cor_raca || p.motivacao || p.pref_genero_par ||
     (prof && (prof.cargo || prof.empresa || mp)) ||
-    (ment && (ment.escolaridade || ment.objetivos || dispMentoradoTxt)) ||
-    anamneseRef
+    (ment && (ment.escolaridade || ment.objetivos || dispMentoradoTxt))
   );
   // grupos do cadastro — o cabeçalho da subseção só aparece quando há pelo
   // menos um campo visível dentro dele (pra coord `sempre` garante isso)
@@ -516,6 +520,17 @@ export default async function PessoaPerfilPage({
                     {ment.saiu_em ? ` · ${formatDiaMes(ment.saiu_em)}` : ""}
                   </Badge>
                 )}
+                {/* convite de acesso (0180) — a conta do jovem nasce no
+                    envio; "convite enviado" até o onboarding dela */}
+                {souCoord &&
+                  ment &&
+                  !foraMent &&
+                  ment.email &&
+                  !ment.conta?.onboarded_em && (
+                    <Badge variant="outline" className="font-normal text-muted-foreground">
+                      {ment.profile_id ? "Convite enviado" : "Não convidado"}
+                    </Badge>
+                  )}
                 {/* conta vinculada (0066): após a promoção a mentor
                     (REALIZA-159) é a porta pra ficha de equipe da mesma
                     pessoa — a ficha de jovem segue sendo o histórico */}
@@ -542,10 +557,26 @@ export default async function PessoaPerfilPage({
                     inativa
                   </Badge>
                 )}
-                {ehStaff && "user_id" in p && !p.user_id && p.ativo && (
+                {/* o convite já cria a conta — "entrou" se mede pelo
+                    onboarded_em, não pelo user_id (0180) */}
+                {ehStaff && "user_id" in p && p.ativo && !p.onboarded_em && (
                   <Badge variant="outline" className="font-normal text-muted-foreground">
-                    Nunca acessou a plataforma
+                    {p.user_id
+                      ? "Convite enviado, aguardando primeiro acesso"
+                      : "Não convidado ainda"}
                   </Badge>
+                )}
+                {/* conta de jovem vinculada: esta página é a CONTA — dupla,
+                    encontros e documentos moram na ficha de mentorado
+                    (espelho do "conta na plataforma" do outro lado) */}
+                {perfil.fichaJovem && (
+                  <Link
+                    href={`/pessoas/${perfil.fichaJovem.id}`}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  >
+                    <UserSwitch size={13} aria-hidden />
+                    ficha de jovem
+                  </Link>
                 )}
               </>
             )}
@@ -788,8 +819,8 @@ export default async function PessoaPerfilPage({
                             </dl>
                             {anos != null && anos < 18 && (
                               <p className="mt-1 rounded-lg bg-[var(--warn-bg)] px-2.5 py-1.5 text-xs text-[var(--warn-text)]">
-                                Menor de idade: a autorização do responsável precisa
-                                estar assinada.
+                                Menor de idade: precisa do termo dele assinado e da
+                                autorização do responsável.
                                 {souCoord && " Confira Documentos e assinaturas no painel lateral."}
                               </p>
                             )}
@@ -918,16 +949,6 @@ export default async function PessoaPerfilPage({
                           </div>
                         )}
 
-                        {/* referência da anamnese (campo notas do intake) —
-                            contexto da jornada, mora como subseção do cadastro */}
-                        {anamneseRef && (
-                          <div className="mt-5 border-t border-border/60 pt-5">
-                            <SubFicha titulo="Referência da anamnese" />
-                            <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
-                              {anamneseRef}
-                            </p>
-                          </div>
-                        )}
                       </>
                     ) : (
                       <p className="mt-2 text-muted-foreground">
@@ -1048,7 +1069,7 @@ export default async function PessoaPerfilPage({
                             )}
                           </span>
                           <span className="block text-xs text-muted-foreground">
-                            {STATUS_DUPLA[d.status]}
+                            {situacaoTxt(d)}
                             {d.iniciada_em ? ` · desde ${formatDate(d.iniciada_em)}` : ""}
                           </span>
                         </span>
@@ -1103,18 +1124,20 @@ export default async function PessoaPerfilPage({
                 <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
                   <div className="border-t border-border/60 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
                     {/* anexos do form de inscrição (0054) — RG, comprovante,
-                        currículo */}
+                        currículo. Na conta de jovem os alvos são a ficha
+                        canônica (docTipo/docId acima) */}
                     <DocumentosPessoa
-                      tipo={ehMentorado ? "mentorado" : "profile"}
-                      pessoaId={p.id}
+                      tipo={docTipo}
+                      pessoaId={docId}
                       documentos={documentos}
                     />
                     <div className="mt-4 border-t border-border pt-3">
                       <AssinaturasPessoa
-                        tipo={ehMentorado ? "mentorado" : "profile"}
-                        id={p.id}
-                        nome={p.nome}
-                        whatsapp={p.whatsapp}
+                        tipo={docTipo}
+                        id={docId}
+                        nome={perfil.fichaJovem?.nome ?? p.nome}
+                        whatsapp={perfil.fichaJovem?.whatsapp ?? p.whatsapp}
+                        voluntario={"voluntario" in p ? p.voluntario : undefined}
                       />
                     </div>
                   </div>

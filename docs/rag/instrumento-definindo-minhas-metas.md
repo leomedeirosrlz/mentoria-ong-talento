@@ -4,7 +4,7 @@ titulo: Definindo Minhas Metas
 material: instrumento-definindo-minhas-metas
 tipo: instrumento
 natureza: consolidado
-audiencia: [dpp, supervisor]
+audiencia: [mentor_dpp, supervisor, mentorado]
 versao: vigente
 origem: consolidado de definindo-metas.md (PDF do instrumento),
   supabase/migrations/0080_instrumentos_dupla.sql (form metas),
@@ -53,6 +53,6 @@ Do 3º ao 4º encontro, a tarefa é desdobrar cada meta em submetas ("o que eu p
 
 ## Definindo Minhas Metas · Onde fica na plataforma
 
-Definindo Minhas Metas é instrumento oficial na ficha da dupla (aba Instrumentos): o(a) mentor(a) emite o link e o(a) jovem responde na plataforma. As metas ficam registradas na ficha e alimentam o PDM; o card do instrumento (enc. 2 a 3) aparece na aba Instrumentos de /materiais e o andamento segue na jornada do(a) jovem.
+Definindo Minhas Metas é instrumento oficial na ficha da dupla (aba Instrumentos): é liberado pro(a) jovem automaticamente conforme os encontros avançam e a resposta acontece na plataforma. As metas ficam registradas na ficha e alimentam o PDM; o card do instrumento (enc. 2 a 3) aparece na aba Instrumentos de /materiais e o andamento segue na jornada do(a) jovem.
 
 *(Atualização: na plataforma vigente, o instrumento é respondido na ficha da dupla, aba Instrumentos; o PDF do template que circula como folha de preenchimento está desatualizado.)*

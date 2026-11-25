@@ -14,6 +14,7 @@ import type {
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { SolicitacaoNegociacao } from "@/components/solicitacao-negociacao";
+import type { OcupadoRotulado } from "@/lib/sugestoes-encontro";
 
 /** A mesa do pedido do jovem — rail de negociação (aceitar a proposta do
  *  especialista, contra-propor, cancelar). O item da home usa dentro da
@@ -26,6 +27,7 @@ export function PedidoJovemMesa({
   equipe,
   nomeJovem,
   disponibilidade,
+  ocupados,
 }: {
   s: SolicitacaoEspecialista;
   propostas: SolicitacaoProposta[];
@@ -36,6 +38,9 @@ export function PedidoJovemMesa({
   /** Grade do próprio jovem — pinta "encaixa com você" nos slots da
    *  contra-proposta; null/undefined = mesa sem o destaque. */
   disponibilidade?: Disponibilidade | null;
+  /** Compromissos do jovem em todas as duplas — o aceite de uma proposta
+   *  em choque avisa antes de gravar (481). */
+  ocupados?: OcupadoRotulado[];
 }) {
   const router = useRouter();
   return (
@@ -48,6 +53,7 @@ export function PedidoJovemMesa({
       equipe={equipe}
       nomeJovem={nomeJovem}
       disponibilidade={disponibilidade}
+      ocupados={ocupados}
       onAceito={() => router.refresh()}
     />
   );
@@ -64,6 +70,7 @@ export function PedidoJovemItem({
   nomeJovem,
   alvo,
   disponibilidade,
+  ocupados,
 }: {
   s: SolicitacaoEspecialista;
   propostas: SolicitacaoProposta[];
@@ -76,6 +83,8 @@ export function PedidoJovemItem({
   alvo: { nome: string; avatar_path: string | null } | null;
   /** Grade do jovem — a mesa marca os slots que encaixam nela. */
   disponibilidade?: Disponibilidade | null;
+  /** Compromissos do jovem em todas as duplas — choque no aceite (481). */
+  ocupados?: OcupadoRotulado[];
 }) {
   const [agoraMs] = useState(() => Date.now());
   const efetivo = efetivoDe(s);
@@ -124,6 +133,7 @@ export function PedidoJovemItem({
           equipe={equipe}
           nomeJovem={nomeJovem}
           disponibilidade={disponibilidade}
+          ocupados={ocupados}
         />
       </div>
     </li>

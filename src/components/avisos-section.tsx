@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { DotsThreeVertical, Flag, Megaphone, Siren, Trash, CaretDown } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { ExitItem, ExitList } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -177,7 +177,7 @@ function AvisoAcoes({ aviso }: { aviso: Comunicado }) {
         const total = ok.destinatarios ?? enviados + falhas;
         if (falhas) {
           toast.warning(
-            `E-mail enviado para ${enviados} de ${total}: ${falhas} ${falhas === 1 ? "falhou" : "falharam"}.`
+            `E-mail enviado para ${enviados} de ${total}. ${falhas} ${falhas === 1 ? "falhou" : "falharam"}.`
           );
         } else {
           toast.success(

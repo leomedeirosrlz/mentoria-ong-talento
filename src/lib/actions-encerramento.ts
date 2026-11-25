@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { notificar } from "@/lib/notificar";
 import { demoAtivo } from "./demo/mode";
@@ -13,9 +14,11 @@ import {
   textoResumoJornada,
 } from "./encerramento";
 import { getPdmResumo } from "./queries-pdm";
+import { resumoAvaliacaoJovem } from "./avaliacao-agregado";
 import { snapshotDuplaHoje } from "./jobs";
 import { erroAmigavel as erroAmigavelBase } from "./utils";
 import type {
+  AvaliacaoEncontro,
   CicloEvento,
   EncerramentoChecklist,
   Encontro,
@@ -69,9 +72,10 @@ export async function registrarEncerramento(
       .select(
         `id, status, trilha, iniciada_em, mentor_id, supervisor_id, cronograma_id,
          mentor:profiles!duplas_mentor_id_fkey(nome),
-         mentorado:mentorados!duplas_mentorado_id_fkey(nome),
+         mentorado:mentorados!duplas_mentorado_id_fkey(nome, profile_id),
          encontros(numero, status, data_hora, realizado_em,
-                  registro:registros(tema, avaliacao)),
+                  registro:registros(tema, avaliacao),
+                  avaliacao_jovem:avaliacoes_encontro(estrelas, temas)),
          encaminhamentos(status)`
       )
       .eq("id", duplaId)
@@ -97,7 +101,7 @@ export async function registrarEncerramento(
   // a decisão que falta é registrar a conclusão
   if (duplaRow.status === "concluida" && tipo !== "concluida") {
     return {
-      error: "A jornada já concluiu com o último encontro — registre a conclusão.",
+      error: "A jornada já concluiu com o último encontro. Registre a conclusão.",
     };
   }
 
@@ -148,6 +152,9 @@ export async function registrarEncerramento(
     encontros: (duplaRow.encontros ?? []).map((e) => ({
       ...e,
       registro: norm(e.registro as Registro | Registro[] | null),
+      avaliacao_jovem: norm(
+        e.avaliacao_jovem as AvaliacaoEncontro | AvaliacaoEncontro[] | null
+      ),
     })) as Encontro[],
     encaminhamentos: duplaRow.encaminhamentos ?? [],
   };
@@ -161,8 +168,23 @@ export async function registrarEncerramento(
   // o PDM vivo entra no snapshot: as metas atingidas com datas já são a
   // retro que o checklist "PDM revisado" pede (o item em si segue manual)
   const pdmResumo = await getPdmResumo(duplaId).catch(() => null);
+  // the young-person series joins the snapshot too (REALIZA-71) — this
+  // runs as coordenacao, so the embed carries the full series
+  const avaliacaoJovem = resumoAvaliacaoJovem(
+    duplaParaResumo.encontros.flatMap((e) =>
+      e.avaliacao_jovem
+        ? [
+            {
+              numero: e.numero,
+              estrelas: e.avaliacao_jovem.estrelas,
+              temas: e.avaliacao_jovem.temas,
+            },
+          ]
+        : []
+    )
+  );
   const resumoJornada = textoResumoJornada(
-    dadosResumoJornada(duplaParaResumo, passos, evsDaDupla, agora.toISOString(), agora, pdmResumo)
+    dadosResumoJornada(duplaParaResumo, passos, evsDaDupla, agora.toISOString(), agora, pdmResumo, avaliacaoJovem)
   );
 
   const { error: errEnc } = await supabase.from("encerramentos").upsert(
@@ -190,6 +212,7 @@ export async function registrarEncerramento(
   // ato — a notificação daqui vira o registro do rito, não repeteco
   const jaConcluida = duplaRow.status === "concluida";
   const nomeMd = norm(duplaRow.mentorado)?.nome;
+  const jovemProfileId = norm(duplaRow.mentorado)?.profile_id ?? null;
   await notificar(
     supabase,
     [
@@ -221,11 +244,25 @@ export async function registrarEncerramento(
             href: `/duplas/${duplaId}`,
           }
         : null,
+      // jovem com conta recebe o desfecho no sino dele — o resumo da
+      // jornada mora na página dele, não na ficha de staff
+      {
+        profile_id: jovemProfileId,
+        tipo: "dupla_formada",
+        titulo: jaConcluida
+          ? "Encerramento registrado"
+          : tipo === "concluida"
+            ? "Sua dupla concluiu a jornada"
+            : "Sua dupla foi encerrada",
+        corpo: "O resumo da jornada fica na sua página.",
+        href: "/jovem",
+      },
     ].filter((r): r is NonNullable<typeof r> => r !== null),
     eu.id
   );
 
-  void snapshotDuplaHoje(duplaId).catch(() => {});
+  // pós-resposta: snapshot idempotente, não segura o usuário
+  after(() => snapshotDuplaHoje(duplaId).catch(() => {}));
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath(`/duplas/${duplaId}`);
@@ -329,7 +366,7 @@ export async function encerrarTrilhaEspecialista(
         tipo: "trilha_encerrada",
         titulo,
         corpo: dest.jovem
-          ? `${eu.nome} fechou sua mentoria especializada — a devolutiva segue pro seu PDM.`
+          ? `${eu.nome} fechou sua mentoria especializada. A devolutiva segue pro seu PDM.`
           : nomeMd
             ? `${eu.nome} fechou a mentoria de ${nomeMd}. A devolutiva pro PDM está na ficha da dupla.`
             : `${eu.nome} fechou a trilha. A devolutiva pro PDM está na ficha da dupla.`,
@@ -360,7 +397,8 @@ export async function encerrarTrilhaEspecialista(
     eu.id
   );
 
-  void snapshotDuplaHoje(duplaId).catch(() => {});
+  // pós-resposta: snapshot idempotente, não segura o usuário
+  after(() => snapshotDuplaHoje(duplaId).catch(() => {}));
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath(`/duplas/${duplaId}`);

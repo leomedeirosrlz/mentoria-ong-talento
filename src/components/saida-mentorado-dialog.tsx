@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { marcarSaidaMentorado } from "@/lib/actions";
 import { MOTIVOS_SAIDA, motivoSaida } from "@/lib/ciclo";
 import type { Mentorado, SituacaoMentorado } from "@/lib/types";

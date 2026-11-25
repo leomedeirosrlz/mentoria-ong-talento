@@ -4,6 +4,7 @@ import { DotsThree, Lifebuoy } from "@phosphor-icons/react/dist/ssr";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { buttonVariants } from "@/components/ui/button";
+import { progressoTrilha } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 
 // ============================================================
@@ -41,14 +42,14 @@ export type PessoaLinha = {
  *  (sem cor de status); "pausa" cobre pausada e concluída. */
 export type TomSituacao = "risco" | "atencao" | "neutro" | "pausa";
 
-const PILL: Record<TomSituacao, string> = {
+export const PILL_SITUACAO: Record<TomSituacao, string> = {
   risco: "border-[var(--danger-border)] bg-[var(--danger-bg)] text-[var(--danger-text)]",
   atencao: "border-[var(--warn-border)] bg-[var(--warn-bg)] text-[var(--warn-text)]",
   neutro: "border-border bg-muted text-foreground",
   pausa: "border-[var(--pausa-border)] bg-[var(--pausa-bg)] text-[var(--pausa-text)]",
 };
 
-const PONTO: Record<TomSituacao, string | null> = {
+export const PONTO_SITUACAO: Record<TomSituacao, string | null> = {
   risco: "bg-[var(--danger)]",
   atencao: "bg-[var(--warn)]",
   neutro: null,
@@ -66,7 +67,12 @@ const QUADRADO_ON: Record<TomSituacao, string> = {
  *  realizados; o traço mostra o esperado até hoje (só em dupla ativa). */
 export type ProgressoDupla = {
   total: number;
+  /** passos do guia cobertos — vem de `passosRealizadosDe` (na trilha de
+   *  especialista é o rank, nunca o `numero` cru da tentativa) */
   realizados: readonly number[];
+  /** trilha de especialista: o contador e o aria falam de sessão, não de
+   *  encontro (a régua é a mesma — feitos/total, REALIZA-498) */
+  sessao?: boolean;
   esperado?: number | null;
   /** texto à direita do "n de N": "esperado 4", "em pausa", "sessões" */
   legenda?: string;
@@ -96,6 +102,8 @@ export type DuplaLinhaProps = {
   fichaNome: string;
   /** índice do stagger (--i) */
   i?: number;
+  /** busca ativa — os trechos casados nos nomes ganham <mark> */
+  marca?: string;
   className?: string;
 };
 
@@ -113,6 +121,7 @@ export function DuplaLinha({
   fichaHref,
   fichaNome,
   i = 0,
+  marca,
   className,
 }: DuplaLinhaProps) {
   const realizados = new Set(progresso?.realizados ?? []);
@@ -153,11 +162,11 @@ export function DuplaLinha({
           <span
             className={cn(
               "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-none",
-              PILL[situacao.tom]
+              PILL_SITUACAO[situacao.tom]
             )}
           >
-            {PONTO[situacao.tom] && (
-              <span aria-hidden className={cn("size-1.5 rounded-full", PONTO[situacao.tom])} />
+            {PONTO_SITUACAO[situacao.tom] && (
+              <span aria-hidden className={cn("size-1.5 rounded-full", PONTO_SITUACAO[situacao.tom])} />
             )}
             {situacao.rotulo}
           </span>
@@ -181,6 +190,7 @@ export function DuplaLinha({
               <DuplaNomes
                 mentor={mentor.nome_social ?? mentor.nome}
                 mentorado={mentorado.nome_social ?? mentorado.nome}
+                marca={marca}
               />
             </p>
             {meta && <p className="mt-0.5 text-xs text-muted-foreground">{meta}</p>}
@@ -206,13 +216,18 @@ export function DuplaLinha({
             <>
               <p className="text-xs">
                 <b className="font-semibold tabular-nums whitespace-nowrap text-foreground">
-                  {feitos} de {total}
+                  {progressoTrilha({
+                    esp: progresso.sessao === true,
+                    feitos,
+                    total,
+                    curta: true,
+                  })}
                 </b>
               </p>
               <div className="relative mt-1">
                 <div
                   role="img"
-                  aria-label={`${feitos} de ${total} encontros realizados${
+                  aria-label={`${progressoTrilha({ esp: progresso.sessao === true, feitos, total })}${
                     esperadoPct != null ? `, esperados ${progresso.esperado} até hoje` : ""
                   }`}
                   className="flex h-2 gap-px"

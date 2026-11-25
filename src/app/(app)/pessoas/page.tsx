@@ -1,17 +1,25 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
+  getCronogramas,
   getDuplasResumo,
   getDuplasResumoTodas,
+  getEncerramentosResumo,
+  getMapaAcesso,
   getMe,
   getMentorados,
   getMentorProfiles,
+  getPapeisEscopo,
   getPessoas,
+  getTurmaInscricoesPessoas,
   type MentorProfile,
 } from "@/lib/queries";
+import { disponivelDesdePorId } from "@/lib/fila";
 import { getAssinaturasResumo } from "@/lib/queries-assinaturas";
+import { getEspecialistasCatalogo } from "@/lib/queries-especialista";
 import { faltantesDocumento } from "@/lib/documentos/texto";
-import { foraDoPrograma } from "@/lib/ciclo";
+import { foraDoPrograma, idade } from "@/lib/ciclo";
+import { turmaDaDupla } from "@/lib/turma";
 import type { DocsPessoa } from "@/components/pessoas-listas";
 import {
   NovaPessoaDialog,
@@ -36,17 +44,55 @@ export default async function PessoasPage() {
   const souCoord = me.role === "coordenacao";
 
   // fora da coordenação a página é um diretório de colegas: os resumos
-  // operacionais (vínculos de dupla, fichas de mentor, assinaturas) viriam
-  // escopados pelo RLS e renderizariam badges falsos — nem dispara
-  const [pessoasRaw, mentorados, duplas, todasDuplas, perfisMentor, resumoAss] =
-    await Promise.all([
-      getPessoas(),
-      getMentorados(),
-      souCoord ? getDuplasResumo() : Promise.resolve([]),
-      souCoord ? getDuplasResumoTodas() : Promise.resolve([]),
-      souCoord ? getMentorProfiles() : Promise.resolve([]),
-      souCoord ? getAssinaturasResumo() : Promise.resolve([]),
-    ]);
+  // operacionais (vínculos de dupla, fichas de mentor, assinaturas, mapas
+  // de turma/acesso) viriam escopados pelo RLS e renderizariam badges
+  // falsos — nem dispara
+  const [
+    pessoasRaw,
+    mentorados,
+    duplas,
+    todasDuplas,
+    perfisMentor,
+    resumoAss,
+    inscricoes,
+    papeisEscopo,
+    acesso,
+    cronogramas,
+    encerramentosResumo,
+    catalogo,
+  ] = await Promise.all([
+    getPessoas(),
+    getMentorados(),
+    souCoord ? getDuplasResumo() : Promise.resolve([]),
+    souCoord ? getDuplasResumoTodas() : Promise.resolve([]),
+    souCoord ? getMentorProfiles() : Promise.resolve([]),
+    souCoord ? getAssinaturasResumo() : Promise.resolve([]),
+    souCoord ? getTurmaInscricoesPessoas() : Promise.resolve([]),
+    souCoord ? getPapeisEscopo() : Promise.resolve([]),
+    souCoord ? getMapaAcesso() : Promise.resolve({}),
+    souCoord ? getCronogramas() : Promise.resolve([]),
+    souCoord ? getEncerramentosResumo() : Promise.resolve([]),
+    // a view já gateia por papel (staff lê, mentorado recebe 0 rows) —
+    // busca pra todo staff: é barata e a faceta "Especialistas" do
+    // diretório consome; a coord não a usa (a faceta dela vem do modal)
+    getEspecialistasCatalogo(),
+  ]);
+
+  // "voltou a ficar disponível" por pessoa — o "há N dias" da fila mede a
+  // espera ATUAL: quem sai de uma dupla recomeça a contar da saída, não da
+  // entrada original no programa (REALIZA-393)
+  const disponivelDesde = disponivelDesdePorId(todasDuplas, encerramentosResumo);
+
+  // filiação por turma (REALIZA-39): duplas.turma é selo — o rótulo vivo
+  // resolve pelo cronograma (renomear a turma não fatia o grupo em duas)
+  const mapasTurma = {
+    duplas: todasDuplas.map((d) => ({
+      ...d,
+      turma: turmaDaDupla(d, cronogramas),
+    })),
+    inscricoes,
+    papeisEscopo,
+  };
 
   // conta de jovem (profile role=mentorado) já aparece como ficha de
   // mentorado — a linha de profile duplicaria a pessoa e a ficha dela é
@@ -174,6 +220,9 @@ export default async function PessoasPage() {
                       nome: m.nome,
                       email: m.email || null,
                       whatsapp: m.whatsapp,
+                      // o dialog avisa e o servidor emite: menor recebe o
+                      // par (termo + autorização) numa passada só
+                      menor: (idade(m.data_nascimento) ?? 99) < 18,
                     })),
                   docs: docsPorPessoa,
                   faltantes: faltantesPorPessoa,
@@ -190,13 +239,17 @@ export default async function PessoasPage() {
       <PessoasListas
         pessoas={souCoord ? pessoas : pessoas.filter((p) => p.role != null)}
         mentorados={mentorados}
+        catalogo={catalogo}
         comDupla={[...comDupla]}
         comQualquerDupla={[...comQualquerDupla]}
         duplaVivaPorMentorado={duplaVivaPorMentorado}
         mentorProfiles={mentorProfiles}
         contagemPorMentor={contagemPorMentor}
+        disponivelDesde={disponivelDesde}
         assinaturas={docsPorPessoa}
         faltantes={faltantesPorPessoa}
+        mapasTurma={mapasTurma}
+        acesso={acesso}
         euNome={me.nome}
         souCoord={souCoord}
       />

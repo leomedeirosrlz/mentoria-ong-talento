@@ -4,6 +4,7 @@ import {
   buscarViaServiceRole,
   convergirDuplaAtiva,
   expect,
+  inserirViaServiceRole,
   jwtDoUsuario,
   loginComSenha,
   relogar,
@@ -11,13 +12,17 @@ import {
   test,
 } from "../helpers";
 
-// Diretório do jovem (REALIZA-113 / migration 0076) contra backend real:
-//   * /jovem/pessoas lista o colega de turma COM conta — a ficha dele vem da
-//     view mentorados_turma (colega = divide turma de dupla, sem filtro de
-//     status — a pausada do jovem2 basta) e o WhatsApp fica atrás do opt-in
-//     contato_compartilhado;
-//   * o toggle mora no /jovem/perfil do DONO (RPC set_contato_compartilhado)
-//     — ligar na UI libera o botão WhatsApp do outro lado;
+// Diretório do jovem (spec 023 / migration 0239 / REALIZA-525) contra
+// backend real:
+//   * /jovem/pessoas é o diretório do programa — adultos com papel, os
+//     jovens com conta e o catálogo; a faceta "Minha rede" recorta a rede
+//     dele (jovem_contatos ∪ mentorados_turma) dentro do painel "Filtros"
+//     (525) e o card da rede abre o WhatsApp que a view já entrega —
+//     colega atrás do opt-in contato_compartilhado;
+//   * a seção "Sua rede" do /jovem/perfil ficou só com os adultos das
+//     duplas (525) — os colegas vivem na faceta "Colegas" do diretório,
+//     com o canal atrás do mesmo opt-in (RPC set_contato_compartilhado,
+//     toggle no Perfil do DONO);
 //   * profiles_select apertado: staff não-coord não lê profile role=mentorado
 //     fora das duplas dele — conferido na UI (/pessoas) e com o JWT real dele
 //     no PostgREST;
@@ -40,9 +45,17 @@ const IDS = {
   jovem2Profile: "e2e00000-0000-4000-8000-0000000000f0",
   mentoradoSemDpp: "e2e00000-0000-4000-8000-0000000000d0", // a ficha do jovem2
   duplaColega: "e2e00000-0000-4000-8000-0000000000f2",
-  // a dupla DPP do jovem — o selo "mentoria <status>" vive dentro do link
-  // do mentor na mentoria-titulo: 'concluida' muda o nome acessível dele
+  // a dupla DPP do jovem — o selo "mentoria <status>" vive no card do
+  // mentor quando a dupla não está em curso
   duplaDpp: "e2e00000-0000-4000-8000-000000000030",
+  // a trilha esp do jovem — a mentorados_turma casa a turma por QUALQUER
+  // dupla dele: turma degradada numa das duas esvazia a rede de colegas
+  duplaEsp: "e2e00000-0000-4000-8000-0000000000e0",
+  // mentor do colega e cronograma da Turma E2E — o seed usa o MESMO uuid
+  // pros dois (tabelas diferentes, não conflita)
+  mentorColega: "e2e00000-0000-4000-8000-0000000000e2",
+  cronogramaE2e: "e2e00000-0000-4000-8000-0000000000e2",
+  supProfile: "e2e00000-0000-4000-8000-000000000100", // supervisor das duplas fixture
   mentorProfile: "e2e00000-0000-4000-8000-000000000010",
   espProfile: "e2e00000-0000-4000-8000-000000000060",
   esp2Profile: "e2e00000-0000-4000-8000-0000000000c0", // catálogo, sem dupla com o jovem
@@ -50,6 +63,9 @@ const IDS = {
   mentorReserva: "e2e00000-0000-4000-8000-000000000050", // adulto não-relacionado
 } as const;
 const JOVEM2_WHATSAPP = "5511999000091";
+// mesma turma das fixtures do seed (TURMA_E2E lá) — a mentorados_turma
+// casa por string de turma, então o valor tem que ser verbatim
+const TURMA_E2E = "Turma E2E";
 // jovem demo do seed:demo (Ana, turma T1) — divide o staging com as
 // fixtures e serve de pin "outra turma" pro teste de escopo da 0097
 const JOVEM_DEMO_EMAIL = "jovem@realiza.test";
@@ -57,52 +73,172 @@ const SENHA_DEMO = process.env.E2E_DEMO_JOVEM_PASSWORD ?? "realiza123";
 
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
-/** Piso do spec: o opt-in desligado, o whatsapp da ficha e a dupla pausada
- *  no lugar — idempotente (PATCH sem row casa nada; quem cria é o seed).
- *  Um run morto com o toggle ligado vazaria "compartilhado" pro teste da
- *  contagem zero — por isso a convergência roda por spec, não só no seed. */
+/** Piso do spec: o colega converge ESTRUTURA, não só estado. PATCH numa
+ *  row ausente é no-op silencioso, então ficha e dupla renascem com os
+ *  mesmos campos do seed quando faltam — e os campos estruturais
+ *  (nome, vínculos, turma, trilha) re-convergem junto dos voláteis, que
+ *  drift manual no staging já degradou (o "Jovem E2e Sem Dpp"
+ *  title-caseado que esvaziou o diretório). O opt-in desligado e o
+ *  whatsapp voltam ao lugar a cada spec — um run morto com o toggle
+ *  ligado vazaria "compartilhado" pro teste da contagem zero. */
 async function restaurarColega() {
-  await atualizarViaServiceRole(
-    "mentorados",
-    `id=eq.${IDS.mentoradoSemDpp}`,
-    { contato_compartilhado: false, whatsapp: JOVEM2_WHATSAPP }
-  );
-  await atualizarViaServiceRole("duplas", `id=eq.${IDS.duplaColega}`, {
-    status: "pausada",
-    encerrada_em: null,
-    motivo_encerramento: null,
-  });
-  // a dupla do jovem tem que estar ativa — 'concluida' costura o selo
-  // "mentoria concluída" no link do mentor e o nome acessível muda
-  await convergirDuplaAtiva(IDS.duplaDpp);
+  // pares independentes em paralelo — em staging cada ida serial ao
+  // PostgREST soma segundos e o hook comia o teto de 60s do teste
+  const [ficha, dupla] = await Promise.all([
+    buscarViaServiceRole<{ id: string }[]>(
+      "mentorados",
+      `select=id&id=eq.${IDS.mentoradoSemDpp}`
+    ),
+    buscarViaServiceRole<{ id: string }[]>(
+      "duplas",
+      `select=id&id=eq.${IDS.duplaColega}`
+    ),
+  ]);
+  // a ficha sai na frente SOZINHA: o insert da dupla tem FK mentorado_id
+  // — em run com estado zerado ela precisa existir antes do paralelo
+  if (ficha) {
+    await atualizarViaServiceRole(
+      "mentorados",
+      `id=eq.${IDS.mentoradoSemDpp}`,
+      {
+        nome: "Jovem E2E Sem DPP",
+        profile_id: IDS.jovem2Profile,
+        contato_compartilhado: false,
+        whatsapp: JOVEM2_WHATSAPP,
+      }
+    );
+  } else {
+    await inserirViaServiceRole("mentorados", {
+      id: IDS.mentoradoSemDpp,
+      nome: "Jovem E2E Sem DPP",
+      profile_id: IDS.jovem2Profile,
+      whatsapp: JOVEM2_WHATSAPP,
+      contato_compartilhado: false,
+    });
+  }
+  await Promise.all([
+    dupla
+      ? atualizarViaServiceRole("duplas", `id=eq.${IDS.duplaColega}`, {
+          status: "pausada",
+          encerrada_em: null,
+          motivo_encerramento: null,
+          turma: TURMA_E2E,
+          mentor_id: IDS.mentorColega,
+          mentorado_id: IDS.mentoradoSemDpp,
+          supervisor_id: IDS.supProfile,
+          trilha: "dpp",
+        })
+      : // insert espelha o seed (status pausada na Turma E2E, trilha dpp) +
+        // o supervisor_id que o bloco do supervisor costura depois — a dupla
+        // renasce já no estado final convergido. O insert dispara
+        // duplas_jornada_autoemit, mesmo efeito do seed: links do enc. 1
+        inserirViaServiceRole("duplas", {
+          id: IDS.duplaColega,
+          mentor_id: IDS.mentorColega,
+          mentorado_id: IDS.mentoradoSemDpp,
+          supervisor_id: IDS.supProfile,
+          turma: TURMA_E2E,
+          cronograma_id: IDS.cronogramaE2e,
+          trilha: "dpp",
+          status: "pausada",
+          iniciada_em: "2026-09-08",
+        }),
+    // o join da mentorados_turma casa pela turma das duplas do JOVEM —
+    // qualquer uma degradada esvazia a rede de colegas inteira
+    atualizarViaServiceRole(
+      "duplas",
+      `id=in.(${IDS.duplaDpp},${IDS.duplaEsp})`,
+      { turma: TURMA_E2E }
+    ),
+    // a dupla do jovem tem que estar ativa — 'concluida' costura o selo
+    // "mentoria concluída" no card do mentor e muda o recorte
+    convergirDuplaAtiva(IDS.duplaDpp),
+  ]);
 }
 
-test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
+// o card do diretório navega por UM link nomeado (aria-label "Abrir
+// perfil de …") — o nome acessível não se mistura com os chips
+// nomes da fixture são prefixo uns dos outros ("Mentor E2E" × "Mentor E2E
+// Colega/Híbrido/…") — o match exato é o que torna o card único
+const cardDe = (page: import("@playwright/test").Page, nome: string) =>
+  page.getByRole("link", { name: `Abrir perfil de ${nome}`, exact: true });
+
+const cardInteiroDe = (
+  page: import("@playwright/test").Page,
+  nome: string
+) => cardDe(page, nome).locator("xpath=ancestor::*[@data-slot='card']");
+
+const filtros = (page: import("@playwright/test").Page) =>
+  page.getByRole("button", { name: /^Filtros/ });
+
+/** O gesto do painel de filtros (525): abre "Filtros", marca a opção pelo
+ *  label-pill (o rádio é sr-only — quem recebe o clique é o label, mesma
+ *  régua do login por senha) e aplica de uma vez. */
+async function aplicarFaceta(
+  page: import("@playwright/test").Page,
+  nome: string
+) {
+  await filtros(page).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog
+    .locator("label", {
+      has: page.getByRole("radio", { name: nome, exact: true }),
+    })
+    .click();
+  await dialog.getByRole("button", { name: /^Aplicar/ }).click();
+  await expect(dialog).toHaveCount(0);
+}
+
+test.describe("diretório do jovem (spec 023 / 0239)", () => {
   test.beforeEach(restaurarColega);
   test.afterAll(restaurarColega);
 
-  test("colegas da turma lista o colega com conta — contato fechado até o opt-in", async ({
+  test("o colega com conta vira card no diretório — contato fechado até o opt-in", async ({
     page,
   }) => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem/pessoas");
 
-    const colegas = page.locator('section[aria-labelledby="colegas-titulo"]');
-    // a view entrega a ficha (mentorados.nome), não o login — "Jovem E2E Sem
-    // DPP" é o nome das duas coisas no seed
-    const linha = colegas.locator("li", { hasText: "Jovem E2E Sem DPP" });
-    await expect(linha).toBeVisible();
-    // opt-in fechado: o card existe, mas o contato não viaja — nunca um
-    // botão wa.me com número null
-    await expect(linha.getByText("não compartilhou o contato")).toBeVisible();
+    // a ficha dele existe no diretório (mentorados.nome, não o login) —
+    // e dentro da faceta "Minha rede" por ser colega de turma
+    await aplicarFaceta(page, "Minha rede");
+    await expect(cardDe(page, "Jovem E2E Sem DPP")).toBeVisible();
+    await expect(cardDe(page, "Mentor E2E")).toBeVisible();
+    await expect(cardDe(page, "Coordenação E2E")).toBeVisible();
+
+    // 525: o card da rede abre o WhatsApp que a view já entrega — o
+    // especialista da trilha dele (único adulto e2e com número) tem o
+    // ícone; o colega com opt-in fechado não. mailto nunca viaja
+    const main = page.getByRole("main");
+    await expect(main.locator('a[href^="mailto:"]')).toHaveCount(0);
     await expect(
-      linha.getByRole("link", { name: /WhatsApp/ })
+      cardInteiroDe(page, "Esp E2E").getByRole("link", {
+        name: /Conversar com Esp E2E no WhatsApp/,
+      })
+    ).toHaveAttribute("href", /wa\.me\/5511999000070/);
+    await expect(
+      cardInteiroDe(page, "Jovem E2E Sem DPP").locator('a[href*="wa.me"]')
+    ).toHaveCount(0);
+    await expect(
+      cardInteiroDe(page, "Mentor E2E").locator('a[href*="wa.me"]')
     ).toHaveCount(0);
 
-    // colega sem conta (profile_id null) nem entra no diretório — as duas
+    // e a ficha dele mostra o estado honesto em vez do botão
+    await cardDe(page, "Jovem E2E Sem DPP").click();
+    await expect(page).toHaveURL(
+      new RegExp(`/jovem/pessoas/${IDS.mentoradoSemDpp}`)
+    );
+    await expect(
+      page.getByText(/ainda não compartilhou o contato/i)
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: /WhatsApp/ })).toHaveCount(0);
+
+    // colega sem conta (profile_id null) nem entra no diretório — as
     // outras fichas e2e são esse caso
-    await expect(colegas.getByText("Mentorada E2E Dois")).toHaveCount(0);
-    await expect(colegas.getByText("Mentorada E2E Livre")).toHaveCount(0);
+    await page.goto("/jovem/pessoas");
+    await expect(cardDe(page, "Mentorada E2E Dois")).toHaveCount(0);
+    await expect(cardDe(page, "Mentorada E2E Livre")).toHaveCount(0);
   });
 
   test("abre o perfil de quem ele enxerga — cada fonte segura resolve", async ({
@@ -111,19 +247,17 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem/pessoas");
 
-    // contato de dupla (jovem_contatos): o click do diretório cai no
-    // perfil — mesmo cartão-banner do /perfil de todo mundo
-    await page
-      .locator('section[aria-labelledby="mentoria-titulo"]')
-      .getByRole("link", { name: "Mentor E2E", exact: true })
-      .click();
+    // contato de dupla (jovem_contatos): o click do card cai no perfil —
+    // mesmo cartão-banner do /perfil de todo mundo
+    await cardDe(page, "Mentor E2E").click();
     await expect(page).toHaveURL(
       new RegExp(`/jovem/pessoas/${IDS.mentorProfile}`)
     );
     await expect(
       page.getByRole("heading", { name: "Mentor E2E", level: 1 })
     ).toBeVisible();
-    await expect(page.getByText("Seu mentor DPP")).toBeVisible();
+    // o badge do vínculo — "Seu mentor" (rotuloContato do perfil)
+    await expect(page.getByText("Seu mentor", { exact: true })).toBeVisible();
     await expect(
       page.getByRole("link", { name: /e2e-mentor@realiza\.test/ })
     ).toBeVisible();
@@ -146,11 +280,7 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
 
     // colega da turma (mentorados_turma — id de mentorados, outro espaço)
     await page.goto("/jovem/pessoas");
-    await page
-      .locator('section[aria-labelledby="colegas-titulo"]')
-      .getByRole("link", { name: /Jovem E2E Sem DPP/, exact: false })
-      .first()
-      .click();
+    await cardDe(page, "Jovem E2E Sem DPP").click();
     await expect(page).toHaveURL(
       new RegExp(`/jovem/pessoas/${IDS.mentoradoSemDpp}`)
     );
@@ -158,9 +288,8 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
       page.getByRole("heading", { name: "Jovem E2E Sem DPP", level: 1 })
     ).toBeVisible();
     await expect(page.getByText("Colega da turma")).toBeVisible();
-    // opt-in fechado: estado honesto, nunca um wa.me vazio
     await expect(
-      page.getByText(/ainda não compartilhou o contato/)
+      page.getByText(/ainda não compartilhou o contato/i)
     ).toBeVisible();
     await expect(page.getByRole("link", { name: /WhatsApp/ })).toHaveCount(0);
 
@@ -184,12 +313,7 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
   }) => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
 
-    // adulto que existe mas não é das duplas dele nem do catálogo — o
-    // profiles_select não deixa nem confirmar que o card existe
-    await page.goto(`/jovem/pessoas/${IDS.mentorReserva}`);
-    await expect(page.getByText("Página não encontrada")).toBeVisible();
-
-    // id aleatório — mesma resposta, sem vazar existência
+    // id aleatório — sem vazar existência
     await page.goto(
       "/jovem/pessoas/00000000-0000-4000-8000-000000000000"
     );
@@ -229,25 +353,24 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
     );
     expect(ficha.contato_compartilhado).toBe(true);
 
-    // e o diretório dele espelha a simetria: o jovem (ficha "Mentorada E2E")
-    // é colega dele de volta — com o contato ainda fechado
+    // a simetria espelha no diretório (525): o jovem (ficha "Mentorada
+    // E2E") é colega dele de volta e aparece na faceta "Minha rede" —
+    // com o contato fechado, o card não tem WhatsApp
     await page.goto("/jovem/pessoas");
-    const linhaJovem = page
-      .locator('section[aria-labelledby="colegas-titulo"]')
-      .locator("li", { hasText: "Mentorada E2E" });
-    await expect(linhaJovem).toBeVisible();
+    await aplicarFaceta(page, "Minha rede");
+    await expect(cardDe(page, "Mentorada E2E")).toBeVisible();
     await expect(
-      linhaJovem.getByText("não compartilhou o contato")
-    ).toBeVisible();
+      cardInteiroDe(page, "Mentorada E2E").locator('a[href*="wa.me"]')
+    ).toHaveCount(0);
 
-    // lado do COLEGA: relogado como jovem, o opt-in destravou o botão —
-    // href aponta pro número da ficha, não um wa.me vazio
+    // lado do COLEGA: relogado como jovem, o opt-in destravou o ícone no
+    // card do diretório — o href aponta pro número da ficha, nunca vazio
     await relogar(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem/pessoas");
-    const wa = page
-      .locator('section[aria-labelledby="colegas-titulo"]')
-      .locator("li", { hasText: "Jovem E2E Sem DPP" })
-      .getByRole("link", { name: /WhatsApp/ });
+    await aplicarFaceta(page, "Minha rede");
+    const wa = cardInteiroDe(page, "Jovem E2E Sem DPP").getByRole("link", {
+      name: /WhatsApp/,
+    });
     await expect(wa).toBeVisible();
     await expect(wa).toHaveAttribute(
       "href",
@@ -334,17 +457,17 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
     );
   });
 
-  test("persona e2e não vaza pro diretório do jovem de outra turma (escopo 0097)", async ({
+  test("a faceta Minha rede não vaza gente de outra turma (escopo 0097)", async ({
     page,
   }) => {
     // Ana (seed:demo) é turma T1; as personas do seed e2e agora têm papel
     // escopado na "Turma E2E" e duplas na mesma turma — jovem_contatos
     // (0097) e mentorados_turma (join por turma da dupla) devem ignorar
-    // tudo isso pra ela. Antes da 0097 o branch de coordenação listava
+    // tudo isso pra ela NA FACETA REDE. O diretório em si mudou de regra
+    // (0239): adultos com papel, jovens com conta e o catálogo são
+    // programa-inteiro — eles aparecem em "Todos" por decisão, só não
+    // viram "rede" dela. Antes da 0097 o branch de coordenação listava
     // qualquer profile com o papel.
-    // jovem_especialistas é a exceção deliberada: o catálogo virou pool
-    // GLOBAL (0101, REALIZA-158) — o escopo dos personas e2e NÃO esconde
-    // eles dela, e o assert abaixo confirma justamente o oposto.
     // Depende do dataset demo — o e2e-app (stack local) só semeia e2e:
     // sem a persona o teste pula, não quebra.
     const [anaExiste] = await buscarViaServiceRole<{ id: string }[]>(
@@ -355,31 +478,21 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
     await loginComSenha(page, JOVEM_DEMO_EMAIL, SENHA_DEMO);
     await page.goto("/jovem/pessoas");
 
-    const coord = page.locator(
-      'section[aria-labelledby="coordenacao-titulo"]'
-    );
-    await expect(coord.getByText("Coordenação E2E")).toHaveCount(0);
-    const colegas = page.locator(
-      'section[aria-labelledby="colegas-titulo"]'
-    );
-    await expect(colegas.getByText("Jovem E2E Sem DPP")).toHaveCount(0);
-    await expect(colegas.getByText("Mentorada E2E Dois")).toHaveCount(0);
+    // programa-inteiro por decisão (0239): a coordenação e2e e o jovem2
+    // com conta aparecem no diretório geral — pessoas do programa, ponto
+    await expect(cardDe(page, "Coordenação E2E")).toBeVisible();
+    await expect(cardDe(page, "Jovem E2E Sem DPP")).toBeVisible();
 
-    // catálogo global (0101): o especialista e2e aparece pra Ana mesmo
-    // com o papel escopado em outra turma — é a regra do ticket
-    await page.goto("/jovem/especialistas");
-    await expect(page.getByText("Esp Dois E2E").first()).toBeVisible();
-    await expect(page.getByText("Esp E2E").first()).toBeVisible();
+    // mas a rede dela segue escopada às duplas/turma dela — a faceta
+    // "Minha rede" é quem não pode vazar
+    await aplicarFaceta(page, "Minha rede");
+    await expect(cardDe(page, "Coordenação E2E")).toHaveCount(0);
+    await expect(cardDe(page, "Jovem E2E Sem DPP")).toHaveCount(0);
+    await expect(cardDe(page, "Mentor E2E")).toHaveCount(0);
 
     // na borda do PostgREST com o JWT real dela — é a view quem filtra,
     // não a UI (o teste de tela acima podia passar por acidente de nome)
     const jwt = await jwtDoUsuario(JOVEM_DEMO_EMAIL, SENHA_DEMO);
-    const resEsp = await restComoUsuario(
-      `jovem_especialistas?select=id&id=in.(${IDS.espProfile},${IDS.esp2Profile})`,
-      jwt
-    );
-    expect(resEsp.status).toBe(200);
-    expect(await resEsp.json()).toHaveLength(2);
     const res = await restComoUsuario(
       `jovem_contatos?select=id&or=(id.eq.${IDS.espProfile},id.eq.${IDS.esp2Profile},id.eq.${IDS.coordProfile},id.eq.${IDS.mentorProfile})`,
       jwt
@@ -394,4 +507,3 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
     expect(await resColega.json()).toEqual([]);
   });
 });
-

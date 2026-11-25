@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "./demo/mode";
 import {
   demoEncerramentoDaDupla,
+  demoEncerramentos,
   demoEncerramentosPendentes,
 } from "./demo/encerramento-data";
 import { demoAvaliacao360DaDupla } from "./demo/forms-data";
@@ -109,5 +110,38 @@ export const getAvaliacao360DaDupla = cache(
       return null;
     }
     return (data?.respondido_em as string | undefined) ?? null;
+  }
+);
+
+/** Todas as rows de `encerramentos` no escopo do papel (RLS) com o decisor
+ *  embedado — a seção acionável de encerramento do relatório operacional
+ *  (REALIZA-389) precisa de pendentes E decididos de uma vez; a ficha segue
+ *  lendo só a sua row por getEncerramentoDaDupla. Falha degrada pra [] com
+ *  log — a seção cai vazia em vez de quebrar o hub. */
+export const getEncerramentos = cache(
+  async (): Promise<Encerramento[]> => {
+    const demo = await demoRole();
+    if (demo) return demoEncerramentos(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("encerramentos")
+      .select(
+        `id, dupla_id, tipo, checklist, resumo_jornada, decidido_por,
+         created_at, decidido:profiles!encerramentos_decidido_por_fkey(nome, nome_social)`
+      )
+      .order("created_at");
+    if (error) {
+      console.error("getEncerramentos:", error);
+      return [];
+    }
+    return (data ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      const emb = Array.isArray(row.decidido) ? row.decidido[0] : row.decidido;
+      return {
+        ...(row as unknown as Encerramento),
+        decidido:
+          (emb as { nome: string; nome_social?: string | null } | null) ?? null,
+      };
+    });
   }
 );

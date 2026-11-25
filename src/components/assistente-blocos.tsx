@@ -42,7 +42,7 @@ import {
   WhatsappLogo,
   type Icon,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type {
   BlocoDestaque,
   BlocoEscolha,
@@ -54,6 +54,7 @@ import type {
 import { waLink } from "@/lib/ciclo";
 import { GraficoBloco } from "@/components/assistente-genui";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -208,7 +209,14 @@ export function Escolha({
                   className="shrink-0 animate-in zoom-in-50 duration-150"
                 />
               )}
-              <span className="min-w-0">{o.rotulo}</span>
+              <span className="min-w-0">
+                {o.rotulo}
+                {o.detalhe && (
+                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                    {o.detalhe}
+                  </span>
+                )}
+              </span>
             </Button>
           );
         })}
@@ -465,9 +473,9 @@ export function Rascunho({
 // ---------- passos ----------
 
 /** Roteiro dos guias com checkbox por passo (estado local, não persiste).
- *  O quadrado mostra o número do passo e vira check ao marcar; feito fica
- *  riscado e esmaecido, sem sumir. Tudo feito: o cartão ganha o amarelo
- *  de celebração da marca e uma linha curta, sem festa. */
+ *  O número do passo vai à frente do texto; feito fica riscado e esmaecido,
+ *  sem sumir. Tudo feito: o cartão ganha o amarelo de celebração da marca
+ *  e uma linha curta, sem festa. */
 export function Passos({ b }: { b: BlocoPassos }) {
   const [feitos, setFeitos] = useState<boolean[]>(() =>
     b.itens.map(() => false)
@@ -513,45 +521,28 @@ export function Passos({ b }: { b: BlocoPassos }) {
           const feito = feitos[i];
           return (
             <li key={i} className="animate-enter" style={stagger(i + 1)}>
-              {/* checkbox nativo + label: teclado e clique no texto de graça;
-                  o quadrado é só a representação (padrão do jovem-combinados) */}
               <label className="group/passo flex min-h-10 cursor-pointer items-start gap-2.5 py-2.5">
-                <input
-                  type="checkbox"
-                  className="peer sr-only"
+                <Checkbox
                   checked={feito}
-                  onChange={() =>
+                  onCheckedChange={() =>
                     setFeitos((f) => f.map((v, j) => (j === i ? !v : v)))
                   }
+                  className="mt-px group-hover/passo:border-foreground"
                 />
-                <span
-                  aria-hidden
-                  className={cn(
-                    "mt-px grid size-5 shrink-0 place-items-center rounded-md border text-[11px] font-semibold tabular-nums transition-[color,background-color,border-color] duration-150 ease-snappy peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
-                    feito
-                      ? "border-[var(--ok-text)] bg-[var(--ok-text)] text-[var(--status-foreground)]"
-                      : "border-muted-foreground/40 text-muted-foreground group-hover/passo:border-foreground group-hover/passo:text-foreground"
-                  )}
-                >
-                  {feito ? (
-                    <Check
-                      size={12}
-                      weight="bold"
-                      className="animate-in zoom-in-50 duration-150"
-                    />
-                  ) : (
-                    i + 1
-                  )}
-                </span>
                 <span className="min-w-0 flex-1">
-                  <span
-                    className={cn(
-                      "block text-sm transition-colors duration-150",
-                      feito &&
-                        "text-muted-foreground line-through decoration-muted-foreground/50"
-                    )}
-                  >
-                    {p.texto}
+                  <span className="block text-sm">
+                    <span className="mr-1.5 tabular-nums text-muted-foreground">
+                      {i + 1}.
+                    </span>
+                    <span
+                      className={cn(
+                        "transition-colors duration-150",
+                        feito &&
+                          "text-muted-foreground line-through decoration-muted-foreground/50"
+                      )}
+                    >
+                      {p.texto}
+                    </span>
                   </span>
                   {p.detalhe && (
                     <span className="mt-0.5 block text-xs text-muted-foreground">

@@ -74,6 +74,10 @@ export const INSTRUMENTO_TOM: Record<
     cor: "var(--inst-desfecho)",
     tinta: "var(--inst-desfecho-t)",
   },
+  competencias_mentor: {
+    cor: "var(--inst-checklist)",
+    tinta: "var(--inst-checklist-t)",
+  },
 };
 
 /** Estreita `sistema` solto do banco (string) pra chave conhecida —
@@ -208,6 +212,13 @@ const GLIFO: Record<InstrumentoChave, ReactNode> = {
       <path d="M12 20.5v-8" />
       <path d="M12 12.5C12 8.8 9.2 6 5.5 6c0 3.7 2.8 6.5 6.5 6.5z" />
       <path d="M12 10.5c0-3.7 2.8-6.5 6.5-6.5 0 3.7-2.8 6.5-6.5 6.5z" />
+    </>
+  ),
+  // i-checklist — a lista com tiques da autoavaliação do mentor (0190)
+  competencias_mentor: (
+    <>
+      <path d="M9 6.5h11M9 12h11M9 17.5h11" />
+      <path d="m4 5.8 1.2 1.2 2.2-2.4M4 11.3l1.2 1.2 2.2-2.4M4 16.8l1.2 1.2 2.2-2.4" />
     </>
   ),
 };

@@ -8,6 +8,9 @@ const CH_REGISTRO = "de000000-0000-4000-8000-000000022569"; // CHA-000141
 const CH_JOVEM = "de000000-0000-4000-8000-000000022570"; // CHA-000142
 const CH_AGENDA = "de000000-0000-4000-8000-000000022571"; // CHA-000143
 const CH_PLATAFORMA = "de000000-0000-4000-8000-000000022572"; // CHA-000144
+const CH_FERIADO = "de000000-0000-4000-8000-000000022575"; // CHA-000147
+const CH_CUIDANDO = "de000000-0000-4000-8000-000000022576"; // CHA-000148
+const CH_ENCERRADO = "de000000-0000-4000-8000-000000022577"; // CHA-000149
 const CH_RESOLVIDO = "de000000-0000-4000-8000-000000022557"; // CHA-000129
 
 test.describe("demo — chamados (WP1)", () => {
@@ -274,6 +277,72 @@ test.describe("demo — chamados (WP1)", () => {
     await expect(pendente).toHaveCount(0);
   });
 
+  // spec 028 — a troca interno↔público anima a MOLDURA do composer por
+  // transition-colors (cores podem transicionar); o campo nunca remonta,
+  // senão o rascunho e a seleção iam embora num crossfade indevido
+  test("modo interno↔público transiciona a moldura e preserva o rascunho", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(`/chamados?c=${CH_REGISTRO}`);
+
+    const interno = page.getByRole("radio", { name: "Nota interna" });
+    const publico = page.getByRole("radio", {
+      name: "Responder a Fernanda",
+    });
+    await expect(interno).toHaveAttribute("aria-checked", "true");
+
+    // a moldura é o pai do seletor de tipo — transition-colors expande
+    // numa lista de cores/borda; nada de `all` nem propriedade de layout
+    const moldura = page
+      .getByRole("radiogroup", { name: "Tipo de mensagem" })
+      .locator("..");
+    const prop = await moldura.evaluate(
+      (el) => getComputedStyle(el).transitionProperty
+    );
+    expect(prop).toMatch(/color/);
+    expect(prop).not.toMatch(/\ball\b|width|height/);
+
+    // escreve no modo interno, marca o campo e troca pro público: mesmo
+    // nó de DOM (a sonda sobrevive a um remount falso) e o texto intacto
+    const campo = page.getByRole("textbox", { name: "Nota interna" });
+    await campo.fill("rascunho que não pode sumir");
+    await campo.evaluate(
+      (el) => ((el as HTMLElement).dataset.probe = "ok")
+    );
+    await publico.click();
+    const campoPublico = page.getByRole("textbox", {
+      name: /Resposta a/,
+    });
+    await expect(campoPublico).toHaveValue("rascunho que não pode sumir");
+    await expect(campoPublico).toHaveAttribute("data-probe", "ok");
+    await expect(publico).toHaveAttribute("aria-checked", "true");
+
+    // reduced-motion zera a transição da moldura junto (0.01ms → "1e-05s")
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const durReduce = await moldura.evaluate(
+      (el) => getComputedStyle(el).transitionDuration
+    );
+    expect(parseFloat(durReduce)).toBeLessThan(0.05);
+  });
+
+  test("menção entra revelada na fileira do composer", async ({ page }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(`/chamados?c=${CH_REGISTRO}`);
+
+    const campo = page.getByRole("textbox", { name: "Nota interna" });
+    await campo.fill("vou conversar com o @pau");
+    await campo.press("Enter");
+
+    // os chips de menção chegam por revelação (cascata do kit), não por
+    // crossfade — o grupo nasce com .animate-enter e some na remoção
+    const marcadas = page.getByRole("group", { name: "Pessoas marcadas" });
+    await expect(marcadas).toHaveClass(/animate-enter/);
+    await expect(
+      marcadas.getByRole("button", { name: /Remover marcação de Paulo/ })
+    ).toBeVisible();
+  });
+
   test("mentor não tem menções nem composer interno", async ({ page }) => {
     await entrarNaDemo(page, "mentor_dpp");
     await page.goto(`/chamados?c=${CH_AGENDA}`);
@@ -316,6 +385,125 @@ test.describe("demo — chamados (WP1)", () => {
       page.getByText("Chamado aberto por Ana Beatriz Silva.")
     ).toBeVisible();
     await expect(page.getByText(/comentário interno/i)).toHaveCount(0);
+  });
+
+  test("resposta da equipe vira pendência; cuidando é neutro; resolvido sai (504)", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentorado");
+    await page.goto("/jovem");
+
+    const fazer = page.getByRole("region", { name: "Para fazer agora" });
+    // a lista mostra 3 à vista e o resto em "e mais N" — as pendências de
+    // chamado (prioridade 50 do motor) ficam no painel recolhido
+    await fazer.getByRole("button", { name: /e mais \d+/ }).click();
+    // CHA-000147 em atendimento com a Marina E com resposta pública →
+    // "Marina respondeu seu pedido", assunto de contexto e "Ver resposta"
+    await expect(
+      fazer.getByText("Marina respondeu seu pedido")
+    ).toBeVisible();
+    await expect(
+      fazer.getByText("O encontro pode cair no feriado?")
+    ).toBeVisible();
+    const verResposta = fazer.getByRole("link", { name: "Ver resposta" });
+    await expect(verResposta).toHaveAttribute(
+      "href",
+      `/jovem/perfil?c=${CH_FERIADO}`
+    );
+    // CHA-000148 tem dono mas a trilha pública ainda não tem fala da
+    // equipe — a pendência informa, não promete: "está cuidando" neutro
+    // e a ação honesta "Ver andamento" (não "Ver resposta")
+    await expect(
+      fazer.getByText("A equipe está cuidando do seu pedido")
+    ).toBeVisible();
+    await expect(
+      fazer.getByText("O guia do 5º encontro não abre no celular")
+    ).toBeVisible();
+    const verAndamento = fazer.getByRole("link", { name: "Ver andamento" });
+    await expect(verAndamento).toHaveAttribute(
+      "href",
+      `/jovem/perfil?c=${CH_CUIDANDO}`
+    );
+    // CHA-000144 segue aberto sem dono — espera não é tarefa, não aparece
+    await expect(
+      fazer.getByText("Não consigo anexar a foto do combinado")
+    ).toHaveCount(0);
+    // CHA-000149 já foi resolvido (e tem resposta pública na trilha) — o
+    // desfecho chegou pela notificação; a pendência não eterniza
+    await expect(
+      fazer.getByText("Não achei onde avaliar o encontro")
+    ).toHaveCount(0);
+    await expect(
+      fazer.locator(`a[href="/jovem/perfil?c=${CH_ENCERRADO}"]`)
+    ).toHaveCount(0);
+
+    // o gesto é link de verdade: foco de teclado cai nele
+    await verResposta.focus();
+    await expect(verResposta).toBeFocused();
+
+    // 390px sem overflow horizontal (re-navega → recolhe → expande de novo)
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/jovem");
+    await fazer.getByRole("button", { name: /e mais \d+/ }).click();
+    await expect(
+      fazer.getByText("Marina respondeu seu pedido")
+    ).toBeVisible();
+    const scrollW = await page.evaluate(
+      () => document.documentElement.scrollWidth
+    );
+    expect(scrollW).toBeLessThanOrEqual(390);
+
+    // a ação abre a conversa no perfil — a resposta pública está lá
+    await verResposta.click();
+    await expect(page).toHaveURL(new RegExp(`/jovem/perfil\\?c=${CH_FERIADO}`));
+    await expect(page.getByText(/aproveitem o feriado/)).toBeVisible();
+    // e a pill do autor é neutra: "Marina está cuidando" é informação,
+    // não alerta — nada de âmbar de fila (QW8)
+    const pillCuidando = page.getByText("Marina está cuidando");
+    await expect(pillCuidando).toHaveClass(/text-muted-foreground/);
+    await expect(pillCuidando).not.toHaveClass(/warn-text/);
+  });
+
+  test("pills do jovem são neutras; as do staff seguem na escala da fila (QW8)", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentorado");
+    await page.goto("/jovem/perfil");
+
+    // aberto → "Aguardando a equipe" e em atendimento → "Marina está
+    // cuidando", ambos neutros pro autor (o texto e o ícone seguem — só a
+    // cor muda)
+    const linhaAberto = page.getByRole("link", {
+      name: /Não consigo anexar a foto do combinado/,
+    });
+    const pillAberto = linhaAberto.getByText("Aguardando a equipe");
+    await expect(pillAberto).toHaveClass(/text-muted-foreground/);
+    await expect(pillAberto).not.toHaveClass(/text-destructive/);
+    const linhaAtend = page.getByRole("link", {
+      name: /O encontro pode cair no feriado/,
+    });
+    const pillAtend = linhaAtend.getByText("Marina está cuidando");
+    await expect(pillAtend).toHaveClass(/text-muted-foreground/);
+    await expect(pillAtend).not.toHaveClass(/warn-text/);
+
+    // staff inalterado: "Sem dono" vermelho e "Com você" âmbar na fila —
+    // o texto também vira tab de filtro, então a pill é lida dentro da
+    // linha do chamado (link pelo assunto)
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/chamados");
+    const fila = page.getByRole("region", { name: "Fila de chamados" });
+    const linhaSemDono = fila.getByRole("link", {
+      name: /Não consigo anexar a foto do combinado/,
+    });
+    await expect(linhaSemDono.getByText("Sem dono")).toHaveClass(
+      /text-destructive/
+    );
+    const linhaComVoce = fila.getByRole("link", {
+      name: /O encontro pode cair no feriado/,
+    });
+    await expect(linhaComVoce.getByText("Com você")).toHaveClass(
+      /text-\[var\(--warn-text\)\]/
+    );
   });
 
   test("resolvido mostra a resposta final uma vez — a trilha não repete", async ({

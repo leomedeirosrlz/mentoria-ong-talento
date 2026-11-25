@@ -41,6 +41,12 @@
 // profile_papeis e chamados são DEFENSIVOS: enquanto as migrations do
 // WP0b/WP1 não aterrissam no ambiente, os probes pulam tudo sem falhar.
 // IDs fixos e2e00000-*, que o workflow usa pra cleanup determinístico.
+// And the MCP fixture (REALIZA-297): a role-less profile (the 403 case),
+// deterministic PATs in ia_mcp_tokens (sha256 of local constants — the
+// spec redeclares the same plaintexts in tests/e2e/helpers.ts) and a
+// "guia-e2e" chunk in ia_chunks so guia_consulta has test corpus.
+
+import { createHash } from "node:crypto";
 
 const URL_ = process.env.E2E_SUPABASE_URL;
 const KEY = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY;
@@ -132,6 +138,10 @@ const IDS = {
   chamadoJovem: "e2e00000-0000-4000-8000-000000000170",
   chamadoUrgencia: "e2e00000-0000-4000-8000-000000000180",
   chamadoAtendimento: "e2e00000-0000-4000-8000-000000000190",
+  // REALIZA-297: role-less profile — the /api/mcp 403 case. No auth user:
+  // the PAT is its only path (role null + ativo resolves in the RPC and
+  // hits the role gate before any execution)
+  semPapelProfile: "e2e00000-0000-4000-8000-0000000000f4",
 };
 const EMAIL = "e2e-mentor@realiza.test";
 const COORD_EMAIL = "e2e-coord@realiza.test";
@@ -154,6 +164,21 @@ const JOVEM3_WHATSAPP = "5511999000093";
 // das demais personas staff (E2E_MENTOR_PASSWORD)
 const SUP_EMAIL = "sup-e2e@realiza.test";
 const HIB_EMAIL = "hib-e2e@realiza.test";
+const SEM_PAPEL_EMAIL = "e2e-sempapel@realiza.test";
+// Deterministic MCP e2e PATs (REALIZA-297): the seed stores only the
+// sha256 in ia_mcp_tokens; the plaintext is a test constant (disposable
+// backend, never prod) and the spec declares the SAME ones in
+// tests/e2e/helpers.ts (MCP_PAT) — change one side, change the other.
+const MCP_PAT_FIXTURES = [
+  { papel: "mentor", profile_id: IDS.mentorProfile, rotulo: "e2e mentor",
+    cru: "rlz_mcp_e2e_mentor_1111111111111111111111111111111111" },
+  { papel: "coord", profile_id: IDS.coordProfile, rotulo: "e2e coord",
+    cru: "rlz_mcp_e2e_coord_222222222222222222222222222222222222" },
+  { papel: "jovem", profile_id: IDS.jovemProfile, rotulo: "e2e jovem",
+    cru: "rlz_mcp_e2e_jovem_333333333333333333333333333333333333" },
+  { papel: "semPapel", profile_id: IDS.semPapelProfile, rotulo: "e2e sem papel",
+    cru: "rlz_mcp_e2e_sem_papel_4444444444444444444444444444444" },
+];
 // assinaturas.token é uuid — os tokens fixos da fixture manual do staging
 const TOKEN_TERMO_JOVEM = "e2e00000-0000-4000-8000-0000000000aa";
 const TOKEN_AUTORIZ_JOVEM = "e2e00000-0000-4000-8000-0000000000ab";
@@ -490,14 +515,19 @@ if (!coord.user_id) {
   }
 }
 
-// ---- mentor reserva: tem a 2ª dupla; sem auth user (nunca loga) ----
-const [reserva] = await rest(`profiles?select=id&id=eq.${IDS.mentorReserva}`);
+// ---- mentor reserva: tem a 2ª dupla e LOGA ----
+// `plano-roteiros` usa o JWT dele como "mentor de fora da dupla"; sem auth
+// user o signInWithPassword dava 400 e 5 specs morriam no login.
+const RESERVA_EMAIL = "e2e-mentor-reserva@realiza.test";
+let [reserva] = await rest(
+  `profiles?select=id,user_id&id=eq.${IDS.mentorReserva}`
+);
 if (!reserva) {
   await rest("profiles", {
     method: "POST",
     body: JSON.stringify({
       id: IDS.mentorReserva,
-      email: "e2e-mentor-reserva@realiza.test",
+      email: RESERVA_EMAIL,
       nome: "Mentor E2E Reserva",
       role: "mentor_dpp",
       ativo: true,
@@ -505,7 +535,11 @@ if (!reserva) {
     }),
   });
   console.log("mentor reserva criado");
+  [reserva] = await rest(
+    `profiles?select=id,user_id&id=eq.${IDS.mentorReserva}`
+  );
 }
+await vincularAuth(reserva, RESERVA_EMAIL);
 
 // ---- mentor livre pro import CSV — profile sem dupla, sem auth ----
 const [mImport] = await rest(`profiles?select=id&id=eq.${IDS.mentorImport}`);
@@ -847,7 +881,7 @@ await vincularAuth(jovem2, JOVEM2_EMAIL);
 // que liga o toggle não pode vazar opt-in pro run seguinte.
 {
   const [ficha] = await rest(
-    `mentorados?select=id,profile_id,whatsapp,contato_compartilhado&id=eq.${IDS.mentoradoSemDpp}`
+    `mentorados?select=id,profile_id,nome,whatsapp,contato_compartilhado&id=eq.${IDS.mentoradoSemDpp}`
   );
   if (!ficha) {
     await rest("mentorados", {
@@ -862,6 +896,9 @@ await vincularAuth(jovem2, JOVEM2_EMAIL);
     console.log("mentorado sem DPP criado");
   } else {
     const fixes = {};
+    // o nome é o que a mentorados_turma exibe no diretório — um rename
+    // manual no staging (title-case, abreviação) quebrava o spec inteiro
+    if (ficha.nome !== "Jovem E2E Sem DPP") fixes.nome = "Jovem E2E Sem DPP";
     if (ficha.profile_id !== jovem2.id) fixes.profile_id = jovem2.id;
     if (ficha.whatsapp !== JOVEM2_WHATSAPP) fixes.whatsapp = JOVEM2_WHATSAPP;
     if (ficha.contato_compartilhado) fixes.contato_compartilhado = false;
@@ -1021,7 +1058,7 @@ await vincularAuth(jovem3, JOVEM3_EMAIL);
 // boas-vindas; a convergência cobre a fixture manual do staging, que nasceu
 // sem o carimbo (e qualquer drift de papel/ativo).
 let [jovem] = await rest(
-  `profiles?select=id,user_id,role,ativo,onboarded_em&email=eq.${JOVEM_EMAIL}`
+  `profiles?select=id,user_id,role,ativo,onboarded_em,nome&email=eq.${JOVEM_EMAIL}`
 );
 if (!jovem) {
   [jovem] = await rest("profiles", {
@@ -1029,7 +1066,8 @@ if (!jovem) {
     body: JSON.stringify({
       id: IDS.jovemProfile,
       email: JOVEM_EMAIL,
-      nome: "Jovem E2E",
+      // 0173: the linked mentorado record is the canonical name source
+      nome: "Mentorada E2E",
       role: "mentorado",
       ativo: true,
       onboarded_em: new Date().toISOString(),
@@ -1041,6 +1079,7 @@ if (!jovem) {
   if (jovem.role !== "mentorado") fixes.role = "mentorado";
   if (!jovem.ativo) fixes.ativo = true;
   if (!jovem.onboarded_em) fixes.onboarded_em = new Date().toISOString();
+  if (jovem.nome !== "Mentorada E2E") fixes.nome = "Mentorada E2E";
   if (Object.keys(fixes).length) {
     await patch(`profiles?id=eq.${jovem.id}`, fixes);
     console.log(`profile jovem convergido (${Object.keys(fixes).join(", ")})`);
@@ -1682,6 +1721,124 @@ for (const a of ASSINATURAS_JOVEM) {
     console.log(`assinatura ${a.id} re-convergida pra pendente`);
   } else {
     console.log(`assinatura ${a.id} já existe`);
+  }
+}
+
+// ---- MCP (REALIZA-297): role-less profile + PATs + guia-e2e corpus ----
+// The role-less profile is the /api/mcp 403 case: ativo but role null, no
+// auth user — the RPC authorizes the PAT, the route stops at the role gate.
+{
+  const [semPapel] = await rest(
+    `profiles?select=id&id=eq.${IDS.semPapelProfile}`
+  );
+  if (!semPapel) {
+    await rest("profiles", {
+      method: "POST",
+      body: JSON.stringify({
+        id: IDS.semPapelProfile,
+        email: SEM_PAPEL_EMAIL,
+        nome: "Sem Papel E2E",
+        role: null,
+        ativo: true,
+      }),
+    });
+    console.log("profile sem papel criado");
+  } else {
+    console.log("profile sem papel já existe");
+  }
+}
+
+// Deterministic PATs — DEFENSIVE block like profile_papeis': no table in
+// the environment, skip. The plaintext never leaves here: only sha256.
+let mcpTokensOk = false;
+try {
+  await rest("ia_mcp_tokens?select=id&limit=1");
+  mcpTokensOk = true;
+} catch {
+  console.log("ia_mcp_tokens ainda não existe — PATs do MCP pulados");
+}
+if (mcpTokensOk) {
+  try {
+    // tokens that specs minted through the /perfil UI outside the fixture
+    // — a run that dies mid-test shouldn't leave credentials piling up
+    const fixtureHashes = MCP_PAT_FIXTURES.map((f) =>
+      createHash("sha256").update(f.cru).digest("hex")
+    ).join(",");
+    await del(
+      `ia_mcp_tokens?profile_id=in.(${E2E_PROFILES},${IDS.semPapelProfile})&token_hash=not.in.(${fixtureHashes})`
+    );
+    for (const f of MCP_PAT_FIXTURES) {
+      const token_hash = createHash("sha256").update(f.cru).digest("hex");
+      const [existe] = await rest(
+        `ia_mcp_tokens?select=id,revogado_em&token_hash=eq.${token_hash}`
+      );
+      if (!existe) {
+        await rest("ia_mcp_tokens", {
+          method: "POST",
+          body: JSON.stringify({
+            profile_id: f.profile_id,
+            token_hash,
+            rotulo: f.rotulo,
+          }),
+        });
+        console.log(`PAT e2e criado: ${f.papel}`);
+      } else {
+        // re-converge: un-revoke (spec or manual revoke) and refresh the
+        // expiry — the 90d default would already be dead on an old staging
+        await patch(`ia_mcp_tokens?id=eq.${existe.id}`, {
+          revogado_em: null,
+          expira_em: new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString(),
+        });
+      }
+    }
+    console.log("PATs e2e do MCP garantidos");
+  } catch (e) {
+    console.warn(`ia_mcp_tokens: fixture não aplicada — ${e.message}`);
+  }
+}
+
+// Corpus for guia_consulta — chunk identity is (guia, secao, pagina)
+// (unique nulls not distinct, 0136): check by key then insert; a diverging
+// texto converges (stale fixture). "guia-e2e" stays out of the
+// docs/rag/fontes.json manifest — the audience rule makes it coord-only,
+// which is why the spec calls guia_consulta with the coord PAT.
+let chunksOk = false;
+try {
+  await rest("ia_chunks?select=id&limit=1");
+  chunksOk = true;
+} catch {
+  console.log("ia_chunks ainda não existe — chunk guia-e2e pulado");
+}
+if (chunksOk) {
+  try {
+    const textoChunk =
+      "Regra de repescagem e2e do programa: quando uma dupla perde o mentor " +
+      "no meio do ciclo, a coordenação pode promover um mentor da fila de " +
+      "espera diretamente pra dupla órfã, sem nova repescagem geral. Este " +
+      "chunk existe só pra fixture: o termo 'repescagem e2e' é único na " +
+      "base, então a busca FTS do guia_consulta sempre volta aqui.";
+    const [chunk] = await rest(
+      "ia_chunks?select=id,texto&guia=eq.guia-e2e&secao=eq.Regras&pagina=eq.1"
+    );
+    if (!chunk) {
+      await rest("ia_chunks", {
+        method: "POST",
+        body: JSON.stringify({
+          guia: "guia-e2e",
+          secao: "Regras",
+          pagina: 1,
+          texto: textoChunk,
+        }),
+      });
+      console.log("chunk guia-e2e criado");
+    } else if (chunk.texto !== textoChunk) {
+      await patch(`ia_chunks?id=eq.${chunk.id}`, { texto: textoChunk });
+      console.log("chunk guia-e2e re-convergido");
+    } else {
+      console.log("chunk guia-e2e já existe");
+    }
+  } catch (e) {
+    console.warn(`ia_chunks: fixture não aplicada — ${e.message}`);
   }
 }
 

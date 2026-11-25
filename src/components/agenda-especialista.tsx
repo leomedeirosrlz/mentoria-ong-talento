@@ -19,6 +19,7 @@ import {
   linkSeguro,
   passoEsp,
   passosDaTrilha,
+  progressoTrilha,
   rotuloSlot,
   toDateStr,
   TRILHA_LEN,
@@ -526,11 +527,19 @@ function CardTrilha({ r, indice }: { r: RecorteDupla; indice: number }) {
       </div>
       <div className="mt-3">
         <p className="text-xs font-medium">
-          {jornada.feitos} de {jornada.total} sessões
+          {progressoTrilha({
+            esp: true,
+            feitos: jornada.feitos,
+            total: jornada.total,
+          })}
         </p>
         <div
           role="progressbar"
-          aria-label={`${jornada.feitos} de ${jornada.total} sessões realizadas`}
+          aria-label={progressoTrilha({
+            esp: true,
+            feitos: jornada.feitos,
+            total: jornada.total,
+          })}
           aria-valuemin={0}
           aria-valuemax={jornada.total}
           aria-valuenow={jornada.feitos}

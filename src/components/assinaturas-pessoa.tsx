@@ -15,7 +15,7 @@ import {
   WhatsappLogo,
   type Icon,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { waLink } from "@/lib/ciclo";
 import { useOrigem } from "@/components/forms/use-origem";
 import {
@@ -382,11 +382,24 @@ export function AssinaturasPessoa({
         toast.error(res.error);
         return;
       }
+      // um link por documento — o menor emite o par de uma vez; cada linha
+      // rotulada pelo doc pra não misturar destinatário na hora de enviar
+      const rotuloDe = (s: string) =>
+        TEMPLATES_POR_TIPO[tipo].find((t) => t.slug === s)?.rotulo ?? s;
+      const texto = res.links
+        .map((l) =>
+          res.links.length > 1
+            ? `${rotuloDe(l.slug)}: ${origem}${l.link}`
+            : `${origem}${l.link}`
+        )
+        .join("\n");
       await copiar(
-        `${origem}${res.link}`,
-        whatsapp
-          ? "Link copiado. Envie direto pelo botão WhatsApp abaixo."
-          : "Link copiado. Envie por WhatsApp ou e-mail."
+        texto,
+        res.links.length > 1
+          ? "2 links copiados. Encaminhe cada um ao destinatário certo."
+          : whatsapp
+            ? "Link copiado. Envie direto pelo botão WhatsApp abaixo."
+            : "Link copiado. Envie por WhatsApp ou e-mail."
       );
       // faltante não bloqueia — quem assina completa no ato — mas a coord
       // precisa saber que o doc saiu com lacuna (pode valer preencher a
@@ -432,7 +445,9 @@ export function AssinaturasPessoa({
     return res;
   }
 
-  // um link por template: só oferece emitir o que ainda não está pendente.
+  // um botão por template: só oferece emitir o que ainda não está pendente.
+  // O clique emite o CONJUNTO devido (pro menor, os dois saem juntos na
+  // action — o botão do irmão pendente só traz o link existente de volta).
   // O pool depende do tipo de ficha (profile → termo do voluntário,
   // mentorado → os dois documentos do jovem)
   const pendentesPorSlug = new Set(

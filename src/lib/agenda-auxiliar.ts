@@ -1,17 +1,20 @@
 import {
   ORDEM_SEMAFORO,
   TRILHA_LEN,
+  cobertosDaDupla,
   comparaNome,
   cronogramasOpcoes,
   defasadosVencidos,
   diaSemanaDe,
   duplasSemEncontroDoNumero,
   emLimbo,
+  encontroTemConteudo,
   eventoDaSemana,
   eventosDoCronograma,
   formatDiaNum,
   linkSeguro,
   passoEsp,
+  progressoTrilha,
   saudadeDaDupla,
   semanaBounds,
   toDateStr,
@@ -104,12 +107,15 @@ function metaTurma(duplasAtivas: Dupla[], vig: EventoDatado | null): string {
 /** A pendência de registro da dupla — MESMO critério do semáforo (agendado
  *  em limbo ou realizado há >24h sem registro, menor número primeiro). */
 function pendenciaDeRegistro(d: Dupla, agoraMs: number): Encontro | null {
+  // sessão combinada (018): o coberto já tem conteúdo via âncora — mesma
+  // régua da agenda da coordenação, sem a qual ele leria como pendente
+  const cobertos = cobertosDaDupla(d.encontros);
   return (
     d.encontros
       .filter(
         (e) =>
-          !e.registro &&
-          (emLimbo(e, agoraMs) ||
+          !encontroTemConteudo(e, cobertos) &&
+          (emLimbo(e, agoraMs, cobertos) ||
             (e.status === "realizado" &&
               agoraMs - new Date(e.data_hora ?? 0).getTime() > 24 * 3600 * 1000))
       )
@@ -191,8 +197,14 @@ export function duplasPorTurma(
         ORDEM_SEMAFORO[saudeDe.get(a.id)!.semaforo] -
           ORDEM_SEMAFORO[saudeDe.get(b.id)!.semaforo] ||
         comparaNome(
-          primeiroNomeDaDupla(a) || a.mentorado?.nome || "",
-          primeiroNomeDaDupla(b) || b.mentorado?.nome || ""
+          primeiroNomeDaDupla(a) ||
+            a.mentorado?.nome_social ||
+            a.mentorado?.nome ||
+            "",
+          primeiroNomeDaDupla(b) ||
+            b.mentorado?.nome_social ||
+            b.mentorado?.nome ||
+            ""
         )
     );
 
@@ -271,7 +283,7 @@ export function itensConsolidados(
 
   for (const d of duplas) {
     const nomeJovem = primeiroNomeDaDupla(d) || "Jovem";
-    const mentorNome = d.mentor?.nome ?? "mentor";
+    const mentorNome = d.mentor?.nome_social ?? d.mentor?.nome ?? "mentor";
     const mentor1 = (
       d.mentor?.nome_social ??
       d.mentor?.nome ??
@@ -354,7 +366,7 @@ export function itensConsolidados(
         inicio: vig.data,
         tipo: "a_agendar",
         titulo: nova ? `Encontro ${vig.numero}: dupla nova, a agendar` : `Encontro ${vig.numero} a agendar`,
-        detalhe: `${nome1} com ${d.mentor?.nome ?? "mentor"} · ${turmaLonga(d.turma)}`,
+        detalhe: `${nome1} com ${d.mentor?.nome_social ?? d.mentor?.nome ?? "mentor"} · ${turmaLonga(d.turma)}`,
         convidado: false,
         duplaId: d.id,
         pill: turmaCurta(d.turma),
@@ -516,12 +528,12 @@ function contextoEspecialistaAux(
 
   if (feitas >= teto)
     return {
-      texto: `Trilha completa: ${feitas} de ${teto} sessões.`,
+      texto: `Trilha completa: ${progressoTrilha({ esp: true, feitos: feitas, total: teto })}.`,
       problema: false,
     };
   if (prazo?.estado === "passou")
     return {
-      texto: `Prazo de 3 meses encerrado com ${feitas} de ${teto} sessões. Levar à coordenação.`,
+      texto: `Prazo de 3 meses encerrado com ${progressoTrilha({ esp: true, feitos: feitas, total: teto })}. Levar à coordenação.`,
       problema: true,
     };
   if (pend)
@@ -538,7 +550,7 @@ function contextoEspecialistaAux(
       problema: false,
     };
   return {
-    texto: `Sessões ${feitas} de ${teto}. Próxima a agendar${prazo ? ` (prazo: ${formatDiaNum(prazo.fim)})` : ""}.`,
+    texto: `${progressoTrilha({ esp: true, feitos: feitas, total: teto })}. Próxima a agendar${prazo ? ` (prazo: ${formatDiaNum(prazo.fim)})` : ""}.`,
     problema: false,
   };
 }

@@ -4,7 +4,7 @@ titulo: "Cronograma do Programa de Mentoria: Turma 2, Ciclo 2026/2027"
 material: ciclo-turma2-cronograma
 tipo: operacao
 natureza: consolidado
-audiencia: [coordenacao, supervisor, mentor_dpp, mentor_especialista]
+audiencia: [coordenacao, supervisor, mentor_dpp]
 versao: vigente (decisões operacionais que SOBREPÕEM os guias físicos)
 origem: scripts/importar-turma2.ts (EVENTOS_T2), que transcreve o cronograma
   oficial "Mentoria Turma 2, Plataforma Juventude Solidária.pdf" (28/set/2026).

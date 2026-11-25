@@ -1,8 +1,10 @@
 # Inventário de dados pessoais por tabela
 
-> Versão do schema: migrations `0001`–`0111` (verificação manual em
-> `supabase/migrations/`). Fonte de recon: `docs/planos/issues/_recon/schema-mapa.md`
-> + leitura direta das migrations `0106`–`0111` (posteriores ao mapa).
+> Versão do schema: migrations `0001`–`0111` (varredura integral,
+> verificação manual em `supabase/migrations/`). Fonte de recon:
+> `docs/planos/issues/_recon/schema-mapa.md` + leitura direta das
+> migrations `0106`–`0111` (posteriores ao mapa). Acréscimos pontuais de
+> migrations mais novas constam nas linhas com a migration citada.
 >
 > **Documento vivo** — toda migration que cria tabela/coluna com dado
 > pessoal deve acrescentar a linha correspondente aqui na mesma PR.
@@ -57,6 +59,8 @@ coord+supervisor.
 | `mentor_profiles` (0001/0034/0073) | tipo, áreas, capacidade, termo_ok, formacao_ok, experiência, disponibilidade | Adulto | baixo | 4 papéis staff + self (RLS) | C | permanente |
 | `profile_papeis` (0085) | papel + escopo_turma | Adulto | baixo | self + staff | C | permanente |
 | `mentorados` — públicas (`nome, email, whatsapp, ong_origem, avatar_path, cidade, uf, interesses, objetivos, escolaridade, origem, nome_social, contato_compartilhado`) | ficha operacional do jovem | Jovem | baixo | coord + mentor/supervisor da dupla (grant por coluna `0034:194` + RLS `0023`); turma dos colegas vê subconjunto via `mentorados_turma` (0076) | C14 † | permanente |
+| `jovem_diretorio` (view, 0239) | projeção pública do programa por titular: nome/nome_social, avatar, papel, cidade/uf, interesses e — só para adulto/especialista — bio, cargo, empresa, áreas, currículo e grade; **sem contato direto** (email/whatsapp/linkedin fora) | Adulto + Jovem | baixo | todo mentorado com conta (gate `my_role()='mentorado'`, definer); adultos do programa e jovens com conta visíveis a todos os jovens, **menores com foto inclusos — decisão do lead 24/11** | C / C14 † | nada retido — view |
+| `especialistas_catalogo` (view, 0239) | a mesma projeção da `jovem_especialistas` (nome, áreas, bio, atuação, grade "dia+período", vagas) para todo staff | Adulto | baixo | os 4 papéis staff (gate `my_role()`, definer); jovem segue com a sua view recortada | C | nada retido — view |
 | `mentorados` — sensíveis (`data_nascimento, genero, pref_genero_par, motivacao`) | ficha matching do jovem | Jovem | sim | `mentorados_pessoal` coord-only | C14 † | permanente |
 | `mentorados.cor_raca, form_bruto` (0054) | autodeclaração + raw intake | Jovem | **A11** / potencial | coord-only | Cs † (via responsável) | permanente |
 | `mentorados.dados_civis` (0046) | civis do jovem | Jovem | parcial | `mentorados_pessoal` coord-only | C14 † | permanente |
@@ -86,6 +90,10 @@ coord+supervisor.
 | `chamados` + atualizações/comentários/anexos (0084) | fila de atendimento; `categoria='urgencia'`; mensagem livre | Jovem/Adulto | potencial (saúde/conflito) | equipe + autor (supervisor não vê `plataforma`); anexos `interno` = equipe | C + C14 † | permanente |
 | `dupla_saude_snapshots` (0107) | histórico do semáforo: `motivos/sinais` = **contagens+labels de enum, sem nomes nem texto livre** (verificação LGPD do PR — `0107:23-25`) | Jovem+Adulto (derivado) | baixo | coord + supervisor das duplas | LI | permanente |
 | `trilha_lembretes` (0108) | ledger de lembretes do prazo (dupla, marco, destino) | Adulto | baixo | coord-only | LI | permanente |
+| `dupla_planos` + `dupla_plano_passos` + `dupla_plano_eventos` (0219) | combinado "ficar em dia": escopo/ritmo/janela, datas aplicadas e ledger de auditoria (`contestado_motivo` é o único texto livre, ≤300) | Jovem+Adulto | baixo | escopo dupla (mentor/coord/supervisor); jovem lê recorte via `jovem_plano` (sem autoria interna) | C + C14 † | permanente |
+| `dupla_intervencoes` (0220) | sugestão de intervenção estruturada (tipo, evidências, motivo ≤300, destino) | Jovem+Adulto (derivado) | baixo | coord + supervisor + mentor da dupla | LI | permanente |
+| `encontro_guia_ajustes` (0220) | ajustes do guia de um encontro (sugestão+justificativa, texto do mentor/Liza) | Jovem (sobre) | potencial | coord + mentor da dupla — jovem fora da policy nesta fatia | C14 † | permanente |
+| `dupla_resumo_ia` (0221) | resumo consolidado por dupla pra Liza: semáforo/motivos/sinais (labels derivados), contagens, interesses do jovem, plano vigente | Jovem+Adulto (derivado) | baixo | ninguém lê direto (sem policy) — `resumo_dupla` recorta por papel: jovem recebe sem `semaforo`/`motivos`/`sinais`/`interno` | LI | regravado a cada mudança de fonte (mantém só o vigente) |
 
 ## 3. Instrumentos e respostas (coração sensível do programa)
 
@@ -97,10 +105,10 @@ coord+supervisor.
 | `formulario_respostas` — `avaliacao_360` (0042) | vínculo, evolução, PDM — respondida por mentor **e** jovem | Jovem+Adulto | potencial | coord na tabela; jovem lê **só a própria resposta** via `jovem_jornada` (`0096:218-222`) | C + C14 † | permanente |
 | `formulario_respostas` — `autoavaliacao_mentor`, `avaliacao_especialista` (0042/0104) | avaliações de fim de ciclo/trilha | Adulto | potencial | coord-only na tabela | C | permanente |
 | `formulario_respostas` — forms comuns (0036) | respostas de formulários criados pela coord | variável | potencial | coord-only | conforme o form † | permanente |
-| `pdm` + `pdm_itens` (0109) | PDM vivo: visão + metas/submetas (texto do jovem e da dupla) | Jovem | potencial | coord + mentor + supervisor + jovem (policy `0109:170-192`) | C14 † | permanente |
+| `pdm` + `pdm_itens` (0109/0211) | PDM vivo: visão + metas/submetas (texto do jovem e da dupla) + autoria das escritas (`visao_por`, `atualizado_por`/`atualizado_em` — quem escreveu/editou e quando) | Jovem+Adulto | potencial | coord + mentor + supervisor + jovem (policy `0109:170-192`) | C14 † | permanente |
 | `avaliacoes_encontro` (0071) | estrelas 1–5, sentimento, comentário, `pedir_apoio` do jovem | Jovem | potencial | coord/supervisor; mentor só se `avaliacao_visivel_mentor` ∧ trilha≠especialista; jovem lê a própria via `jovem_duplas`; média quantizada ≥3 (`avaliacao_media_dpp`) | C14 † | permanente |
 | `terceiros_contatos` (0103) | **nome + WhatsApp de amigos/familiares indicados pelo jovem — pessoas que nunca consentiram** | Terceiro | sim (não-titular) | coord + mentor + supervisor da dupla | **— lacuna L-1** | token expira 30d; **contato permanece** |
-| `terceiros_respostas` (0103) | pontos_fortes/a_melhorar **sobre o jovem** | Jovem | potencial | coord + mentor + supervisor; **jovem nunca** | C14 † | permanente |
+| `terceiros_respostas` (0103/0216) | pontos_fortes/a_melhorar **sobre o jovem**; `origem` (link\|manual), `registrado_por`, `coletado_via`, `consentimento_declarado` — resposta colhida por fora (telefone/presencial/papel) é transcrita pelo mentor/coord **com consentimento declarado do terceiro** | Jovem (conteúdo) + Terceiro (declaração) + Adulto (registrante) | potencial | coord + mentor + supervisor; **jovem nunca** | C14 † (resposta) + C do terceiro declarado no ato | permanente |
 | `terceiros_consolidacao` (0103) | síntese curada pelo mentor | Jovem | potencial | escopo dupla + jovem quando `publicado_em` | C14 † | permanente |
 | `especialista_grade` / `especialista_excecoes` (0073) | agenda semanal e bloqueios do especialista | Adulto | baixo | self + coord | C | permanente |
 
@@ -122,7 +130,12 @@ coord+supervisor.
 | `comunicados` (0018/0055) | avisos da coordenação | Adulto/Jovem (corpo pode citar nomes) | baixo | por audiência | LI | permanente |
 | `notificacoes` (0018) | sino in-app (corpo pode citar nomes) | Adulto/Jovem | baixo | destinatário | LI | sem purge — histórico morre no limit da UI |
 | `emails_enviados` (0056/0071/0084) | assunto + contagem de destinatários + **`falhas text[]` com e-mails que falharam** | Adulto/Jovem | baixo | coord-only | LI | permanente — política em `politica-retencao.md` C-5 |
+| `digest_config` (0210) | config do digest: `destinatarios.emails` pode ter **e-mail explícito de pessoa fora do cadastro**; `atualizado_por` FK de quem editou | Adulto | baixo | coord-only (policy `has_papel('coordenacao')`) | LI | permanente — row singleton, sobrescrita a cada salva |
 | `ia_eventos.args` (0083) | args canônicos das tools IA (pode conter texto do usuário ≤300c) | Adulto | potencial | self + coord | LI | permanente |
+| `produto_eventos` (0197/0198/0201/0203/0212) | telemetria de uso in-app: `superficie` (área colapsada, nunca path nem id), `acao` de interface numa whitelist fechada (pageview, clique, busca, sort, dialog, nudge, form_emitido, material_aberto, lembrete_whatsapp, **permanencia, rolagem** — 0212), `meta` jsonb (ts, geometria do gesto `x`/`y` e tela `vw`/`vh`, classe `dev`, `alvo` opcional de até 48c escrito por dev em atributo `data-telemetry-alvo` — rótulo semântico de CTA tipo "agendar-encontro", nunca texto da tela, e a RPC tampa o meta em 1KB, **`dur_ms`** duração da estadia em ms e **`prof`** marco de rolagem 0/25/50/75/100 — ambos numéricos/enumerados; sem corpo de texto livre, seletor CSS, id de entidade nem conteúdo de formulário) | Adulto/Jovem (quem usa o app) | baixo | self + coord (RLS `0197:42-46`); agregados via RPCs `adocao_*` security invoker e leitura paginada do cru pela aba Adoção | LI | **90 dias o cru** (poda diária `produto_eventos_reter`, 0201); vive como rollup agregado |
+| `relatorio_ia_cards` (0212) | card "Perguntar à Liza": `pergunta` da coordenação + `resposta_md` gerada sobre **agregados** do relatório, `recorte`/`contexto_hash`, `gerado_por` | Adulto | baixo | coord-only (RLS `has_papel('coordenacao')`; escrita só via `relatorio_ia_card_registrar`) | LI | permanente — histórico auditável, nunca auto-regenera |
+| `produto_eventos_dia` (0201) | contagens diárias papel×superfície×ação — **sem profile_id** | — (agregado) | — | coord-only | LI | permanente (é a forma retida após a poda do cru) |
+| `registro_tentativas` (0126) | sessão de preenchimento do form semanal do mentor: `origem` (novo/retroativo/edição), `dispositivo` (classe UA+viewport), `duracao_ms`, `etapas` (tempo por passo em ms), `concluido` — sem conteúdo da resposta | Adulto | baixo | self + coord/supervisor (policy `0126:74-79`) | LI | permanente |
 
 ## 6. Superfícies públicas e storage
 

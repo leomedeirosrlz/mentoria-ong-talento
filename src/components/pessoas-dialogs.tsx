@@ -4,14 +4,24 @@ import { useState, useTransition } from "react";
 import type { ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Briefcase,
+  Camera,
+  Clock,
   DownloadSimple,
   DotsThree,
   FileArrowUp,
+  FileText,
+  Handshake,
+  Heart,
+  IdentificationCard,
+  MapPin,
   Plus,
   Signature,
+  Sparkle,
   UserPlus,
+  Users,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { createMentorado, createPessoa } from "@/lib/actions";
 import { DadosCivisFields } from "@/components/assinatura-form";
 import { FotoField } from "@/components/foto-field";
@@ -26,12 +36,13 @@ import {
   CampoNascimento,
   CampoPrefGenero,
   CampoUf,
-  WizardFicha,
-  type PassoFicha,
+  SENTINEL_VAZIO,
 } from "@/components/campos-pessoais";
+import { WizardPassos, type PassoWizard } from "@/components/ui/etapa";
 import type { Disponibilidade } from "@/lib/types";
 import { maskWhatsApp } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -141,14 +152,21 @@ export function NovaPessoaDialog() {
   const [role, setRole] = useState("mentor_dpp");
   const [interesses, setInteresses] = useState<string[]>([]);
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(null);
+  // cidade/UF da ficha — controlados pro autofill do CEP (modo compacto
+  // do DadosCivisFields) alcançar o passo "Localização e perfil"
+  const [cidade, setCidade] = useState("");
+  const [uf, setUf] = useState("");
   const { submit, pending } = useSubmit(createPessoa, (n) => `Cadastro de ${n} salvo.`, () => setOpen(false));
   const ehMentor = role === "mentor_dpp" || role === "mentor_especialista" || role === "mentor_hibrido";
   const hibrido = role === "mentor_hibrido";
   // um passo por SecaoFicha — a parede de campos virava um scroll só; a
-  // "Ficha de mentor" entra/sai com o papel escolhido no passo 1
-  const passos: PassoFicha[] = [
+  // "Ficha de mentor" entra/sai com o papel escolhido no passo 1. Ordem:
+  // identidade/contato → operacional/papel → dados pessoais por último
+  // (localização e interesses fecham o wizard — REALIZA-384)
+  const passos: PassoWizard[] = [
     {
       titulo: "Identificação",
+      icone: IdentificationCard,
       conteudo: (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -200,22 +218,8 @@ export function NovaPessoaDialog() {
       ),
     },
     {
-      titulo: "Localização e perfil",
-      conteudo: (
-        <>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="n_cidade">Cidade</Label>
-              <Input id="n_cidade" name="cidade" maxLength={100} />
-            </div>
-            <CampoUf />
-          </div>
-          <CampoInteresses value={interesses} onChange={setInteresses} />
-        </>
-      ),
-    },
-    {
       titulo: "Trabalho e origem",
+      icone: Briefcase,
       conteudo: (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -237,6 +241,7 @@ export function NovaPessoaDialog() {
     },
     {
       titulo: ehMentor ? "Motivação e pareamento" : "Motivação",
+      icone: Heart,
       conteudo: (
         <>
           <div className="space-y-2">
@@ -252,6 +257,7 @@ export function NovaPessoaDialog() {
     ...(ehMentor
       ? [{
           titulo: "Ficha de mentor",
+          icone: Handshake,
           conteudo: (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -292,9 +298,18 @@ export function NovaPessoaDialog() {
       : []),
     {
       titulo: "Documentos (termo de adesão)",
+      icone: FileText,
       conteudo: (
         <>
-          <DadosCivisFields prefix="civis_" opcional compacto />
+          <DadosCivisFields
+            prefix="civis_"
+            opcional
+            compacto
+            onEndereco={(e) => {
+              setCidade(e.cidade);
+              setUf(e.uf);
+            }}
+          />
           <p className="text-xs text-muted-foreground">
             RG, CPF e endereço preenchem o termo de adesão automaticamente: a pessoa só confere e assina.
           </p>
@@ -303,18 +318,14 @@ export function NovaPessoaDialog() {
     },
     {
       titulo: "Foto e consentimento",
+      icone: Camera,
       conteudo: (
         <>
           <FotoField id="foto" />
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             {/* voluntário é o caso comum (mentores/equipe) — não-voluntário
                 é a exceção que a coord desmarca; desmarcado pula o termo */}
-            <input
-              type="checkbox"
-              name="voluntario"
-              defaultChecked
-              className="accent-primary"
-            />
+            <Checkbox name="voluntario" defaultChecked />
             Sou voluntário(a)
           </label>
           <CampoConsentimento />
@@ -322,6 +333,32 @@ export function NovaPessoaDialog() {
             A pessoa entra com o e-mail por link de acesso; o papel define o que ela vê e pode ser alterado depois na lista.
             Nascimento, gênero, cor/raça, motivação e preferência de par ficam visíveis só pra coordenação.
           </p>
+        </>
+      ),
+    },
+    // dados pessoais por último — o que é dela fecha o cadastro
+    {
+      titulo: "Localização e perfil",
+      icone: MapPin,
+      conteudo: (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="n_cidade">Cidade</Label>
+              <Input
+                id="n_cidade"
+                name="cidade"
+                maxLength={100}
+                value={cidade}
+                onChange={(e) => setCidade(e.target.value)}
+              />
+            </div>
+            <CampoUf
+              value={uf}
+              onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
+            />
+          </div>
+          <CampoInteresses value={interesses} onChange={setInteresses} />
         </>
       ),
     },
@@ -338,6 +375,8 @@ export function NovaPessoaDialog() {
           setRole("mentor_dpp");
           setInteresses([]);
           setDisponibilidade(null);
+          setCidade("");
+          setUf("");
         }
       }}
     >
@@ -350,7 +389,7 @@ export function NovaPessoaDialog() {
             disponibilidade.
           </DialogDescription>
         </DialogHeader>
-        <WizardFicha
+        <WizardPassos
           passos={passos}
           pending={pending}
           submitLabel="Cadastrar"
@@ -365,12 +404,20 @@ export function NovoMentoradoDialog() {
   const [open, setOpen] = useState(false);
   const [interesses, setInteresses] = useState<string[]>([]);
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(null);
+  // cidade/UF da ficha — controlados pro autofill do CEP (modo compacto
+  // do DadosCivisFields) alcançar o passo "Onde vive e origem"
+  const [cidade, setCidade] = useState("");
+  const [uf, setUf] = useState("");
   const { submit, pending } = useSubmit(createMentorado, (n) => `Cadastro de ${n} salvo.`, () => setOpen(false));
 
-  // um passo por SecaoFicha — o form tinha 9 seções seguidas de scroll
-  const passos: PassoFicha[] = [
+  // um passo por SecaoFicha — o form tinha 9 seções seguidas de scroll.
+  // Ordem: identidade/contato → operacional → dados pessoais por último
+  // (interesses e objetivos fecham o wizard — REALIZA-384). Anamnese é
+  // instrumento externo ao programa: o campo de notas saiu da UI.
+  const passos: PassoWizard[] = [
     {
       titulo: "Identificação",
+      icone: IdentificationCard,
       conteudo: (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -406,14 +453,24 @@ export function NovoMentoradoDialog() {
     },
     {
       titulo: "Onde vive e origem",
+      icone: MapPin,
       conteudo: (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="m_cidade">Cidade</Label>
-              <Input id="m_cidade" name="cidade" maxLength={100} />
+              <Input
+                id="m_cidade"
+                name="cidade"
+                maxLength={100}
+                value={cidade}
+                onChange={(e) => setCidade(e.target.value)}
+              />
             </div>
-            <CampoUf />
+            <CampoUf
+              value={uf}
+              onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -430,7 +487,49 @@ export function NovoMentoradoDialog() {
       ),
     },
     {
+      titulo: "Disponibilidade semanal",
+      icone: Clock,
+      conteudo: (
+        <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
+      ),
+    },
+    {
+      titulo: "Documentos e foto",
+      icone: FileText,
+      conteudo: (
+        <>
+          <DadosCivisFields
+            prefix="civis_"
+            opcional
+            compacto
+            onEndereco={(e) => {
+              setCidade(e.cidade);
+              setUf(e.uf);
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Preenchem o termo de participação: o(a) jovem assina por link, sem precisar de conta.
+          </p>
+          <FotoField id="m_foto" />
+        </>
+      ),
+    },
+    {
+      titulo: "Responsável legal (autorização de menor)",
+      icone: Users,
+      conteudo: (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="m_parentesco">Parentesco com o(a) jovem</Label>
+            <Input id="m_parentesco" name="resp_parentesco" maxLength={60} autoCapitalize="sentences" placeholder="Mãe, pai, avó, tio…" />
+          </div>
+          <DadosCivisFields prefix="resp_" opcional />
+        </>
+      ),
+    },
+    {
       titulo: "Interesses e objetivos",
+      icone: Sparkle,
       conteudo: (
         <>
           <CampoInteresses value={interesses} onChange={setInteresses} />
@@ -443,47 +542,6 @@ export function NovoMentoradoDialog() {
             <Textarea id="m_motivacao" name="motivacao" rows={2} maxLength={2000} placeholder="O que motiva a participação" />
           </div>
           <CampoPrefGenero />
-        </>
-      ),
-    },
-    {
-      titulo: "Disponibilidade semanal",
-      conteudo: (
-        <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
-      ),
-    },
-    {
-      titulo: "Documentos do(a) jovem (termo de participação)",
-      conteudo: (
-        <>
-          <DadosCivisFields prefix="civis_" opcional compacto />
-          <p className="text-xs text-muted-foreground">
-            Preenchem o termo de participação: o(a) jovem assina por link, sem precisar de conta.
-          </p>
-        </>
-      ),
-    },
-    {
-      titulo: "Responsável legal (autorização de menor)",
-      conteudo: (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="m_parentesco">Parentesco com o(a) jovem</Label>
-            <Input id="m_parentesco" name="resp_parentesco" maxLength={60} autoCapitalize="sentences" placeholder="Mãe, pai, avó, tio…" />
-          </div>
-          <DadosCivisFields prefix="resp_" opcional />
-        </>
-      ),
-    },
-    {
-      titulo: "Anamnese e foto",
-      conteudo: (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="m_notas">Notas / referência da anamnese</Label>
-            <Textarea id="m_notas" name="notas" rows={2} />
-          </div>
-          <FotoField id="m_foto" />
           <p className="text-xs text-muted-foreground">
             Nascimento, gênero, cor/raça, motivação e preferência de par ficam visíveis só pra coordenação.
           </p>
@@ -502,6 +560,8 @@ export function NovoMentoradoDialog() {
         if (o) {
           setInteresses([]);
           setDisponibilidade(null);
+          setCidade("");
+          setUf("");
         }
       }}
     >
@@ -514,7 +574,7 @@ export function NovoMentoradoDialog() {
             interesses e disponibilidade.
           </DialogDescription>
         </DialogHeader>
-        <WizardFicha
+        <WizardPassos
           passos={passos}
           pending={pending}
           submitLabel="Cadastrar"

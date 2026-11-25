@@ -2,25 +2,19 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { Etapa, FadeTroca, useTrocaDeEtapa } from "@/components/ui/etapa";
 import {
-  ArrowUp,
+  ArrowLeft,
+  ArrowRight,
   CaretDown,
   CheckCircle,
   CircleNotch,
-  FileText,
   PaperPlaneRight,
-  X,
 } from "@phosphor-icons/react";
-import {
-  subirAnexoFormulario,
-  submeterRespostaFormulario,
-} from "@/lib/forms/actions";
+import { submeterRespostaFormulario } from "@/lib/forms/actions";
 import {
   camposPerguntas,
   campoFormato,
-  ARQUIVO_MAX_MB,
-  ARQUIVO_MIMES,
   SISTEMA_LABEL,
   visivel,
   type FormularioCampo,
@@ -33,12 +27,20 @@ import {
   coletaRespostas,
   leDeFormData,
   validaRespostas,
+  validaSecao,
 } from "@/lib/forms/resposta";
-import { ehInstrumento } from "@/lib/forms/instrumentos";
+import { agrupaEmSecoes, ehInstrumento } from "@/lib/forms/instrumentos";
+import type { ContextoAvaliacao } from "@/lib/forms/queries";
+import { ContextoAvaliacaoCard } from "@/components/contexto-avaliacao";
+import { CampoArquivo } from "@/components/forms/campo-arquivo";
 import { GridDisponibilidade } from "@/components/forms/grid-disponibilidade";
-import { fade, T } from "@/components/motion";
+import {
+  NumeroPergunta,
+  RotuloPergunta,
+} from "@/components/forms/pergunta";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -78,6 +80,9 @@ export function FormularioPublico(props: {
   destinatario: string | null;
   /** 0042 — instrumento oficial ganha selo discreto (vem da RPC) */
   sistema?: FormularioSistema | null;
+  /** 0191 — trajetória read-only da dupla do link (só avaliacao_final_*);
+   *  os instrumentos da jornada já trazem o contexto deles, ignoram */
+  contextoAvaliacao?: ContextoAvaliacao | null;
   /** prévia na ficha da coordenação — campos vivos, envio desligado */
   preview?: boolean;
 }) {
@@ -98,6 +103,7 @@ function FormularioGenerico({
   campos,
   destinatario,
   sistema,
+  contextoAvaliacao,
   preview = false,
 }: {
   token: string;
@@ -106,6 +112,7 @@ function FormularioGenerico({
   campos: FormularioCampo[];
   destinatario: string | null;
   sistema?: FormularioSistema | null;
+  contextoAvaliacao?: ContextoAvaliacao | null;
   preview?: boolean;
 }) {
   const [enviado, setEnviado] = useState(false);
@@ -125,18 +132,80 @@ function FormularioGenerico({
   // cima, a pergunta condicional fora da condição nem entra na conta.
   const perguntas = camposPerguntas(campos).filter((c) => visivel(c, atuais));
 
+  // wizard por seções (REALIZA-144): ≥2 seções COM PERGUNTA ligam o
+  // stepper; 0–1 seção segue a página única. A contagem é ESTÁTICA (olha
+  // a definição, não o visivel() do momento): se uma condicional escondesse
+  // a última pergunta de uma seção no meio da resposta, um wizard que liga
+  // e desliga desmontaria inputs não-controlados e perderia a digitação.
+  const blocosWizard = agrupaEmSecoes(campos).filter(
+    (b) => b.campos.length > 0
+  );
+  const wizard = blocosWizard.length >= 2;
+  // wizard pelo kit (ui/etapa): índice já vem clampado — a prévia da
+  // coordenação reedita a definição e a seção visível não fica órfã. O foco
+  // não é o do hook: a seção rola+foca pelo efeito próprio (scroll + h2 +
+  // rascunho), então toda navegação passa alvo null
+  const { etapa: etapaAtiva, direcao, irPara, reiniciar } =
+    useTrocaDeEtapa(blocosWizard.length);
+  const ultimaEtapa = etapaAtiva === blocosWizard.length - 1;
+  // o efeito de troca rola/foca — a pintura inicial não (o rascunho
+  // restaurado muda a etapa e aí sim leva a pessoa de volta). Comparar
+  // com a etapa anterior, não um flag de "montou": sob StrictMode o efeito
+  // de mount roda duas vezes e um flag deixaria a segunda passar
+  const etapaAnterior = useRef(0); // etapa começa em 0 — igual à inicial
+  // submit com erro em outra seção: a seção errada abre e o foco cai no
+  // campo marcado em vez do título — a troca consome este id uma vez
+  const focoPendente = useRef<string | null>(null);
+
   // rascunho por token+pergunta: o mentorado responde no celular e texto
   // longo não pode morrer num reload (rede caindo, troca de app). Um JSON
   // por token cujo mapa interno é por campo — some quando a resposta sai.
   const chaveRascunho = preview ? null : `rascunho:/f/${token}`;
 
-  // foco migra pro painel de sucesso quando ele monta (o form sai do DOM) —
-  // scrollIntoView antes: a página pode estar rolada lá embaixo no submit
-  const focoSucesso = useCallback((el: HTMLDivElement | null) => {
-    if (!el) return;
-    el.scrollIntoView({ block: "center" });
-    el.focus({ preventScroll: true });
-  }, []);
+  // o foco do painel de sucesso é o contrato do FadeTroca (centraliza +
+  // focus) — não sobra ref callback local
+
+  // troca de seção do wizard: rola a seção nova pro topo (abaixo da pill
+  // fixa, por isso scroll-mt) e entrega o foco no título — o botão que
+  // disparou a navegação segue montado no footer, então sem isso o foco
+  // não acompanharia o conteúdo novo (padrão do onboarding). A etapa
+  // também entra no rascunho aqui: vale pra Avançar, Voltar e a seção
+  // restaurada — reabrir o link cai onde a pessoa parou.
+  useEffect(() => {
+    if (etapaAnterior.current === etapaAtiva) return;
+    etapaAnterior.current = etapaAtiva;
+    const form = formRef.current;
+    const sec =
+      form?.querySelector<HTMLElement>(`[data-secao="${etapaAtiva}"]`) ?? null;
+    const pendente = focoPendente.current;
+    focoPendente.current = null;
+    if (form && sec) {
+      if (pendente) {
+        const alvo = sec.querySelector<HTMLElement>(
+          `[data-campo="${CSS.escape(pendente)}"]`
+        );
+        alvo?.scrollIntoView({ block: "center" });
+        alvo
+          ?.querySelector<HTMLElement>("input, select, textarea")
+          ?.focus({ preventScroll: true });
+      } else {
+        sec.scrollIntoView({ block: "start" });
+        sec.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
+      }
+    }
+    if (chaveRascunho && form) {
+      try {
+        const coletado = coleta(new FormData(form)).respostas;
+        localStorage.setItem(
+          chaveRascunho,
+          JSON.stringify({ ...coletado, ...extras, etapa: etapaAtiva })
+        );
+      } catch {
+        // quota/storage desligado — o rascunho é conveniência, não requisito
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dispara só na troca de seção; chaveRascunho/coleta/extras são estáveis por render
+  }, [etapaAtiva]);
 
   const setExtra = useCallback(
     (id: string, v: RespostaValor | null) => {
@@ -209,6 +278,18 @@ function FormularioGenerico({
         const rascunho = JSON.parse(raw) as Record<string, RespostaValor>;
         const form = formRef.current;
         if (!form) return;
+        // a seção onde a pessoa parou viaja junto ('etapa' é chave
+        // reservada do rascunho: ids de campo são c_* do builder ou o
+        // vocabulário fechado dos oficiais — nunca colide). Rascunho
+        // antigo, de antes do wizard, não tem a chave e cai na seção 1
+        if (wizard && typeof rascunho.etapa === "number") {
+          reiniciar(
+            Math.min(
+              Math.max(0, Math.floor(rascunho.etapa)),
+              blocosWizard.length - 1
+            )
+          );
+        }
         const nome = (id: string) => CSS.escape(id);
         const extrasRest: Record<string, RespostaValor> = {};
         for (const c of camposPerguntas(campos)) {
@@ -271,9 +352,11 @@ function FormularioGenerico({
     );
     if (chaveRascunho) {
       try {
+        // a seção corrente viaja junto das respostas — reabrir o link cai
+        // onde a pessoa parou (a troca de seção também grava, no efeito)
         localStorage.setItem(
           chaveRascunho,
-          JSON.stringify({ ...coletado, ...extras })
+          JSON.stringify({ ...coletado, ...extras, etapa: etapaAtiva })
         );
       } catch {
         // quota/storage desligado — o rascunho é conveniência, não requisito
@@ -290,9 +373,78 @@ function FormularioGenerico({
       setErro((prev) => (prev === ERRO_VALIDACAO ? null : prev));
   }
 
+  /** "Avançar" do wizard — valida SÓ a seção visível com a mesma pipeline
+   *  do submit (coleta o FormData inteiro, junta extras, compõe "Outro");
+   *  o que muda é o escopo: o validador recebe só o bloco corrente, então
+   *  o erro fica marcado onde ele está e o resto do form não bloqueia a
+   *  navegação. Erro pendente nunca é apagado daqui — o Voltar é livre e
+   *  a seção marcada mostra o aviso quando a pessoa voltar. */
+  function avancar() {
+    const form = formRef.current;
+    if (!form) return;
+    const fd = new FormData(form);
+    const { respostas: coletado, falhas } = coleta(fd);
+    const atuaisAgora = { ...coletado, ...extras };
+    // snapshot fresco: `perguntas`/`atuais` do render podem ficar um tick
+    // atrás de um gatilho recém-respondido — aqui a visibilidade é lida do
+    // FormData da hora do clique
+    const perguntasAgora = camposPerguntas(campos).filter((c) =>
+      visivel(c, atuaisAgora)
+    );
+    const respostas = aplicaOutro(
+      perguntasAgora,
+      { ...atuaisAgora },
+      (c) => String(fd.get(`${c.id}__outro`) ?? "")
+    );
+    const bloco = blocosWizard[etapaAtiva];
+    const mapa = validaSecao(bloco.campos, respostas, falhas, atuaisAgora);
+    // limpa erros velhos da seção e grava os novos — erro de outra seção
+    // (a pessoa pode ter voltado com campo inválido) segue marcado
+    const idsBloco = new Set(bloco.campos.map((c) => c.id));
+    const next = { ...erros };
+    for (const id of Object.keys(next)) {
+      if (idsBloco.has(id)) delete next[id];
+    }
+    Object.assign(next, mapa);
+    setErros(next);
+    if (Object.keys(mapa).length) {
+      const primeiro = bloco.campos.find((c) => mapa[c.id]);
+      const alvo =
+        primeiro &&
+        form.querySelector(`[data-campo="${CSS.escape(primeiro.id)}"]`);
+      if (alvo) {
+        alvo.scrollIntoView({ block: "center" });
+        alvo
+          .querySelector<HTMLElement>(
+            "fieldset, input:not([type='hidden']), select, textarea"
+          )
+          ?.focus({ preventScroll: true });
+      }
+      return;
+    }
+    // a seção saiu limpa: se não sobra campo marcado em lugar nenhum, o
+    // banner global de validação (do submit anterior) também sai
+    if (!Object.keys(next).length)
+      setErro((prev) => (prev === ERRO_VALIDACAO ? null : prev));
+    irPara(etapaAtiva + 1, null);
+  }
+
+  /** Voltar nunca valida nem bloqueia — as seções seguem montadas com a
+   *  digitação no DOM (e a etapa nova entra no rascunho pelo efeito). */
+  function voltar() {
+    irPara(etapaAtiva - 1, null);
+  }
+
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (preview) return;
+    // Enter num campo de texto dispara submit implícito — no wizard o
+    // gesto é "próxima seção" (o enterKeyHint "next" já promete isso); o
+    // envio de verdade só mora no botão da última seção
+    if (wizard && !ultimaEtapa) {
+      avancar();
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     const { respostas: coletado, falhas } = coleta(fd);
     // controlados (arquivo/grid) entram por cima do FormData e o "Outro"
@@ -307,6 +459,18 @@ function FormularioGenerico({
       setErros(mapa);
       setErro(ERRO_VALIDACAO);
       const primeiro = perguntas.find((c) => mapa[c.id]);
+      if (wizard && primeiro) {
+        // erro mora em seção escondida → abre ela primeiro; o foco no
+        // campo sai pelo efeito de troca de seção (focoPendente)
+        const i = blocosWizard.findIndex((b) =>
+          b.campos.some((c) => mapa[c.id])
+        );
+        if (i >= 0 && i !== etapaAtiva) {
+          focoPendente.current = primeiro.id;
+          irPara(i, null);
+          return;
+        }
+      }
       const alvo =
         primeiro &&
         formRef.current?.querySelector(
@@ -315,7 +479,9 @@ function FormularioGenerico({
       if (alvo) {
         alvo.scrollIntoView({ block: "center" });
         alvo
-          .querySelector<HTMLElement>("input, select, textarea")
+          .querySelector<HTMLElement>(
+            "fieldset, input:not([type='hidden']), select, textarea"
+          )
           ?.focus({ preventScroll: true });
       }
       return;
@@ -358,7 +524,7 @@ function FormularioGenerico({
   })();
 
   const total = perguntas.length;
-  const minutos = Math.max(1, Math.round((total * 15) / 60));
+  const minutos = Math.max(1, Math.round((total * 20) / 60));
   // a linha que ensina a convenção "(opcional)" só aparece se houver o que
   // pular — num form todo obrigatório ela seria ruído
   const temOpcional = perguntas.some((c) => !c.obrigatorio);
@@ -366,17 +532,46 @@ function FormularioGenerico({
     .reverse()
     .find((c) => TIPOS_COM_ENTER.includes(c.tipo))?.id;
 
+  // a numeração conta só perguntas — 'secao' é rótulo de estrutura e não
+  // entra na contagem nem no "1." do card
+  const numeroPorId = new Map(perguntas.map((c, i) => [c.id, i + 1]));
+
+  function renderCampo(c: FormularioCampo) {
+    // condicional fora da condição não renderiza — some da tela, da
+    // numeração e da coleta (a RPC concorda)
+    if (c.tipo !== "secao" && !visivel(c, atuais)) return null;
+    return (
+      <CampoRenderer
+        key={c.id}
+        campo={c}
+        n={numeroPorId.get(c.id) ?? 0}
+        erro={erros[c.id]}
+        enterKeyHint={c.id === ultimoComEnter ? "send" : "next"}
+        token={token}
+        preview={preview}
+        valor={extras[c.id]}
+        atual={atuais[c.id]}
+        onValor={setExtra}
+      />
+    );
+  }
+
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    // troca de estado (form → sucesso) por crossfade do kit — o painel novo
+    // recebe o foco já centralizado (o submit desmonta junto e a página pode
+    // estar rolada lá embaixo)
+    <FadeTroca
+      chave={enviado ? "ok" : "form"}
+      foco
+      centralizar
+      className={
+        enviado
+          ? "rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] @xl:p-8"
+          : "space-y-3"
+      }
+    >
       {enviado ? (
-        <motion.div
-          key="ok"
-          ref={focoSucesso}
-          tabIndex={-1}
-          {...fade}
-          transition={T.enter}
-          className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] outline-none sm:p-8"
-        >
+        <>
           <div className="mx-auto grid size-12 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
             <CheckCircle size={24} weight="bold" aria-hidden />
           </div>
@@ -393,35 +588,39 @@ function FormularioGenerico({
             pra “${titulo}” foi registrada e já está com a equipe do
             Realiza.vc. Pode fechar esta página.`}
           </p>
-        </motion.div>
+        </>
       ) : (
-        <motion.div
-          key="form"
-          {...fade}
-          transition={T.enter}
-          className="space-y-3"
-        >
+        <>
           {/* progresso fora dos cards: pill sticky que acompanha o scroll de
-              forms longos (safe-area no top, padrão do onboarding) */}
+              forms longos (safe-area no top, padrão do onboarding). No
+              wizard a régua conta seções, não perguntas — "Seção N de M" */}
           <div className="sticky top-[max(0.5rem,env(safe-area-inset-top))] z-10 flex items-center gap-3 rounded-full bg-card/90 px-4 py-2.5 shadow-[var(--shadow-border)] backdrop-blur">
             <div
               role="progressbar"
-              aria-valuenow={respondidos}
-              aria-valuemin={0}
-              aria-valuemax={total}
+              aria-valuenow={wizard ? etapaAtiva + 1 : respondidos}
+              aria-valuemin={wizard ? 1 : 0}
+              aria-valuemax={wizard ? blocosWizard.length : total}
               aria-label="Progresso do formulário"
-              aria-valuetext={`${respondidos} de ${total} perguntas respondidas`}
+              aria-valuetext={
+                wizard
+                  ? `Seção ${etapaAtiva + 1} de ${blocosWizard.length}`
+                  : `${respondidos} de ${total} perguntas respondidas`
+              }
               className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
             >
               <div
-                className="h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-500"
+                className="h-full origin-left rounded-full bg-[var(--brand-lime)] transition-transform duration-500"
                 style={{
-                  width: `${(respondidos / Math.max(total, 1)) * 100}%`,
+                  transform: wizard
+                    ? `scaleX(${(etapaAtiva + 1) / blocosWizard.length})`
+                    : `scaleX(${respondidos / Math.max(total, 1)})`,
                 }}
               />
             </div>
             <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-              {respondidos} de {total}
+              {wizard
+                ? `Seção ${etapaAtiva + 1} de ${blocosWizard.length}`
+                : `${respondidos} de ${total}`}
             </span>
           </div>
 
@@ -429,16 +628,16 @@ function FormularioGenerico({
               themeColor (overflow-hidden pra faixa respeitar o radius) */}
           <div className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
             <div aria-hidden className="h-1.5 bg-[var(--brand-lime)]" />
-            <div className="p-5 sm:p-7">
+            <div className="p-5 @xl:p-7">
               {primeiroNome && (
                 <p className="text-sm font-medium text-[var(--ok-text)]">
                   Olá, {primeiroNome}!
                 </p>
               )}
-              <h1 className="mt-1 text-xl font-semibold tracking-tight">
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight">
                 {titulo}
               </h1>
-              <p className="mt-1 text-xs whitespace-nowrap text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {total} {total === 1 ? "pergunta" : "perguntas"} · leva ~
                 {minutos} min
               </p>
@@ -464,6 +663,8 @@ function FormularioGenerico({
                 Suas respostas são lidas apenas pela equipe do Realiza.vc.{" "}
                 <Link
                   href="/privacidade"
+                  target="_blank"
+                  rel="noopener"
                   className="underline underline-offset-2 transition-colors hover:text-foreground"
                 >
                   privacidade
@@ -473,6 +674,13 @@ function FormularioGenerico({
             </div>
           </div>
 
+          {/* trajetória da dupla no 360º (0191) — entre o cabeçalho e a
+              1ª pergunta, pra resposta nascer situada. Read-only: não é
+              campo, não coleta nada */}
+          {contextoAvaliacao && (
+            <ContextoAvaliacaoCard contexto={contextoAvaliacao} />
+          )}
+
           <form
             ref={formRef}
             onSubmit={onSubmit}
@@ -480,32 +688,73 @@ function FormularioGenerico({
             noValidate
             className="space-y-3"
           >
-            {/* a numeração conta só perguntas — 'secao' é rótulo de
-                estrutura e não entra na contagem nem no "1." do card */}
-            {(() => {
-              const numeroPorId = new Map(
-                perguntas.map((c, i) => [c.id, i + 1])
-              );
-              return campos.map((c) => {
-                // condicional fora da condição não renderiza — some da
-                // tela, da numeração e da coleta (a RPC concorda)
-                if (c.tipo !== "secao" && !visivel(c, atuais)) return null;
-                return (
-                  <CampoRenderer
-                    key={c.id}
-                    campo={c}
-                    n={numeroPorId.get(c.id) ?? 0}
-                    erro={erros[c.id]}
-                    enterKeyHint={c.id === ultimoComEnter ? "send" : "next"}
-                    token={token}
-                    preview={preview}
-                    valor={extras[c.id]}
-                    atual={atuais[c.id]}
-                    onValor={setExtra}
-                  />
-                );
-              });
-            })()}
+            {wizard
+              ? /* uma seção por vez, mas TODAS montadas: só a corrente sai
+                   do `hidden` da <Etapa>. É o que mantém o FormData
+                   byte-a-byte igual ao da página única (coleta/leDeFormData
+                   sem mudança), o rascunho no mesmo formato e o Voltar sem
+                   perda — os inputs não são controlados, remontar seria
+                   perder a digitação */
+                blocosWizard.map((b, i) => {
+                  const ativa = i === etapaAtiva;
+                  const temErro = b.campos.some(
+                    (c) => erros[c.id] && visivel(c, atuais)
+                  );
+                  return (
+                    <Etapa
+                      key={b.secao?.id ?? `bloco-${i}`}
+                      as="section"
+                      ativa={ativa}
+                      direcao={direcao}
+                      data-secao={i}
+                      role="region"
+                      aria-labelledby={`f-sec-titulo-${i}`}
+                      className="scroll-mt-20 space-y-3"
+                    >
+                      {b.secao ? (
+                        <header className="px-1 pb-3">
+                          {/* título da seção recebe o foco na troca — o
+                              leitor de tela anuncia a página nova */}
+                          <h2
+                            id={`f-sec-titulo-${i}`}
+                            tabIndex={-1}
+                            className="text-base font-semibold tracking-tight outline-none @xl:text-lg"
+                          >
+                            {b.secao.label}
+                          </h2>
+                          {b.secao.descricao && (
+                            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                              {b.secao.descricao}
+                            </p>
+                          )}
+                          <div aria-hidden className="mt-3 h-px bg-border" />
+                        </header>
+                      ) : (
+                        // bloco sem 'secao' (form que abre direto com
+                        // perguntas) ainda precisa do alvo de foco
+                        <h2
+                          id={`f-sec-titulo-${i}`}
+                          tabIndex={-1}
+                          className="sr-only outline-none"
+                        >
+                          Perguntas
+                        </h2>
+                      )}
+                      {/* sumário curto no topo da seção marcada — os erros
+                          em si seguem inline, no card de cada campo */}
+                      {temErro && (
+                        <p
+                          role="alert"
+                          className="rounded-lg bg-destructive/10 px-3 py-2 text-sm leading-snug text-destructive"
+                        >
+                          Revise os campos marcados nesta seção.
+                        </p>
+                      )}
+                      {b.campos.map(renderCampo)}
+                    </Etapa>
+                  );
+                })
+              : campos.map(renderCampo)}
 
             {/* honeypot anti-spam: invisível pra humanos, bots preenchem —
                 o servidor finge sucesso e não grava nada. Depois dos cards
@@ -537,68 +786,106 @@ function FormularioGenerico({
               {erro}
             </p>
 
-            {/* title no wrapper: button disabled tem pointer-events-none e o
-                hint "envio desligado" nunca apareceria sobre ele */}
-            <div title={preview ? "Envio desligado na prévia" : undefined}>
-              <Button
-                type="submit"
-                className="h-11 w-full md:h-10"
-                disabled={pending || preview}
-              >
-                {pending ? (
-                  <CircleNotch size={16} className="animate-spin" aria-hidden />
-                ) : (
-                  <PaperPlaneRight size={16} aria-hidden />
+            {wizard ? (
+              /* navegação do wizard numa pill sticky na base — espelha a
+                 pill de progresso do topo. sticky (não fixed): resolve
+                 contra o scrollport mais próximo, então também gruda na
+                 prévia do coordenador (o dialog é o scrollport dele) */
+              <div className="sticky bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 flex items-center gap-2 rounded-full bg-card/90 p-2 shadow-[var(--shadow-border)] backdrop-blur">
+                {/* Voltar nunca valida nem bloqueia — some só na capa
+                    (primeira seção), onde não há pra onde voltar */}
+                {etapaAtiva > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={voltar}
+                    disabled={pending}
+                    className="h-11 rounded-full @xl:h-10"
+                  >
+                    <ArrowLeft size={16} aria-hidden />
+                    Voltar
+                  </Button>
                 )}
-                {pending ? "Enviando…" : "Enviar resposta"}
-              </Button>
-            </div>
+                {/* title no wrapper: button disabled tem pointer-events-none
+                    e o hint "envio desligado" nunca apareceria sobre ele */}
+                <div
+                  className="min-w-0 flex-1"
+                  title={
+                    preview && ultimaEtapa
+                      ? "Envio desligado na prévia"
+                      : undefined
+                  }
+                >
+                  {ultimaEtapa ? (
+                    <Button
+                      type="submit"
+                      className="h-11 w-full rounded-full @xl:h-10"
+                      disabled={pending || preview}
+                    >
+                      {pending ? (
+                        <CircleNotch
+                          size={16}
+                          className="animate-spin"
+                          aria-hidden
+                        />
+                      ) : (
+                        <PaperPlaneRight size={16} aria-hidden />
+                      )}
+                      {pending ? "Enviando…" : "Enviar resposta"}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      onClick={avancar}
+                      disabled={pending}
+                      className="h-11 w-full rounded-full @xl:h-10"
+                    >
+                      Avançar
+                      <ArrowRight size={16} aria-hidden />
+                    </Button>
+                  )}
+                </div>
+                {preview && ultimaEtapa && (
+                  <p className="mt-2 shrink-0 text-xs text-muted-foreground">
+                    Prévia: o envio fica desligado.
+                  </p>
+                )}
+              </div>
+            ) : (
+              /* title no wrapper: button disabled tem pointer-events-none e o
+                 hint "envio desligado" nunca apareceria sobre ele. pt-4 quebra
+                 o ritmo do space-y: o envio respira do último campo */
+              <div
+                title={preview ? "Envio desligado na prévia" : undefined}
+                className="pt-4"
+              >
+                <Button
+                  type="submit"
+                  className="h-11 w-full @xl:h-10"
+                  disabled={pending || preview}
+                >
+                  {pending ? (
+                    <CircleNotch
+                      size={16}
+                      className="animate-spin"
+                      aria-hidden
+                    />
+                  ) : (
+                    <PaperPlaneRight size={16} aria-hidden />
+                  )}
+                  {pending ? "Enviando…" : "Enviar resposta"}
+                </Button>
+                {preview && (
+                  <p className="mt-2 text-center text-xs text-muted-foreground">
+                    Prévia: o envio fica desligado.
+                  </p>
+                )}
+              </div>
+            )}
           </form>
-        </motion.div>
+        </>
       )}
-    </AnimatePresence>
-  );
-}
-
-function Rotulo({
-  campo,
-  n,
-  htmlFor,
-}: {
-  campo: FormularioCampo;
-  n: number;
-  htmlFor?: string;
-}) {
-  const inner = (
-    <>
-      <span className="mr-1 text-muted-foreground tabular-nums">{n}.</span>
-      {campo.label}
-      {!campo.obrigatorio && (
-        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-          (opcional)
-        </span>
-      )}
-      {/* instrução da pergunta ("Responda com até 2 linhas…") mora na
-          descricao — nos cards de secao ela já renderiza no header */}
-      {campo.tipo !== "secao" && campo.descricao && (
-        <span className="mt-0.5 block text-xs font-normal leading-relaxed text-muted-foreground">
-          {campo.descricao}
-        </span>
-      )}
-    </>
-  );
-  // fora de fieldset: <label> com for; dentro de grupos o caller usa <legend>
-  return htmlFor ? (
-    <label
-      htmlFor={htmlFor}
-      className="block text-[15px] font-medium leading-snug sm:text-base"
-    >
-      {inner}
-    </label>
-  ) : (
-    <span className="block text-[15px] font-medium leading-snug sm:text-base">
-      {inner}
-    </span>
+    </FadeTroca>
   );
 }
 
@@ -629,113 +916,6 @@ function CampoOutro({ campo, ativo }: { campo: FormularioCampo; ativo: boolean }
         required
         aria-label={`${campo.label}: outro`}
       />
-    </div>
-  );
-}
-
-/** Upload de arquivo (REALIZA-70): escolhe → sobe via action pro bucket
- *  privado → o valor do campo é só o metadado {path,nome,tamanho} que a
- *  resposta grava. Sem o path ninguém baixa — o objeto nunca é público. */
-function CampoArquivo({
-  campo,
-  token,
-  valor,
-  onValor,
-  preview,
-}: {
-  campo: FormularioCampo;
-  token: string;
-  valor: RespostaValor | undefined;
-  onValor: (id: string, v: RespostaValor | null) => void;
-  preview: boolean;
-}) {
-  const [pending, start] = useTransition();
-  const [erroUp, setErroUp] = useState<string | null>(null);
-  const arq =
-    valor && typeof valor === "object" && !Array.isArray(valor)
-      ? (valor as { path: string; nome: string; tamanho: number })
-      : null;
-
-  function escolheu(file: File | null) {
-    if (!file || pending) return;
-    const maxMb = campo.max_mb ?? ARQUIVO_MAX_MB;
-    if (file.size > maxMb * 1024 * 1024) {
-      setErroUp(`Arquivo grande demais. Máximo ${maxMb} MB.`);
-      return;
-    }
-    const fd = new FormData();
-    fd.set("file", file);
-    setErroUp(null);
-    start(async () => {
-      const r = await subirAnexoFormulario(token, campo.id, fd);
-      if (r.error || !r.arquivo?.path) {
-        setErroUp(r.error ?? "Não deu pra enviar. Tente de novo.");
-        return;
-      }
-      onValor(campo.id, r.arquivo);
-    });
-  }
-
-  return (
-    <div>
-      {/* o valor real viaja no hidden — coleta/validação leem o JSON do
-          FormData como qualquer outro campo */}
-      <input
-        type="hidden"
-        name={campo.id}
-        value={arq ? JSON.stringify(arq) : ""}
-      />
-      {arq ? (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
-          <FileText size={18} className="shrink-0 text-muted-foreground" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{arq.nome}</p>
-            <p className="text-xs text-muted-foreground">
-              {(arq.tamanho / 1024 / 1024).toFixed(1).replace(".", ",")} MB ·
-              enviado
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => onValor(campo.id, null)}
-            aria-label={`Remover ${arq.nome}`}
-            className="shrink-0 text-muted-foreground"
-          >
-            <X aria-hidden />
-          </Button>
-        </div>
-      ) : (
-        <label
-          className={cn(
-            "flex h-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-input text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
-            (pending || preview) && "pointer-events-none opacity-60"
-          )}
-        >
-          {pending ? (
-            <CircleNotch size={20} className="animate-spin" aria-hidden />
-          ) : (
-            <ArrowUp size={20} aria-hidden />
-          )}
-          <span className="font-medium">
-            {pending ? "Enviando…" : "Toque pra escolher o arquivo"}
-          </span>
-          <span className="text-xs">
-            PDF ou imagem · até {campo.max_mb ?? ARQUIVO_MAX_MB} MB
-          </span>
-          <input
-            type="file"
-            accept={(campo.accept ?? ARQUIVO_MIMES).join(",")}
-            disabled={pending || preview}
-            className="sr-only"
-            onChange={(e) => escolheu(e.target.files?.[0] ?? null)}
-          />
-        </label>
-      )}
-      {erroUp && (
-        <p className="mt-1.5 text-sm leading-snug text-destructive">{erroUp}</p>
-      )}
     </div>
   );
 }
@@ -776,7 +956,7 @@ function CampoRenderer({
      scrollIntoView do submit e o erro é o contorno do card inteiro — sem
      rings/borders internos divergentes */
   const cartao = cn(
-    "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5",
+    "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5",
     erro && "ring-2 ring-destructive/60"
   );
 
@@ -785,8 +965,8 @@ function CampoRenderer({
   // instrumento ("Antes de responder", "Mapa de submetas"…)
   if (campo.tipo === "secao") {
     return (
-      <header className="px-1 pb-1 pt-3 first:pt-1">
-        <h2 className="text-base font-semibold tracking-tight sm:text-lg">
+      <header className="px-1 pb-3 pt-4 first:pt-3">
+        <h2 className="text-base font-semibold tracking-tight @xl:text-lg">
           {campo.label}
         </h2>
         {campo.descricao && (
@@ -828,7 +1008,7 @@ function CampoRenderer({
               : {};
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <Rotulo campo={campo} n={n} htmlFor={id} />
+          <RotuloPergunta campo={campo} n={n} htmlFor={id} />
           <Input
             id={id}
             name={campo.id}
@@ -849,7 +1029,7 @@ function CampoRenderer({
       // (default do SO) descreve o gesto de verdade, "send"/"next" mentiria
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <Rotulo campo={campo} n={n} htmlFor={id} />
+          <RotuloPergunta campo={campo} n={n} htmlFor={id} />
           <Textarea
             id={id}
             name={campo.id}
@@ -866,7 +1046,7 @@ function CampoRenderer({
     case "data":
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <Rotulo campo={campo} n={n} htmlFor={id} />
+          <RotuloPergunta campo={campo} n={n} htmlFor={id} />
           <Input
             id={id}
             name={campo.id}
@@ -885,14 +1065,14 @@ function CampoRenderer({
       // WhatsApp) e required/FormData de graça
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <Rotulo campo={campo} n={n} htmlFor={id} />
+          <RotuloPergunta campo={campo} n={n} htmlFor={id} />
           <div className="relative">
             <select
               id={id}
               name={campo.id}
               required={campo.obrigatorio}
               defaultValue=""
-              className="h-11 w-full appearance-none rounded-lg border border-input bg-transparent px-2.5 pr-9 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:h-8 md:text-sm"
+              className="h-11 w-full appearance-none rounded-lg border border-input bg-transparent px-2.5 pr-9 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 @xl:h-8 @xl:text-sm"
               {...a11y}
             >
               <option value="" disabled>
@@ -921,7 +1101,7 @@ function CampoRenderer({
       return (
         <fieldset className={cartao} data-campo={campo.id} {...a11y}>
           <legend>
-            <Rotulo campo={campo} n={n} />
+            <RotuloPergunta campo={campo} n={n} />
           </legend>
           <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
             {(
@@ -932,7 +1112,7 @@ function CampoRenderer({
             ).map((o) => (
               <label
                 key={o.v}
-                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
+                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 @xl:h-10"
               >
                 <input
                   type="radio"
@@ -953,13 +1133,13 @@ function CampoRenderer({
       return (
         <fieldset className={cartao} data-campo={campo.id} {...a11y}>
           <legend>
-            <Rotulo campo={campo} n={n} />
+            <RotuloPergunta campo={campo} n={n} />
           </legend>
           <div className="mt-1.5 grid grid-cols-5 gap-1 rounded-xl bg-muted p-1">
             {[1, 2, 3, 4, 5].map((num) => (
               <label
                 key={num}
-                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-semibold tabular-nums text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
+                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-semibold tabular-nums text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 @xl:h-10"
               >
                 <input
                   type="radio"
@@ -985,13 +1165,13 @@ function CampoRenderer({
       return (
         <fieldset className={cartao} data-campo={campo.id} {...a11y}>
           <legend>
-            <Rotulo campo={campo} n={n} />
+            <RotuloPergunta campo={campo} n={n} />
           </legend>
-          <div className="mt-1.5 grid grid-cols-5 gap-1 rounded-xl bg-muted p-1 sm:grid-cols-10">
+          <div className="mt-1.5 grid grid-cols-5 gap-1 rounded-xl bg-muted p-1 @xl:grid-cols-10">
             {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
               <label
                 key={num}
-                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-semibold tabular-nums text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
+                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-semibold tabular-nums text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 @xl:h-10"
               >
                 <input
                   type="radio"
@@ -1017,7 +1197,7 @@ function CampoRenderer({
       return (
         <fieldset className={cartao} data-campo={campo.id} {...a11y}>
           <legend>
-            <Rotulo campo={campo} n={n} />
+            <RotuloPergunta campo={campo} n={n} />
             <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
               {campo.obrigatorio
                 ? "Marque ao menos uma"
@@ -1027,26 +1207,16 @@ function CampoRenderer({
           <ul className="mt-1.5 space-y-1">
             {(campo.opcoes ?? []).map((o) => (
               <li key={o}>
-                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
-                  <input
-                    type="checkbox"
-                    name={campo.id}
-                    value={o}
-                    className="size-5 shrink-0 rounded accent-primary"
-                  />
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted">
+                  <Checkbox name={campo.id} value={o} />
                   {o}
                 </label>
               </li>
             ))}
             {campo.permite_outro && (
               <li>
-                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
-                  <input
-                    type="checkbox"
-                    name={campo.id}
-                    value="Outro"
-                    className="size-5 shrink-0 rounded accent-primary"
-                  />
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted">
+                  <Checkbox name={campo.id} value="Outro" />
                   Outro
                 </label>
               </li>
@@ -1067,21 +1237,18 @@ function CampoRenderer({
               clique sobre o padding do card — área de toque máxima no
               mobile. O ErroCampo fica fora do label (clique nele não
               alternaria a caixa) */}
-          <label className="-m-4 flex cursor-pointer items-start gap-3 rounded-xl p-4 text-[15px] leading-relaxed transition-colors select-none has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 sm:-m-5 sm:p-5 sm:text-base">
-            <input
-              type="checkbox"
+          <label className="-m-4 flex cursor-pointer items-start gap-3 rounded-xl p-4 text-[15px] leading-relaxed transition-colors select-none has-checked:bg-primary/5 @xl:-m-5 @xl:p-5 @xl:text-base">
+            {n > 0 && <NumeroPergunta n={n} />}
+            <Checkbox
               name={campo.id}
               required={campo.obrigatorio}
-              className="mt-0.5 size-4 shrink-0 accent-primary"
+              className="mt-0.5"
               {...a11y}
             />
-            <span>
-              <span className="mr-1 text-muted-foreground tabular-nums">
-                {n}.
-              </span>
+            <span className="min-w-0 flex-1 font-semibold text-foreground">
               {campo.label}
               {!campo.obrigatorio && (
-                <span className="ml-1.5 text-xs text-muted-foreground">
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                   (opcional)
                 </span>
               )}
@@ -1094,7 +1261,7 @@ function CampoRenderer({
     case "arquivo":
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <Rotulo campo={campo} n={n} />
+          <RotuloPergunta campo={campo} n={n} />
           <CampoArquivo
             campo={campo}
             token={token}
@@ -1111,7 +1278,7 @@ function CampoRenderer({
       // coleta/validação leem do FormData como qualquer outro campo
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <Rotulo campo={campo} n={n} />
+          <RotuloPergunta campo={campo} n={n} />
           <GridDisponibilidade
             name={campo.id}
             value={valor ?? null}

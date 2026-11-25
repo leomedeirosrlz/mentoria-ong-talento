@@ -67,7 +67,7 @@ test.describe("demo — ajuda", () => {
     // pergunta do jovem visível…
     await expect(page.getByText("O que são os especialistas?")).toBeVisible();
 
-    // o link da resposta aponta pra rota dele, não pra de staff
+    // o link da resposta aponta pra rota dele (rótulo Materiais), não pra de staff
     const materiais = page.locator("details", {
       hasText: "Onde estão meus materiais de apoio?",
     });

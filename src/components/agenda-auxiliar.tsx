@@ -15,6 +15,10 @@ import {
   type ItemConsolidado,
 } from "@/lib/agenda-auxiliar";
 import { itensDaSemanaPrograma, saudeDoRecorte } from "@/lib/agenda-coordenacao";
+import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+} from "@/lib/dupla-desfecho";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import {
@@ -314,12 +318,9 @@ const SEM_CARD: Record<Semaforo, { tom: TomTag; rotulo: string }> = {
   risco: { tom: "danger", rotulo: "Risco" },
 };
 
-const ROTULO_STATUS: Record<Dupla["status"], string> = {
-  ativa: "",
-  pausada: "Pausada",
-  concluida: "Concluída",
-  encerrada: "Desistente",
-};
+// label canônico da situação (desfecho separa Desistente × Encerrada)
+const rotuloStatus = (d: Dupla): string =>
+  d.status === "ativa" ? "" : SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)];
 
 /** O sinal mais grave que um lembrete endereça — o primeiro da fila do
  *  semáforo já vem na ordem de prioridade; o mapa traduz pro caso do
@@ -356,7 +357,7 @@ function CardDuplaAux({
     d.mentorado?.nome_social || d.mentorado?.nome || "Jovem";
   const tag =
     d.status !== "ativa"
-      ? { tom: "muted" as TomTag, rotulo: ROTULO_STATUS[d.status] }
+      ? { tom: "muted" as TomTag, rotulo: rotuloStatus(d) }
       : SEM_CARD[saude.semaforo];
   // Lembrar existe quando há pendência apontável — em dia não leva nudge
   const lembrete =
@@ -382,7 +383,7 @@ function CardDuplaAux({
             <PillTurma turma={d.turma} />
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            mentor: {d.mentor?.nome}
+            mentor: {d.mentor?.nome_social || d.mentor?.nome}
           </p>
         </div>
         <Tag tom={tag.tom}>{tag.rotulo}</Tag>
@@ -403,14 +404,14 @@ function CardDuplaAux({
         {lembrete && (
           <DuplaWaAcao
             duplaId={d.id}
-            destNome={d.mentor?.nome ?? "mentor"}
+            destNome={d.mentor?.nome_social || d.mentor?.nome || "mentor"}
             telefone={d.mentor?.whatsapp ?? null}
             mensagem={lembrete.corpo}
             destinatarios={{
               // a pendência é do mentor; o jovem recebe o check-in neutro
               padrao: "mentor",
               mentor: {
-                nome: d.mentor?.nome ?? "mentor",
+                nome: d.mentor?.nome_social || d.mentor?.nome || "mentor",
                 telefone: d.mentor?.whatsapp ?? null,
                 mensagem: lembrete.corpo,
               },
@@ -420,7 +421,11 @@ function CardDuplaAux({
                 mensagem:
                   msgsContato({
                     eu: meuNome,
-                    mentorNome: (d.mentor?.nome ?? "").split(" ")[0],
+                    mentorNome: (
+                      d.mentor?.nome_social ||
+                      d.mentor?.nome ||
+                      ""
+                    ).split(" ")[0],
                     mentoradoNome: nome,
                   }).mentorado ?? "",
               },
@@ -609,7 +614,11 @@ function LinhaConsolidada({
                 {lembrete && item.duplaId && dupla && (
                   <DuplaWaAcao
                     duplaId={item.duplaId}
-                    destNome={dupla.mentor?.nome ?? "mentor"}
+                    destNome={
+                      dupla.mentor?.nome_social ||
+                      dupla.mentor?.nome ||
+                      "mentor"
+                    }
                     telefone={dupla.mentor?.whatsapp ?? null}
                     mensagem={lembrete.corpo}
                     destinatarios={{
@@ -617,7 +626,10 @@ function LinhaConsolidada({
                       // neutro, nunca a cobrança operacional
                       padrao: "mentor",
                       mentor: {
-                        nome: dupla.mentor?.nome ?? "mentor",
+                        nome:
+                          dupla.mentor?.nome_social ||
+                          dupla.mentor?.nome ||
+                          "mentor",
                         telefone: dupla.mentor?.whatsapp ?? null,
                         mensagem: lembrete.corpo,
                       },
@@ -630,7 +642,11 @@ function LinhaConsolidada({
                         mensagem:
                           msgsContato({
                             eu: meuNome,
-                            mentorNome: (dupla.mentor?.nome ?? "").split(" ")[0],
+                            mentorNome: (
+                              dupla.mentor?.nome_social ||
+                              dupla.mentor?.nome ||
+                              ""
+                            ).split(" ")[0],
                             mentoradoNome:
                               dupla.mentorado?.nome_social ||
                               dupla.mentorado?.nome ||

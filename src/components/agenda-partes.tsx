@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import {
+  cobertosDaDupla,
   emLimbo,
+  encontroTemConteudo,
   eventoDaSemana,
   eventosDoCronograma,
 } from "@/lib/ciclo";
@@ -113,7 +115,14 @@ export function lembreteDaDupla(
 ): { titulo: string; corpo: string; href?: string } {
   const hrefRegistro = (id: string) => `/duplas/${d.id}#registrar-${id}`;
   const agoraMs = agora.getTime();
-  const mentorNome = (d.mentor?.nome ?? "").split(" ")[0];
+  // sessão combinada (018): o coberto já tem conteúdo via âncora — o lembrete
+  // não pode apontar "registrar o Nº" de um passo que a sessão já cobriu
+  const cobertos = cobertosDaDupla(d.encontros);
+  const mentorNome = (
+    d.mentor?.nome_social ||
+    d.mentor?.nome ||
+    ""
+  ).split(" ")[0];
   const mentoradoNome = (
     d.mentorado?.nome_social ||
     d.mentorado?.nome ||
@@ -131,8 +140,8 @@ export function lembreteDaDupla(
         .sort((a, b) => a.numero - b.numero)
         .find(
           (e) =>
-            !e.registro &&
-            (e.status === "realizado" || emLimbo(e, agoraMs))
+            !encontroTemConteudo(e, cobertos) &&
+            (e.status === "realizado" || emLimbo(e, agoraMs, cobertos))
         );
       return {
         titulo: "Lembrete: registro pendente",
@@ -142,7 +151,7 @@ export function lembreteDaDupla(
     }
     const pendEsp = [...d.encontros]
       .sort((a, b) => a.numero - b.numero)
-      .find((e) => !e.registro && emLimbo(e, agoraMs));
+      .find((e) => !encontroTemConteudo(e, cobertos) && emLimbo(e, agoraMs, cobertos));
     return {
       titulo: pendEsp
         ? "Lembrete: sessão por confirmar"
@@ -159,7 +168,7 @@ export function lembreteDaDupla(
   );
   const limboEnc = [...d.encontros]
     .sort((a, b) => a.numero - b.numero)
-    .find((e) => emLimbo(e, agoraMs));
+    .find((e) => emLimbo(e, agoraMs, cobertos));
   const numLimbo = limboEnc?.numero;
   const extraVigente =
     vigente?.numero != null ? `${vigente.numero}º` : undefined;
@@ -170,8 +179,8 @@ export function lembreteDaDupla(
       .sort((a, b) => a.numero - b.numero)
       .find(
         (e) =>
-          !e.registro &&
-          (e.status === "realizado" || emLimbo(e, agoraMs))
+          !encontroTemConteudo(e, cobertos) &&
+          (e.status === "realizado" || emLimbo(e, agoraMs, cobertos))
       );
     return {
       titulo: "Lembrete: registro pendente",

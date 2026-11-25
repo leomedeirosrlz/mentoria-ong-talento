@@ -14,10 +14,6 @@ import {
   ArrowUp,
   Check,
   CircleNotch,
-  ClipboardText,
-  Copy,
-  Key,
-  Trash,
   X,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
@@ -40,7 +36,12 @@ import {
   type PlanoGo,
   type PlanoIa,
 } from "@/lib/ia/config";
-import { promptMcp } from "@/lib/ia/mcp-prompt";
+import {
+  DEMO_IA_CATALOGO,
+  DEMO_IA_SAUDE,
+  demoIaConfig,
+} from "@/lib/demo/ia-eventos";
+import { TokensMcp } from "@/components/tokens-mcp";
 import { cn } from "@/lib/utils";
 
 type Tier = "rapido" | "balanceado" | "forte";
@@ -85,36 +86,6 @@ const ESFORCOS: { chave: Esforco; rotulo: string }[] = [
   { chave: "alto", rotulo: "Alto" },
 ];
 
-type TokenMcp = {
-  id: string;
-  rotulo: string;
-  created_at: string;
-  ultimo_uso_em: string | null;
-};
-
-/** rlz_mcp_ + 24 bytes — o token sai daqui UMA vez; no banco fica só o
- *  sha256 (mesma regra dos hashes de segurança do banco). */
-async function gerarToken() {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  const cru = `rlz_mcp_${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(cru)
-  );
-  const hash = [...new Uint8Array(digest)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  return { cru, hash };
-}
-
-const dataCurta = (iso: string) =>
-  new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
-
 type SaudeMap = Record<
   string,
   { ok: boolean; ms: number; status: number } | "medindo"
@@ -126,27 +97,63 @@ type SaudeMap = Record<
 let probeCache: { chave: string; ate: number; saude: SaudeMap } | null = null;
 const PROBE_CACHE_MS = 3 * 60_000;
 
-export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
+/** IaConfig da demo → shape local do painel (a chave `modelos` carrega
+ *  primários + cadeia juntos; aqui são separados). */
+function configDemo(): Config {
+  const d = demoIaConfig();
+  const modelos: Config["modelos"] = {};
+  const fallbacks: Config["fallbacks"] = {
+    rapido: [],
+    balanceado: [],
+    forte: [],
+  };
+  for (const t of TIERS) {
+    if (typeof d.modelos[t.chave] === "string")
+      modelos[t.chave] = d.modelos[t.chave];
+    const f = d.modelos.fallbacks;
+    fallbacks[t.chave] = Array.isArray(f) ? f : (f?.[t.chave] ?? []);
+  }
+  return {
+    modelos,
+    fallbacks,
+    esforco: d.esforco,
+    roteamento: d.roteamento,
+    plano: d.plano,
+  };
+}
+
+export function AssistenteConfig({
+  onVoltar,
+  demo,
+}: {
+  onVoltar: () => void;
+  /** demo (REALIZA-382): config/catálogo/saúde de exemplo locais — o
+   *  painel abre e os controles respondem, mas nada sai pro Supabase e
+   *  o probe não chama /api/ia/modelos */
+  demo?: boolean;
+}) {
   const supabase = createClient();
-  const [cfg, setCfg] = useState<Config | null>(null);
-  const [catalogo, setCatalogo] = useState<string[]>([]);
+  // demo hidrata por lazy init, sem effect nem fetch — o painel abre
+  // pronto e o estado local é o único que existe (nada persiste)
+  const [cfg, setCfg] = useState<Config | null>(() =>
+    demo ? configDemo() : null
+  );
+  const [catalogo, setCatalogo] = useState<string[]>(() =>
+    demo ? DEMO_IA_CATALOGO : []
+  );
   const [salvando, setSalvando] = useState<string | null>(null);
   const [salvo, setSalvo] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [tokens, setTokens] = useState<TokenMcp[] | null>(null);
-  const [tokenNovo, setTokenNovo] = useState<string | null>(null);
-  const [copiado, setCopiado] = useState(false);
-  const [copiadoPrompt, setCopiadoPrompt] = useState<"token" | "base" | null>(null);
-  const [copiadoUrl, setCopiadoUrl] = useState(false);
-  const [gerando, setGerando] = useState(false);
   /** saude por slug: probe de 1 token via /api/ia/modelos — undefined =
-   *  não provado (fora do cap de 8), medindo = probe em voo */
+   *  não provado (fora do cap de 8), medindo = probe em voo. Na demo vem
+   *  pronto do dataset (probe real não roda sem provider) */
   const [saude, setSaude] = useState<
     Record<string, { ok: boolean; ms: number; status: number } | "medindo">
-  >({});
+  >(() => (demo ? DEMO_IA_SAUDE : {}));
   const salvoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (demo) return; // lazy init já cobriu — nenhum fetch em demo
     let vivo = true;
 
     // 1) ia_config é o único fetch que destrava a tela — resolve sozinho
@@ -242,94 +249,10 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
       })
       .catch(() => {});
 
-    // 3) tokens MCP — seção própria, skeleton enquanto não resolve
-    void supabase
-      .from("ia_mcp_tokens")
-      .select("id, rotulo, created_at, ultimo_uso_em")
-      .is("revogado_em", null)
-      .order("created_at", { ascending: false })
-      .then(({ data: tks }) => {
-        if (vivo) setTokens((tks ?? []) as TokenMcp[]);
-      });
-
     return () => {
       vivo = false;
     };
-  }, [supabase]);
-
-  const gerarNovoToken = async () => {
-    setGerando(true);
-    setErro(null);
-    try {
-      const { data: u } = await supabase.auth.getUser();
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", u.user?.id ?? "")
-        .maybeSingle();
-      if (!prof) throw new Error("sem perfil");
-      const { cru, hash } = await gerarToken();
-      const rotulo = `Token ${dataCurta(new Date().toISOString())}`;
-      const { data: row, error } = await supabase
-        .from("ia_mcp_tokens")
-        .insert({ profile_id: prof.id, token_hash: hash, rotulo })
-        .select("id, rotulo, created_at, ultimo_uso_em")
-        .single();
-      if (error) throw error;
-      setTokenNovo(cru);
-      setCopiado(false);
-      setTokens((t) => [row as TokenMcp, ...(t ?? [])]);
-    } catch {
-      setErro("Não consegui gerar o token. Tente de novo.");
-    } finally {
-      setGerando(false);
-    }
-  };
-
-  const revogarToken = async (id: string) => {
-    const { error } = await supabase
-      .from("ia_mcp_tokens")
-      .update({ revogado_em: new Date().toISOString() })
-      .eq("id", id);
-    if (!error) setTokens((t) => (t ?? []).filter((x) => x.id !== id));
-  };
-
-  const copiarToken = async () => {
-    if (!tokenNovo) return;
-    try {
-      await navigator.clipboard.writeText(tokenNovo);
-      setCopiado(true);
-    } catch {
-      // clipboard bloqueado: o token continua selecionável na caixa
-    }
-  };
-
-  const copiarUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(
-        `${window.location.origin}/api/mcp`
-      );
-      setCopiadoUrl(true);
-      setTimeout(() => setCopiadoUrl(false), 1600);
-    } catch {
-      // clipboard bloqueado: a URL segue selecionável no chip
-    }
-  };
-
-  const copiarPrompt = async (qual: "token" | "base") => {
-    try {
-      await navigator.clipboard.writeText(
-        promptMcp(window.location.origin, qual === "token" ? tokenNovo : null)
-      );
-      setCopiadoPrompt(qual);
-      setTimeout(
-        () => setCopiadoPrompt((c) => (c === qual ? null : c)),
-        1600
-      );
-    } catch {
-      // clipboard bloqueado: o token do card segue copiável por botão próprio
-    }
-  };
+  }, [supabase, demo]);
 
   const flash = useCallback((campo: string) => {
     setSalvo(campo);
@@ -341,6 +264,15 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
     async (campo: string, chave: string, valor: unknown) => {
       setErro(null);
       setSalvando(campo);
+      if (demo) {
+        // demo: o estado local já mudou; o spinner+check ainda piscam
+        // pra leitura ficar igual, mas nada persiste — nem ia_config
+        // existe fora da sessão real
+        await new Promise((r) => setTimeout(r, 350));
+        setSalvando(null);
+        flash(campo);
+        return;
+      }
       const { data: u } = await supabase.auth.getUser();
       const { error } = await supabase.from("ia_config").upsert({
         chave,
@@ -355,7 +287,7 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
       }
       flash(campo);
     },
-    [supabase, flash]
+    [supabase, flash, demo]
   );
 
   // a chave `modelos` no banco carrega primários + cadeias juntos —
@@ -471,6 +403,11 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
         <p className="text-sm font-semibold">Ajustes do assistente</p>
       </div>
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
+        {demo && (
+          <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+            Na demonstração, os ajustes são de exemplo e nada é gravado.
+          </p>
+        )}
         {erro && <p className="text-sm text-[var(--danger-text)]">{erro}</p>}
         {!cfg ? (
           /* skeleton no formato do painel — label+select+segmento por
@@ -811,139 +748,20 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
               })()}
             </section>
 
-            <section className="space-y-2 border-t border-border pt-4">
-              <div>
-                <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  IA externa (MCP)
-                </h3>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Token pra conectar Claude, Cursor ou outro cliente MCP.
-                  Carrega o seu papel; quem tem acesso revoga aqui.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-2">
-                <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
-                  POST {window.location.origin}/api/mcp
-                </code>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Copiar endpoint"
-                  onClick={copiarUrl}
-                  className="shrink-0"
-                >
-                  {copiadoUrl ? (
-                    <Check aria-hidden className="text-[var(--ok-text)]" />
-                  ) : (
-                    <Copy aria-hidden />
-                  )}
-                </Button>
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copiarPrompt("base")}
-                className="w-full"
-              >
-                {copiadoPrompt === "base" ? (
-                  <Check aria-hidden className="text-[var(--ok-text)]" />
-                ) : (
-                  <ClipboardText aria-hidden />
-                )}
-                Copiar prompt de conexão
-              </Button>
-
-              {tokenNovo && (
-                <div className="space-y-1.5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn-bg)]/40 p-2.5">
-                  <p className="text-[11px] font-medium">
-                    Copie agora, o token não aparece de novo:
+            {!demo && (
+              <section className="space-y-2 border-t border-border pt-4">
+                <div>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    IA externa (MCP)
+                  </h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Token pra conectar Claude, Cursor ou outro cliente MCP.
+                    Carrega o seu papel; quem tem acesso revoga aqui.
                   </p>
-                  <div className="flex items-center gap-1.5">
-                    <code className="min-w-0 flex-1 select-all truncate rounded bg-muted px-2 py-1.5 font-mono text-[11px]">
-                      {tokenNovo}
-                    </code>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Copiar token"
-                      onClick={copiarToken}
-                      className="shrink-0"
-                    >
-                      {copiado ? (
-                        <Check aria-hidden className="text-[var(--ok-text)]" />
-                      ) : (
-                        <Copy aria-hidden />
-                      )}
-                    </Button>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copiarPrompt("token")}
-                    className="w-full"
-                  >
-                    {copiadoPrompt === "token" ? (
-                      <Check aria-hidden className="text-[var(--ok-text)]" />
-                    ) : (
-                      <ClipboardText aria-hidden />
-                    )}
-                    Copiar prompt com contexto + token
-                  </Button>
                 </div>
-              )}
-
-              {tokens === null ? (
-                <div className="space-y-1.5" aria-busy="true" aria-label="Carregando tokens">
-                  <Skeleton className="h-9 w-full rounded-lg" />
-                  <Skeleton className="h-9 w-full rounded-lg" />
-                </div>
-              ) : (
-                <ul className="space-y-1.5">
-                  {tokens.map((t) => (
-                    <li
-                      key={t.id}
-                      className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-2"
-                    >
-                      <Key size={14} aria-hidden className="shrink-0 text-muted-foreground" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{t.rotulo}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {t.ultimo_uso_em
-                            ? `último uso ${dataCurta(t.ultimo_uso_em)}`
-                            : `criado ${dataCurta(t.created_at)}`}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Revogar ${t.rotulo}`}
-                        onClick={() => revogarToken(t.id)}
-                        className="shrink-0 text-muted-foreground hover:text-[var(--danger-text)]"
-                      >
-                        <Trash aria-hidden />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={gerarNovoToken}
-                disabled={gerando}
-                className="w-full"
-              >
-                {gerando ? (
-                  <CircleNotch size={14} aria-hidden className="animate-spin" />
-                ) : (
-                  <Key size={14} aria-hidden />
-                )}
-                Gerar novo token
-              </Button>
-            </section>
+                <TokensMcp textos={{ gerar: "Gerar novo token" }} />
+              </section>
+            )}
           </>
         )}
       </div>

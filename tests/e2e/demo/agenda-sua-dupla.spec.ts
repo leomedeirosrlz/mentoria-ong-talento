@@ -36,7 +36,7 @@ test.describe("demo — quadro de duplas no painel do dia", () => {
       .locator("xpath=..")
       .locator("> .divide-y > div");
     await expect(grupos).toHaveCount(2);
-    await expect(grupos.nth(0)).toContainText("Ana Beatriz Silva");
+    await expect(grupos.nth(0)).toContainText("Bia");
     await expect(grupos.nth(1)).toContainText("Matheus Gonçalves");
     // a linha da Ana traz o 5º oficial da semana marcado na terça; a do
     // Matheus, o encontro dele marcado nesta semana (a Turma 2 anda à

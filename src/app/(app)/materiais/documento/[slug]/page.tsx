@@ -9,9 +9,18 @@ import {
   corpusServePapel,
   listarDocsCorpus,
 } from "@/lib/materiais/corpus-doc";
+import { chaveDoSistema, sistemaDoDoc } from "@/lib/como-conduzir";
 import { getMe } from "@/lib/queries";
+import { demoRole } from "@/lib/demo/mode";
+import {
+  MENSAGEM_TEMPLATE_SLUGS,
+  mensagemTemplatePedido,
+  type MensagemTemplateSlug,
+} from "@/lib/ia/mensagem-templates";
+import type { AppRole } from "@/lib/types";
 import { MaterialDocumento } from "@/components/material-documento";
 import { CorpusDocumento } from "@/components/corpus-documento";
+import { RegistrarMaterialLido } from "@/components/material-leitura";
 
 // Documento nativo de /materiais — casa do staff e do mentor; o jovem tem a
 // rota própria em /jovem/materiais/documento (o layout (app) o redireciona
@@ -42,27 +51,96 @@ export async function generateMetadata({
 
 export default async function DocumentoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ dupla?: string }>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, { dupla: duplaParam }] = await Promise.all([
+    params,
+    searchParams,
+  ]);
+  // ?dupla=<id> vem dos links da ficha — o "Abrir instrumento" volta pra
+  // ela; sem contexto (biblioteca, catálogo) aponta a régua de /materiais
+  const duplaId =
+    duplaParam &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      duplaParam
+    )
+      ? duplaParam
+      : null;
   const corpus = await carregarDocCorpus(slug);
+
+  // CTA "Pedir pra Liza personalizar" (REALIZA-388): só nos templates de
+  // mensagem e sob o MESMO gate da bolha no layout (demo ou IA_BOLHA=1 +
+  // papel de staff/mentor) — sem bolha montada o clique não teria pra onde
+  // ir. O jovem nem passa aqui (rota própria em /jovem, sem CTA). Os três
+  // templates chegam como docs do corpus (docs/rag/mensagem-*.md, tipo:
+  // template), então o CTA mora no renderer do corpus — o ramo nativo em
+  // baixo fica como fallback defensivo.
+  const me = await getMe();
+  const demo = await demoRole();
+  const papeisIa =
+    me?.papeis && me.papeis.length ? me.papeis : me?.role ? [me.role] : [];
+  const comLiza =
+    (demo != null || process.env.IA_BOLHA === "1") &&
+    ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"].some(
+      (r) => papeisIa.includes(r as AppRole)
+    ) &&
+    (MENSAGEM_TEMPLATE_SLUGS as readonly string[]).includes(slug);
+  const lizaPergunta = comLiza
+    ? mensagemTemplatePedido(slug as MensagemTemplateSlug)
+    : undefined;
+
   if (corpus) {
     // getMe é React.cache — o layout já a chamou neste request (cache hit)
-    if (!corpusServePapel(corpus, await getMe())) notFound();
+    if (!corpusServePapel(corpus, me)) notFound();
     return (
-      <CorpusDocumento
-        doc={corpus}
-        voltar={{ href: "/materiais?aba=biblioteca", rotulo: "Materiais de apoio" }}
-      />
+      <>
+        <RegistrarMaterialLido materialRef={`doc:${slug}`} />
+        <CorpusDocumento
+          doc={corpus}
+          voltar={{ href: "/materiais?aba=biblioteca", rotulo: "Materiais de apoio" }}
+          lizaPergunta={lizaPergunta}
+          ponte={
+            duplaId
+              ? {
+                  href: `/duplas/${duplaId}?aba=instrumentos#instrumentos`,
+                  rotulo: "Abrir instrumento",
+                  dica: "Este guia acompanha o instrumento ao vivo, emitido e acompanhado na ficha da dupla.",
+                }
+              : (() => {
+                  // deep-link ao instrumento que o doc acompanha (REALIZA-414):
+                  // a régua por chave; sem card próprio cai na aba toda
+                  const sistema = sistemaDoDoc(slug);
+                  const chave = sistema ? chaveDoSistema(sistema) : null;
+                  return chave
+                    ? {
+                        href: `/materiais/instrumentos/${chave}`,
+                        rotulo: "Abrir instrumento",
+                        dica: "Instrumento oficial do programa: o estado dele em cada dupla do seu escopo.",
+                      }
+                    : {
+                        href: "/materiais?aba=instrumentos",
+                        rotulo: "Ver instrumentos",
+                        dica: "Instrumento oficial do programa: liberado na ficha da dupla e o resultado volta estruturado.",
+                      };
+                })()
+          }
+        />
+      </>
     );
   }
   if (!materialDocumento(slug)) notFound();
 
   return (
-    <MaterialDocumento
-      slug={slug}
-      voltar={{ href: "/materiais?aba=biblioteca", rotulo: "Materiais de apoio" }}
-    />
+    <>
+      <RegistrarMaterialLido materialRef={`doc:${slug}`} />
+      <MaterialDocumento
+        slug={slug}
+        voltar={{ href: "/materiais?aba=biblioteca", rotulo: "Materiais de apoio" }}
+        lizaPergunta={lizaPergunta}
+      />
+    </>
   );
 }

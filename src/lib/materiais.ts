@@ -1,4 +1,10 @@
-import type { AppRole } from "./types";
+import { linkSeguro } from "./ciclo";
+import {
+  docsDoEncontro,
+  type CronogramaEncontros,
+  type DocApoio,
+} from "./como-conduzir";
+import type { AppRole, Material, Trilha } from "./types";
 import { temPapel } from "./types";
 
 /** Audiências possíveis de um material — uma por papel, na ordem do select.
@@ -62,6 +68,51 @@ export function veMaterial(
   return audiencias.some((a) => temPapel(pessoa, a as AppRole));
 }
 
+/** Materiais de UMA turma carregam o nº dela no título ("Cronograma do
+ *  programa — Turma 2"). Devolve esse nº, ou null quando o material é do
+ *  programa inteiro. A régua é o título porque `materiais` não tem coluna
+ *  de turma — o recorte acontece na query/UI, não na RLS. */
+export function turmaDoMaterial(
+  titulo: string | null | undefined
+): string | null {
+  // dígito só: "turma da"/"turma toda" não é âncora de turma
+  return titulo?.match(/\bturma\s+(\d+)\b/i)?.[1] ?? null;
+}
+
+/** Material de turma só aparece pra quem tem dupla nela. `turmas` = os nºs
+ *  das turmas do recorte da pessoa (turmaDaDupla → turmaNumero); null
+ *  desliga o recorte (coordenação lê o catálogo inteiro). */
+export function veMaterialDaTurma(
+  m: { titulo?: string | null },
+  turmas: ReadonlySet<string> | null
+): boolean {
+  const t = turmaDoMaterial(m.titulo);
+  return t == null || turmas == null || turmas.has(t);
+}
+
+/** Destino único do material: "doc:<slug>" é documento nativo (a base muda
+ *  por casa — /materiais no staff, /jovem no mentorado); arquivo oficial
+ *  ganha da url externa; sem os três não há link pra abrir. Resolver aqui
+ *  porque o path "doc:" não passa pelo /api/material (a rota devolve 404
+ *  pra ele de propósito — o PDF de storage deixou de existir na 0194). */
+export function hrefMaterial(
+  m: { id: string; path?: string | null; url?: string | null },
+  docBase = "/materiais/documento"
+): string | null {
+  if (m.path?.startsWith("doc:")) return `${docBase}/${m.path.slice(4)}`;
+  return m.path ? `/api/material/${m.id}` : linkSeguro(m.url);
+}
+
+/** Chave de leitura do material (0196): "doc:<slug>" marca pelo documento
+ *  nativo — a linha de catálogo e a sintética do encontro apontam pro
+ *  mesmo doc e ler um vale pros dois; arquivo/link externo marca pelo id. */
+export function refDoMaterial(m: {
+  id: string;
+  path?: string | null;
+}): string {
+  return m.path?.startsWith("doc:") ? m.path : m.id;
+}
+
 /** Valor legado (`audiencia` de uma coluna) derivado do array — o código
  *  antigo que ainda estiver rodando durante o deploy continua funcionando. */
 export function audienciaLegada(audiencias: readonly string[]): string {
@@ -69,4 +120,98 @@ export function audienciaLegada(audiencias: readonly string[]): string {
   if (audiencias.includes("mentor_dpp")) return "dpp";
   if (audiencias.includes("mentor_especialista")) return "especialista";
   return "coordenacao";
+}
+
+// ---------- material de apoio por encontro (REALIZA-394) ----------
+
+/** A linha-síntese de um doc nativo: o que o encontro ganha quando o
+ *  catálogo não amarra o doc ao número (linha transversal — encontro_num
+ *  nulo — ou ausente). id estável `doc-<slug>`: a dedup é pelo `path`
+ *  (`doc:<slug>`), então a linha real sempre vence a sintética. */
+function materialDeDoc(d: DocApoio, encontroNum: number): Material {
+  return {
+    id: `doc-${d.slug}`,
+    titulo: d.titulo,
+    descricao: null,
+    tipo: d.tipo,
+    url: null,
+    path: `doc:${d.slug}`,
+    audiencia: audienciaLegada(d.audiencias) as Material["audiencia"],
+    audiencias: [...d.audiencias],
+    encontro_num: encontroNum,
+    ordem: 40, // depois das linhas do catálogo (roteiros ordem 3–18)
+  };
+}
+
+/** Completa o material de apoio de cada encontro DPP do mapa: além das
+ *  linhas que o catálogo já amarra ao nº, o encontro herda os docs nativos
+ *  que o guia oficial põe em jogo — o roteiro da semana, os guias dos
+ *  instrumentos na janela e as técnicas que o evento nomeia (a derivação é
+ *  `docsDoEncontro`, a mesma do chip de instrumento da ficha). Dedup por
+ *  slug `doc:` dentro de cada lista — a linha real sempre vence. Domínio
+ *  DPP: a trilha especialista não tem janelas nem roteiros neste modelo —
+ *  quem chama só passa o mapa dela. */
+export function enriquecerMateriaisPorEncontro(
+  porNumero: Map<number, Material[]>,
+  cronograma: CronogramaEncontros = []
+): Map<number, Material[]> {
+  const numeros = new Set<number>([
+    ...porNumero.keys(),
+    ...cronograma
+      .filter((e) => e.tipo == null || e.tipo === "encontro")
+      .map((e) => e.numero)
+      .filter((n): n is number => n != null),
+  ]);
+  for (const n of numeros) {
+    const lista = porNumero.get(n) ?? [];
+    const presentes = new Set(
+      lista
+        .map((m) => (m.path?.startsWith("doc:") ? m.path.slice(4) : null))
+        .filter((s): s is string => s != null)
+    );
+    const extras = docsDoEncontro(n, cronograma)
+      .filter((d) => !presentes.has(d.slug))
+      .map((d) => materialDeDoc(d, n));
+    if (extras.length) porNumero.set(n, [...lista, ...extras]);
+  }
+  return porNumero;
+}
+
+/** Audiências da trilha — material DPP nunca cai na trilha especialista e
+ *  vice-versa. Vale para coordenação também: o número coincide, a trilha não. */
+const AUDIENCIAS_DA_TRILHA: Record<Trilha, ReadonlySet<string>> = {
+  dpp: new Set(["todos", "mentor_dpp", "coordenacao"]),
+  especialista: new Set(["todos", "mentor_especialista", "coordenacao"]),
+};
+
+/** Material de apoio de UM número do guia: filtra o catálogo pela audiência
+ *  da trilha e completa com os docs nativos que o encontro herda
+ *  (`enriquecerMateriaisPorEncontro`, dedup por slug). A tela focada não
+ *  precisa montar o mapa dos 16. */
+export function materiaisDoNumero({
+  materiais,
+  eventosDaDupla,
+  trilha,
+  numero,
+}: {
+  materiais: Material[];
+  /** Cronograma oficial da dupla (eventosDoCronograma) — fonte dos docs do
+   *  guia. Trilha especialista não tem janelas: passa [] ou omite. */
+  eventosDaDupla?: CronogramaEncontros;
+  trilha: Trilha | null | undefined;
+  numero: number;
+}): Material[] {
+  const audiencias = AUDIENCIAS_DA_TRILHA[trilha ?? "dpp"];
+  const porNumero = new Map<number, Material[]>();
+  for (const m of materiais) {
+    if (m.encontro_num !== numero) continue;
+    if (!audienciasDe(m).some((a) => audiencias.has(a))) continue;
+    const arr = porNumero.get(numero) ?? [];
+    arr.push(m);
+    porNumero.set(numero, arr);
+  }
+  // a trilha especialista não tem janela nem roteiro do guia — os 5 passos
+  // ficam só com as linhas do catálogo
+  if (trilha === "especialista") return porNumero.get(numero) ?? [];
+  return enriquecerMateriaisPorEncontro(porNumero, eventosDaDupla).get(numero) ?? [];
 }

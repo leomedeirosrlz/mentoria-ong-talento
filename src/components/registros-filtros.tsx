@@ -3,17 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, MagnifyingGlass, X } from "@phosphor-icons/react";
+import { MagnifyingGlass, X } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FiltrosButton } from "@/components/ui/filtros-button";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  OpcaoCheck,
+  OpcaoPilula,
+  OVERLINE,
+} from "@/components/ui/filtro-opcoes";
+import { FormSurface } from "@/components/form-surface";
 import {
   Select,
   SelectContent,
@@ -32,7 +31,6 @@ import {
 import { turmaCurta } from "@/lib/turma";
 import type { DuplaOpcao, FiltrosRegistro } from "@/lib/queries";
 import type { Cronograma, Dificuldade } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 const TODAS = "todas";
 
@@ -60,93 +58,6 @@ function draftDe(f: FiltrosRegistro, ordem: OrdemRegistros): Draft {
     tardio: !!f.tardio,
     ordem,
   };
-}
-
-const OVERLINE =
-  "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]";
-
-/** Opção compacta (grade de encontros / avaliações) — radio nativo sr-only
- *  mantém setas do teclado e leitura de tela de graça. */
-function OpcaoPilula({
-  nome,
-  valor,
-  atual,
-  onSelect,
-  children,
-  className,
-}: {
-  nome: string;
-  valor: string;
-  atual: string;
-  onSelect: (v: string) => void;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label
-      className={cn(
-        "flex min-h-11 cursor-pointer items-center justify-center rounded-lg border px-2.5 text-sm transition-colors sm:min-h-9",
-        "hover:bg-muted has-checked:border-foreground has-checked:bg-foreground has-checked:font-medium has-checked:text-background",
-        "has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-background",
-        className
-      )}
-    >
-      <input
-        type="radio"
-        name={nome}
-        value={valor}
-        checked={atual === valor}
-        onChange={() => onSelect(valor)}
-        className="sr-only"
-      />
-      {children}
-    </label>
-  );
-}
-
-/** Checkbox do fieldset Sinal — mesmo truque do radio: input sr-only dentro
- *  do label, estilo via has-checked. */
-function OpcaoCheck({
-  marcado,
-  onChange,
-  children,
-}: {
-  marcado: boolean;
-  onChange: (v: boolean) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <label
-      className={cn(
-        "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm transition-colors sm:min-h-10",
-        "hover:bg-muted has-checked:bg-muted",
-        "has-focus-visible:ring-2 has-focus-visible:ring-ring"
-      )}
-    >
-      <input
-        type="checkbox"
-        checked={marcado}
-        onChange={(e) => onChange(e.target.checked)}
-        className="sr-only"
-      />
-      <span
-        aria-hidden
-        className={cn(
-          "grid size-4.5 shrink-0 place-items-center rounded-[5px] border transition-colors",
-          marcado
-            ? "border-foreground bg-foreground text-background"
-            : "border-input bg-card"
-        )}
-      >
-        <Check
-          size={11}
-          weight="bold"
-          className={marcado ? "opacity-100" : "opacity-0"}
-        />
-      </span>
-      <span className="flex-1">{children}</span>
-    </label>
-  );
 }
 
 /** Barra de /registros: busca direta + modal de filtros (padrão marketplace —
@@ -423,15 +334,41 @@ export function RegistrosFiltros({
         )}
       </div>
 
-      <Dialog open={aberto} onOpenChange={setAberto}>
-        {/* md, não lg: o corpo são pílulas, checks e um select em coluna —
-            acima de md sobrava fundo ocioso; o scroll interno já vem do
-            DialogContent */}
-        <DialogContent size="md">
-          <DialogHeader>
-            <DialogTitle>Filtros</DialogTitle>
-          </DialogHeader>
-
+      {/* superfície única por viewport (spec 022, US6): o painel de
+          filtros é denso — 4 grupos + select — então vira Sheet de rodapé
+          no celular e Dialog lg no desktop */}
+      <FormSurface
+        open={aberto}
+        onOpenChange={setAberto}
+        titulo="Filtros"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              className="sm:me-auto"
+              disabled={draftAtivos === 0}
+              onClick={() =>
+                setDraft((d) => ({
+                  encontro: TODAS,
+                  avaliacao: TODAS,
+                  dificuldade: TODAS,
+                  dupla: TODAS,
+                  apoio: false,
+                  tardio: false,
+                  // ordenar não é filtro — o Limpar preserva a escolha
+                  ordem: d.ordem,
+                }))
+              }
+            >
+              Limpar
+            </Button>
+            <Button type="button" onClick={aplicarDraft}>
+              Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
+            </Button>
+          </>
+        }
+      >
           <div className="space-y-4">
             <fieldset>
               <legend className={OVERLINE}>Sinal</legend>
@@ -620,36 +557,7 @@ export function RegistrosFiltros({
               </div>
             </fieldset>
           </div>
-
-          {/* sticky no pé da área rolante do DialogContent — em tela
-              baixa o "Aplicar" não fica escondido abaixo da lista */}
-          <DialogFooter sticky>
-            <Button
-              type="button"
-              variant="ghost"
-              className="sm:me-auto"
-              disabled={draftAtivos === 0}
-              onClick={() =>
-                setDraft((d) => ({
-                  encontro: TODAS,
-                  avaliacao: TODAS,
-                  dificuldade: TODAS,
-                  dupla: TODAS,
-                  apoio: false,
-                  tardio: false,
-                  // ordenar não é filtro — o Limpar preserva a escolha
-                  ordem: d.ordem,
-                }))
-              }
-            >
-              Limpar
-            </Button>
-            <Button type="button" onClick={aplicarDraft}>
-              Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </FormSurface>
     </>
   );
 }

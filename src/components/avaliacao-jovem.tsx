@@ -32,11 +32,45 @@ import { buttonVariants } from "@/components/ui/button";
 // O "pedir_apoio" do jovem NUNCA se funde com o precisa_apoio do mentor:
 // canais diferentes, respondidos por gente diferente.
 
-/** Bloco dentro do card do encontro (abaixo do registro do mentor): o que
- *  o jovem respondeu. `avaliacao` chega via embed RLS — coord e supervisor
- *  recebem a linha completa; o mentor DPP só recebe quando o jovem ligou
- *  "meu mentor pode ler esta" (o chip "liberada" conta isso a ele). */
-export function AvaliacaoJovemCard({
+/** Linha-resumo do bloco do jovem — phrasing content (spans/badges): o
+ *  trigger do disclosure é um button, então nada de link ou botão aqui. */
+export function AvaliacaoJovemResumo({
+  avaliacao,
+}: {
+  avaliacao: AvaliacaoEncontro;
+}) {
+  return (
+    <>
+      <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
+        Avaliação do jovem
+      </span>
+      <Estrelas n={avaliacao.estrelas} size={13} />
+      {avaliacao.pedir_apoio ? (
+        <Badge
+          variant="outline"
+          className="shrink-0 border-[var(--danger)] text-[var(--danger)]"
+        >
+          <HandHeart size={12} data-icon="inline-start" aria-hidden />
+          pediu ajuda
+        </Badge>
+      ) : null}
+      <span className="ml-auto text-xs text-muted-foreground">
+        {/* respondido_por null = respondeu pelo link, sem login — o canal
+            é a prova; a policy esconde a identidade do token de propósito */}
+        {avaliacao.respondido_por_profile_id == null
+          ? "pelo link, sem login"
+          : "pela conta do jovem"}
+        {" · "}
+        {formatDate(avaliacao.created_at)}
+      </span>
+    </>
+  );
+}
+
+/** Corpo do bloco do jovem: o que ele respondeu + a resposta da coordenação
+ *  quando ele pediu apoio. */
+export function AvaliacaoJovemDetalhe({
   avaliacao,
   duplaId,
   souCoord,
@@ -56,39 +90,7 @@ export function AvaliacaoJovemCard({
     !!avaliacao.comentario;
 
   return (
-    <div
-      className={
-        avaliacao.pedir_apoio
-          ? "border-t border-[var(--danger)]/40 bg-[var(--danger)]/5 px-4 py-3"
-          : "border-t border-border/60 bg-muted/50 px-4 py-3"
-      }
-    >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
-          Avaliação do jovem
-        </span>
-        <Estrelas n={avaliacao.estrelas} size={13} />
-        {avaliacao.pedir_apoio ? (
-          <Badge
-            variant="outline"
-            className="shrink-0 border-[var(--danger)] text-[var(--danger)]"
-          >
-            <HandHeart size={12} data-icon="inline-start" aria-hidden />
-            pediu ajuda
-          </Badge>
-        ) : null}
-        <span className="ml-auto text-xs text-muted-foreground">
-          {/* respondido_por null = respondeu pelo link, sem login — o canal
-              é a prova; a policy esconde a identidade do token de propósito */}
-          {avaliacao.respondido_por_profile_id == null
-            ? "pelo link, sem login"
-            : "pela conta do jovem"}
-          {" · "}
-          {formatDate(avaliacao.created_at)}
-        </span>
-      </div>
-
+    <>
       {liberadaProMentor && (
         <p className="mt-1.5 text-xs text-muted-foreground">
           O jovem ligou “meu mentor pode ler esta”. Normalmente você só vê
@@ -138,6 +140,43 @@ export function AvaliacaoJovemCard({
           />
         </div>
       )}
+    </>
+  );
+}
+
+/** Composição pronta (resumo + detalhe num cartão sempre aberto) — o
+ *  detalhe do registro em /registros não colapsa nada. Na ficha da dupla o
+ *  bloco usa o `EncontroDisclosure` com as duas partes separadas. */
+export function AvaliacaoJovemCard({
+  avaliacao,
+  duplaId,
+  souCoord,
+  liberadaProMentor = false,
+}: {
+  avaliacao: AvaliacaoEncontro;
+  duplaId: string;
+  souCoord: boolean;
+  /** Quem vê é o mentor e a linha só existe porque o jovem a liberou —
+   *  a nota explica por que ela é a exceção da regra da média. */
+  liberadaProMentor?: boolean;
+}) {
+  return (
+    <div
+      className={
+        avaliacao.pedir_apoio
+          ? "border-t border-[var(--danger)]/40 bg-[var(--danger)]/5 px-4 py-3"
+          : "border-t border-border/60 bg-muted/50 px-4 py-3"
+      }
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <AvaliacaoJovemResumo avaliacao={avaliacao} />
+      </div>
+      <AvaliacaoJovemDetalhe
+        avaliacao={avaliacao}
+        duplaId={duplaId}
+        souCoord={souCoord}
+        liberadaProMentor={liberadaProMentor}
+      />
     </div>
   );
 }
@@ -169,6 +208,7 @@ export function AvaliacaoPendenteLinha({
   jovemNome,
   jovemWhatsapp,
   numero,
+  sessao = false,
   souCoord,
   duplaId,
   jornadaViva = true,
@@ -179,6 +219,8 @@ export function AvaliacaoPendenteLinha({
   jovemNome: string;
   jovemWhatsapp: string | null;
   numero: number;
+  /** Trilha esp: o convite fala da sessão (o nº já é o passo do guia). */
+  sessao?: boolean;
   souCoord: boolean;
   /** o ping da avaliação passa por /api/nudge — loga o contato em
    *  interacoes como os demais canais (t=contato) */
@@ -194,7 +236,7 @@ export function AvaliacaoPendenteLinha({
   const wa =
     url && waLink(
       jovemWhatsapp,
-      `Oi ${jovemNome.split(" ")[0]}! ${autoria(autorNome)}. Como foi o ${numero}º encontro de vocês? Conta aqui rapidinho (1 min): ${url}`
+      `Oi ${jovemNome.split(" ")[0]}! ${autoria(autorNome)}. Como foi ${sessao ? `a sessão ${numero}` : `o ${numero}º encontro`} de vocês? Conta aqui rapidinho (1 min): ${url}`
     );
 
   return (
@@ -345,11 +387,15 @@ export function VozDoJovemCard({
 }
 
 /** Lista das estrelas por sessão no rail do especialista — mesmo recorte
- *  do chip: número e data do encontro (que ele mesmo conduziu), nada mais. */
+ *  do chip: o passo do guia (não a tentativa) e a data, nada mais. */
 export function VozDoJovemEspecialista({
   itens,
+  passoPorEncontro,
 }: {
   itens: EspecialistaAvaliacao[];
+  /** encontro_id → passo do guia (passoEsp na página) — a.numero é a
+   *  tentativa física e mostraria o passo errado na trilha esp. */
+  passoPorEncontro?: Map<string, number>;
 }) {
   if (!itens.length) return null;
   return (
@@ -365,7 +411,7 @@ export function VozDoJovemEspecialista({
             className="flex items-center justify-between gap-2 text-sm"
           >
             <span className="text-muted-foreground">
-              {a.numero}º encontro
+              sessão {passoPorEncontro?.get(a.encontro_id) ?? a.numero}
               {a.realizado_em ? ` · ${formatDate(a.realizado_em)}` : ""}
             </span>
             <Estrelas n={a.estrelas} size={13} />

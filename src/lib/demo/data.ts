@@ -63,7 +63,11 @@ import type {
   TurmaInscricao,
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
-import { disponibilidadeDeConjuntos, toDateStr } from "../ciclo";
+import {
+  cobertosDaDupla,
+  disponibilidadeDeConjuntos,
+  toDateStr,
+} from "../ciclo";
 import { audienciasDe } from "../materiais";
 
 // ---------- tabelas da rodada de telas finais (ainda sem migration) ----------
@@ -78,6 +82,9 @@ export type ProfilePapel = {
   papel: AppRole;
   /** null = papel vale pro programa todo; preenchido = só naquela turma. */
   escopo_turma: string | null;
+  /** Alcance do auxiliar (0125): só tem efeito em papel 'supervisor' —
+   *  'turma' + escopo_turma amplia a supervisão pra turma inteira. */
+  escopo_supervisao: "duplas" | "turma";
   primario: boolean;
   criado_em?: string;
 };
@@ -134,6 +141,9 @@ export type DemoData = {
   /** turma_inscricoes (0111 · REALIZA-167) — quem é da turma sem estar em
    *  dupla; alimenta a linha "Sem dupla" do relatório no modo demo. */
   turmaInscricoes: TurmaInscricao[];
+  /** profiles_acesso (0192 · REALIZA-39) — último acesso por profile_id;
+   *  só quem tem user_id tem linha (idem a view real). */
+  acessoMap: Record<string, string | null>;
 };
 
 // ---------- ids ----------
@@ -220,6 +230,8 @@ const D = {
   t2b: 0x060c,
   t2c: 0x060d, // Ricardo × Matheus — a 2ª dupla DPP do híbrido (WP3)
   rito: 0x060e, // Ricardo × Gustavo — concluída com o rito de encerramento aberto
+  reman: 0x060f, // Patrícia × Eduardo — encerrada formal (remanejada)
+  desist: 0x0610, // Carlos × Laura — desistência do jovem no ciclo anterior
 } as const;
 
 // cronogramas (0061) — um por turma; a T2 é a turma que começou um mês depois
@@ -739,6 +751,7 @@ type RegOverride = Partial<
     | "dificuldade_detalhe"
     | "proximo_passo"
     | "proximo_passo_detalhe"
+    | "cobertura"
     | "created_at"
   >
 >;
@@ -759,6 +772,9 @@ function build(): DemoData {
     origem?: "plataforma" | "externo";
     link?: string | null;
     motivo?: string | null;
+    /** sessao_id compartilhado — sessão combinada (018): um encontro físico
+     *  cobre mais de um nº do guia. */
+    sessaoId?: string | null;
   };
 
   const agendado = (dupla: string, numero: number, dia: Date, o: EncOpts = {}): Encontro => ({
@@ -772,6 +788,7 @@ function build(): DemoData {
     origem: o.origem ?? "plataforma",
     link: o.link ?? MEET,
     motivo_reagendamento: o.motivo ?? null,
+    sessao_id: o.sessaoId ?? null,
     registro: null,
   });
 
@@ -786,6 +803,7 @@ function build(): DemoData {
     origem: o.origem ?? "plataforma",
     link: o.link ?? (o.origem === "externo" ? null : MEET),
     motivo_reagendamento: o.motivo ?? null,
+    sessao_id: o.sessaoId ?? null,
     registro: null,
   });
 
@@ -800,6 +818,7 @@ function build(): DemoData {
     origem: o.origem ?? "plataforma",
     link: o.link ?? MEET,
     motivo_reagendamento: o.motivo ?? null,
+    sessao_id: o.sessaoId ?? null,
     registro: null,
   });
 
@@ -1110,7 +1129,7 @@ function build(): DemoData {
     bio: "Empreendedor, fundou duas pequenas empresas de serviço.",
     linkedin: "https://linkedin.com/in/andrerocha",
     areas: ["empreendedorismo", "finanças", "vendas"],
-    voluntariado: "Mentor do Pedro — a dupla pausou a pedido da família; retorno combinado pro próximo mês.",
+    voluntariado: "Mentor do Pedro — a família avisou a saída dele; a dupla pausou enquanto a coordenação decide o encaminhamento.",
     onboarded_em: haDias(30),
     nome_social: null, data_nascimento: "1987-05-16", genero: "masculino",
     cidade: "Osasco", uf: "SP",
@@ -1328,6 +1347,7 @@ function build(): DemoData {
             profile_id: p.id,
             papel: p.role,
             escopo_turma: null,
+            escopo_supervisao: "duplas" as const,
             primario: true,
             criado_em: p.created_at ?? undefined,
           },
@@ -1339,10 +1359,36 @@ function build(): DemoData {
       profile_id: p.id,
       papel: "mentor_especialista",
       escopo_turma: null,
+      escopo_supervisao: "duplas",
       primario: false,
       criado_em: p.created_at ?? undefined,
     });
   }
+  // grant de turma (0125): o Paulo supervisiona a t2b e a t2c direto e
+  // enxerga a T2 INTEIRA — a d-t2a (Beatriz × André/Kauã) entra no escopo
+  // dele pela linha escopada, não pelo supervisor_id. É o que exercita o
+  // supervisiona_dupla demo (queries.ts) fora do caminho direto.
+  profilePapeis.push({
+    profile_id: paulo.id,
+    papel: "supervisor",
+    escopo_turma: "T2 · 2026/2027",
+    escopo_supervisao: "turma",
+    primario: false,
+  });
+
+  // ---------- profiles_acesso (0192 · REALIZA-39) ----------
+  // Último acesso por profile com conta — o "não acessou" do /pessoas lê
+  // daqui. A Luiza completou o onboarding do ciclo novo e sumiu (acesso de
+  // 75d, fora da janela); a Camila nunca voltou desde que entrou (null);
+  // todo o resto acessou essa semana. Quem nem conta tem (Renata) fica
+  // fora do mapa — sem linha, sem badge inventado.
+  const acessoMap: Record<string, string | null> = Object.fromEntries(
+    profiles
+      .filter((p) => p.user_id)
+      .map((p) => [p.id, p.onboarded_em ? haDias(3) : haDias(15)])
+  );
+  acessoMap[luiza.id] = haDias(75);
+  acessoMap[camila.id] = null;
 
   const mentorProfiles: MentorProfile[] = [
     // Ricardo sem termo_ok: persona mentor_dpp entra na demo com o banner
@@ -1619,6 +1665,11 @@ function build(): DemoData {
     motivacao: null, pref_genero_par: null, objetivos: null,
     escolaridade: "medio", origem: null, disponibilidade: null,
     created_at: haDias(58),
+    // a família avisou a saída na pausa (460): desistente numa dupla viva
+    // é o gatilho novo do card de remanejo — a coord decide se encerra ou
+    // se remaneja o André com quem espera na fila
+    situacao: "desistente", saiu_em: haDias(4),
+    motivo_saida: "A família avisou que ele não segue no ciclo.",
   };
 
   // ficha mínima da leva da T2: veio pela ONG parceira da turma nova e
@@ -1715,6 +1766,13 @@ function build(): DemoData {
       mentorado_id: wendel.id, papel_esperado: "mentorado",
       status: "aguardando", nota: "Inscrição direta pelo formulário de matching",
       created_by: marina.id, created_at: haDias(4) },
+    // a fila não conhece trilha: especialista inscrito chega como "mentor"
+    // — o /pessoas resolve pelo papel efetivo (vira "Especialista" na
+    // turma, não "Aguardando par"; REALIZA-383)
+    { id: uid(0x6803), turma: "T2 · 2026/2027", profile_id: marcos.id,
+      mentorado_id: null, papel_esperado: "mentor",
+      status: "aguardando", nota: "Inscrito pra T2 — atende pedidos pelo mural de especialistas",
+      created_by: marina.id, created_at: haDias(10) },
   ];
 
   // ---------- solicitações de especialista (0074 — pedido por sessão) ----
@@ -2228,10 +2286,21 @@ function build(): DemoData {
   const diaE1T2 = diaEncontroT2(1);
   const e1T2Passou = diaE1T2.getTime() < HOJE.getTime();
 
+  // O motivo do passo 5 aplicado pelo plano — a RPC 0219 grava o mesmo
+  // texto no passo, no evento, na row (motivo_reagendamento) e na
+  // remarcação do trigger; aqui a const segura a mesma amarra
+  const MOTIVO_PASSO_5 =
+    "A terça encavalou de novo, a quinta fecha o ritmo do combinado";
+  // E o mesmo instante vai na row (data_hora = em(dia, "19:00") do
+  // `agendado`), no passo (data_nova) e no evento (meta.data_nova)
+  const DATA_NOVA_5 = em(addDias(diaEncontro(5), 9), "19:00");
+
   // d-ok · Ricardo × Ana Beatriz — a dupla saudável: 4 encontros no calendário
-  // oficial com registro bom, 5º agendado pra terça corrente e o 6º já
-  // marcado pra semana seguinte (agenda livre: sempre há um agendado futuro
-  // DPP na mão da persona jovem — remarcar/desmarcar renderizam na /jovem)
+  // oficial com registro bom. O 5º oficial passou sem acontecer e o plano
+  // "ficar em dia" (abaixo) o remarcou pra quinta da semana que vem — o 6º
+  // segue na terça, então os dois fecham a semana dupla do combinado. O
+  // agendado futuro DPP fica sempre na mão da persona jovem (agenda livre:
+  // remarcar/desmarcar renderizam na /jovem)
   const encD1: Encontro[] = [
     comRegistro(
       realizado(uid(D.ok), 1, diaEncontro(1), { duracao: 75, origem: "externo" }),
@@ -2249,20 +2318,26 @@ function build(): DemoData {
       realizado(uid(D.ok), 4, diaEncontro(4), { duracao: 75 }),
       ricardo, "Ana", "dpp"
     ),
-    agendado(uid(D.ok), 5, diaEncontro(5), { link: MEET }),
+    agendado(uid(D.ok), 5, addDias(diaEncontro(5), 9), {
+      link: MEET,
+      motivo: MOTIVO_PASSO_5,
+    }),
     agendado(uid(D.ok), 6, diaEncontro(6), { link: MEET }),
   ];
 
-  // REALIZA-341: o 5º encontro andou duas vezes e voltou pra terça oficial —
-  // a Ana moveu pro sábado por causa de uma prova e a dupla desfez quando a
-  // prova foi adiada. O vaivém é o que a coordenação e o calendário do
+  // REALIZA-341: o 5º encontro andou três vezes — a Ana moveu pro sábado por
+  // causa de uma prova, a dupla desfez quando a prova foi adiada e o passo
+  // do plano levou da terça oficial pra quinta (a mesma data_nova do
+  // passo_aplicado: mover a data sem o encontro junto era o estado
+  // impossível do R6). O vaivém é o que a coordenação e o calendário do
   // mentor leem; o motivo que fica na row é o da ÚLTIMA remarcação.
-  encD1[4].motivo_reagendamento = "A prova da escola foi adiada, dá pra manter a terça";
   encD1[4].remarcacoes = [
     remarcacao(encD1[4], em(diaEncontro(5), "19:00"), em(addDias(diaEncontro(5), 4), "10:00"),
       "Conflito de agenda", haDias(4, "21:15"), anaLogin),
     remarcacao(encD1[4], em(addDias(diaEncontro(5), 4), "10:00"), em(diaEncontro(5), "19:00"),
       "A prova da escola foi adiada, dá pra manter a terça", haDias(1, "18:40"), ricardo),
+    remarcacao(encD1[4], em(diaEncontro(5), "19:00"), DATA_NOVA_5,
+      MOTIVO_PASSO_5, haDias(0, "09:05"), ricardo),
   ];
 
   const regD1E1 = encD1[0].registro!;
@@ -2321,6 +2396,183 @@ function build(): DemoData {
         true, haDias(1, "08:40"), ricardo),
   );
 
+  // plano "ficar em dia" aceito (459): a dupla atrasou no 5º e combinou
+  // ritmo 2/semana — a central "Acordos e intervenções" mostra o
+  // combinado, os passos e a intervenção sugerida pela Liza
+  const planoDemo = {
+    id: uid(0x3000 + 1),
+    dupla_id: uid(D.ok),
+    status: "ativo" as const,
+    escopo: {
+      // 7º entra só como próxima semana do combinado: sem `passos`, o
+      // card "O combinado" (que itera passos) não ganha outra linha; o
+      // roteiro nasce como RASCUNHO na lista e na rota da semana.
+      numeros: [5, 6, 7],
+      ritmo: 2,
+      nivel: "semana_dupla" as const,
+      janela: {
+        inicio: addDias(HOJE, -2).toISOString().slice(0, 10),
+        fim: addDias(HOJE, 26).toISOString().slice(0, 10),
+      },
+      passos: [
+        { numero: 5, titulo: "Primeiros resultados", data: ymd(addDias(diaEncontro(5), 9)), acao: "remarcar" },
+        { numero: 6, titulo: "Superando barreiras", data: addDias(HOJE, 9).toISOString().slice(0, 10), acao: "remarcar" },
+      ],
+    },
+    versao: 1,
+    proposto_por: ricardo.id,
+    proposto_via: "liza" as const,
+    aprovado_por: null,
+    aprovado_lado: "mentor" as const,
+    aprovado_em: haDias(1, "19:12"),
+    // 0225: proposta de lado nasce aceita — o carimbo do mentor vem no
+    // mesmo instante da proposta; o da jovem é a "ciência" do dia
+    // seguinte (aceite idempotente num plano já valendo)
+    aceito_mentor_em: haDias(2, "18:40"),
+    aceito_mentorado_em: haDias(1, "19:12"),
+    contestado_por: null,
+    contestado_motivo: null,
+    contestado_em: null,
+    expira_em: addDias(HOJE, 14).toISOString(),
+    concluido_em: null,
+    created_at: haDias(2, "18:40"),
+    updated_at: haDias(0, "09:05"),
+    passos: [
+      {
+        id: uid(0x3100 + 1),
+        plano_id: uid(0x3000 + 1),
+        dupla_id: uid(D.ok),
+        numero: 5,
+        // o mesmo estado que a 0219 grava: o passo remarcou a row existente
+        // (encontro_id + data_anterior dela), a data_nova é a data_hora
+        // atual e a via é "liza" — o card do app não envia motivo e mover
+        // uma row sem motivo é o que a RPC recusa
+        encontro_id: encD1[4].id,
+        data_anterior: em(diaEncontro(5), "19:00"),
+        data_nova: DATA_NOVA_5,
+        motivo: MOTIVO_PASSO_5,
+        aplicado_por: ricardo.id,
+        aplicado_via: "liza" as const,
+        aplicado_em: haDias(0, "09:05"),
+      },
+    ],
+    eventos: [
+      {
+        id: uid(0x3200 + 1),
+        plano_id: uid(0x3000 + 1),
+        dupla_id: uid(D.ok),
+        tipo: "proposto" as const,
+        de: null,
+        para: "proposto",
+        motivo: null,
+        por: ricardo.id,
+        meta: {},
+        em: haDias(2, "18:40"),
+      },
+      {
+        id: uid(0x3200 + 2),
+        plano_id: uid(0x3000 + 1),
+        dupla_id: uid(D.ok),
+        tipo: "aceito" as const,
+        de: "proposto",
+        para: "aceito",
+        motivo: null,
+        por: ricardo.id,
+        // 0225: o aceite do lado que propõe nasce junto — a RPC marca
+        meta: { lado: "mentor", na_proposta: true },
+        em: haDias(2, "18:40"),
+      },
+      {
+        id: uid(0x3200 + 5),
+        plano_id: uid(0x3000 + 1),
+        dupla_id: uid(D.ok),
+        tipo: "aceito" as const,
+        // 0225: aceitar num plano já valendo é a "ciência" — o status
+        // não anda, só o carimbo do lado que faltava
+        de: "aceito",
+        para: "aceito",
+        motivo: null,
+        por: anaLogin.id,
+        meta: { lado: "mentorado", final: true },
+        em: haDias(1, "19:12"),
+      },
+      {
+        id: uid(0x3200 + 3),
+        plano_id: uid(0x3000 + 1),
+        dupla_id: uid(D.ok),
+        tipo: "passo_aplicado" as const,
+        de: null,
+        para: "ativo",
+        motivo: MOTIVO_PASSO_5,
+        por: ricardo.id,
+        meta: {
+          numero: 5,
+          data_anterior: em(diaEncontro(5), "19:00"),
+          data_nova: DATA_NOVA_5,
+          via: "liza",
+        },
+        em: haDias(0, "09:05"),
+      },
+    ],
+  };
+  duplaOk.planos = [planoDemo];
+  // 0225 tri-estado: a dupla saudável já decidiu o recesso ("vamos pausar
+  // os encontros", declarado pelo mentor) — a d-pend segue sem row = pendente, que é o
+  // estado que a superfície "Combinar o plano" pergunta
+  const recessoT1 = cicloEventos.find(
+    (e) => e.cronograma_id === cronogramaT1 && e.tipo === "recesso"
+  );
+  if (recessoT1)
+    duplaOk.recessos = [
+      {
+        id: uid(0x3500 + 1),
+        dupla_id: uid(D.ok),
+        ciclo_evento_id: recessoT1.id,
+        usa: true,
+        declarado_por: ricardo.id,
+        declarado_em: haDias(3, "20:15"),
+        autor: {
+          nome: ricardo.nome,
+          nome_social: ricardo.nome_social ?? null,
+        },
+      },
+    ];
+  duplaOk.intervencoes = [
+    {
+      id: uid(0x3300 + 1),
+      dupla_id: uid(D.ok),
+      plano_id: planoDemo.id,
+      tipo: "pausa" as const,
+      evidencias: ["5º encontro sem data", "dois combinados vencidos"],
+      destino: "auxiliar" as const,
+      status: "sugerida" as const,
+      saida: null,
+      chamado_id: null,
+      motivo: "A agenda da Bia apertou no fim do ano — pausar agora retoma no ritmo certo em janeiro.",
+      sugerida_por: null,
+      sugerida_via: "liza" as const,
+      created_at: haDias(0, "08:02"),
+      destinada_em: null,
+    },
+  ];
+  duplaOk.guia_ajustes = [
+    {
+      id: uid(0x3400 + 1),
+      dupla_id: uid(D.ok),
+      numero: 5,
+      ajustes: [
+        {
+          sugestao: "Abrir com 10 min só de escuta sobre a rotina nova dela antes de entrar nas submetas.",
+          justificativa: "Ela voltou a trabalhar fins de semana; ir direto às metas sem escutar costuma travar a conversa.",
+        },
+      ],
+      criado_por: ricardo.id,
+      via: "liza" as const,
+      created_at: haDias(1, "18:55"),
+      updated_at: haDias(1, "18:55"),
+    },
+  ];
+
   // d-pend · Carlos × Caio — encontro 4 realizado sem registro (a pendência
   // que o semáforo cobra) + um registro tardio no histórico + o 5º oficial
   // sem row nenhuma: é a dupla do motivo "sem data" no "Para acompanhar"
@@ -2370,6 +2622,65 @@ function build(): DemoData {
     mentorado: caio,
     supervisor: paulo,
     encontros: encD2,
+    // 518: o combinado proposto pelo supervisor (Paulo) esperando UM
+    // aceite da dupla — é a vitrine do "proposto_staff" da 0225: ninguém
+    // de lado carimbou ainda, o primeiro aceite já põe pra valer
+    planos: [
+      {
+        id: uid(0x3000 + 2),
+        dupla_id: uid(D.pend),
+        status: "proposto" as const,
+        escopo: {
+          numeros: [5],
+          ritmo: 2,
+          nivel: "semana_dupla" as const,
+          janela: {
+            inicio: ymd(HOJE),
+            fim: ymd(addDias(HOJE, 21)),
+          },
+          passos: [
+            {
+              numero: 5,
+              titulo: "Primeiros resultados",
+              data: ymd(addDias(HOJE, 5)),
+              acao: "agendar",
+            },
+          ],
+        },
+        versao: 1,
+        proposto_por: paulo.id,
+        proposto_via: "app" as const,
+        aprovado_por: null,
+        aprovado_lado: null,
+        aprovado_em: null,
+        aceito_mentor_em: null,
+        aceito_mentorado_em: null,
+        contestado_por: null,
+        contestado_motivo: null,
+        contestado_em: null,
+        // 520: expira em 3 dias — a proposta da equipe sem aceite é o
+        // motivo "proposta expirando" da fila "O que precisa de você"
+        expira_em: addDias(HOJE, 3).toISOString(),
+        concluido_em: null,
+        created_at: haDias(1, "10:20"),
+        updated_at: haDias(1, "10:20"),
+        passos: [],
+        eventos: [
+          {
+            id: uid(0x3200 + 4),
+            plano_id: uid(0x3000 + 2),
+            dupla_id: uid(D.pend),
+            tipo: "proposto" as const,
+            de: null,
+            para: "proposto",
+            motivo: null,
+            por: paulo.id,
+            meta: { versao: 1, via: "app" },
+            em: haDias(1, "10:20"),
+          },
+        ],
+      },
+    ],
     encaminhamentos: [
       encaminhamento(uid(D.pend), regD2E1.id,
         "Separar o histórico escolar pra comparar com as metas do PDM",
@@ -2421,6 +2732,74 @@ function build(): DemoData {
     mentorado: dandara,
     supervisor: beatriz,
     encontros: encD3,
+    // 520: a equipe propôs um plano pra repor os devidos e a Fernanda
+    // contestou ontem — é o motivo "contestado recente" da fila "O que
+    // precisa de você" (a retomada nasce por um acordo novo, nunca por
+    // reabrir este)
+    planos: [
+      {
+        id: uid(0x3000 + 3),
+        dupla_id: uid(D.risco),
+        status: "contestado" as const,
+        escopo: {
+          numeros: [3, 4],
+          ritmo: 2,
+          nivel: "semana_dupla" as const,
+          janela: {
+            inicio: ymd(addDias(HOJE, -9)),
+            fim: ymd(addDias(HOJE, 12)),
+          },
+          passos: [
+            { numero: 3, titulo: "Metas e checagem SMART", data: ymd(addDias(HOJE, -4)), acao: "agendar" },
+            { numero: 4, titulo: "Submetas e compromisso", data: ymd(addDias(HOJE, 2)), acao: "agendar" },
+          ],
+        },
+        versao: 1,
+        proposto_por: beatriz.id,
+        proposto_via: "app" as const,
+        aprovado_por: null,
+        aprovado_lado: null,
+        aprovado_em: null,
+        aceito_mentor_em: null,
+        aceito_mentorado_em: null,
+        contestado_por: fernanda.id,
+        contestado_motivo:
+          "A Dandara faltou duas vezes — repor dois por semana agora afasta ela de vez.",
+        contestado_em: haDias(1, "18:40"),
+        expira_em: addDias(HOJE, 5).toISOString(),
+        concluido_em: null,
+        created_at: haDias(9, "09:10"),
+        updated_at: haDias(1, "18:40"),
+        passos: [],
+        eventos: [
+          {
+            id: uid(0x3200 + 5),
+            plano_id: uid(0x3000 + 3),
+            dupla_id: uid(D.risco),
+            tipo: "proposto" as const,
+            de: null,
+            para: "proposto",
+            motivo: null,
+            por: beatriz.id,
+            meta: { versao: 1, via: "app" },
+            em: haDias(9, "09:10"),
+          },
+          {
+            id: uid(0x3200 + 6),
+            plano_id: uid(0x3000 + 3),
+            dupla_id: uid(D.risco),
+            tipo: "contestado" as const,
+            de: "proposto",
+            para: "contestado",
+            motivo:
+              "A Dandara faltou duas vezes — repor dois por semana agora afasta ela de vez.",
+            por: fernanda.id,
+            meta: {},
+            em: haDias(1, "18:40"),
+          },
+        ],
+      },
+    ],
     encaminhamentos: [
       encaminhamento(uid(D.risco), regD3E2.id,
         "Confirmar com a escola o retorno às aulas presenciais",
@@ -2458,10 +2837,10 @@ function build(): DemoData {
         proximo_passo: "novo_feedback",
       }
     ),
-    comRegistro(
-      realizado(uid(D.atraso), 3, diaEncontro(3), { duracao: 60 }),
-      joaoPedro, "Eduardo", "dpp"
-    ),
+    // 513: o 3º também furou — três passos devidos (3, 4 e o 5º vencido
+    // sem registro) é o que acende o "Para ficar em dia" com proposta
+    // possível na ficha, não só o limbo de um agendado murchado
+    naoAconteceu(uid(D.atraso), 3, diaEncontro(3), {}),
     naoAconteceu(uid(D.atraso), 4, diaEncontro(4), {}),
     // agendado que já passou sem registro — pendência ("limbo"), não atraso
     agendado(uid(D.atraso), 5, addDias(diaEncontro(5), -7), {}),
@@ -2490,7 +2869,9 @@ function build(): DemoData {
 
   // d-pausa · André × Pedro — a dupla pausada: engatou nos 2 primeiros
   // encontros, aí a família pediu pausa (a mãe do Pedro adoeceu e ele assumiu
-  // o cuidado do irmão). O 3º ficou agendado no passado e o semáforo congela
+  // o cuidado do irmão) e na sequência avisou a saída — ele tá desistente,
+  // então o card de remanejo acende pelo gatilho novo do 460 mesmo com a
+  // jornada congelada. O 3º ficou agendado no passado e o semáforo congela
   // em "Dupla pausada" — sai das cobranças sem virar risco.
   const encDPausa: Encontro[] = [
     comRegistro(
@@ -2526,28 +2907,48 @@ function build(): DemoData {
     encontros: encDPausa,
     encaminhamentos: [
       encaminhamento(uid(D.pausa), encDPausa[1].registro!.id,
-        "Ligar pra família no dia 10 pra combinar a retomada",
+        "Confirmar a saída com a família e encaminhar o remanejo",
         "mentor", addDias(HOJE, 10), "pendente"),
     ],
     notas: [],
   };
 
-  // d-fim · Luiza × Isabela — ciclo anterior completo: 16 encontros semanais
-  // com registro, avaliação subindo ao longo da jornada. Serve pra trajetória
-  // completa na ficha e pro export CSV.
+  // d-fim · Luiza × Isabela — ciclo anterior completo: 16 encontros com
+  // avaliação subindo ao longo da jornada. Serve pra trajetória completa na
+  // ficha e pro export CSV. O par 5/6 é a sessão combinada da 018: uma
+  // sentada de 2h cobriu os dois passos — o registro mora só na âncora
+  // (enc 5) com cobertura [6], o 6º nasceu realizado pelo mesmo carimbo,
+  // sem registro nem link próprios (a avaliação da Isabela cobre o grupo
+  // inteiro [5,6] — ver o map dela mais abaixo e o filtro do avaliacaoLinks).
   const FIM_CICLO_ANTERIOR = addDias(HOJE, -240); // encontro 16 ~8 meses atrás
   const AVAL_FIM: AvaliacaoJovem[] = [
     "regular", "regular", "boa", "boa", "boa", "boa", "regular", "boa",
     "boa", "excelente", "boa", "boa", "excelente", "excelente", "excelente", "excelente",
   ];
+  // sessao_id compartilhado do par — a action grava o mesmo uuid nas duas
+  // rows quando a cobertura marca "a sessão também cobriu o 6º"
+  const SESSAO_FIM_56 = uid(0x4a01);
   const encD5: Encontro[] = Array.from({ length: 16 }, (_, i) => {
     const n = i + 1;
     const dia = addDias(FIM_CICLO_ANTERIOR, (n - 16) * 7);
+    // coberto pela sessão do 5º: mesmo sessao_id, mesmo instante (a action
+    // carimba data_hora/realizado_em/duração da âncora em todos os cobertos)
+    // e nenhum registro — o conteúdo dele vive no registro da âncora
+    if (n === 6)
+      return realizado(
+        uid(D.fim),
+        6,
+        addDias(FIM_CICLO_ANTERIOR, (5 - 16) * 7),
+        { duracao: 120, sessaoId: SESSAO_FIM_56 }
+      );
     const enc = realizado(uid(D.fim), n, dia, {
-      duracao: n % 3 === 0 ? 60 : 75,
+      duracao: n === 5 ? 120 : n % 3 === 0 ? 60 : 75,
       origem: n % 4 === 0 ? "externo" : "plataforma",
+      sessaoId: n === 5 ? SESSAO_FIM_56 : null,
     });
     const over: RegOverride = { avaliacao: AVAL_FIM[i] };
+    // âncora: o registro único da sessão lista os nºs cobertos ALÉM dela
+    if (n === 5) over.cobertura = [6];
     // uma dificuldade de rotina no meio da jornada — o gráfico de trajetória
     // conta a retomada depois dela
     if (n === 7) {
@@ -2979,7 +3380,93 @@ function build(): DemoData {
     notas: [],
   };
 
-  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaRito, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b, duplaT2c];
+  // d-reman · Patrícia × Eduardo — o primeiro par do Eduardo na T1: a
+  // Patrícia avisou o afastamento do ciclo (perfil inativo dela) e a
+  // coordenação encerrou a dupla pra remanejar o jovem — o João Pedro
+  // assumiu na sequência (a d-atraso). É a fatia "Encerrada" do resumo:
+  // fechamento formal, não desistência.
+  const INICIO_REMAN = ymd(addDias(HOJE, -70));
+  const fechoRemanDia = addDias(HOJE, -42);
+  const FECHO_REMAN = ymd(fechoRemanDia);
+  const encReman: Encontro[] = [
+    comRegistro(
+      realizado(uid(D.reman), 1, addDias(fechoRemanDia, -28), { duracao: 60 }),
+      patricia, "Eduardo", "dpp"
+    ),
+    comRegistro(
+      realizado(uid(D.reman), 2, addDias(fechoRemanDia, -21), { duracao: 75 }),
+      patricia, "Eduardo", "dpp"
+    ),
+  ];
+
+  const duplaReman: Dupla = {
+    id: uid(D.reman),
+    turma: "T1 · 2026/2027",
+    cronograma_id: cronogramaT1,
+    status: "encerrada",
+    iniciada_em: INICIO_REMAN,
+    trilha: "dpp",
+    demanda: null,
+    solicitacao_id: null,
+    mentor: patricia,
+    mentorado: eduardo,
+    supervisor: beatriz,
+    encontros: encReman,
+    encaminhamentos: [],
+    notas: [],
+    encerrada_em: FECHO_REMAN,
+    desfecho: "remanejada",
+    desfecho_motivo: "Remanejamento de mentor",
+    desfecho_obs:
+      "A Patrícia avisou o afastamento do ciclo; a coordenação encerrou a dupla e o Eduardo foi remanejado pro João Pedro.",
+    desfecho_em: FECHO_REMAN,
+    desfecho_por: null,
+  };
+
+  // d-desist · Carlos × Laura — ciclo anterior: a Laura desistiu na
+  // semana 3 (mudança de escola); meses depois a família reviu e ela
+  // reentrou na T2 com a Luiza (a d-t2b). É a fatia "Desistente" — quem
+  // saiu foi o jovem, distinta do fechamento formal da d-reman.
+  const INICIO_DESIST = ymd(addDias(HOJE, -220));
+  const fechoDesistDia = addDias(HOJE, -200);
+  const FECHO_DESIST = ymd(fechoDesistDia);
+  const encDesist: Encontro[] = [
+    comRegistro(
+      realizado(uid(D.desist), 1, addDias(fechoDesistDia, -14), { duracao: 60 }),
+      carlos, "Laura", "dpp"
+    ),
+    comRegistro(
+      realizado(uid(D.desist), 2, addDias(fechoDesistDia, -7), { duracao: 60 }),
+      carlos, "Laura", "dpp"
+    ),
+    naoAconteceu(uid(D.desist), 3, fechoDesistDia, {}),
+  ];
+
+  const duplaDesist: Dupla = {
+    id: uid(D.desist),
+    turma: "2025/2026",
+    cronograma_id: null,
+    status: "encerrada",
+    iniciada_em: INICIO_DESIST,
+    trilha: "dpp",
+    demanda: null,
+    solicitacao_id: null,
+    mentor: carlos,
+    mentorado: laura,
+    supervisor: paulo,
+    encontros: encDesist,
+    encaminhamentos: [],
+    notas: [],
+    encerrada_em: FECHO_DESIST,
+    desfecho: "desistencia_jovem",
+    desfecho_motivo: "Mudança de cidade/escola",
+    desfecho_obs:
+      "A Laura mudou de escola e desistiu na semana 3. A família voltou a procurar meses depois — reentrou na T2 com a Luiza.",
+    desfecho_em: FECHO_DESIST,
+    desfecho_por: null,
+  };
+
+  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaRito, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b, duplaT2c, duplaReman, duplaDesist];
   // combinado do registro herda o nº do encontro (backfill da 0157)
   for (const d of duplas) {
     const numeroPorRegistro = new Map(
@@ -3244,22 +3731,21 @@ function build(): DemoData {
     { numero: 5, titulo: "Encerramento, reflexão e celebração", foco: "Reflexão sobre aprendizados; desafios futuros; feedback do jovem; registro final no PDM" },
   ];
 
-  // o catálogo de prod depois da 0135 (e da 0138) — 30 linhas, todas
-  // acionáveis: roteiros das 16 semanas (o guia cobre a jornada inteira), os
-  // templates do cap. 14 como documentos nativos (path "doc:<slug>" → página
-  // do app), Perguntas Eficazes (o documento que o guia cita) e os links
-  // públicos. Arquivos resolvem pro PDF placeholder da rota demo; doc: abre o
-  // doc real.
+  // o catálogo de prod depois da 0135/0138 e dos flips da 0185/0194 — 30
+  // linhas, todas acionáveis: guias, roteiros das 16 semanas, Perguntas
+  // Eficazes, cronogramas por turma e os instrumentos de corpus são
+  // documentos nativos (path "doc:<slug>" → página do app); os demais
+  // itens são links externos. doc: abre o doc real da demo.
   const catalogo: Material[] = [
-    { id: uid(0x2001), titulo: "Guia do Mentor DPP", descricao: "Metodologia completa: jornada, 16 encontros, instrumentos e templates.", tipo: "guia", url: null, path: "materiais/guia-dpp.pdf", audiencia: "dpp", encontro_num: null, ordem: 1 },
-    { id: uid(0x2002), titulo: "Guia do Mentor Especialista", descricao: "Metodologia da mentoria com especialista: 5 encontros e cinco funções.", tipo: "guia", url: null, path: "materiais/guia-especialista.pdf", audiencia: "especialista", encontro_num: null, ordem: 2 },
+    { id: uid(0x2001), titulo: "Guia do Mentor DPP", descricao: "Metodologia completa: jornada, 16 encontros, instrumentos e templates.", tipo: "guia", url: null, path: "doc:guia-mentor-dpp", audiencia: "dpp", encontro_num: null, ordem: 1 },
+    { id: uid(0x2002), titulo: "Guia do Mentor Especialista", descricao: "Metodologia da mentoria com especialista: 5 encontros e cinco funções.", tipo: "guia", url: null, path: "doc:guia-mentor-especialista", audiencia: "especialista", encontro_num: null, ordem: 2 },
     ...Array.from({ length: 16 }, (_, i) => i + 1).map((n, i) => ({
       id: uid(0x2010 + i),
       titulo: `Roteiro Semana ${n} — ${["Boas-vindas e histórias de vida","Avaliação por terceiros e visão de futuro","Metas e checagem SMART","Submetas e compromisso","Primeiros resultados","Superando barreiras","Ajustes no plano","Monitoramento e responsabilidade","Revisão de meio de percurso","O mentor como espelho","Rede de apoio e novos espaços","Leitura da Roda da Vida","Metas das áreas prioritárias","Desdobramento e plano de continuidade","Reflexão e reconhecimento","Encerramento e celebração"][i]}`,
       descricao: n <= 10 ? null : `Roteiro do ${n}º encontro: ${["mapear a rede de apoio, abrir portas e apresentar a Roda da Vida","ler a Roda quadrante por quadrante e abrir as metas das 16 áreas","revisar as metas da Roda e eleger as áreas prioritárias a detalhar","validar o mapa de submetas e montar o plano de continuidade","olhar a jornada, reconhecer conquistas e trocar feedback mútuo","celebrar o percurso, revisar PDM e Roda e responder a avaliação geral"][i - 10]}.`,
       tipo: "conteudo" as const,
       url: null,
-      path: `materiais/roteiro-semana-${n}.pdf`,
+      path: `doc:roteiro-encontro-${String(n).padStart(2, "0")}`,
       audiencia: "dpp" as const,
       encontro_num: n,
       ordem: n + 2,
@@ -3267,12 +3753,12 @@ function build(): DemoData {
     { id: uid(0x2030), titulo: "Mensagem de preparação do mentorado", descricao: "Modelo para enviar antes do 1º encontro: história de vida, Roda da Vida e contatos para avaliação.", tipo: "template", url: null, path: "doc:mensagem-preparacao", audiencia: "dpp", encontro_num: 1, ordem: 19 },
     { id: uid(0x2031), titulo: "Mensagem às pessoas indicadas", descricao: "Modelo de contato para a avaliação por terceiros (duas perguntas).", tipo: "template", url: null, path: "doc:mensagem-indicadas", audiencia: "dpp", encontro_num: 1, ordem: 20 },
     { id: uid(0x2032), titulo: "Mensagem de encaminhamento entre encontros", descricao: "Modelo curto para manter o vínculo e deixar a próxima tarefa clara.", tipo: "template", url: null, path: "doc:mensagem-encaminhamento", audiencia: "dpp", encontro_num: null, ordem: 21 },
-    { id: uid(0x2033), titulo: "Roda da Vida: roteiro de aplicação", descricao: "Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.", tipo: "template", url: null, path: "materiais/roda-da-vida.pdf", audiencia: "dpp", encontro_num: 12, ordem: 22 },
+    { id: uid(0x2033), titulo: "Roda da Vida (instrumento)", descricao: "Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.", tipo: "template", url: null, path: "doc:instrumento-roda-da-vida", audiencia: "dpp", encontro_num: 12, ordem: 22 },
     { id: uid(0x2034), titulo: "Feedback Construtivo", descricao: "Instrumento do guia: o modelo de fala e os cuidados para feedback sobre comportamento negativo.", tipo: "conteudo", url: null, path: "doc:feedback-construtivo", audiencia: "todos", encontro_num: null, ordem: 23 },
-    { id: uid(0x2035), titulo: "Instrumento: Definindo Metas", descricao: "Metas SMART do mentorado — instrumento de preenchimento entre encontros.", tipo: "template", url: null, path: "materiais/definindo-metas.pdf", audiencia: "dpp", encontro_num: null, ordem: 24 },
-    { id: uid(0x2036), titulo: "Perguntas Eficazes", descricao: "Documento complementar do guia: o que são, o que evitar e o banco de perguntas por momento da conversa.", tipo: "conteudo", url: null, path: "materiais/perguntas-eficazes.pdf", audiencia: "dpp", encontro_num: null, ordem: 25 },
-    { id: uid(0x2037), titulo: "Cronograma do programa — Turma 1", descricao: null, tipo: "conteudo", url: null, path: "materiais/cronograma-turma-1.pdf", audiencia: "dpp", encontro_num: null, ordem: 26 },
-    { id: uid(0x2038), titulo: "Cronograma do programa — Turma 2", descricao: null, tipo: "conteudo", url: null, path: "materiais/cronograma-turma-2.pdf", audiencia: "dpp", encontro_num: null, ordem: 27 },
+    { id: uid(0x2035), titulo: "Instrumento: Definindo Metas", descricao: "Metas SMART do mentorado — instrumento de preenchimento entre encontros.", tipo: "template", url: null, path: "doc:instrumento-definindo-minhas-metas", audiencia: "dpp", encontro_num: null, ordem: 24 },
+    { id: uid(0x2036), titulo: "Perguntas Eficazes", descricao: "Documento complementar do guia: o que são, o que evitar e o banco de perguntas por momento da conversa.", tipo: "conteudo", url: null, path: "doc:perguntas-eficazes", audiencia: "dpp", encontro_num: null, ordem: 25 },
+    { id: uid(0x2037), titulo: "Cronograma do programa — Turma 1", descricao: null, tipo: "conteudo", url: null, path: "doc:ciclo-cronograma", audiencia: "dpp", encontro_num: null, ordem: 26 },
+    { id: uid(0x2038), titulo: "Cronograma do programa — Turma 2", descricao: null, tipo: "conteudo", url: null, path: "doc:ciclo-turma2-cronograma", audiencia: "dpp", encontro_num: null, ordem: 27 },
     { id: uid(0x2039), titulo: "Plataforma de mentoria", descricao: "Onde os encontros oficiais são agendados e avaliados.", tipo: "link", url: "https://mentoria.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 28 },
     { id: uid(0x203a), titulo: "Formação EaD gratuita", descricao: "Trilha opcional com certificado para mentores.", tipo: "link", url: "https://ead.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 29 },
     { id: uid(0x203b), titulo: "Checklist de competências do mentor", descricao: "As 10 competências do guia para marcar antes do ciclo e no 16º encontro.", tipo: "template", url: null, path: "doc:checklist-competencias", audiencia: "dpp", encontro_num: null, ordem: 30 },
@@ -3384,6 +3870,20 @@ function build(): DemoData {
         created_at: haDias(3, "10:00"),
       },
       {
+        // 027 — a mint real (0086) salva "quem confirmou e o quê" no corpo e
+        // o título fica genérico; a releitura promove a frase pro título na
+        // lista. A confirmação da Bia (~16d) precede a trilha formada (14d):
+        // a matemática com a Sofia nasceu de uma sugestão do Ricardo
+        id: uid(0x3024),
+        tipo: "solicitacao_registrada",
+        titulo: "Sugestão confirmada",
+        corpo:
+          "Ana Beatriz Silva confirmou a sua sugestão de especialista — o pedido seguiu.",
+        href: `/duplas/${uid(D.ok)}`,
+        lida_em: haDias(15, "08:00"),
+        created_at: haDias(16, "20:00"),
+      },
+      {
         id: uid(0x3021),
         tipo: "dupla_formada",
         titulo: "Dupla de especialista formada · Sofia & Ana Beatriz",
@@ -3468,6 +3968,28 @@ function build(): DemoData {
         href: "/#avisos",
         lida_em: null,
         created_at: haDias(2, "18:00"),
+      },
+      {
+        // 027 — corpo acima do clamp de 2 linhas: exercita o "Ler mais"/
+        // "Ler menos" do popover de notificações
+        id: uid(0x3044),
+        tipo: "comunicado",
+        titulo: "Semana da avaliação por terceiros",
+        corpo:
+          "Turma: chegou a semana de convidar as 3 pessoas do seu círculo pra avaliação por terceiros. Escolhe quem te conhece de verdade: família, amiga de infância, professor, colega de time. O convite sai por aqui, a pessoa responde em 5 minutos pelo celular e você acompanha pela sua página. Se faltar resposta, a gente lembra na quinta.",
+        href: "/#avisos",
+        lida_em: null,
+        created_at: haDias(0, "08:00"),
+      },
+      {
+        // 027 — corpo curto (cabe no clamp): nenhum toggle renderiza
+        id: uid(0x3045),
+        tipo: "comunicado",
+        titulo: "Formação confirmada",
+        corpo: "Sábado às 10h, Meet de sempre.",
+        href: "/#avisos",
+        lida_em: null,
+        created_at: haDias(0, "07:30"),
       },
       {
         // o trigger que minta o link avisa o jovem logado (0071) — o href
@@ -3748,17 +4270,101 @@ function build(): DemoData {
       respondido_por_profile_id: null, // Caio não tem login — veio pelo token
       created_at: depoisDe(encD2[3].realizado_em!, 6),
     },
+    // série quase completa do fim de ciclo (REALIZA-71): 15 avaliações
+    // cobrindo os 16 encontros da d-fim — o par 5/6 foi sessão combinada
+    // (018), então a Isabela respondeu UMA vez pelo grupo: a row fica na
+    // âncora (enc 5) com cobertura [5,6] — a âncora inclusa, como a action
+    // grava. O pedido de apoio é justamente dessa sessão: já foi resolvido
+    // na época e hoje exercita a régua de nunca vazar pro mentor.
+    ...[
+      [3, "mais_ou_menos", "um_pouco", ["pdm", "estudos"], false, false],
+      [3, "mais_ou_menos", "um_pouco", ["pdm"], false, false],
+      [4, "bem", "sim", ["estudos", "familia"], false, false],
+      [3, "mais_ou_menos", "um_pouco", ["bem_estar"], false, false],
+      [2, "desconfortavel", "nao", ["familia"], true, false],
+      [4, "bem", "sim", ["bem_estar", "estudos"], false, false],
+      [4, "bem", "sim", ["carreira"], false, true],
+      [4, "bem", "sim", ["pdm", "carreira"], false, false],
+      [4, "muito_bem", "sim", ["estudos"], false, false],
+      [5, "muito_bem", "sim", ["carreira", "estudos"], false, false],
+      [4, "bem", "sim", ["pdm"], false, false],
+      [4, "muito_bem", "sim", ["carreira"], false, true],
+      [5, "muito_bem", "sim", ["estudos", "carreira"], false, false],
+      [5, "muito_bem", "sim", ["carreira"], false, false],
+      [5, "muito_bem", "sim", ["pdm", "carreira"], false, false],
+      [5, "muito_bem", "sim", ["carreira"], false, false],
+    ].flatMap(([estrelas, sentimento, avancei, temas, apoio, visivel], i) =>
+      // sem avaliação no encontro coberto — sem link, sem resposta
+      i === 5
+        ? []
+        : [
+            {
+              id: uid(0x4407 + i), dupla_id: duplaFim.id,
+              encontro_id: encD5[i].id,
+              estrelas: estrelas as number,
+              sentimento: sentimento as string,
+              avancei: avancei as AvaliacaoEncontro["avancei"],
+              temas: temas as string[],
+              comentario:
+                i === 4
+                  ? "Semana ruim em casa, não consegui focar. A Luiza ajudou a reorganizar e a coordenação entrou em contato depois."
+                  : i === 15
+                    ? "Fecho do ciclo — saio com o plano pronto e muita saudade dessas terças."
+                    : null,
+              pedir_apoio: Boolean(apoio),
+              avaliacao_visivel_mentor: Boolean(visivel),
+              // a Isabela nunca teve login — as respostas dela vieram pelo token
+              respondido_por_profile_id: null,
+              created_at: depoisDe(encD5[i].realizado_em!, 3 + (i % 4)),
+              // TODOS os nºs da sessão, âncora inclusa — a régua que o
+              // avaliacaoCobreNumero lê (a row responde pelo grupo)
+              ...(i === 4 ? { cobertura: [5, 6] } : {}),
+            },
+          ]
+    ),
+    // three on d-rito: the minimum batch that releases the quantized media,
+    // so Ricardo's pending 360 link there opens the mentor card with
+    // Gustavo's aggregate visible
+    {
+      id: uid(0x4417), dupla_id: duplaRito.id, encontro_id: encRito[0].id,
+      estrelas: 4, sentimento: "bem", avancei: "sim",
+      temas: ["pdm", "carreira"], comentario: null,
+      pedir_apoio: false, avaliacao_visivel_mentor: false,
+      respondido_por_profile_id: null,
+      created_at: depoisDe(encRito[0].realizado_em!, 4),
+    },
+    {
+      id: uid(0x4418), dupla_id: duplaRito.id, encontro_id: encRito[1].id,
+      estrelas: 3, sentimento: "mais_ou_menos", avancei: "um_pouco",
+      temas: ["estudos"], comentario: null,
+      pedir_apoio: false, avaliacao_visivel_mentor: false,
+      respondido_por_profile_id: null,
+      created_at: depoisDe(encRito[1].realizado_em!, 2),
+    },
+    {
+      id: uid(0x4419), dupla_id: duplaRito.id, encontro_id: encRito[2].id,
+      estrelas: 4, sentimento: "bem", avancei: "sim",
+      temas: ["carreira", "dinheiro"], comentario:
+        "O papo sobre o curso de elétrica destravou — agora é correr atrás da inscrição.",
+      pedir_apoio: false, avaliacao_visivel_mentor: true,
+      respondido_por_profile_id: null,
+      created_at: depoisDe(encRito[2].realizado_em!, 5),
+    },
   ];
 
   // O trigger real minta um link por encontro realizado — a demo replica:
   // respondido onde existe avaliação, pendente enquanto válido (o link do
   // enc 2 da trilha da Sofia é o que a coord manda pra Ana) e expirado
   // nos realizados antigos sem resposta (a dupla concluída do ciclo
-  // passado mostra o estado natural do funil).
+  // passado mostra o estado natural do funil). Sessão combinada (018): a
+  // migration do trigger passou a mintar UM link na âncora com a cobertura
+  // inteira do grupo — o coberto não tem link nem forma de responder.
   let seqLink = 0;
-  const avaliacaoLinks: AvaliacaoLink[] = duplas.flatMap((d) =>
-    (d.encontros ?? [])
-      .filter((e) => e.status === "realizado")
+  const avaliacaoLinks: AvaliacaoLink[] = duplas.flatMap((d) => {
+    // nº coberto → nº âncora (o registro da âncora lista os cobertos)
+    const cobertos = cobertosDaDupla(d.encontros ?? []);
+    return (d.encontros ?? [])
+      .filter((e) => e.status === "realizado" && !cobertos.has(e.numero))
       .map((e) => {
         const aval = avaliacoes.find((a) => a.encontro_id === e.id);
         const mintado = e.realizado_em ?? e.data_hora ?? "";
@@ -3780,12 +4386,17 @@ function build(): DemoData {
           respondido_por_profile_id:
             (aval && aval.respondido_por_profile_id) ?? null,
           created_at: mintado,
+          // âncora de sessão combinada: o link cobre TODOS os nºs do grupo,
+          // ela inclusa — mesma convenção da avaliacoes_encontro.cobertura
+          ...(e.registro?.cobertura?.length
+            ? { cobertura: [e.numero, ...e.registro.cobertura] }
+            : {}),
         };
-      })
-  );
+      });
+  });
 
   // ---------- chamados unificados (0084) ----------
-  // 8 casos cobrindo origem, categoria e estado — a fila da coordenação e
+  // 9 casos cobrindo origem, categoria e estado — a fila da coordenação e
   // os "meus chamados" de mentor e jovem saem do mesmo dataset. Os dois
   // nascidos de flag têm a flag ainda acesa na origem (dual-run coerente).
   const ch = (o: Partial<Chamado> & Pick<Chamado, "numero" | "categoria" | "assunto" | "created_at">): Chamado => ({
@@ -3843,6 +4454,41 @@ function build(): DemoData {
       mensagem: "Quando escolho a foto no celular a tela fecha sozinha.",
       autor_id: anaLogin.id, autor_mentorado_id: ana.id, dupla_id: duplaOk.id,
       created_at: haDias(2, "14:40"),
+    }),
+    // a Ana também tem um pedido já respondido — a pendência "respondeu
+    // seu pedido" da home dela (489) e a conversa pública do perfil saem
+    // daqui. Agenda, não plataforma: o auxiliar executivo lê a linha
+    // inteira (a máscara é só da categoria plataforma)
+    ch({
+      numero: "CHA-000147", categoria: "agenda",
+      assunto: "O encontro pode cair no feriado?",
+      mensagem: "Sexta que vem é feriado e a gente tinha marcado 19h. Posso confirmar com o Ricardo ou é melhor remarcar?",
+      autor_id: anaLogin.id, autor_mentorado_id: ana.id, dupla_id: duplaOk.id,
+      status: "em_atendimento", atribuido_a: marina.id,
+      created_at: haDias(1, "08:20"), updated_at: haDias(1, "09:45"),
+    }),
+    // pedido assumido mas sem resposta pública ainda — a home da Ana
+    // mostra o estado neutro "a equipe está cuidando" (504), não a
+    // promessa "respondeu" que atribuição sozinha sugeria
+    ch({
+      numero: "CHA-000148", categoria: "metodologia",
+      assunto: "O guia do 5º encontro não abre no celular",
+      mensagem: "Toco no link do material e a tela fica branca.",
+      autor_id: anaLogin.id, autor_mentorado_id: ana.id, dupla_id: duplaOk.id,
+      status: "em_atendimento", atribuido_a: marina.id,
+      created_at: haDias(1, "07:50"), updated_at: haDias(1, "08:10"),
+    }),
+    // pedido já resolvido — mesmo com resposta pública na trilha, o
+    // desfecho mora na notificação e não ocupa "Para fazer agora" (504)
+    ch({
+      numero: "CHA-000149", categoria: "metodologia",
+      assunto: "Não achei onde avaliar o encontro",
+      mensagem: "Procurei a estrela na home e não vi onde clicar.",
+      autor_id: anaLogin.id, autor_mentorado_id: ana.id, dupla_id: duplaOk.id,
+      status: "resolvido", atribuido_a: marina.id,
+      resolvido_em: haDias(3, "15:00"), resolvido_por: marina.id,
+      resolucao_resumo: "A avaliação mora no card do encontro — apontei o caminho e confirmei com ela.",
+      created_at: haDias(4, "09:00"), updated_at: haDias(3, "15:00"),
     }),
     // coordenação abrindo em nome de — trilha metodologia com o Paulo
     ch({
@@ -3903,6 +4549,25 @@ function build(): DemoData {
       created_at: haDias(1, "10:05") },
     { id: uid(0x6006), chamado_id: uid(0x582c), autor_id: null, tipo: "sistema",
       texto: "Chamado aberto por Ana Beatriz Silva.", created_at: haDias(2, "14:40") },
+    { id: uid(0x600a), chamado_id: uid(0x582f), autor_id: null, tipo: "sistema",
+      texto: "Chamado aberto por Ana Beatriz Silva.", created_at: haDias(1, "08:20") },
+    { id: uid(0x600b), chamado_id: uid(0x582f), autor_id: null, tipo: "sistema",
+      texto: "Chamado assumido por Marina Duarte.", created_at: haDias(1, "09:38") },
+    { id: uid(0x600c), chamado_id: uid(0x582f), autor_id: marina.id, tipo: "publica",
+      texto: "Oi, Ana! Pode manter a sexta sim — aproveitem o feriado. Só não esquece de registrar depois.",
+      created_at: haDias(1, "09:45") },
+    { id: uid(0x600d), chamado_id: uid(0x5830), autor_id: null, tipo: "sistema",
+      texto: "Chamado aberto por Ana Beatriz Silva.", created_at: haDias(1, "07:50") },
+    { id: uid(0x600e), chamado_id: uid(0x5830), autor_id: null, tipo: "sistema",
+      texto: "Chamado assumido por Marina Duarte.", created_at: haDias(1, "08:10") },
+    { id: uid(0x600f), chamado_id: uid(0x5831), autor_id: null, tipo: "sistema",
+      texto: "Chamado aberto por Ana Beatriz Silva.", created_at: haDias(4, "09:00") },
+    { id: uid(0x6010), chamado_id: uid(0x5831), autor_id: marina.id, tipo: "publica",
+      texto: "Oi, Ana! A estrela fica no card do encontro, embaixo do tema. Qualquer coisa me chama.",
+      created_at: haDias(3, "14:40") },
+    { id: uid(0x6011), chamado_id: uid(0x5831), autor_id: null, tipo: "sistema",
+      texto: "Chamado resolvido — A avaliação mora no card do encontro — apontei o caminho e confirmei com ela.",
+      created_at: haDias(3, "15:00") },
     { id: uid(0x6007), chamado_id: uid(0x5824), autor_id: null, tipo: "sistema",
       texto: "Chamado resolvido — Roteado certo — a devolutiva era da trilha DPP e seguiu pro Ricardo.",
       created_at: haDias(4, "16:20") },
@@ -3959,6 +4624,7 @@ function build(): DemoData {
     avaliacoes,
     avaliacaoLinks,
     turmaInscricoes,
+    acessoMap,
     chamados,
     chamadoAtualizacoes,
     chamadoComentarios,
@@ -3977,4 +4643,29 @@ export function getDemoData(): DemoData {
   if (!cache || Date.now() - cache.at > DEMO_TTL_MS)
     cache = { at: Date.now(), data: build() };
   return cache.data;
+}
+
+/** Espelho da RPC `supervisiona_dupla` (0125): supervisor_id direto OU uma
+ *  linha de papel 'supervisor' com escopo_supervisao='turma' cuja
+ *  escopo_turma casa com duplas.turma OU com a turma do cronograma dela
+ *  (a dupla pode herdar a turma pelo calendário — os dois caminhos contam).
+ *  Vive aqui e não em queries.ts porque forms-data/pdm-data importam de
+ *  queries — o ciclo viria de graça. */
+export function supervisionaDuplaDemo(
+  data: DemoData,
+  euId: string,
+  d: Dupla
+): boolean {
+  if (d.supervisor?.id === euId) return true;
+  const turmaCronograma = d.cronograma_id
+    ? data.cronogramas.find((c) => c.id === d.cronograma_id)?.turma
+    : null;
+  return data.profilePapeis.some(
+    (pp) =>
+      pp.profile_id === euId &&
+      pp.papel === "supervisor" &&
+      pp.escopo_supervisao === "turma" &&
+      pp.escopo_turma != null &&
+      (pp.escopo_turma === d.turma || pp.escopo_turma === turmaCronograma)
+  );
 }

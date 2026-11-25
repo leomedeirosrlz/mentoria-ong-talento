@@ -198,3 +198,32 @@ export function msgsContato(
     }`,
   };
 }
+
+/** Aviso externo do plano (518): o WhatsApp é sempre um deep link `wa.me`
+ *  com este texto dinâmico — nunca um provider/API. O corpo não carrega
+ *  datas, passos ou conteúdo do plano: só quem combinou e o caminho pro
+ *  site, onde a pessoa vê e responde com a sessão dela. */
+export function msgPlanoCombinado({
+  paraNome,
+  quem,
+  href,
+}: {
+  paraNome?: string | null;
+  quem: string;
+  href: string;
+}): string {
+  const oi = pn(paraNome ?? undefined) ? `Oi ${pn(paraNome ?? undefined)}` : "Oi";
+  return `${oi}, ${quem} combinou um plano de encontros com você no Realiza.vc. Dá uma olhada e confirma se serve: ${href}`;
+}
+
+/** Apresentação do jovem no canal direto — a mesma frase abre a conversa
+ *  com a equipe (dialog "Falar com a equipe"), com cada adulto do
+ *  diretório e com o colega de turma. Texto único pra não divergir. */
+export function msgApresentacaoJovem(
+  nomeJovem: string,
+  colega = false
+): string {
+  return colega
+    ? `Olá! Sou ${nomeJovem}, da sua turma no programa Realiza.vc.`
+    : `Olá! Sou ${nomeJovem}, mentorado(a) do programa Realiza.vc.`;
+}

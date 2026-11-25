@@ -15,6 +15,20 @@ const DUPLA_FIM = "de000000-0000-4000-8000-000000001541";
 const DUPLA_MATHEUS = "de000000-0000-4000-8000-000000001549"; // Ricardo × Matheus
 const TOK_VISAO_EDUARDO = "demo-tok-visao-eduardo-00001";
 const TOK_RODA_EDUARDO = "demo-tok-roda-eduardo-000001";
+const TOK_360_ANA = "demo-tok-360-ana-00000001";
+// fMetas/fPdm (uid 0x4008/0x4009 → decimal) — a régua não tem link
+// pendente em demo, a cobertura do fill-form vai pela prévia da ficha do
+// form (o mesmo InstrumentoFlow que o /f/<token> renderiza)
+const URL_METAS = "/formularios/de000000-0000-4000-8000-000000016392";
+const URL_PDM = "/formularios/de000000-0000-4000-8000-000000016393";
+
+// REALIZA-442, reescrita na 010 — gramática pergunta→resposta em TODAS
+// as superfícies: o nº da régua é texto no verde da marca (--ok-text),
+// sem disco; o enunciado lê em primeiro plano e a resposta idem.
+// Seletores estáveis: data-numero-pergunta pro número e a substring do
+// atributo class pro primeiro plano
+const NUMERO = "[data-numero-pergunta]";
+const FG = '[class*="text-foreground"]';
 
 test.describe("demo — instrumentos oficiais da jornada", () => {
   test("ficha da dupla: status por instrumento + resultado estruturado", async ({
@@ -32,11 +46,11 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(sec.getByText("Definindo Minhas Metas")).toBeVisible();
     await expect(sec.getByText("Roda da Vida")).toBeVisible();
 
-    // quatro respondidos — a roda inicial da Ana entrou na WP7 (fixture
-    // "jornada completa"), fechando visão/metas/PDM/roda
-    await expect(sec.getByText("respondido", { exact: true })).toHaveCount(4);
+    // cinco respondidos — a roda inicial da Ana entrou na WP7 (fixture
+    // "jornada completa"), fechando visão/metas/PDM/roda/checklist 0190
+    await expect(sec.getByText("respondido", { exact: true })).toHaveCount(5);
     await expect(
-      sec.getByRole("button", { name: "Ver resultado" }).first()
+      sec.getByRole("button", { name: "Ver resposta" }).first()
     ).toBeVisible();
 
     // resultado estruturado do PDM — metas com indicador/prazo/submeta,
@@ -46,12 +60,35 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     const pdm = sec.locator("li", {
       hasText: "Plano de Desenvolvimento do Mentorado",
     });
-    await pdm.getByRole("button", { name: "Ver resultado" }).click();
     const dialog = page.getByRole("dialog");
+    // clique-resiliente: a ilha do diálogo pode ainda estar hidratando
+    // quando o botão SSR já aparece — repete até o dialog abrir (mesmo
+    // padrão do assistente.spec.ts)
+    await expect(async () => {
+      await pdm.getByRole("button", { name: "Ver resposta" }).click();
+      await expect(dialog).toBeVisible({ timeout: 1500 });
+    }).toPass();
     await expect(dialog.getByText("Declaração de Visão")).toBeVisible();
     await expect(dialog.getByText(/Indicador:/).first()).toBeVisible();
     await expect(
       dialog.getByText(/Desdobramento da meta/).first()
+    ).toBeVisible();
+    // a ficha de meta lê "Meta N" em texto — o número da régua fica nas
+    // perguntas, não duplicado no rótulo da ficha
+    const meta1 = dialog.locator("li", { hasText: "Meta 1" }).first();
+    await expect(
+      meta1.getByText("Meta 1", { exact: true })
+    ).toBeVisible();
+
+    // REALIZA-512 — a resposta da Ana tem meta_4 (a extra): a leitura
+    // aninha o desdobramento sob a meta dela, não num bloco à parte
+    const meta4 = dialog.locator("li", { hasText: "Meta 4" }).first();
+    await expect(meta4).toBeVisible();
+    await expect(
+      meta4.getByText("Desdobramento da meta 4")
+    ).toBeVisible();
+    await expect(
+      meta4.getByText(/Ensaiar a apresentação em casa/)
     ).toBeVisible();
   });
 
@@ -67,8 +104,18 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
       hasText: "Instrumentos da jornada",
     });
     await expect(sec.getByText("Definindo Minhas Metas")).toBeVisible();
-    await sec.getByRole("button", { name: "Gerar link" }).first().click();
-    await expect(page.getByText(/Modo demonstração/)).toBeVisible();
+    // clique-resiliente: a ilha do emitir pode ainda estar hidratando
+    // quando o botão SSR já aparece — repete até o toast demo subir.
+    // O escopo é a linha do instrumento (Matheus tem vários "Gerar link")
+    await expect(async () => {
+      await sec
+        .locator("li", { hasText: "Definindo Minhas Metas" })
+        .getByRole("button", { name: "Gerar link" })
+        .click();
+      await expect(page.getByText(/Modo demonstração/)).toBeVisible({
+        timeout: 1500,
+      });
+    }).toPass();
   });
 
   test("/f/<token>: visão numera só perguntas e mostra seções", async ({
@@ -86,6 +133,26 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(
       page.getByText("Sua Declaração de Visão", { exact: true })
     ).toBeVisible();
+
+    // hierarquia 010: 1ª e 5ª perguntas da régua com o nº verde em texto
+    // e enunciado em primeiro plano — a declaração (6ª) troca o nº pelo
+    // ícone, mas veste a mesma cor de texto
+    const filme = page.locator('[data-campo="filme"]');
+    await expect(
+      filme.locator(NUMERO, { hasText: "1" }).first()
+    ).toBeVisible();
+    await expect(filme.locator("label").first()).toHaveClass(
+      /text-foreground/
+    );
+    const valoriza = page.locator('[data-campo="valoriza"]');
+    await expect(
+      valoriza.locator(NUMERO, { hasText: "5" }).first()
+    ).toBeVisible();
+    const declaracao = page.locator('[data-campo="declaracao_visao"]');
+    await expect(declaracao.locator(NUMERO)).toHaveCount(0);
+    await expect(
+      declaracao.locator("label").first()
+    ).toHaveClass(/text-foreground/);
   });
 
   // dupla fechada = jornada congelada: ninguém emite, copia ou manda link
@@ -147,5 +214,409 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(page.getByText(/17 perguntas/)).toBeVisible();
     await expect(page.getByText("Nada satisfeito").first()).toBeVisible();
     await expect(page.getByText("Muito satisfeito").first()).toBeVisible();
+
+    // hierarquia 010: cada área é um slider com o nº verde da régua e o
+    // rótulo em primeiro plano; a reflexão segue a numeração (a 17ª)
+    const saude = page.locator('[data-campo="p_saude"]');
+    await expect(saude).toHaveAttribute("aria-label", /1\. Saúde/);
+    await expect(
+      saude.locator(NUMERO, { hasText: "1" }).first()
+    ).toBeVisible();
+    await expect(
+      saude.locator("span", { hasText: "Saúde e disposição" })
+    ).toHaveClass(/text-foreground/);
+    const reflexao = page.locator('[data-campo="reflexao"]');
+    await expect(
+      reflexao.locator(NUMERO, { hasText: "17" }).first()
+    ).toBeVisible();
+    await expect(reflexao.locator(FG).first()).toBeVisible();
+  });
+
+  // spec 028 — o eixo da roda troca por gesto direto: fade curto só de
+  // entrada no cartão (um crossfade wait ficaria atrás do dedo) e a
+  // seta anuncia a área nova no aria-live (o leitor de tela ficava mudo)
+  test("/f/<token>: eixo da roda troca com fade curto + anúncio; reduce zera", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentorado");
+    await page.goto(`/f/${TOK_RODA_EDUARDO}`);
+
+    const tituloEixo = (nome: string) =>
+      page.getByRole("heading", { level: 3, name: nome, exact: true });
+    await expect(tituloEixo("Saúde e disposição")).toBeVisible();
+
+    // a seta troca o eixo — o cartão remonta por key (re-dispara o
+    // fade-in) e a área nova sai pelo aria-live sr-only
+    await page.getByRole("button", { name: "Próxima área" }).click();
+    await expect(tituloEixo("Intelecto e cultura")).toBeVisible();
+    await expect(page.locator('p[aria-live="polite"]')).toHaveText(
+      "Intelecto e cultura"
+    );
+
+    // fade curto de troca de estado (~150ms) — não é slide de navegação
+    const cardEixo = tituloEixo("Intelecto e cultura").locator("..");
+    const dur = await cardEixo.evaluate(
+      (el) => getComputedStyle(el).animationDuration
+    );
+    expect(parseFloat(dur)).toBeGreaterThan(0.05);
+    expect(parseFloat(dur)).toBeLessThanOrEqual(0.2);
+
+    // o guard global zera: o próximo remount já nasce parado
+    // (serializado em segundos: 0.01ms → "1e-05s")
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.getByRole("button", { name: "Próxima área" }).click();
+    await expect(tituloEixo("Equilíbrio emocional")).toBeVisible();
+    const durReduce = await tituloEixo("Equilíbrio emocional")
+      .locator("..")
+      .evaluate((el) => getComputedStyle(el).animationDuration);
+    expect(parseFloat(durReduce)).toBeLessThan(0.05);
+  });
+
+  // REALIZA-440/441 — a página por instrumento do mentor: o seletor de
+  // mentorado filtra por ?dupla= (a régua linka a dupla em foco), a linha
+  // já resume o resultado e "Ver resposta" expande a leitura completa
+  test("página por instrumento (mentor): seletor filtra e resumo abre resposta", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentor_dpp");
+    await page.goto(`/materiais/instrumentos/roda_inicial?dupla=${DUPLA_OK}`);
+
+    // o seletor repete o padrão da régua + "Todas" — a lista inteira é o
+    // default sem filtro
+    const seletor = page.getByRole("navigation", {
+      name: "Filtrar por mentorado",
+    });
+    await expect(
+      seletor.getByRole("link", { name: "Todas", exact: true })
+    ).toBeVisible();
+    await expect(
+      seletor.getByRole("link", { name: "Bia", exact: true })
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
+      seletor.getByRole("link", { name: "Matheus Gonçalves", exact: true })
+    ).toBeVisible();
+
+    // só a linha da dupla em foco renderiza — o separador do aria-label
+    // ("Duplas: título") variou no passe de copy; a regex tolera a
+    // pontuação e ancora no título
+    const sec = page.getByRole("region", {
+      name: /^Duplas\s*[:—–-]\s*Roda da Vida · leitura inicial$/,
+    });
+    const linha = sec.locator("li", { hasText: "Bia" });
+    await expect(linha).toBeVisible();
+    await expect(sec.locator("li", { hasText: "Matheus" })).toHaveCount(0);
+
+    // o resumo já conta o resultado antes de abrir: a mini-roda com a
+    // média (o mesmo desenho que a pessoa preencheu). O 1º "Média geral"
+    // é o do resumo — o do resultado expandido já existe no painel oculto
+    await expect(
+      linha.getByRole("img", { name: /Roda da Vida: média/ })
+    ).toBeVisible();
+    await expect(linha.getByText(/Média geral/).first()).toBeVisible();
+
+    // "Ver resposta" expande a leitura completa e vira "Fechar resposta"
+    const gatilho = linha.getByRole("button", { name: /resposta/ });
+    const painelId = await gatilho.getAttribute("aria-controls");
+    // clique-resiliente: o toggle é ilha client — repete até abrir
+    await expect(async () => {
+      await gatilho.click();
+      await expect(
+        linha.getByRole("button", { name: "Fechar resposta" })
+      ).toBeVisible({ timeout: 1500 });
+    }).toPass();
+    await expect(
+      linha.locator("ul li", { hasText: "Carreira e trabalho" })
+    ).toBeVisible();
+    await linha.getByRole("button", { name: "Fechar resposta" }).click();
+    // o painel animado colapsa — o conteúdo segue no DOM mas some da tela
+    await expect(page.locator(`[id="${painelId}"]`)).toBeHidden();
+    await expect(
+      linha.getByRole("button", { name: "Ver resposta" })
+    ).toHaveAttribute("aria-expanded", "false");
+
+    // "Todas" devolve a lista inteira
+    await seletor.getByRole("link", { name: "Todas", exact: true }).click();
+    await expect(page).toHaveURL("/materiais/instrumentos/roda_inicial");
+    await expect(sec.locator("li", { hasText: "Matheus" })).toBeVisible();
+  });
+
+  // staff: a resposta carrega sob demanda — mesmo gatilho/gramática do
+  // toggle do mentor (REALIZA-441)
+  test("página por instrumento (coord): Ver resposta carrega sob demanda", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/materiais/instrumentos/roda_inicial");
+
+    const sec = page.getByRole("region", {
+      name: /^Duplas\s*[:—–-]\s*Roda da Vida · leitura inicial$/,
+    });
+    const linha = sec.locator("li", { hasText: "Bia" });
+    // clique-resiliente: a ilha lazy pode ainda estar hidratando
+    await expect(async () => {
+      await linha.getByRole("button", { name: "Ver resposta" }).click();
+      await expect(
+        linha.getByRole("button", { name: "Fechar resposta" })
+      ).toBeVisible({ timeout: 1500 });
+    }).toPass();
+    await expect(
+      linha.getByRole("button", { name: "Fechar resposta" })
+    ).toBeVisible();
+    // a roda desenhada chega com o payload lazy
+    await expect(
+      linha.getByRole("img", { name: /Roda da Vida: média/ }).first()
+    ).toBeVisible();
+  });
+
+  // REALIZA-442 — a visão resume a declaração na linha e a narrativa lê
+  // com hierarquia própria (perguntas numeradas, resposta em primeiro
+  // plano)
+  test("página por instrumento (mentor): visão resume a declaração e abre a narrativa", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentor_dpp");
+    await page.goto(`/materiais/instrumentos/visao?dupla=${DUPLA_OK}`);
+
+    const sec = page.getByRole("region", {
+      name: /^Duplas\s*[:—–-]\s*Construindo a sua Visão$/,
+    });
+    const linha = sec.locator("li", { hasText: "Bia" });
+    // a declaração já aparece na linha (resumo) antes de abrir — o 1º
+    // blockquote é o da linha; o hero do resultado mora no painel oculto
+    await expect(linha.locator("blockquote").first()).toBeVisible();
+
+    // clique-resiliente: o toggle é ilha client — repete até abrir
+    await expect(async () => {
+      await linha.getByRole("button", { name: "Ver resposta" }).click();
+      await expect(
+        linha.getByRole("button", { name: "Fechar resposta" })
+      ).toBeVisible({ timeout: 1500 });
+    }).toPass();
+    await expect(linha.getByText("Declaração de Visão")).toBeVisible();
+    await expect(linha.getByText("O filme da vida ideal")).toBeVisible();
+    // as 5 perguntas da narrativa numeradas — a primeira do fixture da Ana
+    await expect(linha.locator("ol li").first()).toBeVisible();
+    await expect(
+      linha.getByText(/Narre as cenas desse filme/)
+    ).toBeVisible();
+    await expect(
+      linha.getByText(/No filme eu me vejo formada/)
+    ).toBeVisible();
+    // a leitura repete a gramática da escrita: nº verde em texto +
+    // enunciado em primeiro plano na 1ª pergunta da régua
+    const primeira = linha.locator("ol li").first();
+    await expect(
+      primeira.locator(NUMERO, { hasText: "1" })
+    ).toBeVisible();
+    await expect(primeira.locator("p").first()).toHaveClass(
+      /text-foreground/
+    );
+  });
+
+  // REALIZA-442 (escopo corrigido) — Metas não tem link pendente em demo:
+  // a cobertura do fill-form vai pela prévia da ficha, que renderiza o
+  // próprio InstrumentoFlow
+  test("prévia da Metas: ficha Meta N e enunciados em primeiro plano", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(URL_METAS);
+    await page.getByRole("button", { name: "Pré-visualizar" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // ficha Meta 1: o N mora no título "Meta 1" (sem número duplicado),
+    // os rótulos dos campos leem em primeiro plano
+    const ficha = dialog.locator("article", { hasText: "Meta 1" }).first();
+    await expect(
+      ficha.getByRole("heading", { name: "Meta 1" })
+    ).toBeVisible();
+    const meta1 = dialog.locator('[data-campo="meta_1"]');
+    await expect(meta1.locator("label")).toHaveClass(/text-foreground/);
+    // preciso_* são perguntas soltas da régua — a 2ª vem logo depois da
+    // declaração (1ª): nº verde em texto com o número da régua
+    const preciso = dialog.locator('[data-campo="preciso_criar"]');
+    await expect(
+      preciso.locator(NUMERO, { hasText: "2" })
+    ).toBeVisible();
+    await expect(preciso.locator("label")).toHaveClass(/text-foreground/);
+  });
+
+  // o 360º é form oficial fora da régua: cai no renderer genérico —
+  // mesma gramática por campos comuns (escala, multi_select, select)
+  test("/f/<token>: 360º genérico numera perguntas em verde e enunciados em primeiro plano", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentorado");
+    await page.goto(`/f/${TOK_360_ANA}`);
+    await expect(
+      page.getByRole("heading", { name: /Avaliação Geral de Mentorados/ })
+    ).toBeVisible();
+    // o genérico é um wizard por seção — a régua numera só perguntas
+    // visíveis (a condicional "quais mudanças" fica oculta até o "sim")
+    await expect(
+      page.getByText("Atingimento das expectativas")
+    ).toBeVisible();
+
+    // 1ª e 2ª perguntas (escala 1–5 + multi_select): fieldset com o nº
+    // verde + legend em primeiro plano
+    const expectativa = page.locator('[data-campo="expectativa_atendida"]');
+    await expect(
+      expectativa.locator(NUMERO, { hasText: "1" })
+    ).toBeVisible();
+    await expect(expectativa.locator("legend " + FG)).toBeVisible();
+    const expectativas = page.locator('[data-campo="expectativas"]');
+    await expect(
+      expectativas.locator(NUMERO, { hasText: "2" })
+    ).toBeVisible();
+    await expect(expectativas.locator("legend " + FG)).toBeVisible();
+
+    // responde a etapa 1 e avança — a numeração atravessa a seção sem
+    // reiniciar: a 1ª pergunta do processo é a 3ª da régua. O radio da
+    // escala é sr-only: o clique real é no label que o embrulha
+    await expectativa
+      .locator("label", { hasText: /^4$/ })
+      .click();
+    await page
+      .getByRole("checkbox", { name: "Desenvolvimento profissional" })
+      .check();
+    await page.getByRole("button", { name: "Avançar" }).click();
+    await expect(
+      page.getByText("Avaliação do processo de mentoria")
+    ).toBeVisible();
+    const estrutura = page.locator('[data-campo="estrutura_programa"]');
+    await expect(
+      estrutura.locator(NUMERO, { hasText: "3" })
+    ).toBeVisible();
+    await expect(estrutura.locator(FG).first()).toBeVisible();
+  });
+
+  // REALIZA-512 — o documento na ordem em que a dupla o lê: cada
+  // submetas_N dentro da ficha da meta N (o capítulo "Mapa de submetas"
+  // da 0080 não existe mais no template e, mesmo nele, não duplicava) e
+  // "Nova meta" abre as opcionais 4–8 até o teto escrito do form
+  test("prévia do PDM: submeta sob a meta, Nova meta até o limite de 8", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(URL_PDM);
+    await page.getByRole("button", { name: "Pré-visualizar" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // o capítulo legado não existe mais — e não há nenhum título "Mapa"
+    await expect(dialog.getByText("Mapa de submetas")).toHaveCount(0);
+
+    // desdobramento dentro da ficha da meta: o h3 "Meta 1" e o editor de
+    // linhas moram no mesmo cartão
+    const ficha1 = dialog
+      .locator("h3", { hasText: "Meta 1" })
+      .locator("..");
+    await expect(
+      ficha1.getByText(/Desdobramento da meta 1/)
+    ).toBeVisible();
+    // metas 2 e 3 agora são obrigatórias como a 1 — o cabeçalho de
+    // capítulo explica a ordem nova
+    await expect(dialog.getByText(/3 primeiras metas/)).toBeVisible();
+
+    // as opcionais nascem fechadas: "Nova meta" abre a próxima vazia —
+    // cinco cliques abrem as fichas 4–8 e o teto aparece escrito
+    const nova = dialog.getByRole("button", { name: "Nova meta" });
+    await nova.click();
+    await expect(
+      dialog.locator("h3", { hasText: "Meta 4" })
+    ).toBeVisible();
+    await expect(dialog.getByText("(opcional)").first()).toBeVisible();
+    for (let i = 0; i < 4; i++) await nova.click();
+    await expect(
+      dialog.locator("h3", { hasText: "Meta 8" })
+    ).toBeVisible();
+    // o limite não esconde as metas nem o botão some sem explicar — o
+    // teto do template fica escrito no lugar do CTA
+    await expect(dialog.getByText("Limite de 8 metas no PDM.")).toBeVisible();
+    await expect(nova).toHaveCount(0);
+    await expect(
+      dialog.locator("h3", { hasText: "Meta 4" })
+    ).toBeVisible();
+  });
+
+  // REALIZA-512 (FR-004/006) — a régua do mentor usa o nome como
+  // controle: pills com "Todas" (o default do catálogo), a escolha
+  // escreve ?dupla= e o param atravessa a troca de instrumento e o
+  // refresh. "Ficha" segue como ação secundária, não a única via.
+  test("régua (mentor): pills com nome + Todas; ?dupla= atravessa e persiste", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentor_dpp");
+    await page.goto("/materiais?aba=instrumentos");
+
+    const seletor = page.getByRole("navigation", {
+      name: "Filtrar por mentorado",
+    });
+    // Ricardo tem 2 duplas vivas → pills + "Todas" como o estado do
+    // catálogo (sem ?dupla= o foco é o conjunto)
+    await expect(
+      seletor.getByRole("link", { name: "Todas", exact: true })
+    ).toHaveAttribute("aria-current", "page");
+    const bia = seletor.getByRole("link", { name: "Bia", exact: true });
+    const matheus = seletor.getByRole("link", {
+      name: "Matheus Gonçalves",
+      exact: true,
+    });
+    await expect(bia).toBeVisible();
+    await expect(matheus).toBeVisible();
+
+    // a escolha escreve ?dupla= — a pill ativa e a régua relê o estado
+    // da dupla dela (Matheus tem a roda "aguardando", a Bia fechou a
+    // jornada de instrumentos)
+    await matheus.click();
+    await expect(page).toHaveURL(
+      `/materiais?aba=instrumentos&dupla=${DUPLA_MATHEUS}`
+    );
+    await expect(matheus).toHaveAttribute("aria-current", "page");
+    await expect(
+      page.getByRole("region", { name: /Instrumentos do programa/ })
+    ).toBeVisible();
+
+    // FR-006: a troca de instrumento preserva a dupla em foco — o card
+    // linka a página por instrumento com o param
+    await page
+      .getByRole("link", { name: /Abrir Roda da Vida/ })
+      .first()
+      .click();
+    await expect(page).toHaveURL(/instrumentos\/roda_inicial\?dupla=/);
+    await expect(page.url()).toContain(DUPLA_MATHEUS);
+    // a página por instrumento abre já filtrada na mesma dupla
+    const seletorInstrumento = page.getByRole("navigation", {
+      name: "Filtrar por mentorado",
+    });
+    await expect(
+      seletorInstrumento.getByRole("link", {
+        name: "Matheus Gonçalves",
+        exact: true,
+      })
+    ).toHaveAttribute("aria-current", "page");
+
+    // e o refresh mantém — ?dupla= é a fonte da escolha
+    await page.reload();
+    await expect(
+      seletorInstrumento.getByRole("link", {
+        name: "Matheus Gonçalves",
+        exact: true,
+      })
+    ).toHaveAttribute("aria-current", "page");
+
+    // de volta à régua, "Todas" devolve o catálogo — e a ação
+    // secundária "Ficha" também some sem dupla em foco
+    await page.goto("/materiais?aba=instrumentos");
+    await expect(
+      seletor.getByRole("link", { name: "Todas", exact: true })
+    ).toHaveAttribute("aria-current", "page");
+    const sec = page.getByRole("region", {
+      name: /Instrumentos do programa/,
+    });
+    await expect(
+      sec.getByRole("link", { name: "Ficha", exact: true })
+    ).toHaveCount(0);
   });
 });

@@ -8,12 +8,15 @@ import {
   afinidadeScore,
   ladoDeMentor,
   ladoDeMentorado,
+  motivoSugestaoRemanejo,
   ocupacaoMentor,
   ranquearMentorados,
   ranquearMentores,
+  sugereRemanejo,
 } from "@/lib/remanejo";
-import { mkMentorado, mkProfile } from "./helpers";
+import { mkDupla, mkMentorado, mkProfile } from "./helpers";
 import type { FilaItem } from "@/lib/fila";
+import type { DuplaSaude, Sinal } from "@/lib/ciclo";
 import type { MentorProfile } from "@/lib/types";
 
 const mp = (capacidade = 1, over: Partial<MentorProfile> = {}): MentorProfile =>
@@ -339,5 +342,130 @@ describe("ranquearMentorados", () => {
     expect(lado.areas).toEqual(["educação"]);
     const semFicha = ladoDeMentor(mkProfile({ areas: ["público"] }), null);
     expect(semFicha.areas).toEqual(["público"]);
+  });
+});
+
+// ---------- gatilho da superfície (FR-018, REALIZA-460) ----------
+
+const saudeOk = (over: Partial<DuplaSaude> = {}): DuplaSaude =>
+  ({
+    semaforo: "ok",
+    motivo: "Em dia",
+    motivos: ["Em dia"],
+    sinais: [],
+    apoio: { aberto: false },
+    esperado: 0,
+    feitos: 0,
+    proximo: null,
+    registroPendente: false,
+    pediuApoio: false,
+    apoioJovem: false,
+    avaliacaoJovemPendente: 0,
+    ...over,
+  }) as DuplaSaude;
+
+const sinal = (tom: Sinal["tom"] = "atencao"): Sinal => ({
+  tipo: "atraso",
+  tom,
+  texto: "1 encontro em atraso",
+});
+
+describe("sugereRemanejo", () => {
+  it("dupla em dia e sem sinais não sugere nada", () => {
+    expect(sugereRemanejo(mkDupla(), saudeOk())).toBe(false);
+  });
+
+  it("semáforo em risco segue gatilho (comportamento antigo)", () => {
+    expect(
+      sugereRemanejo(
+        mkDupla(),
+        saudeOk({ semaforo: "risco", sinais: [sinal("risco")] })
+      )
+    ).toBe(true);
+  });
+
+  it("sinal de atenção já acende — o gatilho ampliou além do risco", () => {
+    expect(
+      sugereRemanejo(mkDupla(), saudeOk({ sinais: [sinal("atencao")] }))
+    ).toBe(true);
+  });
+
+  it("apoio aberto segue gatilho (dupla em dia + chamado)", () => {
+    expect(
+      sugereRemanejo(
+        mkDupla(),
+        saudeOk({ apoio: { aberto: true, origem: "mentor" } })
+      )
+    ).toBe(true);
+  });
+
+  it("mentor inativo acende mesmo com jornada em dia", () => {
+    const dupla = mkDupla({ mentor: mkProfile({ ativo: false }) });
+    expect(sugereRemanejo(dupla, saudeOk())).toBe(true);
+  });
+
+  it("jovem desistente acende mesmo com jornada em dia", () => {
+    const dupla = mkDupla({
+      mentorado: { ...mkMentorado(), situacao: "desistente" },
+    });
+    expect(sugereRemanejo(dupla, saudeOk())).toBe(true);
+  });
+
+  it("dupla encerrada nunca sugere — capítulo fechado", () => {
+    const dupla = mkDupla({
+      status: "encerrada",
+      mentor: mkProfile({ ativo: false }),
+    });
+    expect(sugereRemanejo(dupla, saudeOk())).toBe(false);
+  });
+
+  it("dupla pausada com jovem desistente sugere — jornada viva conta", () => {
+    const dupla = mkDupla({
+      status: "pausada",
+      mentorado: { ...mkMentorado(), situacao: "desistente" },
+    });
+    expect(sugereRemanejo(dupla, saudeOk())).toBe(true);
+  });
+});
+
+describe("motivoSugestaoRemanejo", () => {
+  it("estado declarado das pessoas explica antes do semáforo", () => {
+    const dupla = mkDupla({ mentor: mkProfile({ ativo: false }) });
+    expect(
+      motivoSugestaoRemanejo(
+        dupla,
+        saudeOk({ semaforo: "risco", motivo: "3 encontros em atraso" })
+      )
+    ).toBe("Mentor inativo no programa");
+  });
+
+  it("jovem desistente vira o motivo", () => {
+    const dupla = mkDupla({
+      mentorado: { ...mkMentorado(), situacao: "desistente" },
+    });
+    expect(motivoSugestaoRemanejo(dupla, saudeOk())).toBe(
+      "Jovem marcado como desistente"
+    );
+  });
+
+  it("semáforo aceso usa o motivo da régua", () => {
+    expect(
+      motivoSugestaoRemanejo(
+        mkDupla(),
+        saudeOk({ semaforo: "atencao", motivo: "Avaliação baixa no último encontro" })
+      )
+    ).toBe("Avaliação baixa no último encontro");
+  });
+
+  it("apoio aberto explica pelo eixo de trabalho, por origem", () => {
+    expect(
+      motivoSugestaoRemanejo(mkDupla(), saudeOk({ apoio: { aberto: true, origem: "mentorado" } }))
+    ).toBe("Pedido de apoio aberto pelo mentorado");
+    expect(
+      motivoSugestaoRemanejo(mkDupla(), saudeOk({ apoio: { aberto: true, origem: "ambos" } }))
+    ).toBe("Pedidos de apoio abertos nos dois lados");
+    expect(
+      motivoSugestaoRemanejo(mkDupla(), saudeOk({ apoio: { aberto: true, origem: "mentor" } }))
+    ).toBe("Pedido de apoio aberto pelo mentor");
   });
 });

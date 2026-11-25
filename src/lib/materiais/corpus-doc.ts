@@ -810,11 +810,21 @@ export function gruposCorpus(secoes: CorpusSecao[]): CorpusGrupo[] {
   return grupos;
 }
 
-/** A página do jovem só serve doc cuja audiência cubra o mentorado: `todos`,
- *  `mentorado` explícito ou campo ausente. Papel de staff/mentor → notFound. */
+/** Itens clicáveis do sumário: um por ## (grupo — com intro ou não, a
+ *  âncora mora no h2) + um por ###. O pill, o rail e o meta do hero
+ *  exibem esse total — a contagem visível sempre casa com os links
+ *  renderizados (doc.secoes.length conta as subs mas não conta ## sem
+ *  intro, então as duas medidas divergem no guia do especialista). */
+export function totalSumario(grupos: CorpusGrupo[]): number {
+  return grupos.reduce((n, g) => n + 1 + g.subs.length, 0);
+}
+
+/** A página do jovem só serve doc cuja audiência cubra o mentorado: `todos`
+ *  ou `mentorado` explícito. Campo ausente/vazio NÃO serve — fail-closed:
+ *  um md de staff sem o campo não pode vazar pro jovem (o spec
+ *  tests/corpus-audiencia garante o campo em todo doc do corpus). */
 export function corpusServeJovem(doc: CorpusDoc): boolean {
   return (
-    doc.audiencia.length === 0 ||
     doc.audiencia.includes("todos") ||
     doc.audiencia.includes("mentorado")
   );
@@ -822,12 +832,12 @@ export function corpusServeJovem(doc: CorpusDoc): boolean {
 
 /** Gate da rota (app): mesma regra de visibilidade do catálogo (veMaterial —
  *  coordenação vê tudo; `todos` serve a todos; senão o papel precisa constar
- *  na audiência). Audiência ausente serve a todos, como no jovem. */
+ *  na audiência). Audiência ausente vai ao veMaterial vazia — fail-closed
+ *  como no jovem: só passa quem tem bypass de staff (coordenação). */
 export function corpusServePapel(
   doc: CorpusDoc,
   pessoa: { role: AppRole | null; papeis?: AppRole[] | null } | null | undefined
 ): boolean {
-  if (doc.audiencia.length === 0) return true;
   return veMaterial(doc.audiencia, pessoa);
 }
 

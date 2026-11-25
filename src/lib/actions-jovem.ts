@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parseDisponibilidade } from "./ciclo";
+import {
+  ESCOLARIDADES,
+  parseDisponibilidade,
+  SENTINEL_VAZIO,
+} from "./ciclo";
+import { parseDataHora } from "./escritas";
 import { getSlotsLivres } from "./queries-especialista";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
@@ -81,6 +86,93 @@ export async function salvarDisponibilidadeJovem(
   return { ok: true };
 }
 
+/** Ficha do programa editável pelo próprio jovem (REALIZA-420) — os 3
+ *  campos auto-descritivos (objetivos, motivação, escolaridade) descem
+ *  pela RPC jovem_update_ficha (0200/0202): a whitelist de colunas mora
+ *  no banco, porque mentorados não tem UPDATE pro papel. A validação
+ *  espelha camposFicha (trim + teto dos CHECKs da 0034) pra devolver o
+ *  erro claro em vez do 23514; a RPC revalida de novo no servidor. O form
+ *  sempre manda o conjunto completo — vazio vira null ("limpar"). */
+export async function salvarFichaJovem(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Só o próprio jovem edita a ficha dele." };
+  }
+
+  const campos: Record<string, string | null> = {};
+  for (const [k, max, rotulo] of [
+    ["objetivos", 2000, "Objetivos com a mentoria"],
+    ["motivacao", 2000, "Motivação"],
+  ] as const) {
+    const v = String(formData.get(k) ?? "").trim() || null;
+    if (v && v.length > max) {
+      return { error: `O campo "${rotulo}" aceita até ${max} caracteres.` };
+    }
+    campos[k] = v;
+  }
+  // SelectOpcional emite SENTINEL_VAZIO no "Não informado" (contrato do
+  // camposFicha): sentinela e branco viram null; fora do vocabulário é erro
+  const escolaridadeRaw = String(formData.get("escolaridade") ?? "").trim();
+  const escolaridade =
+    escolaridadeRaw === SENTINEL_VAZIO ? "" : escolaridadeRaw;
+  if (!escolaridade) {
+    campos.escolaridade = null;
+  } else if (!(ESCOLARIDADES as readonly string[]).includes(escolaridade)) {
+    return { error: "Escolha uma escolaridade válida." };
+  } else {
+    campos.escolaridade = escolaridade;
+  }
+
+  const { error } = await supabase.rpc("jovem_update_ficha", {
+    p_objetivos: campos.objetivos,
+    p_motivacao: campos.motivacao,
+    p_escolaridade: campos.escolaridade,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  revalidatePath("/jovem/perfil");
+  return { ok: true };
+}
+
+/** Foto do jovem no bucket `avatares` (REALIZA-419) — o arquivo já subiu
+ *  na pasta do profile_id pelo client (a policy da 0014/0024 garante); a
+ *  RPC jovem_set_avatar (0200) grava mentorados.avatar_path, a coluna que
+ *  jovem_perfil e mentorados_turma projetam (profiles.avatar_path é a dos
+ *  adultos). Mesmo protocolo do setAvatarPath de staff: path fora da
+ *  própria pasta é rejeitado e o arquivo antigo sai do bucket. */
+export async function setAvatarJovem(path: string | null) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Só o próprio jovem troca a foto dele." };
+  }
+  if (path != null && !path.startsWith(`${eu.id}/`)) {
+    return { error: "Não foi possível usar esse arquivo." };
+  }
+
+  // jovem_perfil já é self-scoped — o path antigo sai sem round extra
+  const { data: atual } = await supabase
+    .from("jovem_perfil")
+    .select("avatar_path")
+    .maybeSingle();
+  const { error } = await supabase.rpc("jovem_set_avatar", {
+    p_path: path ?? undefined,
+  });
+  if (error) return { error: erroAmigavel(error) };
+
+  const antigo = atual?.avatar_path;
+  if (antigo && antigo !== path) {
+    await supabase.storage.from("avatares").remove([antigo]);
+  }
+  revalidatePath("/jovem/perfil");
+  revalidatePath("/jovem/pessoas");
+  // o avatar do rodapé da sidebar vem do layout — revalida o grupo inteiro
+  revalidatePath("/jovem", "layout");
+  return { ok: true };
+}
+
 /** O jovem pede uma sessão de especialista (pedir_especialista_jovem,
  *  0074): direcionado (com slot opcional da grade real dele) ou broadcast
  *  pro mural. Todo pedido nasce 'aberta', direto no mural (0158: sem
@@ -110,7 +202,7 @@ export async function pedirEspecialistaJovem(input: {
 
   // saneamento de forma — o domínio (gate, dedup, teto, grade) a RPC valida
   if (demanda && (demanda.length < 10 || demanda.length > 1000)) {
-    return { error: "Conta um pouco mais — entre 10 e 1.000 caracteres." };
+    return { error: "Conta um pouco mais: entre 10 e 1.000 caracteres." };
   }
   if (motivo && (motivo.length < 3 || motivo.length > 500)) {
     return { error: "O motivo precisa ter entre 3 e 500 caracteres." };
@@ -222,5 +314,91 @@ export async function dispensarSugestaoEspecialista(
   revalidatePath("/jovem");
   revalidatePath("/jovem/especialistas");
   revalidatePath("/");
+  return { ok: true };
+}
+
+// ---------- retroativo do jovem (REALIZA-437, migration 0207) ----------
+// As RPCs definer devolvem jsonb {error} em pt-BR pronto pro toast — a
+// action só saneia o payload e repassa. O encontro nasce realizado: é o
+// que destrava a avaliação dele, e o registro do mentor segue devido.
+
+function retornoRpc(data: unknown): {
+  error?: string;
+  ok?: boolean;
+  encontro_id?: string;
+} {
+  return (data ?? {}) as { error?: string; ok?: boolean; encontro_id?: string };
+}
+
+/** O jovem registra encontro que já aconteceu sem agendamento prévio —
+ *  a linha que faltava na lista pra avaliar. A mesma RPC cobre a correção
+ *  de data do retroativo criado por ele (upsert por (dupla,numero)
+ *  enquanto o mentor não registrou). `dataHora` chega naïve do
+ *  datetime-local; a RPC revalida tudo (dupla DPP ativa dele, teto do
+ *  cronograma sem o último, passado, piso do início da mentoria). */
+export async function registrarRetroativoJovem(
+  duplaId: string,
+  numero: number,
+  dataHora: string
+): Promise<{ error?: string; ok?: boolean; encontroId?: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Essa ação é do mentorado." };
+  }
+  if (!duplaId || !numero || !dataHora) {
+    return { error: "Encontro e data são obrigatórios." };
+  }
+  const quando = parseDataHora(dataHora);
+  if (!quando) return { error: "Confira a data." };
+  const { data, error } = await supabase.rpc("registrar_retroativo_mentorado", {
+    p_dupla: duplaId,
+    p_numero: numero,
+    p_data_hora: quando.toISOString(),
+  });
+  if (error) return { error: erroAmigavel(error) };
+  const ret = retornoRpc(data);
+  if (ret.error) return { error: ret.error };
+  // realizado sem registro pende pro mentor — a home dele, a agenda e a
+  // ficha da dupla leem a mesma row que acabou de nascer (ou mudar)
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/agenda");
+  revalidatePath("/jovem/materiais");
+  revalidatePath("/");
+  revalidatePath("/agenda");
+  revalidatePath("/duplas");
+  revalidatePath(`/duplas/${duplaId}`);
+  return { ok: true, encontroId: ret.encontro_id };
+}
+
+/** Desfaz o retroativo criado pelo próprio jovem enquanto o mentor não
+ *  registrou — o "não aconteceu de verdade" do gesto dele. */
+export async function desfazerRetroativoJovem(encontroId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Essa ação é do mentorado." };
+  }
+  // a dupla sai antes do delete só pra revalidar a ficha dela — a RPC não
+  // devolve o id
+  const { data: enc } = await supabase
+    .from("encontros")
+    .select("dupla_id")
+    .eq("id", encontroId)
+    .maybeSingle();
+  const { data, error } = await supabase.rpc("desfazer_retroativo_mentorado", {
+    p_encontro: encontroId,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  const ret = retornoRpc(data);
+  if (ret.error) return { error: ret.error };
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/agenda");
+  revalidatePath("/");
+  revalidatePath("/agenda");
+  revalidatePath("/duplas");
+  if (enc?.dupla_id) revalidatePath(`/duplas/${enc.dupla_id}`);
   return { ok: true };
 }

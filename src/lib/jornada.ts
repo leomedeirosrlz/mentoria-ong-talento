@@ -65,10 +65,15 @@ export type Estacao = {
   /** "Você escreveu…" — citação real de respostas (campo canônico por
    *  instrumento). Null quando não há resposta ou campo citável. */
   snippet: { tag: string; texto: string } | null;
-  /** Estado honesto em texto: "o mentor envia quando chegar a hora",
+  /** Estado honesto em texto: "o instrumento já devia estar liberado",
    *  "libera no enc. 12 (4 nov)", "em dia · 5 de 6", "falta avaliar o
    *  encontro 7". Null quando o pill+CTA já dizem tudo. */
   detalhe: string | null;
+  /** REALIZA-515 — true só quando o `a_fazer` é uma nova rodada DECIDIDA
+   *  (alguém mandou refazer depois de uma resposta): a emissão automática
+   *  que minta link após resposta migrada (rematch, auto-cura) não é
+   *  decisão de ninguém e nunca vira "nova rodada". */
+  reemissao: boolean;
   /** Respostas brutas da entrega corrente (pro dialog "Rever resposta"
    *  reusar InstrumentoResultado). Null fora de `feito`. */
   respostas: Record<string, unknown> | null;
@@ -90,7 +95,7 @@ export type EntregaJornada = {
 };
 
 export type InstrumentoJornada = {
-  sistema: "visao" | "metas" | "pdm" | "roda_vida";
+  sistema: "visao" | "metas" | "pdm" | "roda_vida" | "competencias_mentor";
   formulario_id: string;
   titulo: string;
   descricao: string | null;
@@ -120,6 +125,18 @@ export type JovemJornadaDados = {
   cronograma: EventoJornada[];
   instrumentos: InstrumentoJornada[];
   avaliacao_360: Entrega360[];
+  /** Linha do tempo da retrospectiva (0190): encontros realizados com o
+   *  tema do registro — o recorte que o mentorado pode ver (sem notas
+   *  internas: observações, pedido de apoio e avaliação do mentor ficam
+   *  fora do payload definer). */
+  retrospectiva?: {
+    desbloqueada: boolean;
+    encontros: {
+      numero: number;
+      data: string | null;
+      tema: string | null;
+    }[];
+  } | null;
 };
 
 /** Encontro mínimo pra estação "avaliação do encontro" — mesmo shape de
@@ -248,7 +265,7 @@ export const ESTACOES: Record<
   avaliacao_360: {
     titulo: "Avaliação final",
     descricao:
-      "O fechamento do ciclo: o jovem e o mentor respondem, cada um pelo seu link. A coordenação emite no fim da jornada.",
+      "O fechamento do ciclo: você e seu mentor respondem no fim da jornada. A sua libera aqui.",
     encIni: 16,
     encFim: 16,
     chipLabel: "Enc. 16",
@@ -266,7 +283,13 @@ const SUBMETAS_TETO = 20;
 type StatusEntrega = EntregaJornada["status"];
 type ResolucaoEstacao = Pick<
   Estacao,
-  "estado" | "respondidoEm" | "token" | "snippet" | "detalhe" | "respostas"
+  | "estado"
+  | "respondidoEm"
+  | "token"
+  | "snippet"
+  | "detalhe"
+  | "reemissao"
+  | "respostas"
 >;
 
 /** 'yyyy-mm-dd' → 'dd/mm' por substring — a data do evento é dia de
@@ -328,6 +351,125 @@ export function entregasDoMomento<
       e.contexto?.["momento"] !== "formal"
   );
   return ord.filter((e, i) => momentoRoda(e, i === idxSemMarca) === momento);
+}
+
+/** Estado da estação na leitura por dupla — a mesma régua do estadoAtual
+ *  da ficha: respondido vence, depois pendente, expirado e "não enviado".
+ *  Usada onde não há painel pra resolver janela (o mentor na régua de
+ *  /materiais e na página por instrumento — a ficha também não trava). */
+export function estadoDeEntregas<T extends { status: string }>(
+  entregas: T[]
+): EstacaoPainelEstado {
+  if (entregas.some((e) => e.status === "respondido")) return "respondido";
+  if (entregas.some((e) => e.status === "pendente")) return "pendente";
+  if (entregas.length) return "expirado";
+  return "nao_enviado";
+}
+
+/** A entrega corrente de um momento — a mais recente respondida (a
+ *  re-emissão substitui a anterior na leitura; pendente não tem payload). */
+function ultimaRespondidaDoMomento<
+  T extends {
+    contexto?: Record<string, unknown> | null;
+    created_at?: string;
+    respondido_em?: string | null;
+    respostas?: unknown;
+  },
+>(entregas: T[], momento: "inicial" | "formal" | "inicio" | "final"): T | null {
+  const respondidas = (
+    momento === "inicial" || momento === "formal"
+      ? entregasDoMomento(entregas, momento)
+      : entregasDoMomentoChecklist(entregas, momento)
+  ).filter((e) => e.respostas != null);
+  return (
+    [...respondidas].sort((a, b) =>
+      (b.respondido_em ?? b.created_at ?? "").localeCompare(
+        a.respondido_em ?? a.created_at ?? ""
+      )
+    )[0] ?? null
+  );
+}
+
+/** O par inicial × formal da roda da dupla (REALIZA-18) — cada ponta é a
+ *  aplicação respondida mais recente do seu momento. Null quando o
+ *  momento ainda não tem resposta. */
+export function parRoda<
+  T extends {
+    contexto?: Record<string, unknown> | null;
+    created_at?: string;
+    respondido_em?: string | null;
+    respostas?: unknown;
+  },
+>(entregas: T[]): { inicial: T | null; formal: T | null } {
+  return {
+    inicial: ultimaRespondidaDoMomento(entregas, "inicial"),
+    formal: ultimaRespondidaDoMomento(entregas, "formal"),
+  };
+}
+
+/** O momento que `refazer_instrumento_jovem` (0209) minta pra roda_vida
+ *  agora: a RPC lê o `contexto.momento` do último link USADO e, quando a
+ *  marca não existe, cai na régua automática do emitir — com ≥1 usada a
+ *  derivação é 'formal'. A estante usa pra não oferecer "Refazer" na
+ *  ponta errada (486): na leitura inicial o botão só é honesto quando o
+ *  link gerado é mesmo o 'inicial'. Null = nenhuma usada, a RPC recusa. */
+export function momentoRefazerRoda<
+  T extends { contexto?: Record<string, unknown> | null; usado_em?: string | null },
+>(entregas: T[]): "inicial" | "formal" | null {
+  const ultima = [...entregas]
+    .filter((e) => e.usado_em != null)
+    .sort((a, b) => (b.usado_em ?? "").localeCompare(a.usado_em ?? ""))[0];
+  if (!ultima) return null;
+  return ultima.contexto?.["momento"] === "inicial" ? "inicial" : "formal";
+}
+
+// ---------- checklist de competências do mentor (0190) ----------
+
+/** Separa as duas marcações do checklist de competências: `inicio`
+ *  (formação da dupla) × `final` (revisitação do fechamento). Mesma régua
+ *  da roda: marca explícita do contexto vence; sem marca, a primeira
+ *  entrega é a do início. */
+export function momentoChecklist(
+  e: { contexto?: Record<string, unknown> | null },
+  primeiraSemMarca: boolean
+): "inicio" | "final" {
+  const m = e.contexto?.["momento"];
+  if (m === "inicio" || m === "final") return m;
+  return primeiraSemMarca ? "inicio" : "final";
+}
+
+/** Filtra as entregas do checklist de um momento — mesmo desenho de
+ *  entregasDoMomento, vocabulário início × fim. */
+export function entregasDoMomentoChecklist<
+  T extends { contexto?: Record<string, unknown> | null; created_at?: string },
+>(entregas: T[], momento: "inicio" | "final"): T[] {
+  const ord = [...entregas].sort((a, b) =>
+    (a.created_at ?? "").localeCompare(b.created_at ?? "")
+  );
+  const idxSemMarca = ord.findIndex(
+    (e) =>
+      e.contexto?.["momento"] !== "inicio" &&
+      e.contexto?.["momento"] !== "final"
+  );
+  return ord.filter(
+    (e, i) => momentoChecklist(e, i === idxSemMarca) === momento
+  );
+}
+
+/** O par início × fim do checklist — a marcação respondida mais recente
+ *  de cada momento. */
+export function parChecklist<
+  T extends {
+    contexto?: Record<string, unknown> | null;
+    created_at?: string;
+    respondido_em?: string | null;
+    respostas?: unknown;
+  },
+>(entregas: T[]): { inicio: T | null; final: T | null } {
+  return {
+    inicio: ultimaRespondidaDoMomento(entregas, "inicio"),
+    final: ultimaRespondidaDoMomento(entregas, "final"),
+  };
 }
 
 /** Conta os itens de um campo submetas_N: enumerações "1. … 2. …" (mesmo
@@ -424,6 +566,7 @@ function resolveEstacao<
     respondido_em: string | null;
     respostas: Record<string, unknown> | null;
     created_at: string;
+    contexto?: Record<string, unknown> | null;
     usado_em?: string | null;
     expira_em?: string | null;
   },
@@ -463,6 +606,17 @@ function resolveEstacao<
   // CTA — cai no `feito` da resposta anterior (paridade com a estação
   // trancada e com o painel, que usa a mesma régua min(vigente, dupla))
   if (reemissao && ctx.encCorrente >= ESTACOES[chave].encIni) {
+    // REALIZA-515 — "nova rodada" só existe quando a emissão foi DECISÃO
+    // de alguém: mentor/coord refazendo pela ficha ou a própria jovem no
+    // self-serve (0209). A origem 'auto' minta link por calendário ou
+    // rematch sem ninguém pedir refazer — a estação abre o link, mas não
+    // conta a história de "nova rodada" (e a 1ª roda autoemitida, sem
+    // respondida antes, nem chega aqui).
+    const origem =
+      typeof reemissao.contexto?.origem === "string"
+        ? reemissao.contexto.origem
+        : null;
+    const decidida = origem !== "auto" && origem !== "autoemit";
     return {
       estado: "a_fazer",
       // Rever sobrevive à re-emissão: respondidoEm/respostas da última
@@ -470,7 +624,12 @@ function resolveEstacao<
       respondidoEm: ultima!.respondido_em ?? ultima!.usado_em ?? null,
       token: reemissao.token,
       snippet: null,
-      detalhe: "o mentor enviou uma nova rodada: a resposta anterior segue salva",
+      reemissao: decidida,
+      detalhe: decidida
+        ? origem === "jovem"
+          ? "você pediu pra refazer: a resposta anterior segue salva"
+          : "a dupla decidiu refazer: a resposta anterior segue salva"
+        : null,
       respostas: ultima!.respostas,
     };
   }
@@ -482,6 +641,7 @@ function resolveEstacao<
       token: null,
       snippet: texto ? { tag: ESTACOES[chave].tagSnippet, texto: truncaSnippet(texto) } : null,
       detalhe: chave === "pdm" ? texto : null,
+      reemissao: false,
       respostas: ultima.respostas,
     };
   }
@@ -497,6 +657,7 @@ function resolveEstacao<
       token: null,
       snippet: null,
       detalhe: `libera no encontro ${ESTACOES[chave].encIni}${dm ? ` (${dm})` : ""}`,
+      reemissao: false,
       respostas: null,
     };
   }
@@ -513,6 +674,7 @@ function resolveEstacao<
       token: pendente.token,
       snippet: null,
       detalhe: null,
+      reemissao: false,
       respostas: null,
     };
   }
@@ -528,17 +690,18 @@ function resolveEstacao<
       : "o link expirou: peça à coordenação pra reenviar"
     : passou
       ? ctx.emissor === "mentor"
-        ? "o link ainda não chegou: fala com teu mentor"
-        : "o link ainda não chegou: a coordenação pode ajudar"
+        ? "ainda não foi liberado: fala com teu mentor"
+        : "ainda não foi liberado: a coordenação pode ajudar"
       : ctx.emissor === "mentor"
-        ? "o mentor envia quando chegar a hora"
-        : "a coordenação envia quando chegar a hora";
+        ? "o instrumento já devia estar liberado: fala com teu mentor"
+        : "a coordenação libera quando chegar a hora";
   return {
     estado: "a_fazer",
     respondidoEm: null,
     token: null,
     snippet: null,
     detalhe,
+    reemissao: false,
     respostas: null,
   };
 }
@@ -551,8 +714,9 @@ function resolveEstacao<
  * Regras:
  *  - `feito`: entrega respondida da janela → data + snippet do campo
  *    canônico; `a_fazer`: janela aberta/corrente, sem resposta (link vivo
- *    → token "Continuar"; sem link → detalhe "o mentor envia quando
- *    chegar a hora"); `trancada`: janela ainda não abriu (detalhe
+ *    → token "Continuar"; sem link → detalhe "o instrumento já devia
+ *    estar liberado" — com auto-emissão (0099) a falta é anomalia);
+ *    `trancada`: janela ainda não abriu (detalhe
  *    "libera no enc. N ({data da turma})", NUNCA botão).
  *  - Roda duas vezes: `momento` = contexto->>'momento' quando existir
  *    (0096 grava na emissão); sem marca, a PRIMEIRA roda da dupla é a
@@ -726,6 +890,7 @@ export function estacoesJornada(input: {
           token: null,
           snippet: null,
           detalhe: `em dia · ${emDia} de ${realizados.length}`,
+          reemissao: false,
           respostas: null,
         }
       : {
@@ -736,6 +901,7 @@ export function estacoesJornada(input: {
           detalhe: faltantes.length
             ? `falta avaliar o encontro ${faltantes[0]}`
             : "a primeira sai depois do encontro 1",
+          reemissao: false,
           respostas: null,
         };
 
@@ -868,7 +1034,10 @@ export function painelTurmaCtx(
   cronogramaId: string | null,
   agora: Date = new Date()
 ): PainelTurmaCtx {
-  const hoje = agora.toISOString().slice(0, 10);
+  // toDateStr dá o dia civil em America/Sao_Paulo — toISOString seria UTC
+  // (entre 21h e 23:59 BRT o "hoje" UTC já é amanhã e o painel libera a
+  // estação um dia antes).
+  const hoje = toDateStr(agora);
   const datas = new Map<number, string>();
   for (const e of eventos) {
     if (

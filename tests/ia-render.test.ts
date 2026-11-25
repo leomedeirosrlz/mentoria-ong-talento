@@ -494,6 +494,27 @@ describe("extrairBlocos — blocos válidos", () => {
     );
   });
 
+  it("escolha aceita detalhe (026/FR-008) — a segunda linha do botão", () => {
+    const { blocos } = extrairBlocos(
+      fence(
+        "escolha",
+        '{"pergunta":"Qual dupla?","opcoes":[{"rotulo":"Bia · Ricardo","detalhe":"T1 · 2026/2027"},{"rotulo":"Caio · Carlos"}]}'
+      )
+    );
+    expect(blocos).toEqual([
+      {
+        kind: "escolha",
+        b: {
+          pergunta: "Qual dupla?",
+          opcoes: [
+            { rotulo: "Bia · Ricardo", detalhe: "T1 · 2026/2027" },
+            { rotulo: "Caio · Carlos" },
+          ],
+        },
+      },
+    ]);
+  });
+
   it("marca colada no texto (sem linha em branco) ganha a separação", () => {
     const { textoSemBloco } = extrairBlocos(
       `antes\n${fence("passos", PASSOS)}\ndepois`

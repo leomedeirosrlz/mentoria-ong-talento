@@ -1,6 +1,8 @@
 import {
   alvoAgendamento,
+  cobertosDaDupla,
   encontrosDaSemana,
+  encontroTemConteudo,
   eventosDoCronograma,
   semanaBounds,
   toDateStr,
@@ -93,11 +95,15 @@ export function painelDuplasDoDia({
     if (oficiais.length > 0) {
       const numeros = new Set(oficiais.map((o) => o.numero!));
       const primeiroOficial = Math.min(...numeros);
+      // sessão combinada (018): o coberto tem conteúdo via âncora — conta
+      // como "realizado e registrado" e some da semana igual ao âncora
+      const cobertos = cobertosDaDupla(dupla.encontros);
       for (const encontro of dupla.encontros) {
         if (diaDoEncontro(encontro) === selecionado) continue; // já em "Neste dia"
         // realizado e registrado é história: nada a fazer na semana, e a
         // linha só disputaria atenção com o que pede gesto
-        if (encontro.status === "realizado" && encontro.registro) continue;
+        if (encontro.status === "realizado" && encontroTemConteudo(encontro, cobertos))
+          continue;
         const dia = diaDoEncontro(encontro);
         const naSemana = dia != null && dia >= seg && dia <= dom;
         if (

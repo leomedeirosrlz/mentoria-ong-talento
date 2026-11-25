@@ -206,6 +206,7 @@ export function HistoricoRuns({
                   <BarraSegmentada
                     className="mt-0.5"
                     altura="sm"
+                    legenda
                     denominador={res.total}
                     segmentos={[
                       { valor: res.ok, rotulo: "passou", cls: "bg-[var(--ok)]" },

@@ -1,5 +1,6 @@
 import { SITE_URL } from "@/lib/email";
 import type { ComunicadoPrioridade } from "@/lib/types";
+import { vozChamado } from "@/lib/types";
 
 // hex equivalentes das CSS vars da marca (globals.css) — e-mail não herda
 // tokens, e cliente de e-mail só garante inline CSS
@@ -22,8 +23,10 @@ const LOGO_BRANCO_URL =
   process.env.EMAIL_LOGO_URL ??
   "https://yhjzmxleotahijinjepl.supabase.co/storage/v1/object/public/email-assets/logo-realiza-branco.png";
 
-/** Conteúdo digitado pela coordenação vai pra HTML de e-mail — escapa sempre. */
-function esc(s: string): string {
+/** Escape HTML — conteúdo digitado pela coordenação vai pra HTML de e-mail;
+ *  exportada pro digest (relatorios/digest.ts), que monta o próprio corpo
+ *  em vez de um template fechado daqui. */
+export function esc(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -180,12 +183,13 @@ export function emailAviso({
     tagline: "Aviso da coordenação",
     preheader: `${tema ? `${tema.texto}: ` : ""}${titulo}: ${corpo.slice(0, 90)}`,
     rodapeExtra:
-      "Este aviso também está na plataforma, na aba inicial. Você pode conferir por lá a qualquer momento.",
+      "Este aviso também está na plataforma, na aba inicial.",
   });
 }
 
 /** Aviso de material novo — card com chip do tipo + descrição e CTA pro
- *  destino real (arquivo assinado via /api/material ou o link externo). */
+ *  destino real (documento nativo, arquivo assinado via /api/material ou
+ *  o link externo). */
 export function emailMaterial({
   titulo,
   descricao,
@@ -463,6 +467,60 @@ export function emailDesfechoRepasseMentor({
   });
 }
 
+/** Access invite sent by the coordination (0180): the account already
+ *  exists when the e-mail goes out (generateLink invite → handle_new_user
+ *  binds the record on send), so the CTA is the token_hash straight into
+ *  /auth/confirm — the page asks for the explicit gesture before planting
+ *  the session. Two `trilha` variants: staff (mentor, supervisor,
+ *  coordination) hears "what the platform has for you", the youth hears
+ *  "your journey". The body states whose account the link opens (name +
+ *  role + email, REALIZA-35): /auth/confirm cannot show identity before
+ *  verifyOtp, so the email is the honest surface. The footer carries the
+ *  copyable link and the plan B for the 1h token: ask for a new link at
+ *  login, with the e-mail already filled (?e=). */
+export function emailConviteAcesso({
+  trilha,
+  primeiroNome,
+  nome,
+  papel,
+  link,
+  email,
+}: {
+  trilha: "staff" | "jovem";
+  primeiroNome: string;
+  /** full display name (nome_social || nome) — whose account this is */
+  nome: string;
+  /** account role label (papelLabel) — what the access unlocks */
+  papel: string;
+  link: string;
+  email: string;
+}): string {
+  const jovem = trilha === "jovem";
+  const loginUrl = `${SITE_URL}/login?e=${encodeURIComponent(email)}`;
+  return emailLayout({
+    titulo: jovem
+      ? "Sua jornada de mentoria começou"
+      : "Sua conta na Mentoria Social está pronta",
+    tagline: jovem ? "Sua jornada de mentoria" : "Boas-vindas",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${primeiroNome ? `, ${esc(primeiroNome)}` : ""}!</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">A coordenação preparou o seu acesso à <strong>Mentoria Social</strong>, a plataforma do programa de mentoria.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">O link abaixo é só seu: ele abre a conta de <strong>${esc(nome)}</strong>, ${esc(papel)}, no e-mail ${esc(email)}.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">${
+        jovem
+          ? "Por lá você acompanha a sua jornada: os encontros, os instrumentos e a sua turma."
+          : "Por lá você encontra a sua dupla, a agenda de encontros e os registros e materiais da jornada."
+      }</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">O primeiro acesso leva cerca de 1 minuto: é só abrir o link e confirmar a entrada.</p>`,
+    ctaLabel: "Entrar na Mentoria Social",
+    ctaHref: link,
+    preheader: jovem
+      ? "Sua jornada de mentoria começou: primeiro acesso em cerca de 1 minuto."
+      : "Sua conta na Mentoria Social está pronta: primeiro acesso em cerca de 1 minuto.",
+    rodapeExtra: `Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">${esc(link)}</span><br>Este link é pessoal e vale por cerca de 1 hora. Se expirar, peça um novo em <a href="${esc(loginUrl)}" style="color:${MUTED};text-decoration:underline;">${esc(loginUrl)}</a>.`,
+  });
+}
+
 // 0084 — chamados unificados: urgência/origem jovem avisa a equipe por
 // e-mail (o sino não é garantia pra canal de segurança) e atualização
 // pública chega ao autor também fora do app.
@@ -482,7 +540,7 @@ export function emailChamadoUrgencia({
 }): string {
   return emailLayout({
     titulo: `Chamado ${esc(numero)} precisa de resposta`,
-    tagline: categoria === "urgencia" ? "Pedido urgente" : "Novo pedido de apoio",
+    tagline: categoria === "urgencia" ? "Chamado urgente" : "Novo chamado",
     conteudoHtml:
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};"><strong>${esc(autorNome)}</strong> abriu o chamado <strong>${esc(numero)}</strong>${categoria === "urgencia" ? ' marcado como <strong>urgente</strong>' : ""}.</p>` +
       `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;background:${categoria === "urgencia" ? DANGER_BG : CARD_SUAVE};border-radius:10px;"><tr><td style="padding:14px 16px;font-size:15px;line-height:1.55;color:${INK};">“${esc(assunto)}”</td></tr></table>` +
@@ -495,25 +553,43 @@ export function emailChamadoUrgencia({
   });
 }
 
+/** O nome do ticket na voz de quem abriu (R15) — o mesmo do app: o jovem
+ *  tem um "pedido de ajuda", o mentor um "pedido de apoio" e a equipe um
+ *  "chamado". Assunto e corpo do e-mail de atualização dividem o termo. */
+export function rotuloPedidoAutor(
+  papel: string | null | undefined
+): string {
+  const v = vozChamado(papel);
+  return v === "jovem"
+    ? "pedido de ajuda"
+    : v === "mentor"
+      ? "pedido de apoio"
+      : "chamado";
+}
+
 export function emailChamadoAtualizacao({
   autorNome,
   texto,
   href,
+  papel,
 }: {
   autorNome: string;
   texto: string;
   href: string;
+  /** role do autor — decide o substantivo ("pedido de ajuda" no jovem,
+   *  "pedido de apoio" no mentor, "chamado" na equipe). */
+  papel?: string | null;
 }): string {
+  const pedido = rotuloPedidoAutor(papel);
   return emailLayout({
-    titulo: "Atualização no seu pedido",
+    titulo: `Atualização no seu ${pedido}`,
     tagline: "Chamados · Mentoria Social",
     conteudoHtml:
-      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${autorNome ? `, ${esc(autorNome.split(" ")[0])}` : ""}! A equipe respondeu no seu pedido de apoio:</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${autorNome ? `, ${esc(autorNome.split(" ")[0])}` : ""}! A equipe respondeu no seu ${pedido}:</p>` +
       `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;background:${CARD_SUAVE};border-radius:10px;"><tr><td style="padding:14px 16px;font-size:15px;line-height:1.55;color:${INK};">${paragrafos(texto)}</td></tr></table>`,
     ctaLabel: "Ver a conversa",
     ctaHref: href,
-    preheader: `A equipe respondeu no seu pedido de apoio.`,
-    rodapeExtra:
-      "Você está recebendo este e-mail porque abriu um pedido de apoio na Mentoria Social.",
+    preheader: `A equipe respondeu no seu ${pedido}.`,
+    rodapeExtra: `Você está recebendo este e-mail porque abriu um ${pedido} na Mentoria Social.`,
   });
 }

@@ -47,6 +47,7 @@ const SHOTS = {
     { arquivo: "mentor_dpp-dupla", rota: dupla(D_OK) },
     { arquivo: "mentor_dpp-duplas", rota: "/duplas" },
     { arquivo: "mentor_dpp-home", rota: "/" },
+    { arquivo: "mentor_dpp-pdm", rota: `${dupla(D_OK)}?aba=instrumentos`, foco: "#pdm" },
     { arquivo: "mentor_dpp-apoio", rota: "/chamados" },
     { arquivo: "mentor_dpp-especialista", rota: "/agenda?aba=por-mentorado", texto: "Especialista solicitado" },
     { arquivo: "mentor_dpp-materiais", rota: "/materiais" },
@@ -56,6 +57,16 @@ const SHOTS = {
     { arquivo: "mentor_especialista-trilha", rota: dupla(D_ESP3) },
     { arquivo: "mentor_especialista-registro", rota: `${dupla(D_ESP3)}?aba=encontros`, foco: '[role="tabpanel"]' },
     { arquivo: "mentor_especialista-materiais", rota: "/materiais" },
+  ],
+  // o lado do jovem (REALIZA-426) — rotas /jovem/*; os focos nas seções da
+  // home e do perfil usam os ids dos h2 (aria-labelledby de cada seção)
+  mentorado: [
+    { arquivo: "mentorado-home", rota: "/jovem" },
+    { arquivo: "mentorado-agenda", rota: "/jovem/agenda" },
+    { arquivo: "mentorado-avaliacoes", rota: "/jovem", foco: "#avaliacoes-titulo" },
+    { arquivo: "mentorado-combinados", rota: "/jovem", foco: "#combinados-titulo" },
+    { arquivo: "mentorado-ajuda", rota: "/jovem/perfil", foco: "#jovem-chamados-titulo" },
+    { arquivo: "mentorado-perfil", rota: "/jovem/perfil" },
   ],
 };
 

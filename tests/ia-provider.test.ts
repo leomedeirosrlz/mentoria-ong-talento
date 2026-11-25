@@ -24,11 +24,21 @@ function stubFetch(impl: (init: RequestInit) => Response | Promise<Response>) {
   return spy;
 }
 
-function respostaOpenAi(message: unknown, status = 200) {
-  return new Response(JSON.stringify({ choices: [{ message }] }), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
+function respostaOpenAi(
+  message: unknown,
+  status = 200,
+  extra: { finish_reason?: string; usage?: unknown } = {}
+) {
+  return new Response(
+    JSON.stringify({
+      choices: [{ message, finish_reason: extra.finish_reason }],
+      usage: extra.usage,
+    }),
+    {
+      status,
+      headers: { "Content-Type": "application/json" },
+    }
+  );
 }
 
 describe("providerConfigurado", () => {
@@ -96,8 +106,8 @@ describe("chamarModelo", () => {
     );
     const esperado: Record<EsforcoIa, number> = {
       baixo: 1600,
-      medio: 4000,
-      alto: 8000,
+      medio: 6000,
+      alto: 12000,
     };
     for (const [esforco, max] of Object.entries(esperado)) {
       await chamarModelo([{ role: "user", content: "oi" }], undefined, {
@@ -136,11 +146,150 @@ describe("chamarModelo", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     stubFetch(() => new Response("quota", { status: 402 }));
     const r1 = await chamarModelo([{ role: "user", content: "oi" }]);
-    expect(r1).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    // provider-side quota failure puts Liza to sleep (REALIZA-363)
+    expect(r1).toEqual({
+      ok: false,
+      erro: IA_MSG_INDISPONIVEL,
+      dormindo: true,
+    });
 
     stubFetch(() => Promise.reject(new Error("socket")) as never);
     const r2 = await chamarModelo([{ role: "user", content: "oi" }]);
+    // non-transient exception is not sleep: stays a generic error
     expect(r2).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    consoleSpy.mockRestore();
+  });
+
+  it("marca dormindo nas falhas do provider; 400 genérico e erro nosso não", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const dormindo = (r: unknown) =>
+      (r as { dormindo?: boolean }).dormindo === true;
+
+    stubFetch(() => new Response("rate", { status: 429 }));
+    expect(dormindo(await chamarModelo([{ role: "user", content: "oi" }]))).toBe(true);
+    stubFetch(() => new Response("pau", { status: 502 }));
+    expect(dormindo(await chamarModelo([{ role: "user", content: "oi" }]))).toBe(true);
+    stubFetch(
+      () => Promise.reject(new DOMException("estourou", "TimeoutError")) as never
+    );
+    expect(dormindo(await chamarModelo([{ role: "user", content: "oi" }]))).toBe(true);
+    stubFetch(
+      () => Promise.reject(new TypeError("fetch failed")) as never
+    );
+    expect(dormindo(await chamarModelo([{ role: "user", content: "oi" }]))).toBe(true);
+
+    // not sleep: our own 400 payload and an oddball exception
+    stubFetch(() => new Response("invalid payload", { status: 400 }));
+    expect(dormindo(await chamarModelo([{ role: "user", content: "oi" }]))).toBe(false);
+    stubFetch(() => Promise.reject(new RangeError("?")) as never);
+    expect(dormindo(await chamarModelo([{ role: "user", content: "oi" }]))).toBe(false);
+    consoleSpy.mockRestore();
+  });
+});
+
+describe("chamarModelo — truncamento por max_tokens (REALIZA-397)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("finish_reason=length continua anexando e soma o usage das rodadas", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    let n = 0;
+    const spy = stubFetch(() =>
+      n++ === 0
+        ? respostaOpenAi(
+            { role: "assistant", content: "Primeira parte" },
+            200,
+            {
+              finish_reason: "length",
+              usage: { prompt_tokens: 10, completion_tokens: 5, cost: 0.1 },
+            }
+          )
+        : respostaOpenAi(
+            { role: "assistant", content: " e o resto." },
+            200,
+            {
+              finish_reason: "stop",
+              usage: { prompt_tokens: 8, completion_tokens: 4, cost: 0.05 },
+            }
+          )
+    );
+    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    if (!r.ok) throw new Error("esperava ok");
+    // o texto sai costurado, não substituído — e truncado vem falso
+    expect(r.mensagem.content).toBe("Primeira parte e o resto.");
+    expect(r.truncado).toBeUndefined();
+    // usage é a soma das duas chamadas, não só da última
+    expect(r.usage).toMatchObject({ prompt_tokens: 18, completion_tokens: 9 });
+    expect(r.usage?.cost).toBeCloseTo(0.15);
+    expect(spy).toHaveBeenCalledTimes(2);
+    // a continuação carrega o parcial como assistant + o pedido de retomada
+    const msgs = JSON.parse(String(spy.mock.calls[1]?.[1]?.body)).messages;
+    expect(msgs.at(-2)).toEqual({
+      role: "assistant",
+      content: "Primeira parte",
+    });
+    expect(msgs.at(-1).role).toBe("user");
+    expect(msgs.at(-1).content).toMatch(/continue/i);
+  });
+
+  it("continuação também cortada marca truncado (cap: sem loop)", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const spy = stubFetch(() =>
+      respostaOpenAi({ role: "assistant", content: "parte" }, 200, {
+        finish_reason: "length",
+      })
+    );
+    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    if (!r.ok) throw new Error("esperava ok");
+    expect(r.mensagem.content).toBe("parteparte");
+    expect(r.truncado).toBe(true);
+    // MAX_CONTINUACOES=1: original + 1 continuação, e para por aí
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("tool_call cortada NÃO continua — arguments quebrado não tem remendo", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const spy = stubFetch(() =>
+      respostaOpenAi(
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "c1",
+              type: "function",
+              function: { name: "ficha_dupla", arguments: '{"dupla' },
+            },
+          ],
+        },
+        200,
+        { finish_reason: "length" }
+      )
+    );
+    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    if (!r.ok) throw new Error("esperava ok");
+    expect(r.truncado).toBe(true);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("continuação que falha devolve o parcial sinalizado", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    let n = 0;
+    const spy = stubFetch(() =>
+      n++ === 0
+        ? respostaOpenAi({ role: "assistant", content: "metade" }, 200, {
+            finish_reason: "length",
+          })
+        : new Response("pau", { status: 503 })
+    );
+    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    if (!r.ok) throw new Error("esperava ok");
+    expect(r.mensagem.content).toBe("metade");
+    expect(r.truncado).toBe(true);
     consoleSpy.mockRestore();
   });
 });
@@ -188,7 +337,11 @@ describe("chamarModelo — cadeia de fallback (REALIZA-307)", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const spy = stubFetch(() => new Response("pau", { status: 503 }));
     const r = await chamarModelo([{ role: "user", content: "oi" }]);
-    expect(r).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    expect(r).toEqual({
+      ok: false,
+      erro: IA_MSG_INDISPONIVEL,
+      dormindo: true,
+    });
     expect(spy).toHaveBeenCalledTimes(1);
     consoleSpy.mockRestore();
   });
@@ -226,7 +379,12 @@ describe("chamarModelo — cadeia de fallback (REALIZA-307)", () => {
       undefined,
       OPTS
     );
-    expect(r).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    // fully exhausted transient chain → sleep, not a generic error
+    expect(r).toEqual({
+      ok: false,
+      erro: IA_MSG_INDISPONIVEL,
+      dormindo: true,
+    });
     expect(spy).toHaveBeenCalledTimes(3); // primario + fb-1 + fb-2
 
     // TimeoutError do AbortSignal interno → transitório, próximo slug resolve

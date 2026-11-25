@@ -7,14 +7,14 @@ import {
   demoInstrumentosDaDupla,
   getDemoFormularios,
 } from "../demo/forms-data";
-import type { AppRole } from "../types";
+import type { AppRole, AvaliacaoJovem, AvanceiAvaliacao } from "../types";
 import type {
   Formulario,
   FormularioCampo,
   FormularioLink,
   FormularioResposta,
   FormularioSistema,
-  InstrumentoSistema,
+  InstrumentoDuplaSistema,
   RespostaValor,
 } from "./schema";
 
@@ -79,6 +79,25 @@ export type FormularioDetalhe = {
   anexos: FormularioAnexo[];
 };
 
+/** Contexto de trajetória no 360º (0191 · REALIZA-71): derivado na
+ *  leitura da dupla do link — só sai nos sistemas avaliacao_final_*.
+ *  Mentor: a própria série 1–4 de registros + a média do jovem quantizada
+ *  (null quando a régua de lote ≥3 da 0071 não libera). Mentorado: as
+ *  próprias estrelas. Read-only — não é campo de resposta; 'outra_pessoa'
+ *  sai da RPC antes, sem contexto. */
+export type ContextoAvaliacao =
+  | {
+      registros: { numero: number; avaliacao: AvaliacaoJovem | null }[];
+      media_jovem: number | null;
+    }
+  | {
+      estrelas: {
+        numero: number;
+        estrelas: number;
+        avancei: AvanceiAvaliacao | null;
+      }[];
+    };
+
 /** Payload público do /f/<token> — o que formulario_por_token devolve. */
 export type FormularioPublico = {
   /** 0070 — 'outra_pessoa' quando uma sessão autenticada abre o link de
@@ -96,6 +115,9 @@ export type FormularioPublico = {
     /** 0042 — selo do instrumento oficial na página pública */
     sistema?: FormularioSistema | null;
   };
+  /** 0191 — trajetória da dupla do link nos 360º; ausente nos demais
+   *  sistemas e no corte 'outra_pessoa'. */
+  contexto_avaliacao?: ContextoAvaliacao | null;
 };
 
 // embed to-one pode vir array no client não-tipado — mesma norm() de queries.ts
@@ -178,12 +200,12 @@ export const getFormulario = cache(
       .select(
         `*,
         resposta:formulario_respostas(id, link_id, respostas, respondido_em, promovido_profile_id, promovido_mentorado_id),
-        dest_profile:profiles!formulario_links_dest_profile_id_fkey(id, nome, role, avatar_path),
-        dest_mentorado:mentorados!formulario_links_dest_mentorado_id_fkey(id, nome, whatsapp, avatar_path),
+        dest_profile:profiles!formulario_links_dest_profile_id_fkey(id, nome, nome_social, role, avatar_path),
+        dest_mentorado:mentorados!formulario_links_dest_mentorado_id_fkey(id, nome, nome_social, whatsapp, avatar_path),
         dupla:duplas!formulario_links_dupla_id_fkey(
           id,
-          mentor:profiles!duplas_mentor_id_fkey(nome),
-          mentorado:mentorados!duplas_mentorado_id_fkey(nome)
+          mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+          mentorado:mentorados!duplas_mentorado_id_fkey(nome, nome_social)
         )`
       )
       .eq("formulario_id", id)
@@ -222,26 +244,27 @@ export const getFormulario = cache(
       for (const c of conts ?? []) contatos.set(c.id, c.whatsapp);
     }
 
+    type PessoaLink = { nome: string; nome_social?: string | null };
     type LinkRaw = FormularioLink & {
       resposta: FormularioResposta | FormularioResposta[] | null;
       dest_profile:
-        | { id: string; nome: string; role: string | null; avatar_path: string | null }
-        | { id: string; nome: string; role: string | null; avatar_path: string | null }[]
+        | (PessoaLink & { id: string; role: string | null; avatar_path: string | null })
+        | (PessoaLink & { id: string; role: string | null; avatar_path: string | null })[]
         | null;
       dest_mentorado:
-        | { id: string; nome: string; whatsapp: string | null; avatar_path: string | null }
-        | { id: string; nome: string; whatsapp: string | null; avatar_path: string | null }[]
+        | (PessoaLink & { id: string; whatsapp: string | null; avatar_path: string | null })
+        | (PessoaLink & { id: string; whatsapp: string | null; avatar_path: string | null })[]
         | null;
       dupla:
         | {
             id: string;
-            mentor: { nome: string } | { nome: string }[] | null;
-            mentorado: { nome: string } | { nome: string }[] | null;
+            mentor: PessoaLink | PessoaLink[] | null;
+            mentorado: PessoaLink | PessoaLink[] | null;
           }
         | {
             id: string;
-            mentor: { nome: string } | { nome: string }[] | null;
-            mentorado: { nome: string } | { nome: string }[] | null;
+            mentor: PessoaLink | PessoaLink[] | null;
+            mentorado: PessoaLink | PessoaLink[] | null;
           }[]
         | null;
     };
@@ -256,12 +279,15 @@ export const getFormulario = cache(
           : l.resposta
             ? [l.resposta]
             : [];
+        const dm = dupla ? norm(dupla.mentor) : null;
+        const dmtd = dupla ? norm(dupla.mentorado) : null;
         return {
           ...l,
           resposta: norm(l.resposta),
           respostas: todas,
           dest_tipo: p ? "profile" : m ? "mentorado" : "generico",
-          dest_nome: p?.nome ?? m?.nome ?? null,
+          dest_nome:
+            p?.nome_social ?? p?.nome ?? m?.nome_social ?? m?.nome ?? null,
           dest_whatsapp: m?.whatsapp ?? (p ? (contatos.get(p.id) ?? null) : null),
           dest_papel: p?.role ?? (m ? "mentorado" : null),
           dest_avatar: p?.avatar_path ?? m?.avatar_path ?? null,
@@ -269,8 +295,8 @@ export const getFormulario = cache(
           dupla: dupla
             ? {
                 id: dupla.id,
-                mentor_nome: norm(dupla.mentor)?.nome ?? "",
-                mentorado_nome: norm(dupla.mentorado)?.nome ?? "",
+                mentor_nome: dm?.nome_social ?? dm?.nome ?? "",
+                mentorado_nome: dmtd?.nome_social ?? dmtd?.nome ?? "",
               }
             : null,
         };
@@ -314,7 +340,7 @@ export type InstrumentoEntrega = {
 
 /** Um instrumento oficial no contexto da dupla — definição + entregas. */
 export type InstrumentoDupla = {
-  sistema: InstrumentoSistema;
+  sistema: InstrumentoDuplaSistema;
   formulario_id: string;
   titulo: string;
   descricao: string | null;
@@ -444,7 +470,8 @@ function demoDetalhe(role: AppRole, id: string): FormularioDetalhe | null {
       return {
         ...l,
         dest_tipo: p ? "profile" : m ? "mentorado" : "generico",
-        dest_nome: p?.nome ?? m?.nome ?? null,
+        dest_nome:
+          p?.nome_social ?? p?.nome ?? m?.nome_social ?? m?.nome ?? null,
         dest_whatsapp: p?.whatsapp ?? m?.whatsapp ?? null,
         dest_papel: p?.role ?? (m ? "mentorado" : null),
         dest_avatar: p?.avatar_path ?? m?.avatar_path ?? null,
@@ -452,8 +479,10 @@ function demoDetalhe(role: AppRole, id: string): FormularioDetalhe | null {
         dupla: dupla
           ? {
               id: dupla.id,
-              mentor_nome: dupla.mentor?.nome ?? "",
-              mentorado_nome: dupla.mentorado?.nome ?? "",
+              mentor_nome:
+                dupla.mentor?.nome_social ?? dupla.mentor?.nome ?? "",
+              mentorado_nome:
+                dupla.mentorado?.nome_social ?? dupla.mentorado?.nome ?? "",
             }
           : null,
         resposta: todas[0] ?? null,

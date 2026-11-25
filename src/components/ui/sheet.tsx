@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
+import { useFecharNoVoltar } from "@/lib/use-fechar-no-voltar"
 
 import { Button } from "@/components/ui/button"
 import { X } from "@phosphor-icons/react"
@@ -12,8 +13,32 @@ import { X } from "@phosphor-icons/react"
  * em vez de centralizado. Desliza da borda; o guard global de
  * prefers-reduced-motion zera a animação. */
 
-function Sheet({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="sheet" {...props} />
+function Sheet({
+  open,
+  defaultOpen,
+  onOpenChange,
+  actionsRef,
+  voltarFecha = true,
+  ...props
+}: DialogPrimitive.Root.Props & { voltarFecha?: boolean }) {
+  const [aberto, setAberto] = React.useState(defaultOpen ?? false)
+  const internas = React.useRef<DialogPrimitive.Root.Actions | null>(null)
+  const acoes = actionsRef ?? internas
+  const atual = open ?? aberto
+  useFecharNoVoltar(voltarFecha && atual, () => acoes.current?.close())
+
+  return (
+    <DialogPrimitive.Root
+      data-slot="sheet"
+      {...props}
+      open={atual}
+      actionsRef={acoes}
+      onOpenChange={(o, detalhes) => {
+        setAberto(o)
+        onOpenChange?.(o, detalhes)
+      }}
+    />
+  )
 }
 
 function SheetTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
@@ -37,22 +62,32 @@ function SheetContent({
   children,
   side = "left",
   showCloseButton = true,
+  closeLabel = "Fechar menu",
   keepMounted,
   ...props
 }: DialogPrimitive.Popup.Props & {
   side?: keyof typeof LADO
   showCloseButton?: boolean
+  /** Nome acessível do X — "menu" é o caso do kit (nav); sheets de conteúdo
+   *  passam "Fechar". */
+  closeLabel?: string
 } & Pick<DialogPrimitive.Portal.Props, "keepMounted">) {
   return (
     <DialogPrimitive.Portal keepMounted={keepMounted}>
+      {/* sem backdrop-blur: blur animado sobre scrim translúcido pisca
+          preto no Chrome Android (camada do filtro compõe antes de
+          amostrar o fundo) — e blur-xs num scrim de 20% nem se percebe */}
       <DialogPrimitive.Backdrop
         data-slot="sheet-overlay"
-        className="fixed inset-0 isolate z-50 bg-[var(--overlay-forte)] duration-200 ease-[cubic-bezier(0.2,0,0,1)] supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+        className="fixed inset-0 z-50 bg-[var(--overlay-forte)] duration-200 ease-[cubic-bezier(0.2,0,0,1)] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
       />
       <DialogPrimitive.Popup
         data-slot="sheet-content"
         className={cn(
-          "fixed z-50 flex flex-col overflow-y-auto border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[var(--shadow-modal)] outline-none duration-200 ease-[cubic-bezier(0.2,0,0,1)] data-open:animate-in data-closed:animate-out",
+          /* will-change aqui é just-in-time de graça: keepMounted deixa o
+             popup hidden (sem camada); ao exibir, ele já nasce promovido —
+             sem o raster em main-thread + re-promoção no meio do slide */
+          "fixed z-50 flex flex-col overflow-y-auto border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[var(--shadow-modal)] outline-none duration-200 ease-[cubic-bezier(0.2,0,0,1)] will-change-transform data-open:animate-in data-closed:animate-out",
           LADO[side],
           className
         )}
@@ -71,7 +106,7 @@ function SheetContent({
             }
           >
             <X />
-            <span className="sr-only">Fechar menu</span>
+            <span className="sr-only">{closeLabel}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Popup>

@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckSquare, Users } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { marcarPresenca, marcarPresencas } from "@/lib/actions-presenca";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { MentorChamada } from "@/lib/queries-presenca";
 import { cn } from "@/lib/utils";
 
@@ -35,9 +36,6 @@ export function ChamadaFormacao({
   // chave do src): override confirmado pelo servidor sai; divergente fica
   // até a action dele responder
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
-  // ids marcados presentes nesta sessão — só eles ganham o check animado;
-  // quem já chega presente do server não celebra de novo a cada mount
-  const [presentesAgora, setPresentesAgora] = useState<ReadonlySet<string>>(new Set());
   const [presentesAnt, setPresentesAnt] = useState(presentes);
   if (presentes !== presentesAnt) {
     setPresentesAnt(presentes);
@@ -54,7 +52,6 @@ export function ChamadaFormacao({
 
   function alternar(m: MentorChamada, v: boolean) {
     setOverrides((o) => ({ ...o, [m.id]: v }));
-    if (v) setPresentesAgora((s) => new Set(s).add(m.id));
     setPendingId(m.id);
     start(async () => {
       try {
@@ -83,7 +80,6 @@ export function ChamadaFormacao({
   }
 
   function marcarTodas() {
-    setPresentesAgora((s) => new Set([...s, ...mentores.map((m) => m.id)]));
     setOverrides((o) => ({
       ...o,
       ...Object.fromEntries(mentores.map((m) => [m.id, true])),
@@ -131,49 +127,18 @@ export function ChamadaFormacao({
               const presente = presenteDe(m.id);
               return (
                 <li key={m.id}>
-                  {/* checkbox nativo + label: teclado, estado e o clique no
-                      nome funcionam sem ARIA manual (mesma gramática dos
-                      combinados em encaminhamentos-list) */}
                   <label
                     className={cn(
                       "group flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/70",
                       pending && pendingId === m.id && "opacity-60"
                     )}
                   >
-                    <input
-                      type="checkbox"
-                      className="peer sr-only"
+                    <Checkbox
                       checked={presente}
                       disabled={pending && pendingId === m.id}
-                      onChange={(e) => alternar(m, e.target.checked)}
+                      onCheckedChange={(v) => alternar(m, v)}
+                      className="group-hover:border-foreground"
                     />
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "grid size-4.5 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
-                        presente
-                          ? "border-[var(--ok)] bg-[var(--ok)] text-[var(--status-foreground)]"
-                          : "border-muted-foreground/40 group-hover:border-foreground"
-                      )}
-                    >
-                      {presente && (
-                        // check entra com pop (svg) e se desenha (path) —
-                        // mesmos keyframes confirm-pop/confirm-draw do
-                        // /auth/confirmado, só no clique desta sessão
-                        <svg
-                          viewBox="0 0 10 8"
-                          className={cn(
-                            "size-2.5 fill-none stroke-current stroke-2",
-                            presentesAgora.has(m.id) && "confirm-pop"
-                          )}
-                        >
-                          <path
-                            d="M1 4l2.5 2.5L9 1"
-                            className={cn(presentesAgora.has(m.id) && "confirm-draw")}
-                          />
-                        </svg>
-                      )}
-                    </span>
                     <Avatar
                       nome={m.nome}
                       src={m.avatar_path ? avatarPublicUrl(m.avatar_path) : null}

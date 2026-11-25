@@ -1,6 +1,6 @@
 # Backlog — realiza.vc
 
-Fonte única de pendências. Itens resolvidos são removidos das listas e somados ao resumo abaixo.
+Fila canônica de pendências. Intenção de mudança fica em `specs/`; histórico de decisão, em `docs/planos/`. Itens resolvidos são removidos das listas e somados ao resumo abaixo.
 
 Resolvido até aqui: fuso SP em `ciclo.ts`, datas date-only, CSV multi-linha/BOM/`normWhatsapp`/`emailValido`, enum `sem papel`→`null` + validação de papéis/status, `agendarEncontro` (data inválida, número limitado ao ciclo, não reescreve `realizado`, dupla inativa, fuso resolvido no client com ISO + server aceita naïve como SP, `origem`/`link`/`created_by` preservados), `salvarRegistro` (só encontro passado/realizado da própria dupla, dupla ativa, enums validados, `created_by` só no insert, update→realizado checado), `RegistroForm` gated por data + editável com prefill, encaminhamentos em JSON com dedup + reset pós-salvar + keys estáveis + linha clicável inteira, open redirect em `/auth/confirm`, `erroAmigavel`, RLS endurecido (`0004`), semáforo respeita `iniciada_em` e congela pausada/encerrada + motivo com número real do encontro faltante, trilha completa esconde "agendar", coordenação não agenda/registra, `mentor_profile` não zera em update parcial + sincronizado nas transições de papel, `whatsapp` vazio→`null` e inválido→erro (não apaga campo), signup pentestado, mobile-first completo, copy pt-BR acentuado em `src/` e no seed/migration `0005`.
 
@@ -156,18 +156,18 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 - [x] ~~**"Meu perfil"**~~ — `/perfil` com foto (upload → Gravatar do e-mail → iniciais), nome/WhatsApp self-edit e troca de senha. `0014`: `profiles.avatar_path` + bucket público `avatares` (pasta `<profile_id>/`). Avatar aparece no shell (sidebar/topbar) e no header da dupla. ✅ sprint perfis: avatar nas rows de /pessoas, `mentorados.avatar_path` + foto opcional no cadastro/edição.
 - [x] ~~**`duplas.ciclo` com default fixo**~~ — seletor nos dois dialogs (`cicloVigente`/`ciclosOpcoes` em ciclo.ts, default = vigente).
 - [x] ~~**Desativar mentor com dupla ativa**~~ — o confirm nomeia o impacto ("tem N dupla(s) ativa(s) — vão ficar sem mentor") com label "Desativar" no botão.
-- [ ] **"Sem papel" em pessoa com dupla**: dupla continua listando ela como mentor — aviso. (Mitigado: `setPessoaRole` trava papel de quem tem dupla ativa/pausada; resta o caso do papel já removido antes do guard.)
-- [ ] **Statuses mortos**: `remarcado`/`cancelado`/`atrasado` — implementar ou remover do enum. `duracao_min` ✅ persistido (whitelist no `salvarRegistro` + prefill na edição).
+- [x] **"Sem papel" em pessoa com dupla**: dupla continua listando ela como mentor — aviso. (Mitigado: `setPessoaRole` trava papel de quem tem dupla ativa/pausada; resta o caso do papel já removido antes do guard.) — **feito**: o embed do mentor na `DUPLA_SELECT` passou a trazer `profile_papeis` e a ficha da dupla mostra um pill de aviso pra staff quando falta o papel esperado da trilha ("ajuste em Pessoas" pra coordenação, "avise a coordenação" pro auxiliar).
+- [x] **Statuses mortos**: `remarcado`/`cancelado`/`atrasado` — implementar ou remover do enum. `duracao_min` ✅ persistido (whitelist no `salvarRegistro` + prefill na edição). — **verificado, nada morto**: `remarcado` é legado lido em rows antigas (remarcação grava `agendado` + `encontro_remarcacoes` — tirar do enum quebraria histórico), `cancelado` é transição reservada pelo guard 0043 tratada nos leitores da agenda, `atrasado` nem é do enum de encontro — é `EncaminhamentoStatus` derivado (pendente + prazo < hoje).
 - [x] ~~**`materiais.ordem`**~~ — persistida no `editarMaterial` (edição de metadados implementada no MaterialActions).
 - [x] ~~**Ordenação case-insensitive**~~ — `localeCompare pt-BR` em pessoas e nos selects de parear.
 - [x] ~~**Trigger no banco**~~ — `0043`: `encontros_status_guard` barra saída de `realizado` (TOCTOU fechado).
 - [x] ~~**Supervisor em `/duplas`**~~ — usa `getMinhasDuplas()` (RLS no banco, não filtro JS).
 - [~] **`queries.ts`**: `as unknown as Dupla[]` → `supabase gen types`. `src/lib/database.types.ts` gerado do remoto (2256 linhas, schema vivo); adoção gradual nos casts — os tipos locais são hand-narrowed com embeds.
-- [ ] **Kit UI residual**: `material-actions.tsx` (1 uso) → inline. (Resto removido; `skeleton.tsx` agora usado pelo `loading.tsx`.)
+- [x] ~~**Kit UI residual**~~ — verificado nov/2026: `material-actions.tsx` tem 2 consumidores reais (`MaterialActions` na biblioteca + `MaterialMenu` no /jovem/materiais) — o inline descaracterizaria. Nada a fazer.
 - [x] ~~**`sonner` `richColors`**~~ — verificado: `sonner.tsx` já mapeia `--success/--error/--warning` pros tokens `--ok`/`--warn`/`--danger`. Nada a fazer.
 - [x] ~~**`importar-csv-dialog`**~~ — input reseta (`value=""`), leitura `arrayBuffer()` com fallback UTF-8→Win-1252 + catch pt-BR.
 - [x] ~~**`NovaDuplaDialog`/`EditarDuplaDialog`**~~ — skeleton no 1º load, erro honesto com retry, refetch falho → toast sem bloquear.
-- [ ] **Padronizar import de `cn`** (`@/lib/utils` vs `cn` direto em ui/*).
+- [x] ~~**Padronizar import de `cn`**~~ — feito nov/2026 (`e05118b5`): 24 arquivos que importavam do pacote `cn` direto passaram pro alias `@/lib/utils` (re-export da mesma função).
 - [x] ~~**Pessoas com só dupla encerrada**~~ — `temQualquerDupla` desabilita o excluir com nota explicativa; "Sem dupla ativa" com menção ao histórico.
 - [ ] **wa.me diretos na página da dupla** ("Falar com mentorado", "Enviar combinados") não passam por `/api/nudge` → não logam em `interacoes`. Decidir se contato do mentor entra no log (hoje só nudges de coord/supervisor via NudgeButton).
 - [x] ~~**`me()` em actions.ts**~~ — 58 call sites com early-return "Sessão expirada" (auditoria completa).
@@ -189,6 +189,7 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
   - A `0158` tirou a triagem: demanda e motivo escritos pelo jovem vão direto ao mural de todo `mentor_especialista` ativo.
   - `ia_confirmacoes` (`0163`) guarda os args completos (mensagem de até 4000 chars) e só é limpa pelo próprio dono na próxima prévia. Um usuário inativo retém esses dados para sempre. Falta um job de limpeza global.
 - [ ] **Contra-assinatura do presidente**: subir o PNG em qualquer ficha → seção Assinaturas → engrenagem (ou `documentos/sistema/contra-assinatura.png` no storage). Os PDFs do termo já saem assinados pelo instituto quando a imagem existe.
+- [ ] **"Aconteceu como planejado?" × avaliação do encontro** (R19 do recon da REALIZA-508): a pergunta do registro mede aderência ao plano, mas grava no `registros.avaliacao` de 4 pontos ("Não" → `baixa`) que alimenta trajetória e semáforo como QUALIDADE. Um encontro fora do planejado pode ter sido ótimo — são duas leituras que hoje dividem um enum só. Espera decisão de produto (pergunta muda, ou o mapeamento deixa de conflar); até lá pergunta e mapeamento ficam como estão.
 
 ## REALIZA-238 — auditoria dos guias vs catálogo (out/2026)
 
@@ -204,15 +205,25 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 - [x] ~~**Janela da Roda inicial** (S1)~~ — aceito: a Roda da Vida vai na "Mensagem de preparação do mentorado" (enc. 1), que é o canal pré-encontro; a estação do enc. 1 espelha isso.
 - [x] ~~**Especialista não registra meta no PDM** (S2)~~ — **decisão out/2026: não abre.** O especialista registra na trilha (`registros`/`devolutiva_pdm`) e o mentor DPP transporta para o PDM; `pdm_pode_editar` segue recusando `trilha='especialista'`.
 - [ ] **Títulos 3 a 7 do cronograma divergem do guia** (S6) — paráfrases ("Declaração de Visão e metas SMART" no lugar de "Metas e checagem SMART"), e o mentor lê os dois lado a lado. Depende do Leo.
-- [ ] **Dataset demo com 12 materiais** (E6) — prod tem 25; quem testa a demo vê uma biblioteca que não existe.
+- [x] ~~**Dataset demo com 12 materiais**~~ (E6) — stale: o catálogo demo tem ~29 itens (2 guias + 16 roteiros + templates e links), acima dos 25 de prod. Coberto.
 - [x] ~~**Duas linhas com `ordem = 17` em produção**~~ (E7) — biblioteca reordenada 1 a 25 sem empate em out/2026.
 - [x] ~~**Anamnese Social e Autoavaliação do mentor**~~ — decidido em out/2026: a anamnese é **processo externo** (o intake é o único canal; a referência mora no campo de notas do mentorado) e a autoavaliação **saiu de vez** (0128+0132 + material apagado de prod, seed e demo).
-- [ ] **PDM do especialista e divergência "PDM fora da plataforma"** (E1/S2) — **decisão out/2026: o PDM mora dentro da plataforma.** Falta a copy: dizer isso ao mentor no onboarding (senão ele mantém duas cópias).
+- [x] ~~**PDM do especialista e divergência "PDM fora da plataforma"**~~ (E1/S2) — feito nov/2026 (`8faaa231`+`4a90e3bc`): o tour do mentor ganhou o item "PDM do mentorado: metas e plano vivem na plataforma" com print real da aba Instrumentos (PDM aberto com metas/indicadores/submetas).
 
 ## Intake e documentos (out/2026)
 
 - [x] ~~**Currículos dos mentorados como link do Drive**~~ — os 33 mentorados agora têm `curriculo_url` preenchido com o link do form de matching (ficha em `/pessoas/[id]`, confidencial coord/auxiliar). Nada foi re-uploadado: o arquivo continua no Drive e a ficha oferece o link. Os 17 currículos que já estavam no bucket privado `documentos` (import de 24/set) seguem lá como arquivo morto opcional — remover só com pedido explícito.
 - [x] ~~**Anexos do intake**~~ — os 178 arquivos dos três forms (matching mentores/mentorados + cadastro BP) já estão importados desde 24/set: 45 pessoas, 138 arquivos → 115 rows em `documentos_pessoa` (RG/CNH, comprovante de residência, comprovante bancário, CPF e currículo dos mentores e da equipe) + 23 avatares. `scripts/importar-intake.ts` é idempotente e roda de novo sem duplicar.
+
+## Anti-regressão — pendências do nível 2 (nov/2026)
+
+Feito em 18/nov/2026 (nível 1 — branch `docs/regression-proof`): constitution em `.specify/memory/`, AGENTS novo, specs + fluxo SDD, job `repo-guard` no CI, 5 specs de contrato (allowlist pública do proxy, matcher, integridade das migrations, jobs/cron, gates de deploy) e docs corrigidos (README, architecture, ci-e2e).
+
+- [ ] **Fronteiras de código**: dependency-cruiser com regras de fronteira (demo/ não importa módulo server; regra de escrita só em `escritas.ts`), knip para código morto e type-coverage com piso — definir pisos antes de virar gate.
+- [ ] **Lacunas de teste** do `docs/regression-map.md`: PII do `/resumo` (`resumo-acesso.ts`), paridade TS×SQL de vocabulários (`AcaoProduto`, `AUDIENCIAS`), `refazer` (`0209`), auth do `/api/mcp`, handoff em SQL (`0181`/`0175`/`0050`), trigger de encerramento e `rematch_dupla`.
+- [ ] **e2e vermelho latente no `staging`** (descoberto pelo PR #179, o primeiro PR desde #146 — o `e2e-app` só dispara em PR, e os pushes diretos de 16–17/11 passaram sem rodar): `demo/avaliacao-360.spec.ts:75`, `demo/instrumentos.spec.ts:74` e `:128` (elemento não encontrado — a rodada UI/UX + audit de 17/11 mudou a marcação) e `app/pdm.spec.ts:665` (Metas → árvore do PDM; pode ser drift ou regressão real do `0209`). É a "rodada-2 do audit" que faltava + prova de por que push direto em `staging` não pode ser o fluxo.
+- [ ] **Proteção de branch**: ligar required checks (`gates`, `repo-guard`, `schema-contract`, `e2e-app / e2e`) em `main` e `staging` com `enforce_admins:false` — comando pronto em `docs/convencoes/ci-e2e.md`.
+- [ ] **Decisões que travam teste**: documento revogado (0206 vs emissão manual), dupla tardia sem grace period, especialista em "Aguardando par" (com o Leo).
 
 ## Produção
 
@@ -220,7 +231,7 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 - [x] ~~Remover login por senha~~ — virou feature: primeiro acesso via magic link cai em `/auth/definir-senha` (flag `user_metadata.senha_em`), depois a pessoa entra por senha **ou** link. Resta só garantir que contas de teste não fiquem com senha fraca compartilhada (`senha123`).
 - [x] ~~Signup aberto → convite/allowlist~~ — `0045`: trigger em `auth.users` exige e-mail pré-cadastrado em `profiles` (signup público E `admin.createUser` — dentro do GoTrue são indistinguíveis; SQL direto/migrações bypassam). **Coordenação precisa pré-cadastrar antes de convidar** — magic link de e-mail novo falha com mensagem pt-BR.
 - [x] ~~Deploy Vercel~~ — `https://realizavc.vercel.app` no ar (projeto `thisux1s-projects/realiza.vc`, repo `thisux1/realiza.vc` conectado — push na main já dispara redeploy). Envs de prod: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL` (todas Config/exposed). Dashboard Supabase: ~~Site URL `https://realizavc.vercel.app` + Redirect URLs `/**`~~ — feito. Resta o SMTP da tarefa acima.
-- [ ] E-mail pra coordenação quando `precisa_apoio = true` (após Resend).
+- [x] ~~E-mail pra coordenação quando `precisa_apoio = true`~~ — feito nov/2026 (`0204` + salvarRegistro): o trigger do 0084 abre o chamado dentro da transação, então a action nova (`chamado_do_registro`, definer) devolve id/numero/destinatários pra `enviaEmailChamadoDepois` mandar o `emailChamadoUrgencia` (coord + supervisor da dupla — mesma régua do `abrir_chamado`).
 - [x] ~~Observabilidade (Sentry)~~ — org `realizavc`/`realizamentoria-nextjs`: erros + tracing (10% prod), tunnel `/monitoring`, PII off + scrub de bearer tokens (path + query + fragment), sem Replay. Falta: `SENTRY_AUTH_TOKEN` na Vercel prod+preview (source maps).
 - [x] ~~Export CSV de pessoas/mentorados~~ — `/api/export?tipo=pessoas` coord-only, agora com bloco sensível (nascimento/gênero/pref/motivação) via views `*_pessoal`.
 - [x] ~~`middleware`→`proxy`~~ — feito (build reconhece `ƒ Proxy`).
@@ -384,6 +395,63 @@ Pedido do Thiago (perdido numa sessão anterior, resgatado em 24/out):
   "aguardando par" é do fluxo DPP (mentor-mentorado). Mentores
   especialistas não fazem parte desse fluxo e não devem aparecer em
   "aguardando par". Filtrar por trilha/papel nas queries e na UI.
+  — **recon (nov/2026)**: a fila é `turma_inscricoes.status='aguardando'`
+  (coord-gerenciada, CHECK só permite `mentor`/`mentorado` — não há trilha
+  na inscrição). Um especialista inscrito como `mentor` vira "Aguardando
+  par" nos dois consumidores (`pessoas-status.ts` e a linha "Sem dupla" do
+  relatório). Caminhos possíveis: (a) enum `papel_esperado` ganha
+  `mentor_especialista` → inscrição vira "disponível pra pedidos" sem fila
+  DPP; (b) UI suprime o papel quando a pessoa só tem `mentor_especialista`
+  em `profile_papeis`. Decide com Leo: a fila de especialista sequer
+  existe como conceito operacional? (eles pegam pedidos no mural, não
+  aguardam par).
 - [ ] **Filtros da aba Pessoas reorganizados** — os pills de filtro devem
   ficar abaixo, logo antes da lista de pessoas. Transformar "aguardando
-  par" em um dropdown e movê-lo para cima dos filtros/pesquisa.
+  par" em um dropdown e movê-lo para cima dos filtros/pesquisa. — **recon
+  (nov/2026)**: o controle hoje é a seção/pill derivado de
+  `papeisNaTurma`/`rankNaTurma` em `pessoas-status.ts` +
+  `pessoas-listas.tsx`; o reshape depende do desfecho do item anterior
+  (se "aguardando" mudar de semântica, o dropdown muda junto — fazer os
+  dois juntos).
+- [ ] **Card de disponibilidade (FR-014)** — recorte do REALIZA-459 que
+  ficou fora da fatia por decisão do orquestrador: a UI pra dupla declarar
+  os horários possíveis (o planner de "ficar em dia" já lê ritmo/janela;
+  falta a superfície que alimenta a disponibilidade semanal). Quando
+  entrar, o `plano_propor` passa a sugerir datas dentro dos slots
+  declarados em vez de só evitar colisão. Registrar junto: a policy de
+  `encontro_guia_ajustes` pro jovem também ficou fora da fatia — liberar
+  depois é migration nova de policy, não mudança de código.
+
+## Rodada UI/UX — 23/nov/2026
+
+Pipeline em andamento (feedback → recon → spec → issues → implementação → review → aprovação manual):
+
+- [ ] **REALIZA-511** — Instrumentos, modais e Roda da Vida. Spec `specs/010-instrumentos-visual/`.
+- [ ] **REALIZA-512** — PDM cascateado e seletor de mentorado. Spec `specs/011-pdm-cascata/`.
+- [ ] **REALIZA-515** — Conquistas, nova rodada e preview de especialista. Spec `specs/012-conquistas-especialista/`.
+- [ ] **REALIZA-513** — “Ficar em dia” até o encerramento (1 encontro/dia). Spec `specs/013-ficar-em-dia/`.
+- [ ] **REALIZA-514** — Evals das novas tools da Liza. Spec `specs/014-liza-evals/`.
+- [ ] **REALIZA-510** — Revisão e2e UI/UX das trilhas de especialista. Spec `specs/015-e2e-especialista-uiux/`.
+- [ ] **REALIZA-516** — Badges isométricas e níveis de jornada. Spec `specs/016-badges/`.
+
+Recon consolidado: `docs/planos/issues/_recon/rodada-2026-11-23.md`.
+
+## Rodada plano "ficar em dia" 2.0 — 23/nov/2026
+
+Pipeline em andamento (recon + specs + opinião entregues; implementação aguarda aprovação):
+
+- [ ] **REALIZA-518** — Autonomia do plano: ritmo em pills, disponibilidade cruzada, recesso antes de simular, 4 papéis propondo, um aceite basta. Spec `specs/017-plano-autonomia/`.
+- [ ] **REALIZA-519** — Fusão de encontros no plano e registro combinado sem cópia (cobertura nativa + avaliação única). Spec `specs/018-fusao-registro/`.
+- [ ] **REALIZA-520** — Card "Sua semana" nas homes (jovem 1 card, mentor por dupla, staff lista de risco). Spec `specs/019-sua-semana/`.
+- [ ] **REALIZA-521** — Doc do combinado determinístico + roteiros semanais lazy + geração sob demanda. Spec `specs/020-docs-do-plano/`.
+- [ ] **REALIZA-522** — Materiais estruturados gerados pela Liza (backlog, schema fechado, coordenação publica). Spec `specs/021-materiais-liza/`.
+
+Recon + opinião: `docs/planos/issues/_recon/plano-518-522-2026-11-23.md` e `plano-518-522-opiniao.md` (SQL sugerido em texto; próximo número de migration livre: 0225). O item "Card de disponibilidade (FR-014)" acima tem a parte do planner coberta pela spec 017; a superfície de edição da grade segue pendente.
+
+## Backlog — relatórios (nov/2026)
+
+- [ ] **REALIZA-523** — Relatórios: filtros por papel/tipo de mentor e mais granularidade. Manter a tabela default como está e acrescentar pills extras; default não mostra staff nem especialistas. Pills: mentor DPP, mentor especialista, coordenação, auxiliar, todos; combinar com trilha/turma/status/período; URL + limpar + exportação/contagens coerentes.
+
+## Backlog — avaliação do jovem (nov/2026)
+
+- [ ] **REALIZA-524** — Modal de avaliação: mostrar data e dia da semana além do número/nome do encontro; fallback para data nula; cobrir também o fluxo por token.

@@ -18,6 +18,7 @@ __pycache__/
 # clones de referência soltos no root — não são do app
 openwa/
 .tmp-analise/
+.tmp/
 
 # config local da CLI Devin (pode ter credenciais) — não versionar
 .devin/

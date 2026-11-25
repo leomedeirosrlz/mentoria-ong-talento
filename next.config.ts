@@ -1,5 +1,26 @@
 import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Worktrees locais compartilham o node_modules por symlink (o .pnpm real
+// mora no worktree-mãe). O Turbopack recusa symlink que sai do filesystem
+// root — quando o realpath escapa do diretório do projeto, o root sobe
+// pro ancestral comum dos dois; checkout normal não muda nada
+// (root === diretório do projeto, o default).
+const DIR = path.dirname(fileURLToPath(import.meta.url));
+const nmPath = path.join(DIR, "node_modules");
+const nmReal = fs.existsSync(nmPath) ? fs.realpathSync(nmPath) : nmPath;
+const turboRoot = nmReal.startsWith(DIR + path.sep)
+  ? DIR
+  : (() => {
+      const a = DIR.split(path.sep);
+      const b = nmReal.split(path.sep);
+      let i = 0;
+      while (i < a.length && i < b.length && a[i] === b[i]) i++;
+      return a.slice(0, i).join(path.sep) || path.sep;
+    })();
 
 // Segunda barreira contra XSS (hoje não há sink de markup) + clickjacking:
 // /assinar/<token> e /f/<token> são públicas por token e nunca podem virar
@@ -9,7 +30,11 @@ const CSP = [
   // 'unsafe-inline' é exigência do hydration/RSC do Next sem nonce middleware;
   // 'unsafe-eval' só em dev — React Dev o usa pra reconstruir callstacks
   // (em produção o React nunca chama eval, então a diretiva fica fora)
-  `script-src 'self' 'unsafe-inline'${
+  // 'wasm-unsafe-eval' habilita WebAssembly.instantiate — exigência do
+  // DuckDB-WASM do explorador de adoção (fase B) no Chrome; sem ela o
+  // módulo nem compila. Escopo estreito: só libera compilar wasm, não
+  // eval de JS.
+  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${
     process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""
   }`,
   "style-src 'self' 'unsafe-inline'",
@@ -57,10 +82,26 @@ const remotePatterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [
     : []),
 ];
 
+// Proxy same-origin pro Supabase local: o browser chama /supabase no host da
+// aplicação e o Next repassa pro 127.0.0.1:54321. Evita o CORS inválido do
+// Kong (`*` + `Allow-Credentials: true`) sem expor a porta 54321 ao celular.
+const supabaseProxyTarget = process.env.SUPABASE_PROXY_TARGET;
+
 const nextConfig: NextConfig = {
   // sem "X-Powered-By: Next.js" — banner de stack não ajuda ninguém
   poweredByHeader: false,
   images: { remotePatterns },
+  // Explorador de adoção (REALIZA-417 fase B): os binários do
+  // @duckdb/duckdb-wasm (wasm + worker pré-empacotado, bundles mvp/eh sem
+  // thread) são emitidos como assets — o import devolve a URL e o
+  // download só acontece quando o explorador abre, num chunk lazy.
+  turbopack: {
+    root: turboRoot,
+    rules: {
+      "duckdb-{mvp,eh}.wasm": { type: "asset" },
+      "duckdb-browser-{mvp,eh}.worker.js": { type: "asset" },
+    },
+  },
   // router cache do cliente: tela dinâmica revisitada em até 30s renderiza
   // do payload guardado em vez de refazer todas as queries no banco. As
   // actions já invalidam com revalidatePath — escrita continua fresca.
@@ -79,6 +120,12 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/materiais/documento/*": ["./docs/rag/**/*.md"],
     "/jovem/materiais/documento/*": ["./docs/rag/**/*.md"],
+    // roteiros do plano (020): as rotas da semana e as superfícies de
+    // lazy (ficha, agenda do jovem) leem docs/rag no server
+    "/duplas/*/roteiro/*": ["./docs/rag/**/*.md"],
+    "/jovem/roteiro/*": ["./docs/rag/**/*.md"],
+    "/duplas/*": ["./docs/rag/**/*.md"],
+    "/jovem/agenda": ["./docs/rag/**/*.md"],
   },
   // acesso ao dev server a partir de outros dispositivos (celular via LAN
   // ou Tailscale): sem a origem aqui o Next bloqueia os endpoints de dev —
@@ -92,7 +139,19 @@ const nextConfig: NextConfig = {
     "192.168.15.4",
     "100.116.25.126",
     "nb-linux.tailf3e87b.ts.net",
+    // loopback explícito — proxies de preview locais chegam como 127.0.0.1
+    "127.0.0.1",
+    "localhost",
   ],
+  async rewrites() {
+    if (!supabaseProxyTarget) return [];
+    return [
+      {
+        source: "/supabase/:path*",
+        destination: `${supabaseProxyTarget}/:path*`,
+      },
+    ];
+  },
   async headers() {
     return [
       {

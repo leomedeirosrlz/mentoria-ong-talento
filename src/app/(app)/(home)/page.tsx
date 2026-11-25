@@ -8,6 +8,7 @@ import {
   getCronogramas,
   getDuplas,
   getEspecialistaEventos,
+  getMateriais,
   getMe,
   getMinhasDuplas,
 } from "@/lib/queries";
@@ -29,7 +30,10 @@ import {
 } from "@/lib/turma-contexto";
 import { turmaDaDupla } from "@/lib/turma";
 import { DashboardCoordenacao } from "@/components/dashboard-coordenacao";
-import { TurmaContextoSelect } from "@/components/turma-contexto-select";
+import {
+  TurmaContextoSelect,
+  TurmaFocoSync,
+} from "@/components/turma-contexto-select";
 import {
   FaixaTurmaEscopo,
   FaixaTurmaFoco,
@@ -118,10 +122,11 @@ export default async function HomePage({
           termo={termoPendente ? <TermoBanner /> : null}
           turmaFoco={foco.turma}
           seletorContexto={
-            // o sync do cookie mora dentro do seletor mesmo quando ele se
-            // esconde (1 turma) — a ?turma= aterrissada grava igual
-            <TurmaContextoSelect
-              turmas={navegaveis}
+            // REALIZA-365: sem seletor no topo — o hub de turmas logo
+            // abaixo já é o controle de contexto (card ativo re-clicado
+            // limpa, "ver todas" idem). O sync headless segue gravando a
+            // ?turma= aterrissada no cookie
+            <TurmaFocoSync
               foco={{ turma: foco.turma, origem: foco.origem }}
             />
           }
@@ -267,7 +272,7 @@ export default async function HomePage({
   // especialista encadeiam na promise das duplas (React.cache deduplica) e
   // só disparam quando há dupla dela — mentor DPP puro não paga o RTT
   const duplasPromise = getMinhasDuplas();
-  const [duplas, espEventos, solicitacoes, meusChamados] = await Promise.all([
+  const [duplas, espEventos, solicitacoes, meusChamados, materiais] = await Promise.all([
     duplasPromise,
     duplasPromise.then((ds) =>
       ds.some((d) => d.trilha === "especialista")
@@ -280,6 +285,9 @@ export default async function HomePage({
       ? getSolicitacoesVisiveis()
       : Promise.resolve([]),
     getChamados(),
+    // roteiro/materiais do próximo passo no card "Sua semana" (520) — uma
+    // query só, a derivação por número acontece dentro do card
+    getMateriais(),
   ]);
   // a negociação precisa da thread de propostas e da agenda do especialista
   // (o slot sempre sai da grade dele — os picks de aceite/contra vêm daqui)
@@ -309,6 +317,7 @@ export default async function HomePage({
         eventos={eventos}
         espEventos={espEventos}
         cronogramas={cronogramas}
+        materiais={materiais}
         me={me!}
         termo={termoPendente ? <TermoBanner /> : null}
       />

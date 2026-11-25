@@ -7,7 +7,7 @@ import type { CoberturaVigente, NumerosSemana } from "@/lib/agenda-coordenacao";
 import { BarraSegmentada } from "@/components/viz";
 import { SaudePrograma } from "@/components/saude-programa";
 import { PillTurma } from "@/components/agenda-partes";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 
 // ============================================================
 // "Números da semana" (REALIZA-195 · mock v8b) — os três eixos
@@ -54,14 +54,14 @@ export function NumerosSemanaSecao({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h2 className="text-base font-semibold">Números da semana</h2>
         {opcoes.length > 1 && (
-          <div
+          <FilterChipRow
             role="group"
             aria-label="Recortar os números por turma"
-            // w-full no mobile: a fileira pula pra linha própria e os
-            // chips quebram dentro dela — o grupo sem wrap (562px com 4+
-            // turmas) estourava o flex-wrap do pai e alargava a página
-            // inteira, levando o FAB fixo pra fora da tela
-            className="flex flex-wrap items-center gap-2 w-full sm:w-auto"
+            // w-full no mobile: a fileira ocupa a linha própria e rola na
+            // horizontal — sem ela o grupo (562px com 4+ turmas) estourava
+            // o flex-wrap do pai e alargava a página, levando o FAB fixo
+            // pra fora da tela
+            className="w-full gap-2 sm:w-auto"
           >
             {opcoes.map((o) => (
               <button
@@ -74,7 +74,7 @@ export function NumerosSemanaSecao({
                 {o.rotulo}
               </button>
             ))}
-          </div>
+          </FilterChipRow>
         )}
       </div>
 
@@ -120,9 +120,9 @@ export function NumerosSemanaSecao({
                     className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
                   >
                     <div
-                      className="h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-500 ease-snappy"
+                      className="h-full w-full origin-left rounded-full bg-[var(--brand-lime)] transition-transform duration-500 ease-snappy"
                       style={{
-                        width: `${(c.comRegistro / c.total) * 100}%`,
+                        transform: `scaleX(${c.comRegistro / c.total})`,
                       }}
                     />
                   </div>
@@ -165,6 +165,7 @@ export function NumerosSemanaSecao({
               <BarraSegmentada
                 className="mt-1.5"
                 altura="sm"
+                legenda
                 denominador={ag.pulso.realizados}
                 segmentos={[
                   {

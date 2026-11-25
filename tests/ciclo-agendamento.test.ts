@@ -9,7 +9,10 @@ import {
   maxEncontros,
   passoEsp,
   passosDaTrilha,
+  passosRealizadosDe,
+  progressoTrilha,
   resumoSemana,
+  rotuloPasso,
   textoResumoSemana,
   totalEncontros,
 } from "@/lib/ciclo";
@@ -333,6 +336,100 @@ describe("especialista — numero = tentativa, passo = rank (0074)", () => {
     const a = alvoAgendamento(dupla, [], dt("2025-11-01"));
     expect(a.cicloCompleto).toBe(false); // 4 realizados de 5 passos
     expect(a.proximoNumero).toBe(5);
+  });
+});
+
+describe("rotuloPasso — o 'com quem' entra inteiro (R14)", () => {
+  it("frase de fallback não trunca no primeiro token", () => {
+    expect(
+      rotuloPasso({ esp: true, numero: 5, com: "seu especialista" })
+    ).toBe("Sessão 5 com seu especialista");
+    expect(rotuloPasso({ esp: false, numero: 5, com: "seu mentor" })).toBe(
+      "5º encontro com seu mentor"
+    );
+  });
+
+  it("nome próprio entra como veio — o corte é do chamador", () => {
+    expect(rotuloPasso({ esp: true, numero: 5, com: "Sofia" })).toBe(
+      "Sessão 5 com Sofia"
+    );
+    expect(rotuloPasso({ esp: false, numero: 3, com: "Ricardo" })).toBe(
+      "3º encontro com Ricardo"
+    );
+    // quem chama decide o corte: um nome composto passa inteiro
+    expect(rotuloPasso({ esp: true, numero: 2, com: "Ana Beatriz" })).toBe(
+      "Sessão 2 com Ana Beatriz"
+    );
+  });
+
+  it("sem 'com' sai o rótulo limpo", () => {
+    expect(rotuloPasso({ esp: true, numero: 1 })).toBe("Sessão 1");
+    expect(rotuloPasso({ esp: false, numero: 1, com: "  " })).toBe(
+      "1º encontro"
+    );
+  });
+});
+
+describe("progressoTrilha + passosRealizadosDe — régua única (REALIZA-498)", () => {
+  it("a frase conta feitos sobre o total da trilha, com a unidade certa", () => {
+    expect(progressoTrilha({ esp: false, feitos: 4, total: 16 })).toBe(
+      "4 de 16 encontros feitos"
+    );
+    expect(progressoTrilha({ esp: true, feitos: 2, total: 5 })).toBe(
+      "2 de 5 sessões feitas"
+    );
+    // trilha fechada lê a mesma frase — não existe forma especial
+    expect(progressoTrilha({ esp: false, feitos: 16, total: 16 })).toBe(
+      "16 de 16 encontros feitos"
+    );
+    expect(progressoTrilha({ esp: true, feitos: 5, total: 5 })).toBe(
+      "5 de 5 sessões feitas"
+    );
+  });
+
+  it("curta é a forma apertada — o particípio sai, a unidade fica", () => {
+    expect(
+      progressoTrilha({ esp: false, feitos: 4, total: 16, curta: true })
+    ).toBe("4 de 16 encontros");
+    expect(
+      progressoTrilha({ esp: true, feitos: 2, total: 5, curta: true })
+    ).toBe("2 de 5 sessões");
+  });
+
+  it("capa os números no [0, total] — sem mentir com extra nem negativo", () => {
+    expect(progressoTrilha({ esp: false, feitos: 20, total: 16 })).toBe(
+      "16 de 16 encontros feitos"
+    );
+    expect(progressoTrilha({ esp: true, feitos: -1, total: 5 })).toBe(
+      "0 de 5 sessões feitas"
+    );
+  });
+
+  it("passosRealizadosDe: no DPP o nº oficial já é o passo", () => {
+    const d = mkDupla({
+      encontros: [
+        encRealizado(1, "2025-10-07"),
+        encRealizado(3, "2025-10-14"),
+        mkEncontro(4, { status: "agendado" }),
+      ],
+    });
+    expect(passosRealizadosDe(d)).toEqual([1, 3]);
+  });
+
+  it("passosRealizadosDe: na trilha esp a tentativa vira o passo — o numero cru não vaza", () => {
+    const d = mkDupla({
+      trilha: "especialista",
+      encontros: [
+        encRealizado(1, "2025-10-07"),
+        mkEncontro(2, { status: "nao_aconteceu" }),
+        encRealizado(3, "2025-10-14"),
+        mkEncontro(4, { status: "agendado" }),
+      ],
+    });
+    // tentativas 1 e 3 rolaram → passos 1 e 2 cobertos; sem o rank, o nº3
+    // acenderia o passo errado e o passo 2 pareceria aberto (o bug do
+    // review: "4º onde a régua diz 3ª sessão")
+    expect(passosRealizadosDe(d)).toEqual([1, 2]);
   });
 });
 

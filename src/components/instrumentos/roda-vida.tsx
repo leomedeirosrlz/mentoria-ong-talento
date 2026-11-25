@@ -11,10 +11,15 @@ import {
 } from "@phosphor-icons/react";
 import { extraiEstruturaRoda } from "@/lib/forms/instrumentos";
 import {
+  camposPerguntas,
   extraiRodaDaVida,
   type FormularioCampo,
 } from "@/lib/forms/schema";
 import { Button } from "@/components/ui/button";
+import {
+  NumeroPergunta,
+  RotuloPergunta,
+} from "@/components/forms/pergunta";
 import { cn } from "@/lib/utils";
 import type { RespostaApi } from "./use-resposta";
 import { RodaSvg } from "./roda-svg";
@@ -56,6 +61,13 @@ export function RodaVida({
     [roda]
   );
   const total = areas.length;
+  // posição na régua do form — o "9" do slider é o "9" que a leitura
+  // mostra no resultado; campos não-escala antes/depois da roda contam
+  const numeroPorId = useMemo(() => {
+    const m = new Map<string, number>();
+    camposPerguntas(campos).forEach((c, i) => m.set(c.id, i + 1));
+    return m;
+  }, [campos]);
 
   if (!estrutura || !roda || !total) {
     // definição sem nenhuma escala_1_10 — não é uma roda; renderiza o que
@@ -64,7 +76,14 @@ export function RodaVida({
       <>
         {campos
           .filter((c) => c.tipo !== "secao")
-          .map((c) => <CampoGenerico key={c.id} campo={c} api={api} />)}
+          .map((c) => (
+            <CampoGenerico
+              key={c.id}
+              campo={c}
+              api={api}
+              n={numeroPorId.get(c.id)}
+            />
+          ))}
       </>
     );
   }
@@ -104,6 +123,9 @@ export function RodaVida({
   function passo(delta: number) {
     const i = (ativo + delta + total) % total;
     setAtivo(i);
+    // as setas não anunciam nada sozinhas — sem isso o leitor de tela
+    // ficava mudo sobre qual área ganhou o foco
+    setAnuncio(areas[i].label);
   }
 
   // a "volta completa" é a roda toda respondida — o contador + o badge
@@ -117,7 +139,7 @@ export function RodaVida({
       {estrutura.intro.map((s) => (
         <div
           key={s.id}
-          className="flex gap-3 rounded-xl bg-card p-5 shadow-[var(--shadow-border)]"
+          className="flex gap-3 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5"
         >
           <span
             aria-hidden
@@ -139,7 +161,7 @@ export function RodaVida({
       ))}
 
       {/* a roda + o eixo em foco — uma zona de interação só */}
-      <div className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+      <div className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5">
         {/* linha própria de navegação EM CIMA da roda, em fundo branco —
             o título do eixo sai do cartão lime e fica legível entre as
             setas; as setas são chips lime (ações primárias, ícone ink) */}
@@ -152,11 +174,19 @@ export function RodaVida({
           >
             <CaretLeft size={20} weight="bold" aria-hidden />
           </Button>
-          <div className="min-w-0 flex-1 text-center">
+          {/* fade curto SÓ de entrada entre eixos (spec 028, camada troca
+              de estado): o eixo troca por gesto direto — seta, arraste na
+              roda, toque no slider — e um crossfade mode="wait" ficaria
+              atrás do dedo; a remontagem por key re-dispara o fade-in e
+              o guard global de reduced-motion já zera */}
+          <div
+            key={ativo}
+            className="min-w-0 flex-1 animate-in text-center fade-in duration-150"
+          >
             <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground">
               {quadAtivo ? `${quadAtivo} · ` : ""}Área {ativo + 1} de {total}
             </p>
-            <h3 className="truncate text-[15px] font-bold leading-snug">
+            <h3 className="truncate text-[15px] font-bold leading-snug text-foreground">
               {areaAtiva.label}
             </h3>
           </div>
@@ -198,7 +228,7 @@ export function RodaVida({
           {anuncio}
         </p>
 
-        <div className="mt-2 border-t border-border/60 pt-3">
+        <div className="mt-3 border-t border-border/60 pt-3">
           <div className="flex items-center justify-between gap-3">
             {/* progresso da volta — conta áreas com nota, não posição */}
             <p className="text-xs font-medium text-muted-foreground">
@@ -246,11 +276,11 @@ export function RodaVida({
             className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
           >
             <div
-              className="h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-300"
-              style={{ width: `${(respondidas / total) * 100}%` }}
+              className="h-full origin-left rounded-full bg-[var(--brand-lime)] transition-transform duration-300 will-change-transform"
+              style={{ transform: `scaleX(${respondidas / total})` }}
             />
           </div>
-          <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
+          <div className="mt-1.5 flex justify-between text-xs text-muted-foreground">
             <span>Nada satisfeito</span>
             <span>Muito satisfeito</span>
           </div>
@@ -270,7 +300,7 @@ export function RodaVida({
 
       {/* a lista completa por quadrante — cada linha é um slider: setas
           no teclado, toque/arraste na trilha, número exato à direita */}
-      <div className="space-y-4 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+      <div className="space-y-4 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5">
         {roda.quadrantes.map((q) => (
           <section key={q.nome || "geral"}>
             {/* sem uppercase via CSS: o nome acessível do heading segue o
@@ -285,7 +315,7 @@ export function RodaVida({
                   <AreaSlider
                     key={a.id}
                     area={a}
-                    indice={i}
+                    numero={numeroPorId.get(a.id) ?? i + 1}
                     ativo={i === ativo}
                     erro={api.erros[a.id]}
                     onFoco={() => setAtivo(i)}
@@ -305,33 +335,31 @@ export function RodaVida({
             key={c.id}
             data-campo={c.id}
             className={cn(
-              "space-y-1.5 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5",
+              "space-y-1.5 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5",
               api.erros[c.id] && "ring-2 ring-destructive/60"
             )}
           >
-            <label
+            <RotuloPergunta
+              campo={c}
+              n={numeroPorId.get(c.id)}
               htmlFor={campoDomId(c)}
-              className="block text-[15px] font-medium leading-snug sm:text-base"
-            >
-              {c.label}
-              {!c.obrigatorio && (
-                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                  (opcional)
-                </span>
-              )}
-            </label>
+            />
             <EntradaTextoLongo
               campo={c}
               valor={api.valores[c.id]}
               definir={api.definir}
               erro={api.erros[c.id]}
-              enterKeyHint="send"
               rows={5}
             />
             <ErroCampo campo={c} msg={api.erros[c.id]} />
           </div>
         ) : (
-          <CampoGenerico key={c.id} campo={c} api={api} />
+          <CampoGenerico
+            key={c.id}
+            campo={c}
+            api={api}
+            n={numeroPorId.get(c.id)}
+          />
         )
       )}
     </>
@@ -342,14 +370,16 @@ export function RodaVida({
  *  setas ±1, Home/End nas pontas; a trilha aceita toque/arraste. */
 function AreaSlider({
   area,
-  indice,
+  numero,
   ativo,
   erro,
   onFoco,
   onNota,
 }: {
   area: { id: string; label: string; nota: number | null };
-  indice: number;
+  /** posição na régua do form — o número e o aria-label mostram o
+   *  mesmo número que a pergunta tem na leitura */
+  numero: number;
   ativo: boolean;
   erro: string | undefined;
   onFoco: () => void;
@@ -388,7 +418,7 @@ function AreaSlider({
       role="slider"
       tabIndex={0}
       data-campo={area.id}
-      aria-label={`${indice + 1}. ${area.label}`}
+      aria-label={`${numero}. ${area.label}`}
       aria-valuemin={1}
       aria-valuemax={10}
       aria-valuenow={area.nota ?? 0}
@@ -396,6 +426,7 @@ function AreaSlider({
         respondida ? `Nota ${area.nota} de 10` : "Sem nota ainda"
       }
       aria-invalid={erro ? true : undefined}
+      aria-describedby={erro ? `f-${area.id}-erro` : undefined}
       onFocus={onFoco}
       onKeyDown={onKeyDown}
       onClick={onFoco}
@@ -408,19 +439,15 @@ function AreaSlider({
         erro && "ring-2 ring-destructive/60"
       )}
     >
+      <NumeroPergunta n={numero} compacto />
       <span
-        aria-hidden
-        className={cn(
-          "grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-bold tabular-nums",
-          respondida
-            ? "bg-[var(--brand-lime)]/20 text-[var(--ok-text)]"
-            : "bg-muted text-muted-foreground"
-        )}
+        className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground"
+        title={area.label}
       >
-        {indice + 1}
+        {area.label}
       </span>
-      <span className="min-w-0 flex-1 truncate text-sm">{area.label}</span>
-      {/* a trilha é o alvo do arraste — a fração do toque vira a nota */}
+      {/* a trilha é o alvo do arraste — a fração do toque vira a nota;
+          pan-y deixa a rolagem vertical passar e o gesto horizontal fica */}
       <span
         ref={trilhaRef}
         aria-hidden
@@ -431,17 +458,20 @@ function AreaSlider({
         onPointerMove={(e) => {
           if (e.buttons & 1) porPonteiro(e);
         }}
-        className="relative h-6 w-20 shrink-0 touch-none sm:w-28"
+        className="relative h-8 w-24 shrink-0 touch-pan-y @xl:w-28"
       >
         <span className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-muted">
           <span
-            className="block h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-150"
-            style={{ width: `${((area.nota ?? 0) / 10) * 100}%` }}
+            className="block h-full origin-left rounded-full bg-[var(--brand-lime)] transition-transform duration-150 will-change-transform"
+            style={{ transform: `scaleX(${(area.nota ?? 0) / 10})` }}
           />
         </span>
         {respondida && (
           <span
-            className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--ok-text)] transition-[left] duration-150"
+            // sem transition-[left]: o polegar segue o ponteiro 1:1 no
+            // arraste — uma transição de posição seria layout por frame E
+            // deixaria a bolinha atrás do dedo (spec 028, FR-106)
+            className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--ok-text)]"
             style={{ left: `${((area.nota ?? 0) / 10) * 100}%` }}
           />
         )}
@@ -460,6 +490,14 @@ function AreaSlider({
       >
         {area.nota ?? "—"}
       </span>
+      {erro && (
+        <span
+          id={`f-${area.id}-erro`}
+          className="basis-full pt-0.5 text-sm leading-snug text-destructive"
+        >
+          {erro}
+        </span>
+      )}
     </li>
   );
 }

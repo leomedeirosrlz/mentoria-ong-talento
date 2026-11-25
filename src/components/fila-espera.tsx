@@ -8,6 +8,8 @@ import {
   ArrowsLeftRight,
   CaretDown,
   Check,
+  Info,
+  MagnifyingGlass,
   Sparkle,
   Student,
   UsersThree,
@@ -16,6 +18,14 @@ import {
 import type { Mentorado, MentorProfile, Profile } from "@/lib/types";
 import type { FilaItem } from "@/lib/fila";
 import { textoEspera, tetoMentor } from "@/lib/fila";
+import { comparaNome } from "@/lib/ciclo";
+import { fuzzyMatch } from "@/lib/fuzzy";
+import {
+  turmasDePessoa,
+  type AlvoPessoa,
+  type MapasTurma,
+} from "@/lib/pessoas-status";
+import { turmaCurta } from "@/lib/turma";
 import {
   ranquearCandidatosMatching,
   temasMatchingPar,
@@ -24,16 +34,26 @@ import {
 import { msgAguardandoPar } from "@/lib/whatsapp-msgs";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
-import { idade } from "@/lib/ciclo";
+import {
+  docOkMentorado,
+  docsDevidosMentorado,
+  type SlugDocMentorado,
+} from "@/lib/pessoas-status";
 import { Avatar, type PapelVisual } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { WhatsAppRapido } from "@/components/whatsapp-rapido";
 import { MentoradoActions } from "@/components/mentorado-actions";
 import { PessoaActions } from "@/components/pessoa-actions";
 import type { DocsPessoa } from "@/components/pessoas-listas";
-import { AfinidadePar } from "@/components/matching-afinidade";
+import {
+  AfinidadePar,
+  type DocJovemStatus,
+} from "@/components/matching-afinidade";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
+import { FadeTroca } from "@/components/ui/etapa";
+import { Input } from "@/components/ui/input";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 
 /** Sugestões visíveis de uma vez no bloco do topo — o "carregar mais"
  *  revela mais SUG_POR_VEZ; abaixo do limiar a ordem ainda vale, só o
@@ -42,6 +62,10 @@ import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
  *  distribuição; revisar depois do backfill de prod. */
 const SUG_POR_VEZ = 3;
 const SUG_SIM_MIN = 0.58;
+// busca/recorte dentro do card (REALIZA-446): fila curta não ganha controles
+// — aparecem quando o recorte ajuda (várias pessoas ou mais de uma turma)
+const FILTRO_ITENS_MIN = 5;
+const SEM_TURMA = "__sem_turma__";
 
 /** Card "Aguardando par" — fila de espera + pareamento num lugar só
  *  (REALIZA-101 + rodada fev/2026). Dois estados no mesmo card:
@@ -69,6 +93,8 @@ export function FilaEspera({
   mentorProfiles,
   ocupacao,
   assinaturas,
+  mapasTurma,
+  esperaDesdePorId,
 }: {
   mentorados: FilaItem[];
   mentores: FilaItem[];
@@ -88,17 +114,24 @@ export function FilaEspera({
   mentorProfiles: Record<string, MentorProfile>;
   /** Ocupação por `${mentorId}:${trilha}` — aqui só a chave :dpp interessa. */
   ocupacao: Record<string, number>;
-  /** Resumo de assinaturas por id de pessoa — alimenta a restrição de
-   *  documento do jovem no card de afinidade (status real: emitida,
-   *  enviada, assinada). Mesmo mapa dos badges da lista. */
+  /** Resumo de assinaturas por id de pessoa — alimenta a restrição dos
+   *  documentos devidos do jovem no card de afinidade (status real:
+   *  emitida, enviada, assinada). Mesmo mapa dos badges da lista. */
   assinaturas?: Record<string, DocsPessoa>;
+  /** Filiação por turma (mesmos mapas da lista de pessoas) — alimenta o
+   *  recorte por turma dentro do card. */
+  mapasTurma?: MapasTurma;
+  /** id → ISO do início da espera atual (mesma régua do "há N dias" da
+   *  fila) — no modo Parear o pool é maior que a fila (inclui remanejo e
+   *  mentor cheio), então a espera chega derivada por id. */
+  esperaDesdePorId?: Record<string, string | null>;
 }) {
   const total = mentorados.length + mentores.length;
   // congelado na hidratação — o "há N dias" não pode divergir do SSR
   const [agoraMs] = useState(() => Date.now());
-  // a tela sempre abre com o card fechado — a fila é contexto que a coord
-  // expande se precisar, não conteúdo que se impõe
-  const [open, setOpen] = useState(false);
+  // com gente esperando o card já abre: a fila é chamada de entrada, não
+  // contexto escondido — fechado só faz sentido quando está vazia
+  const [open, setOpen] = useState(() => total > 0);
 
   const [modo, setModo] = useState<"fila" | "parear">("fila");
   const [selMentorado, setSelMentorado] = useState<string | null>(null);
@@ -122,6 +155,11 @@ export function FilaEspera({
     mentor: string[];
     mentorado: string[];
   } | null>(null);
+  // recorte dentro do card (REALIZA-446): busca por nome + chip de turma —
+  // o mesmo filtro vale pra fila e pro Parear
+  const [busca, setBusca] = useState("");
+  const [buscaDebounced, setBuscaDebounced] = useState(busca);
+  const [turmaSel, setTurmaSel] = useState<string | null>(null);
 
   /** Atalho da linha da fila: entra no modo Parear com a pessoa já marcada. */
   function iniciarParear(lado: "mentor" | "mentorado", id: string) {
@@ -212,6 +250,13 @@ export function FilaEspera({
     temasPar?.mentoradoId === selMentoradoEf
       ? temasPar
       : null;
+  // loading de decisão unificado: sugestão pendente no lado oposto OU os
+  // temas do par ainda não chegaram — o rodapé cobre o "selecionei e ainda
+  // não sei" inteiro, não só um sub-bloco
+  const carregandoDecisao =
+    carregandoMentores ||
+    carregandoMentorados ||
+    (selMentorEf != null && selMentoradoEf != null && temasParEf === null);
 
   // ————— derivação do modo Parear —————
   const tetoDe = (id: string) => {
@@ -220,13 +265,30 @@ export function FilaEspera({
     return tetoMentor(p, mentorProfiles[id], "dpp");
   };
   const usadasDe = (id: string) => ocupacao[`${id}:dpp`] ?? 0;
-  // lista FIXA: livres primeiro (mais vagas na frente), cheios afundam,
-  // nome desempata — a ordem não muda quando o rank semântico chega; as
-  // sugestões vivem num bloco próprio no topo, não reordenam a lista
+  // espera do candidato no Parear — mesma régua do "há N dias" da fila;
+  // quem chega sem carimbo ordena pro fim (porEspera da fila faz igual)
+  const esperaDe = (id: string) => esperaDesdePorId?.[id] ?? null;
+  const esperaTxtDe = (id: string) => {
+    const d = esperaDe(id);
+    return d ? textoEspera(d, agoraMs) : null;
+  };
+  const msEsperaDe = (id: string) => {
+    const d = esperaDe(id);
+    return d ? Date.parse(d) : Infinity;
+  };
+  // listas FIXAS: a ordem não muda quando o rank semântico chega; as
+  // sugestões vivem num bloco próprio no topo, não reordenam a lista.
+  // Mentorados por espera primeiro (a fila é promessa por ordem de
+  // chegada); mentores por vagas livres, espera antes do alfabético
+  const mentoradosLivresOrd = [...mentoradosLivres].sort(
+    (a, b) =>
+      msEsperaDe(a.id) - msEsperaDe(b.id) || comparaNome(a.nome, b.nome)
+  );
   const mentoresOrd = [...mentoresDpp].sort(
     (a, b) =>
       tetoDe(b.id) - usadasDe(b.id) - (tetoDe(a.id) - usadasDe(a.id)) ||
-      a.nome.localeCompare(b.nome, "pt-BR")
+      msEsperaDe(a.id) - msEsperaDe(b.id) ||
+      comparaNome(a.nome, b.nome)
   );
   // sugestões: ranqueados acima do limiar na ordem do rank — bloco
   // próprio acima da lista fixa, com "carregar mais" em lotes de
@@ -239,14 +301,6 @@ export function FilaEspera({
     .map((r) => r.id);
   const sugeridosMentores = new Set(idsSugMentores);
   const sugeridosMentorados = new Set(idsSugMentorados);
-  const sugObjsMentores = idsSugMentores
-    .slice(0, sugMentores)
-    .map((id) => mentoresDpp.find((m) => m.id === id))
-    .filter((m): m is Profile => m != null);
-  const sugObjsMentorados = idsSugMentorados
-    .slice(0, sugMentorados)
-    .map((id) => mentoradosLivres.find((m) => m.id === id))
-    .filter((m): m is Mentorado => m != null);
   // meta da linha é a mesma no bloco de sugestões e na lista fixa — a
   // pessoa não muda de cara conforme aparece num lugar ou outro
   const metaMentorado = (m: Mentorado) =>
@@ -266,31 +320,25 @@ export function FilaEspera({
   const mentorLotado =
     mentorSelObj != null && usadasDe(mentorSelObj.id) >= tetoDe(mentorSelObj.id);
 
-  // status real do documento do jovem — mesma regra dos badges da lista:
-  // menor → autorização (documento_path também vale), maior → termo.
-  // "assinado" resolve a restrição; "enviado"/"nao_emitido" viram aviso.
-  const docsJovem = mentoradoSelObj
+  // status real dos documentos devidos do jovem — mesma régua dos badges
+  // da lista: menor deve os dois (o próprio termo e a autorização do
+  // responsável, que o documento_path também quita), maior só o termo.
+  // Cada "assinado" resolve a sua ponta; o que falta vira aviso antes
+  // de formar a dupla (a autorização é o gate jurídico do menor).
+  const docsSel = mentoradoSelObj
     ? assinaturas?.[mentoradoSelObj.id]
     : undefined;
-  const docJovem = mentoradoSelObj
-    ? (() => {
-        const anos = idade(mentoradoSelObj.data_nascimento);
-        const menor = anos != null && anos < 18;
-        const slug: "autorizacao-responsavel" | "termo-mentorando" = menor
-          ? "autorizacao-responsavel"
-          : "termo-mentorando";
-        const assinado =
-          (menor && Boolean(mentoradoSelObj.documento_path)) ||
-          Boolean(docsJovem?.assinado[slug]);
-        return {
+  const docsJovem = mentoradoSelObj
+    ? docsDevidosMentorado(mentoradoSelObj).map(
+        (slug): { slug: SlugDocMentorado; status: DocJovemStatus } => ({
           slug,
-          status: assinado
-            ? ("assinado" as const)
-            : docsJovem?.pendente.includes(slug)
-              ? ("enviado" as const)
-              : ("nao_emitido" as const),
-        };
-      })()
+          status: docOkMentorado(mentoradoSelObj, slug, docsSel)
+            ? "assinado"
+            : docsSel?.pendente.includes(slug)
+              ? "enviado"
+              : "nao_emitido",
+        })
+      )
     : undefined;
 
   // o par veio de uma sugestão semântica — seja o mentor sugerido pro
@@ -299,23 +347,146 @@ export function FilaEspera({
     (selMentorEf != null && sugeridosMentores.has(selMentorEf)) ||
     (selMentoradoEf != null && sugeridosMentorados.has(selMentoradoEf));
 
+  // ————— recorte do card: busca por nome + chip de turma (REALIZA-446) —————
+  // debounce 300ms — mesmo padrão da busca da lista (REALIZA-318)
+  useEffect(() => {
+    const t = setTimeout(() => setBuscaDebounced(busca), 300);
+    return () => clearTimeout(t);
+  }, [busca]);
+  const qBusca = buscaDebounced.trim();
+
+  const mapas: MapasTurma = mapasTurma ?? {
+    duplas: [],
+    inscricoes: [],
+    papeisEscopo: [],
+  };
+  // alvo de filiação — mentorado basta o id; mentor precisa de role+papeis
+  // (a regra "especialista sem DPP não espera par" mora na derivação)
+  const alvoDe = (lado: "mentor" | "mentorado", id: string): AlvoPessoa | null =>
+    lado === "mentorado"
+      ? { tipo: "mentorado", id }
+      : (() => {
+          const p = pessoasPorId.get(id) ?? mentoresDpp.find((m) => m.id === id);
+          return p
+            ? { tipo: "profile", id: p.id, role: p.role, papeis: p.papeis }
+            : null;
+        })();
+  const turmasItem = (lado: "mentor" | "mentorado", id: string): string[] => {
+    const a = alvoDe(lado, id);
+    return a ? turmasDePessoa(a, mapas).map((t) => t.turma) : [];
+  };
+  // turmas presentes no pool ATIVO (a contagem do chip é de pessoas, não de
+  // linhas — quem tem duas turmas conta nas duas)
+  const poolTurma: { lado: "mentor" | "mentorado"; id: string }[] =
+    modo === "fila"
+      ? [
+          ...mentorados.map((p) => ({ lado: "mentorado" as const, id: p.id })),
+          ...mentores.map((p) => ({ lado: "mentor" as const, id: p.id })),
+        ]
+      : [
+          ...mentoradosLivres.map((m) => ({
+            lado: "mentorado" as const,
+            id: m.id,
+          })),
+          ...mentoresDpp.map((m) => ({ lado: "mentor" as const, id: m.id })),
+        ];
+  const turmasContagem = new Map<string, number>();
+  let semTurmaN = 0;
+  for (const p of poolTurma) {
+    const ts = turmasItem(p.lado, p.id);
+    if (!ts.length) {
+      semTurmaN++;
+      continue;
+    }
+    for (const t of new Set(ts))
+      turmasContagem.set(t, (turmasContagem.get(t) ?? 0) + 1);
+  }
+  const turmasPresentes = [...turmasContagem.keys()].sort((a, b) =>
+    b.localeCompare(a, "pt-BR", { numeric: true })
+  );
+  // deep-state defensivo: turma escolhida que não existe mais no pool cai
+  // no neutro em vez de esvaziar as colunas sem explicação
+  const turmaSelEf =
+    turmaSel === SEM_TURMA
+      ? semTurmaN > 0
+        ? SEM_TURMA
+        : null
+      : turmaSel && turmasPresentes.includes(turmaSel)
+        ? turmaSel
+        : null;
+
+  const filtroAtivo = qBusca !== "" || turmaSelEf != null;
+  const filtroOk = (lado: "mentor" | "mentorado", id: string, nome: string) => {
+    if (qBusca && !(fuzzyMatch(qBusca, nome)?.score ?? 0)) return false;
+    if (turmaSelEf == null) return true;
+    const ts = turmasItem(lado, id);
+    return turmaSelEf === SEM_TURMA
+      ? ts.length === 0
+      : ts.includes(turmaSelEf);
+  };
+  const mentoradosVis = mentorados.filter((p) =>
+    filtroOk("mentorado", p.id, p.nome)
+  );
+  const mentoresVis = mentores.filter((p) => filtroOk("mentor", p.id, p.nome));
+  const mentoradosLivresVis = mentoradosLivresOrd.filter((m) =>
+    filtroOk("mentorado", m.id, m.nome)
+  );
+  const mentoresOrdVis = mentoresOrd.filter((m) =>
+    filtroOk("mentor", m.id, m.nome)
+  );
+  // sugestões seguem o mesmo recorte da lista fixa — filtradas ANTES do
+  // slice, senão o "carregar mais" contava sugestão que o recorte escondeu
+  const idsSugMentoradosVis = idsSugMentorados.filter((id) => {
+    const m = mentoradosLivres.find((x) => x.id === id);
+    return m != null && filtroOk("mentorado", m.id, m.nome);
+  });
+  const idsSugMentoresVis = idsSugMentores.filter((id) => {
+    const m = mentoresDpp.find((x) => x.id === id);
+    return m != null && filtroOk("mentor", m.id, m.nome);
+  });
+  const sugObjsMentoradosVis = idsSugMentoradosVis
+    .slice(0, sugMentorados)
+    .map((id) => mentoradosLivres.find((m) => m.id === id))
+    .filter((m): m is Mentorado => m != null);
+  const sugObjsMentoresVis = idsSugMentoresVis
+    .slice(0, sugMentores)
+    .map((id) => mentoresDpp.find((m) => m.id === id))
+    .filter((m): m is Profile => m != null);
+  const poolAtivo =
+    modo === "fila" ? total : mentoradosLivres.length + mentoresDpp.length;
+  const mostraFiltro =
+    poolAtivo >= FILTRO_ITENS_MIN || turmasPresentes.length > 1;
+
   return (
     <Collapsible.Root open={open} onOpenChange={setOpen}>
       <section
+        id="aguardando-par"
         aria-labelledby="fila-espera-titulo"
-        className="rounded-xl bg-card shadow-[var(--shadow-border)] overflow-hidden"
+        className="scroll-mt-20 rounded-xl bg-card shadow-[var(--shadow-border)] overflow-hidden"
       >
-        <div className="flex items-center gap-2 px-4 py-2 sm:px-5">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2 sm:px-5">
           <Collapsible.Trigger
             aria-expanded={open}
             className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <span
-              id="fila-espera-titulo"
-              className="text-base font-semibold tabular-nums"
-            >
-              Aguardando par{" "}
-              <span className="whitespace-nowrap">· {total}</span>
+            <span className="min-w-0">
+              <span id="fila-espera-titulo" className="text-base font-semibold">
+                Aguardando par
+              </span>
+              {/* a contagem separa os dois lados — "3 mentorados · 2
+                  mentores com vaga" responde o que falta pra parear, não
+                  só quantos esperam */}
+              <span className="block text-xs font-normal text-muted-foreground tabular-nums">
+                {total === 0
+                  ? "Ninguém aguardando"
+                  : `${mentorados.length} ${
+                      mentorados.length === 1 ? "mentorado" : "mentorados"
+                    } · ${mentores.length} ${
+                      mentores.length === 1
+                        ? "mentor com vaga"
+                        : "mentores com vaga"
+                    }`}
+              </span>
             </span>
             <CaretDown
               aria-hidden
@@ -358,242 +529,438 @@ export function FilaEspera({
           className="h-[var(--collapsible-panel-height)] overflow-hidden opacity-100 transition-[height,opacity] duration-200 data-ending-style:h-0 data-ending-style:opacity-0 data-starting-style:h-0 data-starting-style:opacity-0 [&[hidden]:not([hidden='until-found'])]:hidden"
         >
           <div className="px-4 pb-4 sm:px-5">
-            {modo === "fila" ? (
-              total === 0 ? (
-                <div className="flex flex-col items-center gap-1.5 py-8 text-center">
-                  <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-                    <UsersThree aria-hidden size={18} />
-                  </span>
-                  <p className="text-sm font-medium">Todo mundo pareado</p>
-                  <p className="max-w-sm text-sm text-muted-foreground">
-                    Quando uma inscrição chegar ou um mentor abrir vaga, a
-                    espera aparece aqui, com quanto tempo a pessoa aguarda.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
-                  <FilaColuna
-                    titulo="Mentorados"
-                    itens={mentorados}
-                    lado="mentorado"
-                    vazio="Nenhum mentorado aguardando."
-                    mentoradosPorId={mentoradosPorId}
-                    pessoasPorId={pessoasPorId}
-                    semHistorico={semHistorico}
-                    euNome={euNome}
-                    agoraMs={agoraMs}
-                    onParear={iniciarParear}
+            {/* recorte do card: busca por nome + chip de turma — só aparece
+                quando o recorte ajuda (fila longa ou mais de uma turma) */}
+            {mostraFiltro && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pb-3">
+                <div className="relative min-w-[9rem] flex-1 sm:max-w-56">
+                  <MagnifyingGlass
+                    aria-hidden
+                    size={15}
+                    className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
                   />
-                  <FilaColuna
-                    titulo="Mentores com vaga"
-                    itens={mentores}
-                    lado="mentor"
-                    vazio="Nenhum mentor com vaga livre."
-                    mentoradosPorId={mentoradosPorId}
-                    pessoasPorId={pessoasPorId}
-                    semHistorico={semHistorico}
-                    euNome={euNome}
-                    agoraMs={agoraMs}
-                    onParear={iniciarParear}
+                  <Input
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    placeholder="Buscar por nome"
+                    aria-label="Buscar na fila por nome"
+                    className="pl-8"
                   />
                 </div>
-              )
-            ) : (
-              <div className="space-y-3">
-                <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 sm:grid-cols-2">
-                  <ParearColuna
-                    rotulo="Mentorados livres"
-                    vazio="Nenhum mentorado livre pra parear."
-                    carregandoSugestoes={carregandoMentorados}
-                    sugestoes={
-                      <BlocoSugestoes
-                        carregando={carregandoMentorados}
-                        total={idsSugMentorados.length}
-                        restantes={
-                          idsSugMentorados.length - sugObjsMentorados.length
-                        }
-                        onVerMais={() =>
-                          setSugMentorados((v) => v + SUG_POR_VEZ)
-                        }
-                      >
-                        {sugObjsMentorados.map((m, i) => (
-                          <ParearLinha
-                            key={m.id}
-                            indice={i}
-                            selecionado={selMentoradoEf === m.id}
-                            onSelecionar={() =>
-                              setSelMentorado(
-                                selMentoradoEf === m.id ? null : m.id
-                              )
-                            }
-                            nome={m.nome}
-                            avatarPath={m.avatar_path}
-                            papel="mentorado"
-                            selo="sugerido"
-                            meta={metaMentorado(m)}
-                          />
-                        ))}
-                      </BlocoSugestoes>
-                    }
+                {(turmasPresentes.length > 0 || semTurmaN > 0) && (
+                  <FilterChipRow
+                    role="group"
+                    aria-label="Filtrar a fila por turma"
+                    className="min-w-0 flex-1"
                   >
-                    {mentoradosLivres.map((m, i) => (
-                      <ParearLinha
-                        key={m.id}
-                        indice={i}
-                        selecionado={selMentoradoEf === m.id}
-                        onSelecionar={() =>
-                          setSelMentorado(
-                            selMentoradoEf === m.id ? null : m.id
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-pressed={turmaSelEf == null}
+                      onClick={() => setTurmaSel(null)}
+                      className={cn("h-auto", filterChipCls(turmaSelEf == null))}
+                    >
+                      Todas
+                    </Button>
+                    {turmasPresentes.map((t) => (
+                      <Button
+                        key={t}
+                        type="button"
+                        variant="outline"
+                        aria-pressed={turmaSel === t}
+                        onClick={() =>
+                          setTurmaSel(turmaSel === t ? null : t)
+                        }
+                        className={cn("h-auto", filterChipCls(turmaSel === t))}
+                      >
+                        {turmaCurta(t)}
+                        <span className="tabular-nums">
+                          {" "}
+                          · {turmasContagem.get(t)}
+                        </span>
+                      </Button>
+                    ))}
+                    {semTurmaN > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        aria-pressed={turmaSel === SEM_TURMA}
+                        onClick={() =>
+                          setTurmaSel(
+                            turmaSel === SEM_TURMA ? null : SEM_TURMA
                           )
                         }
-                        nome={m.nome}
-                        avatarPath={m.avatar_path}
-                        papel="mentorado"
-                        selo={
-                          sugeridosMentorados.has(m.id)
-                            ? "sugerido"
-                            : undefined
-                        }
-                        meta={metaMentorado(m)}
-                      />
-                    ))}
-                  </ParearColuna>
-                  <ParearColuna
-                    rotulo="Mentores DPP"
-                    vazio="Nenhum mentor DPP ativo."
-                    carregandoSugestoes={carregandoMentores}
-                    sugestoes={
-                      <BlocoSugestoes
-                        carregando={carregandoMentores}
-                        total={idsSugMentores.length}
-                        restantes={
-                          idsSugMentores.length - sugObjsMentores.length
-                        }
-                        onVerMais={() =>
-                          setSugMentores((v) => v + SUG_POR_VEZ)
-                        }
+                        className={cn(
+                          "h-auto",
+                          filterChipCls(turmaSel === SEM_TURMA)
+                        )}
                       >
-                        {sugObjsMentores.map((m, i) => (
-                          <ParearLinha
-                            key={m.id}
-                            indice={i}
-                            selecionado={selMentorEf === m.id}
-                            onSelecionar={() =>
-                              setSelMentor(selMentorEf === m.id ? null : m.id)
-                            }
-                            nome={m.nome}
-                            avatarPath={m.avatar_path}
-                            papel="mentor"
-                            selo="sugerido"
-                            meta={metaMentor(m.id)}
-                          />
-                        ))}
-                      </BlocoSugestoes>
-                    }
+                        Sem turma
+                        <span className="tabular-nums"> · {semTurmaN}</span>
+                      </Button>
+                    )}
+                  </FilterChipRow>
+                )}
+                {filtroAtivo && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setBusca("");
+                      setTurmaSel(null);
+                    }}
                   >
-                    {mentoresOrd.map((m, i) => (
-                      <ParearLinha
-                        key={m.id}
-                        indice={i}
-                        selecionado={selMentorEf === m.id}
-                        onSelecionar={() =>
-                          setSelMentor(selMentorEf === m.id ? null : m.id)
-                        }
-                        nome={m.nome}
-                        avatarPath={m.avatar_path}
-                        papel="mentor"
-                        selo={
-                          sugeridosMentores.has(m.id) ? "sugerido" : undefined
-                        }
-                        meta={metaMentor(m.id)}
+                    Limpar
+                  </Button>
+                )}
+              </div>
+            )}
+            {/* troca de estado do kit: o painel entrante recebe o foco — o
+                "Parear agora" que disparou desmonta junto com a fila */}
+            <FadeTroca chave={modo} foco>
+              {modo === "fila" ? (
+                total === 0 ? (
+                  <div className="flex flex-col items-center gap-1.5 py-8 text-center">
+                    <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+                      <UsersThree aria-hidden size={18} />
+                    </span>
+                    <p className="text-sm font-medium">Todo mundo pareado</p>
+                    <p className="max-w-sm text-sm text-muted-foreground">
+                      Quando uma inscrição chegar ou um mentor abrir vaga, a
+                      espera aparece aqui, com quanto tempo a pessoa aguarda.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* "o que falta pra parear" — um lado vazio não é só uma
+                        coluna quieta, é a explicação do bloqueio e o atalho
+                        pra resolver */}
+                    {mentorados.length > 0 && mentores.length === 0 && (
+                      <p className="flex items-start gap-1.5 text-sm text-[var(--warn-text)]">
+                        <Warning
+                          aria-hidden
+                          size={14}
+                          className="mt-0.5 shrink-0"
+                        />
+                        <span>
+                          Tem mentorado esperando, mas nenhum mentor com vaga
+                          livre agora. No Parear, selecione um mentor cheio pra
+                          comparar afinidade e{" "}
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            onClick={() => setModo("parear")}
+                            className="-my-2 sm:my-0"
+                          >
+                            aumentar a capacidade dele →
+                          </Button>
+                        </span>
+                      </p>
+                    )}
+                    {mentores.length > 0 && mentorados.length === 0 && (
+                      <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
+                        <Info aria-hidden size={14} className="mt-0.5 shrink-0" />
+                        <span>
+                          Há {mentores.length}{" "}
+                          {mentores.length === 1
+                            ? "mentor com vaga"
+                            : "mentores com vaga"}
+                          , mas nenhum mentorado aguardando. A próxima
+                          inscrição ou remanejo aparece aqui.
+                        </span>
+                      </p>
+                    )}
+                    <div
+                      // re-key no container: trocar o recorte re-anima as
+                      // linhas (mesma régua do enter de lista)
+                      key={`fila-${qBusca}|${turmaSelEf}`}
+                      className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2"
+                    >
+                      <FilaColuna
+                        titulo="Mentorados"
+                        itens={mentoradosVis}
+                        totalBruto={mentorados.length}
+                        filtrando={filtroAtivo}
+                        lado="mentorado"
+                        vazio="Nenhum mentorado aguardando."
+                        mentoradosPorId={mentoradosPorId}
+                        pessoasPorId={pessoasPorId}
+                        semHistorico={semHistorico}
+                        euNome={euNome}
+                        agoraMs={agoraMs}
+                        onParear={iniciarParear}
                       />
-                    ))}
-                  </ParearColuna>
-                </div>
+                      <FilaColuna
+                        titulo="Mentores com vaga"
+                        itens={mentoresVis}
+                        totalBruto={mentores.length}
+                        filtrando={filtroAtivo}
+                        lado="mentor"
+                        vazio="Nenhum mentor com vaga livre."
+                        mentoradosPorId={mentoradosPorId}
+                        pessoasPorId={pessoasPorId}
+                        semHistorico={semHistorico}
+                        euNome={euNome}
+                        agoraMs={agoraMs}
+                        onParear={iniciarParear}
+                      />
+                    </div>
+                    <div className="flex justify-end pt-1">
+                      <Button size="sm" onClick={() => setModo("parear")}>
+                        <ArrowsLeftRight size={15} aria-hidden />
+                        Parear agora
+                      </Button>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="space-y-3">
+                  <div
+                    key={`parear-${qBusca}|${turmaSelEf}`}
+                    className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 sm:grid-cols-2"
+                  >
+                    <ParearColuna
+                      rotulo="Mentorados livres"
+                      vazio={
+                        filtroAtivo
+                          ? "Nenhum mentorado nesse recorte."
+                          : "Nenhum mentorado livre pra parear."
+                      }
+                      carregandoSugestoes={carregandoMentorados}
+                      sugestoes={
+                        <BlocoSugestoes
+                          carregando={carregandoMentorados}
+                          total={idsSugMentoradosVis.length}
+                          restantes={
+                            idsSugMentoradosVis.length -
+                            sugObjsMentoradosVis.length
+                          }
+                          onVerMais={() =>
+                            setSugMentorados((v) => v + SUG_POR_VEZ)
+                          }
+                        >
+                          {sugObjsMentoradosVis.map((m, i) => (
+                            <ParearLinha
+                              key={m.id}
+                              indice={i}
+                              selecionado={selMentoradoEf === m.id}
+                              onSelecionar={() =>
+                                setSelMentorado(
+                                  selMentoradoEf === m.id ? null : m.id
+                                )
+                              }
+                              nome={m.nome}
+                              avatarPath={m.avatar_path}
+                              papel="mentorado"
+                              selo="sugerido"
+                              meta={metaMentorado(m)}
+                              destaqueMeta={esperaTxtDe(m.id)}
+                            />
+                          ))}
+                        </BlocoSugestoes>
+                      }
+                    >
+                      {mentoradosLivresVis.map((m, i) => (
+                        <ParearLinha
+                          key={m.id}
+                          indice={i}
+                          selecionado={selMentoradoEf === m.id}
+                          onSelecionar={() =>
+                            setSelMentorado(
+                              selMentoradoEf === m.id ? null : m.id
+                            )
+                          }
+                          nome={m.nome}
+                          avatarPath={m.avatar_path}
+                          papel="mentorado"
+                          selo={
+                            sugeridosMentorados.has(m.id)
+                              ? "sugerido"
+                              : undefined
+                          }
+                          meta={metaMentorado(m)}
+                          destaqueMeta={esperaTxtDe(m.id)}
+                        />
+                      ))}
+                    </ParearColuna>
+                    <ParearColuna
+                      rotulo="Mentores DPP"
+                      vazio={
+                        filtroAtivo
+                          ? "Nenhum mentor nesse recorte."
+                          : "Nenhum mentor DPP ativo."
+                      }
+                      carregandoSugestoes={carregandoMentores}
+                      sugestoes={
+                        <BlocoSugestoes
+                          carregando={carregandoMentores}
+                          total={idsSugMentoresVis.length}
+                          restantes={
+                            idsSugMentoresVis.length - sugObjsMentoresVis.length
+                          }
+                          onVerMais={() =>
+                            setSugMentores((v) => v + SUG_POR_VEZ)
+                          }
+                        >
+                          {sugObjsMentoresVis.map((m, i) => (
+                            <ParearLinha
+                              key={m.id}
+                              indice={i}
+                              selecionado={selMentorEf === m.id}
+                              onSelecionar={() =>
+                                setSelMentor(selMentorEf === m.id ? null : m.id)
+                              }
+                              nome={m.nome}
+                              avatarPath={m.avatar_path}
+                              papel="mentor"
+                              selo="sugerido"
+                              meta={metaMentor(m.id)}
+                            />
+                          ))}
+                        </BlocoSugestoes>
+                      }
+                    >
+                      {mentoresOrdVis.map((m, i) => (
+                        <ParearLinha
+                          key={m.id}
+                          indice={i}
+                          selecionado={selMentorEf === m.id}
+                          onSelecionar={() =>
+                            setSelMentor(selMentorEf === m.id ? null : m.id)
+                          }
+                          nome={m.nome}
+                          avatarPath={m.avatar_path}
+                          papel="mentor"
+                          selo={
+                            sugeridosMentores.has(m.id) ? "sugerido" : undefined
+                          }
+                          meta={metaMentor(m.id)}
+                        />
+                      ))}
+                    </ParearColuna>
+                  </div>
 
-                {mentorSelObj && mentorLotado && (
-                  <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-[var(--warn-text)]">
-                    <Warning size={14} aria-hidden className="shrink-0" />
-                    {mentorSelObj.nome.split(" ")[0]} está sem vaga (
-                    {usadasDe(mentorSelObj.id)}/{tetoDe(mentorSelObj.id)} duplas
-                    em andamento). Se a afinidade fechar,{" "}
-                    <CapacidadeMentorDialog
-                      mentorId={mentorSelObj.id}
-                      nome={mentorSelObj.nome}
-                      atual={tetoDe(mentorSelObj.id)}
-                      emUso={usadasDe(mentorSelObj.id)}
-                      trilha="dpp"
+                  {mentorSelObj && mentorLotado && (
+                    <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-[var(--warn-text)]">
+                      <Warning size={14} aria-hidden className="shrink-0" />
+                      {mentorSelObj.nome.split(" ")[0]} está sem vaga (
+                      {usadasDe(mentorSelObj.id)}/{tetoDe(mentorSelObj.id)} duplas
+                      em andamento). Se a afinidade fechar,{" "}
+                      <CapacidadeMentorDialog
+                        mentorId={mentorSelObj.id}
+                        nome={mentorSelObj.nome}
+                        atual={tetoDe(mentorSelObj.id)}
+                        emUso={usadasDe(mentorSelObj.id)}
+                        trilha="dpp"
+                        trigger={
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="-my-2 sm:my-0"
+                          >
+                            aumentar capacidade →
+                          </Button>
+                        }
+                      />
+                    </p>
+                  )}
+
+                  {mentorSelObj && mentoradoSelObj ? (
+                    <AfinidadePar
+                      temasMentor={temasParEf?.mentor}
+                      temasMentorado={temasParEf?.mentorado}
+                      docsJovem={docsJovem}
+                      sugeridoSemantico={sugeridoSemantico}
+                      mentor={{
+                        id: mentorSelObj.id,
+                        nome: mentorSelObj.nome,
+                        interesses: mentorSelObj.interesses,
+                        cidade: mentorSelObj.cidade,
+                        uf: mentorSelObj.uf,
+                        genero: mentorSelObj.genero ?? null,
+                        cor_raca: mentorSelObj.cor_raca ?? null,
+                        pref_genero_par: mentorSelObj.pref_genero_par ?? null,
+                        motivacao: mentorSelObj.motivacao ?? null,
+                        disponibilidade: mpSel?.disponibilidade ?? null,
+                        trilha: "dpp",
+                        areas: mpSel?.areas ?? null,
+                      }}
+                      mentorado={{
+                        id: mentoradoSelObj.id,
+                        nome: mentoradoSelObj.nome,
+                        interesses: mentoradoSelObj.interesses,
+                        cidade: mentoradoSelObj.cidade,
+                        uf: mentoradoSelObj.uf,
+                        genero: mentoradoSelObj.genero ?? null,
+                        cor_raca: mentoradoSelObj.cor_raca ?? null,
+                        pref_genero_par: mentoradoSelObj.pref_genero_par ?? null,
+                        motivacao: mentoradoSelObj.motivacao ?? null,
+                        objetivos: mentoradoSelObj.objetivos,
+                        escolaridade: mentoradoSelObj.escolaridade,
+                        data_nascimento: mentoradoSelObj.data_nascimento,
+                        disponibilidade: mentoradoSelObj.disponibilidade ?? null,
+                      }}
+                    />
+                  ) : selMentorEf || selMentoradoEf ? null : (
+                    <p className="text-sm text-muted-foreground">
+                      Toque num jovem e num mentor pra comparar interesses,
+                      cor/raça, preferências e agenda antes de formar a dupla.
+                    </p>
+                  )}
+
+                  {/* rodapé de decisão sempre visível: o que falta (ou quem é
+                      o par pronto) à esquerda, a ação primária à direita — a
+                      coord não varre as duas colunas atrás do botão */}
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border/60 pt-3">
+                    <p
+                      aria-live="polite"
+                      className="min-w-0 text-sm text-muted-foreground"
+                    >
+                      {carregandoDecisao ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Sparkle
+                            aria-hidden
+                            size={14}
+                            className="animate-pulse"
+                          />
+                          Buscando sugestões e comparando afinidade…
+                        </span>
+                      ) : mentorSelObj && mentoradoSelObj ? (
+                        <>
+                          Par pronto:{" "}
+                          <span className="font-medium text-foreground">
+                            {mentoradoSelObj.nome.split(" ")[0]} +{" "}
+                            {mentorSelObj.nome.split(" ")[0]}
+                          </span>
+                        </>
+                      ) : selMentoradoEf || selMentorEf ? (
+                        `Falta escolher ${
+                          selMentoradoEf ? "o mentor" : "o mentorado"
+                        }.`
+                      ) : (
+                        "Nenhum lado escolhido ainda."
+                      )}
+                    </p>
+                    <NovaDuplaDialog
+                      mentorIdInicial={selMentorEf}
+                      mentoradoIdInicial={selMentoradoEf}
                       trigger={
                         <Button
-                          type="button"
-                          variant="link"
                           size="sm"
-                          className="-my-2 sm:my-0"
+                          disabled={!mentorSelObj || !mentoradoSelObj}
                         >
-                          aumentar capacidade →
+                          <ArrowsLeftRight size={15} aria-hidden />
+                          Formar dupla
                         </Button>
                       }
                     />
-                  </p>
-                )}
-
-                {mentorSelObj && mentoradoSelObj ? (
-                  <AfinidadePar
-                    temasMentor={temasParEf?.mentor}
-                    temasMentorado={temasParEf?.mentorado}
-                    docJovem={docJovem}
-                    sugeridoSemantico={sugeridoSemantico}
-                    mentor={{
-                      id: mentorSelObj.id,
-                      nome: mentorSelObj.nome,
-                      interesses: mentorSelObj.interesses,
-                      cidade: mentorSelObj.cidade,
-                      uf: mentorSelObj.uf,
-                      genero: mentorSelObj.genero ?? null,
-                      cor_raca: mentorSelObj.cor_raca ?? null,
-                      pref_genero_par: mentorSelObj.pref_genero_par ?? null,
-                      motivacao: mentorSelObj.motivacao ?? null,
-                      disponibilidade: mpSel?.disponibilidade ?? null,
-                      trilha: "dpp",
-                      areas: mpSel?.areas ?? null,
-                    }}
-                    mentorado={{
-                      id: mentoradoSelObj.id,
-                      nome: mentoradoSelObj.nome,
-                      interesses: mentoradoSelObj.interesses,
-                      cidade: mentoradoSelObj.cidade,
-                      uf: mentoradoSelObj.uf,
-                      genero: mentoradoSelObj.genero ?? null,
-                      cor_raca: mentoradoSelObj.cor_raca ?? null,
-                      pref_genero_par: mentoradoSelObj.pref_genero_par ?? null,
-                      motivacao: mentoradoSelObj.motivacao ?? null,
-                      objetivos: mentoradoSelObj.objetivos,
-                      escolaridade: mentoradoSelObj.escolaridade,
-                      data_nascimento: mentoradoSelObj.data_nascimento,
-                      disponibilidade: mentoradoSelObj.disponibilidade ?? null,
-                    }}
-                  />
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Toque num jovem e num mentor pra comparar interesses,
-                    cor/raça, preferências e agenda antes de formar a dupla.
-                  </p>
-                )}
-
-                <div className="flex justify-end pt-1">
-                  <NovaDuplaDialog
-                    mentorIdInicial={selMentorEf}
-                    mentoradoIdInicial={selMentoradoEf}
-                    trigger={
-                      <Button size="sm" disabled={!mentorSelObj || !mentoradoSelObj}>
-                        <ArrowsLeftRight size={15} aria-hidden />
-                        Formar dupla
-                      </Button>
-                    }
-                  />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </FadeTroca>
           </div>
         </Collapsible.Panel>
       </section>
@@ -604,6 +971,8 @@ export function FilaEspera({
 function FilaColuna({
   titulo,
   itens,
+  totalBruto,
+  filtrando,
   lado,
   vazio,
   mentoradosPorId,
@@ -615,6 +984,10 @@ function FilaColuna({
 }: {
   titulo: string;
   itens: FilaItem[];
+  /** contagem do lado sem recorte — sob filtro a coluna mostra "X de Y" */
+  totalBruto: number;
+  /** recorte ativo — coluna zerada vira "nada nesse recorte", não vazio de verdade */
+  filtrando: boolean;
   lado: "mentor" | "mentorado";
   vazio: string;
   mentoradosPorId: ReadonlyMap<string, Mentorado>;
@@ -633,10 +1006,16 @@ function FilaColuna({
         ) : (
           <UsersThree aria-hidden size={14} />
         )}
-        {titulo} ({itens.length})
+        {titulo} (
+        {filtrando && itens.length !== totalBruto
+          ? `${itens.length} de ${totalBruto}`
+          : itens.length}
+        )
       </p>
       {itens.length === 0 ? (
-        <p className="px-1 py-3 text-sm text-muted-foreground">{vazio}</p>
+        <p className="px-1 py-3 text-sm text-muted-foreground">
+          {filtrando && totalBruto > 0 ? "Nada nesse recorte." : vazio}
+        </p>
       ) : (
         <ul className="divide-y divide-border/60">
           {itens.map((p, i) => (
@@ -765,16 +1144,18 @@ function FilaLinha({
           destaqueMeta={espera}
         />
       </Link>
+      {/* "parear" é a ação da linha — rótulo visível, não ícone de canto
+          que só o leitor de tela anunciava */}
       <Button
         type="button"
-        variant="ghost"
-        size="icon"
+        variant="outline"
+        size="sm"
         aria-label={`Parear ${primeiroNome}`}
-        title={`Parear ${primeiroNome}`}
         onClick={() => onParear(lado, p.id)}
-        className="shrink-0 text-muted-foreground"
+        className="shrink-0"
       >
-        <ArrowsLeftRight size={15} aria-hidden />
+        <ArrowsLeftRight size={14} aria-hidden />
+        Parear
       </Button>
       <WhatsAppRapido
         icone
@@ -913,6 +1294,7 @@ function ParearLinha({
   avatarPath,
   papel,
   meta,
+  destaqueMeta,
   selo,
   selecionado,
   onSelecionar,
@@ -922,6 +1304,8 @@ function ParearLinha({
   avatarPath: string | null | undefined;
   papel?: PapelVisual;
   meta: string | null;
+  /** prefixo do meta em destaque — o "há N dias" da espera no parear */
+  destaqueMeta?: string | null;
   selo?: string;
   selecionado: boolean;
   onSelecionar: () => void;
@@ -952,6 +1336,7 @@ function ParearLinha({
           avatarPath={avatarPath}
           papel={papel}
           meta={meta}
+          destaqueMeta={destaqueMeta}
         />
         {selo && (
           <span className="ml-auto shrink-0 rounded-full border border-[var(--brand-lime)]/60 bg-[var(--brand-lime)]/15 px-2 py-0.5 text-[11px] font-medium leading-4 text-foreground">

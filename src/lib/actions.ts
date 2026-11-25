@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath, updateTag } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AVATAR_MAX_BYTES, avisoImagemGrande } from "@/lib/avatar";
@@ -9,15 +10,16 @@ import {
   DOCUMENTO_PESSOA_TIPOS,
   ESCOLARIDADES,
   GENEROS,
-  MOTIVOS_REAGENDAMENTO,
   PREF_GENEROS,
   UFS,
   cronogramaVigente,
+  coberturaDoRegistro,
   inicioDefaultDupla,
   maxEncontros,
   normLinkExterno,
   parseDisponibilidade,
   podeSupervisionar,
+  registroTemConteudo,
 } from "@/lib/ciclo";
 import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
 import { desfechoValido } from "@/lib/dupla-desfecho";
@@ -49,7 +51,15 @@ import {
   type LinhaPar,
   type ResolucaoPar,
 } from "@/lib/importar-duplas";
-import { notificar } from "./notificar";
+import { notificar, relerPlanoPropostoDeMembro } from "./notificar";
+import { relerTitulosNotificacao } from "./notificacao-releitura";
+import {
+  agendarEncontroCore,
+  marcarSaidaMentoradoCore,
+  parseDataHora,
+  salvarCampoRelatorioCore,
+  urlOk,
+} from "./escritas";
 import {
   depoisDe,
   removerMatchingPerfil,
@@ -57,13 +67,19 @@ import {
   sincronizarMatchingPerfilPessoa,
 } from "./ia/matching";
 import { bloqueioTrocaPapel } from "./papel-vinculo";
+import {
+  emitirDocumentosMentorado,
+  templatesMentoradoAtivos,
+} from "./documentos/emissao";
 import { AUDIENCIAS, audienciaLegada } from "./materiais";
-import { ROLES_POR_AUDIENCIA } from "@/lib/email";
+import { ROLES_POR_AUDIENCIA, SITE_URL } from "@/lib/email";
+import { emailChamadoUrgencia } from "@/lib/email-templates";
+import { enviaEmailChamadoDepois } from "./actions-chamados";
 import {
   dispararComunicadoEmail,
   dispararMaterialEmail,
 } from "./actions-email";
-import { demoAtivo, demoLidas, demoRole, limparDemo, marcarDemoLidas, marcarOnboardingDemo } from "./demo/mode";
+import { demoAtivo, demoLidas, demoRole, limparDemo, marcarDemoLidas, marcarDemoMaterialLido, marcarOnboardingDemo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { getDemoData } from "./demo/data";
 import { demoNotificacoes } from "./demo/queries";
@@ -653,7 +669,8 @@ export async function createMentorado(formData: FormData) {
     email: email || null,
     whatsapp: whatsapp || null,
     ong_origem: String(formData.get("ong_origem") ?? "").trim() || null,
-    notas: String(formData.get("notas") ?? "").trim() || null,
+    // notas fora: a coluna é resíduo da anamnese externa (REALIZA-384) —
+    // nada mais alimenta até a auditoria decidir o drop
     ...ficha,
   }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
@@ -667,6 +684,26 @@ export async function createMentorado(formData: FormData) {
   } else {
     aviso = foto.aviso;
   }
+
+  // documentos de assinatura nascem com o cadastro (REALIZA-436) — mesma
+  // gravação da emissão manual; falha vira aviso, nunca derruba o cadastro
+  const tplsDoc = await templatesMentoradoAtivos(supabase);
+  const falhasDoc = await emitirDocumentosMentorado(supabase, tplsDoc, {
+    mentoradoId: mentorado.id,
+    dataNascimento: ficha.data_nascimento,
+    createdBy: eu.id,
+  });
+  if (falhasDoc.length) {
+    aviso = [
+      aviso,
+      falhasDoc.length > 1
+        ? "Os documentos de assinatura não foram emitidos. Emita pela ficha da pessoa."
+        : "Um documento de assinatura não foi emitido. Emita pela ficha da pessoa.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
   depoisDe(() => sincronizarMatchingPerfilMentorado(mentorado.id));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${mentorado.id}`);
@@ -865,7 +902,7 @@ export async function createDupla(formData: FormData) {
   if (error) return { error: erroAmigavel(error) };
   // avisa o mentor — o pareamento é a notícia que muda a rotina dele
   const { data: md } = await supabase
-    .from("mentorados").select("nome").eq("id", mentorado_id).single();
+    .from("mentorados").select("nome, profile_id").eq("id", mentorado_id).single();
   const hrefDupla = novaDupla?.id ? `/duplas/${novaDupla.id}` : "/duplas";
   await notificar(supabase, [
     {
@@ -881,6 +918,15 @@ export async function createDupla(formData: FormData) {
       titulo: "Nova dupla sob sua supervisão",
       corpo: md?.nome ? `${md.nome}: acompanhe a ficha da dupla.` : null,
       href: hrefDupla,
+    },
+    // jovem com conta recebe o marco no sino dele — a home dele mostra a
+    // dupla e os contatos da equipe (href /jovem, não a ficha de staff)
+    {
+      profile_id: md?.profile_id,
+      tipo: "dupla_formada",
+      titulo: "Sua dupla foi formada",
+      corpo: "A mentoria começou. Combine o 1º encontro com seu mentor.",
+      href: "/jovem",
     },
   ], eu.id);
   revalidatePath("/duplas");
@@ -902,7 +948,7 @@ export async function setPessoaRole(profileId: string, role: string | null) {
   if (role === "mentorado") {
     return {
       error:
-        "O papel de mentorado vem do vínculo com o cadastro do jovem — não é concedido por aqui.",
+        "O papel de mentorado vem do vínculo com o cadastro do jovem, então não é concedido por aqui.",
     };
   }
   // 'mentor_hibrido' é o valor composto do RoleSelect (REALIZA-262): DPP +
@@ -934,7 +980,7 @@ export async function setPessoaRole(profileId: string, role: string | null) {
   if ((ppAtuais ?? []).some((r) => r.papel === "mentorado")) {
     return {
       error:
-        "Essa pessoa é jovem do programa — a mudança de papel segue pelo fluxo de promoção a mentor.",
+        "Essa pessoa é jovem do programa. A mudança de papel segue pelo fluxo de promoção a mentor.",
     };
   }
 
@@ -1222,46 +1268,6 @@ export async function setEscopoAuxiliar(
 
 // ---------- gestao ----------
 
-/** Dados civis do termo (0046) — CPF, RG e endereço, coluna coord-only.
- *  Merge parcial: só os campos que o form mandou entram; o resto do jsonb
- *  fica como estava. CPF com DV conferido, CEP só dígitos. */
-function camposCivis(
-  formData: FormData,
-  atual: DadosCivis | null
-): { dados_civis: DadosCivis } | { error: string } | Record<string, never> {
-  const chaves = [
-    "civ_cpf", "civ_rg", "civ_cep", "civ_logradouro", "civ_numero",
-    "civ_complemento", "civ_bairro", "civ_cidade", "civ_uf",
-  ];
-  if (!chaves.some((k) => formData.has(k))) return {};
-
-  const texto = (k: string, anterior: string | null | undefined) =>
-    formData.has(k) ? String(formData.get(k) ?? "").trim() || null : (anterior ?? null);
-
-  const cpfRaw = String(formData.get("civ_cpf") ?? "").replace(/\D/g, "");
-  if (cpfRaw && !cpfValido(cpfRaw)) {
-    return { error: "Confira o CPF (dígito verificador)." };
-  }
-  const e = atual?.endereco;
-  return {
-    dados_civis: {
-      nome_civil: atual?.nome_civil ?? null,
-      data_nascimento: atual?.data_nascimento ?? null,
-      cpf: cpfRaw || null,
-      rg: texto("civ_rg", atual?.rg),
-      endereco: {
-        logradouro: texto("civ_logradouro", e?.logradouro) ?? "",
-        numero: texto("civ_numero", e?.numero) ?? "",
-        complemento: texto("civ_complemento", e?.complemento),
-        bairro: texto("civ_bairro", e?.bairro) ?? "",
-        cidade: texto("civ_cidade", e?.cidade) ?? "",
-        uf: (texto("civ_uf", e?.uf) ?? "").toUpperCase().slice(0, 2),
-        cep: (texto("civ_cep", e?.cep) ?? "").replace(/\D/g, "").slice(0, 8),
-      },
-    },
-  };
-}
-
 export async function updatePessoa(profileId: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -1299,29 +1305,28 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   // 0060). A pessoa troca o próprio em /perfil (trocarEmail).
   const { data: atual } = await supabase
     .from("profiles").select("user_id, role, email, dados_civis, consent_lgpd_em, profile_papeis(papel)").eq("id", profileId).single();
-  // campos de apresentação (0030) — a coordenação edita os mesmos que a
-  // pessoa edita em /perfil; o form manda `areas_perfil` porque `areas` já é
-  // o campo do mentor_profile
-  const apresentacao = camposApresentacao(formData, { areasKey: "areas_perfil" });
+  // campos de apresentação (0030) são da pessoa — ela edita em /perfil e o
+  // dialog da coordenação nem renderiza; parcial pra chave ausente nunca
+  // zerar o que está gravado. `areas_perfil` porque `areas` já é o campo
+  // do mentor_profile no FormData
+  const apresentacao = camposApresentacao(formData, { areasKey: "areas_perfil", parcial: true });
   if ("error" in apresentacao) return { error: apresentacao.error };
   // ficha pessoal/matching (0034) — a escrita é table-level: coord edita de
   // qualquer um; os sensíveis que ela lê via view ela também grava aqui.
   // Patch parcial de propósito: campo que o form não renderiza (a preferência
   // de par de quem não é mentor, REALIZA-231) não pode virar null no save —
   // o dado já gravado sobrevive a uma edição feita por outro recorte de papel.
+  // Inclui os dados civis do termo (0046) via prefixo `civis_`.
   const ficha = camposFicha(formData, { de: "pessoa", parcial: true });
   if ("error" in ficha) return { error: ficha.error };
-  const mentorCampos = camposMentor(formData);
+  // mentor_profile idem — só o que o form mandou entra no upsert
+  const mentorCampos = camposMentor(formData, { parcial: true });
   if ("error" in mentorCampos) return { error: mentorCampos.error };
-  // dados civis do termo (0046) — CPF/RG/endereço, coord-only
-  const civis = camposCivis(formData, (atual?.dados_civis ?? null) as DadosCivis | null);
-  if ("error" in civis) return { error: civis.error };
   const patch: Record<string, unknown> = {
     nome,
     whatsapp: whatsapp || null,
     ...apresentacao,
     ...ficha,
-    ...civis,
     ...consentPatch(formData, atual?.consent_lgpd_em),
   };
   // sentinela: checkbox desmarcado não posta (mesmo padrão do salvarOnboarding)
@@ -1592,7 +1597,7 @@ export async function updateMentorado(id: string, formData: FormData) {
     if (!email) {
       return {
         error:
-          "Essa pessoa já entrou na plataforma — o e-mail de acesso não pode ficar vazio.",
+          "Essa pessoa já entrou na plataforma. O e-mail de acesso não pode ficar vazio.",
       };
     }
     const { data: livre, error: erroRpc } = await supabase.rpc(
@@ -1635,7 +1640,8 @@ export async function updateMentorado(id: string, formData: FormData) {
     email: email || null,
     whatsapp: whatsapp || null,
     ong_origem: String(formData.get("ong_origem") ?? "").trim() || null,
-    notas: String(formData.get("notas") ?? "").trim() || null,
+    // sem `notas` no update: o campo saiu da UI (REALIZA-384) e escrever
+    // null zerava o valor guardado a cada edição, antes da auditoria
     ...ficha,
   }).eq("id", id).select("id");
   if (error) return { error: erroAmigavel(error) };
@@ -1680,7 +1686,7 @@ export async function deleteMentorado(id: string) {
   if (vinculo?.profile_id) {
     return {
       error:
-        "Essa pessoa já entrou na plataforma — marque como desistente em vez de excluir.",
+        "Essa pessoa já entrou na plataforma. Marque como desistente em vez de excluir.",
     };
   }
   const [{ data: m }, { data: cv }] = await Promise.all([
@@ -1717,64 +1723,21 @@ export async function deleteMentorado(id: string) {
   return { ok: true };
 }
 
-const SITUACOES_MENTORADO = ["ativo", "desistente", "concluido"] as const;
-
 /** Marca a saída do mentorado do programa (0077) — desistente/concluído —
- *  ou a reativação (situacao 'ativo' limpa carimbo e motivo). Coord-only;
- *  a dupla viva é pré-condição: quem tem par em andamento passa ANTES pelo
- *  rito de encerramento da ficha da dupla (checklist + resumo da jornada) —
- *  marcar a saída por cima deixaria vaga ocupada por quem já saiu. */
+ *  ou a reativação (situacao 'ativo' limpa carimbo e motivo). A regra mora
+ *  no core (lib/escritas): coord-only, dupla viva bloqueia, desistente
+ *  exige motivo — o mesmo contrato que a tool `marcar_situacao_mentorado`
+ *  consome pelo canal de IA. */
 export async function marcarSaidaMentorado(
   id: string,
   situacao: SituacaoMentorado,
   motivo?: string | null
-) {
+): Promise<{ error?: string; ok?: boolean; duplaId?: string }> {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (eu.role !== "coordenacao") {
-    return { error: "Só a coordenação marca a saída de mentorados." };
-  }
-  if (!(SITUACOES_MENTORADO as readonly string[]).includes(situacao)) {
-    return { error: "Escolha uma situação válida." };
-  }
-  const motivoTxt = (motivo ?? "").trim() || null;
-  if (motivoTxt && motivoTxt.length > 300) {
-    return { error: "O motivo da saída aceita até 300 caracteres." };
-  }
-  // o motivo é o "porquê" que a ficha e a lista exibem — desistente sem ele
-  // vira dado mudo; concluído dispensa (a jornada se explica)
-  if (situacao === "desistente" && !motivoTxt) {
-    return { error: "Conte o motivo da saída — ele aparece na ficha e na lista." };
-  }
-  if (situacao !== "ativo") {
-    const { data: vivas } = await supabase
-      .from("duplas")
-      .select("id")
-      .eq("mentorado_id", id)
-      .in("status", ["ativa", "pausada"])
-      .limit(1);
-    if (vivas?.length) {
-      return {
-        error:
-          "Tem dupla em andamento — registre o encerramento na ficha da dupla antes de marcar a saída.",
-        duplaId: vivas[0].id,
-      };
-    }
-  }
-  const { data, error } = await supabase
-    .from("mentorados")
-    .update(
-      situacao === "ativo"
-        ? { situacao, saiu_em: null, motivo_saida: null }
-        : { situacao, saiu_em: new Date().toISOString(), motivo_saida: motivoTxt }
-    )
-    .eq("id", id)
-    .select("id");
-  if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) {
-    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
-  }
+  const r = await marcarSaidaMentoradoCore(supabase, eu, { id, situacao, motivo });
+  if ("error" in r) return r;
   depoisDe(() => sincronizarMatchingPerfilMentorado(id));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${id}`);
@@ -1782,114 +1745,25 @@ export async function marcarSaidaMentorado(
   return { ok: true };
 }
 
-/** Campos de cadastro que a grade de relatórios edita inline (typo/contato).
- *  Tudo que tem fluxo próprio — status e demanda de dupla, papel, datas —
- *  fica de fora de propósito: a grade corrige ficha, não opera o ciclo. */
-const CAMPOS_RELATORIO = ["nome", "email", "whatsapp", "cidade", "uf"] as const;
-
+/** Edição inline da grade de relatórios — o core (lib/escritas) valida a
+ *  allowlist e normaliza igual aos dialogs completos. */
 export async function salvarCampoRelatorio(
   tabela: "profiles" | "mentorados",
   id: string,
   campo: string,
   valor: string
-) {
+): Promise<{ error?: string; ok?: boolean; valor?: string | null }> {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (eu.role !== "coordenacao") {
-    return { error: "Só a coordenação edita cadastros." };
-  }
-  if (tabela !== "profiles" && tabela !== "mentorados") {
-    return { error: "Não foi possível concluir. Tente de novo." };
-  }
-  if (!(CAMPOS_RELATORIO as readonly string[]).includes(campo)) {
-    return { error: "Esse campo não é editável por aqui." };
-  }
-
-  // mesmas normalizações dos dialogs completos (updatePessoa/updateMentorado
-  // + camposFicha) — um campo digitado na grade vale o mesmo que no form
-  const v = valor.trim();
-  let normalizado: string | null;
-  switch (campo as (typeof CAMPOS_RELATORIO)[number]) {
-    case "nome": {
-      normalizado = nomeProprio(v);
-      if (!normalizado) return { error: "Nome é obrigatório." };
-      break;
-    }
-    case "email": {
-      normalizado = normEmail(v) || null;
-      if (normalizado && !emailValido(normalizado)) {
-        return { error: "Confira o e-mail." };
-      }
-      // e-mail de profile já vinculado a uma conta só muda pelo sync do
-      // auth (0060): a troca é self-service, feita pela própria pessoa
-      if (tabela === "profiles") {
-        const { data: atual } = await supabase
-          .from("profiles").select("user_id").eq("id", id).single();
-        if (atual?.user_id) {
-          return {
-            error:
-              "Essa pessoa já entrou na plataforma — o e-mail de acesso só muda pelo perfil dela.",
-          };
-        }
-      }
-      // idem ficha de jovem vinculada (mentorados.profile_id): o e-mail de
-      // acesso mora na conta e divergir aqui abriria conta fantasma
-      if (tabela === "mentorados") {
-        const { data: atual } = await supabase
-          .from("mentorados").select("profile_id").eq("id", id).single();
-        if (atual?.profile_id) {
-          return {
-            error:
-              "Essa pessoa já entrou na plataforma — o e-mail de acesso só muda pelo perfil dela.",
-          };
-        }
-      }
-      break;
-    }
-    case "whatsapp": {
-      normalizado = v ? normWhatsapp(v) : null;
-      // lixo digitado não pode zerar o campo silenciosamente
-      if (v && !normalizado) {
-        return { error: "Confira o WhatsApp: use DDD e o número completo." };
-      }
-      break;
-    }
-    case "cidade": {
-      normalizado = nomeProprio(v) || null;
-      if (normalizado && normalizado.length > 100) {
-        return { error: 'O campo "Cidade" aceita até 100 caracteres.' };
-      }
-      break;
-    }
-    case "uf": {
-      const uf = v.toUpperCase();
-      if (!uf) normalizado = null;
-      else if (!(UFS as readonly string[]).includes(uf)) {
-        return { error: "Escolha um estado (UF) válido." };
-      } else normalizado = uf;
-      break;
-    }
-  }
-
-  // UPDATE direto na tabela (nunca na view profiles_contato): coord cobre a
-  // row inteira pela policy *_coord for all (0001) — o grant por coluna da
-  // 0026/0034 só estreitou SELECT
-  const { data, error } = await supabase
-    .from(tabela)
-    .update({ [campo]: normalizado })
-    .eq("id", id)
-    .select("id");
-  if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) {
-    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
-  }
+  const r = await salvarCampoRelatorioCore(supabase, eu, { tabela, id, campo, valor });
+  if ("error" in r) return r;
   revalidatePath("/relatorios");
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${id}`);
   // devolve o valor gravado: a grade aplica o normalizado no estado local
   // (o que aparece na célula é o que ficou no banco, não o que se digitou)
-  return { ok: true, valor: normalizado };
+  return r;
 }
 
 export async function updateDupla(duplaId: string, formData: FormData) {
@@ -1933,7 +1807,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   }
   const { data: mentor } = await supabase
     .from("profiles")
-    .select("role, profile_papeis(papel)")
+    .select("role, nome, nome_social, profile_papeis(papel)")
     .eq("id", mentor_id)
     .single();
   const papeisMentor = new Set<AppRole>(
@@ -1987,7 +1861,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   )
     return {
       error:
-        "Trilha de especialista se encerra pelo botão 'Encerrar trilha' da ficha — é o rito que pede motivo e devolutiva e emite a avaliação geral.",
+        "Trilha de especialista se encerra pelo botão 'Encerrar trilha' da ficha: é o rito que pede motivo e devolutiva e emite a avaliação geral.",
     };
   // dupla de especialista não tem supervisor — null forçado, nunca confia no form
   const supervisorFinal = trilhaNova === "especialista" ? null : supervisor_id;
@@ -2067,10 +1941,21 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   const desfechoNovo = desfechoVeio && desfechoRaw !== (desfechoAtual ?? "");
   const encerrando =
     statusMudouDupla && (status === "encerrada" || status === "concluida");
+  // motivo/obs também disparam a gravação auditável — corrigir só o
+  // motivo (o caso típico: trocar o 'legado' do backfill pelo real) sem
+  // mexer no desfecho não pode ser no-op silencioso
+  const motivoMudou =
+    formData.has("desfecho_motivo") &&
+    (String(formData.get("desfecho_motivo") ?? "").trim() || null) !==
+      (atualDupla?.desfecho_motivo ?? null);
+  const obsMudou =
+    formData.has("desfecho_obs") &&
+    (String(formData.get("desfecho_obs") ?? "").trim() || null) !==
+      (atualDupla?.desfecho_obs ?? null);
   const desfechoMudouMesmoStatus =
     !statusMudouDupla &&
     (status === "encerrada" || status === "concluida") &&
-    desfechoNovo;
+    (desfechoNovo || motivoMudou || obsMudou);
   const reabrindo =
     statusMudouDupla &&
     (status === "ativa" || status === "pausada") &&
@@ -2108,9 +1993,16 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         ? String(formData.get("demanda") ?? "").trim() || null
         : null,
     // dupla viva (ativa/pausada) não carrega carimbo de fechamento — reabrir
-    // uma trilha especialista limpa o rastro do encerramento anterior
+    // uma trilha especialista limpa o rastro do encerramento anterior. O
+    // concluida_em do trigger também sai: um reabrir posterior não pode
+    // re-ancorar a espera da fila na conclusão de um ciclo reaberto
     ...(status === "ativa" || status === "pausada"
-      ? { encerrada_em: null, motivo_encerramento: null, devolutiva_pdm: null }
+      ? {
+          encerrada_em: null,
+          concluida_em: null,
+          motivo_encerramento: null,
+          devolutiva_pdm: null,
+        }
       : {}),
   };
   // desfecho auditável (0140): grava quando fecha/muda; limpa quando reabre.
@@ -2159,7 +2051,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         if (!vigente) {
           return {
             error:
-              "A dupla DPP precisa de um cronograma pra ficar ativa — cadastre um antes.",
+              "A dupla DPP precisa de um cronograma pra ficar ativa. Cadastre um antes.",
           };
         }
         patch.cronograma_id = vigente.id;
@@ -2216,8 +2108,11 @@ export async function updateDupla(duplaId: string, formData: FormData) {
     (status === "pausada" || status === "encerrada" || status === "concluida");
   if (atualDupla && (trocouPessoas || mudouStatus)) {
     const { data: mdTroca } = await supabase
-      .from("mentorados").select("nome").eq("id", mentorado_id).single();
+      .from("mentorados").select("nome, profile_id").eq("id", mentorado_id).single();
     const nomeMd = mdTroca?.nome;
+    // jovem com conta recebe o marco no sino dele — paridade com a equipe
+    const jovemProfileId = mdTroca?.profile_id ?? null;
+    const nomeMentorNovo = primeiroNomeDe(mentor?.nome_social ?? mentor?.nome);
     await notificar(supabase, [
       mentor_id !== atualDupla.mentor_id ? {
         profile_id: mentor_id,
@@ -2252,6 +2147,22 @@ export async function updateDupla(duplaId: string, formData: FormData) {
           : "A coordenação reorganizou as duplas.",
         href: "/",
       } : null,
+      mentor_id !== atualDupla.mentor_id ? {
+        profile_id: jovemProfileId,
+        tipo: "dupla_formada",
+        titulo: "Seu mentor mudou",
+        corpo: nomeMentorNovo
+          ? `Agora a mentoria é com ${nomeMentorNovo}. A coordenação reorganizou as duplas.`
+          : "A coordenação reorganizou as duplas.",
+        href: "/jovem",
+      } : null,
+      atualDupla.supervisor_id && supervisorFinal !== atualDupla.supervisor_id ? {
+        profile_id: jovemProfileId,
+        tipo: "dupla_formada",
+        titulo: "Seu supervisor mudou",
+        corpo: "A coordenação reorganizou as duplas. A equipe nova aparece na sua página.",
+        href: "/jovem",
+      } : null,
       mudouStatus ? {
         profile_id: mentor_id,
         tipo: "dupla_formada",
@@ -2263,6 +2174,18 @@ export async function updateDupla(duplaId: string, formData: FormData) {
               : "Sua dupla foi encerrada",
         corpo: "A coordenação atualizou a sua dupla. Fale com ela se tiver dúvidas.",
         href: `/duplas/${duplaId}`,
+      } : null,
+      mudouStatus ? {
+        profile_id: jovemProfileId,
+        tipo: "dupla_formada",
+        titulo:
+          status === "pausada"
+            ? "Sua dupla foi pausada"
+            : status === "concluida"
+              ? "Sua dupla concluiu a jornada"
+              : "Sua dupla foi encerrada",
+        corpo: "A coordenação atualizou a sua dupla. Fale com ela se tiver dúvidas.",
+        href: "/jovem",
       } : null,
       mudouStatus && supervisorFinal ? {
         profile_id: supervisorFinal,
@@ -2334,7 +2257,7 @@ export async function deleteDupla(duplaId: string) {
   ].filter(Boolean);
   if (historico.length) {
     return {
-      error: `Essa dupla tem histórico que não pode ser apagado (${historico.join(", ")}). Encerre-a em vez de excluir — o histórico fica salvo.`,
+      error: `Essa dupla tem histórico que não pode ser apagado (${historico.join(", ")}). Encerre-a em vez de excluir: o histórico fica salvo.`,
     };
   }
   // a cascata leva encontros→registros→registro_anexos (rows), mas os OBJETOS
@@ -2396,7 +2319,8 @@ export async function remanejarDupla(
   novoId: string,
   motivo: string,
   registrarNota: boolean,
-  devolutiva?: string
+  devolutiva?: string,
+  redirecionar = false
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -2417,8 +2341,8 @@ export async function remanejarDupla(
     .from("duplas")
     .select(
       `id, mentor_id, mentorado_id, supervisor_id, status, trilha,
-       mentor:profiles!duplas_mentor_id_fkey(nome),
-       mentorado:mentorados!duplas_mentorado_id_fkey(nome)`
+       mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+       mentorado:mentorados!duplas_mentorado_id_fkey(nome, nome_social, profile_id)`
     )
     .eq("id", duplaId)
     .maybeSingle();
@@ -2433,7 +2357,7 @@ export async function remanejarDupla(
   ) {
     return {
       error:
-        "A devolutiva pro PDM precisa de 10 a 4.000 caracteres — é a entrega de quem sai da trilha.",
+        "A devolutiva pro PDM precisa de 10 a 4.000 caracteres: é a entrega de quem sai da trilha.",
     };
   }
   const saiId = lado === "mentor" ? atual.mentor_id : atual.mentorado_id;
@@ -2441,8 +2365,8 @@ export async function remanejarDupla(
     return {
       error:
         lado === "mentor"
-          ? "Essa pessoa já é o mentor da dupla — pra trocar, escolha outra."
-          : "Essa pessoa já é o mentorado da dupla — pra trocar, escolha outra.",
+          ? "Essa pessoa já é o mentor da dupla. Pra trocar, escolha outra."
+          : "Essa pessoa já é o mentorado da dupla. Pra trocar, escolha outra.",
     };
   }
   // quem entra do lado do mentorado precisa estar NO programa (0077) — o
@@ -2483,24 +2407,29 @@ export async function remanejarDupla(
     };
   }
 
-  // notícias do remanejo. O mentorado não tem login — o sino só alcança
-  // profiles: mentor que entra, mentor que fica, mentor que sai e o
-  // supervisor. Este último CONTINUA na nova dupla, então recebe um aviso
-  // só — não o par "encerrada + formada" que a leitura literal do
-  // updateDupla mandaria.
+  // notícias do remanejo. Com a conta vinculada o jovem também tem sino:
+  // mentor que entra, mentor que fica, mentor que sai, supervisor e os
+  // profiles do(s) jovem(ns) tocados. Este último CONTINUA na nova dupla,
+  // então recebe um aviso só — não o par "encerrada + formada" que a
+  // leitura literal do updateDupla mandaria.
   const norm = <T,>(v: T | T[] | null | undefined): T | null =>
     Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
-  const nomeMentor = norm(atual.mentor)?.nome ?? null;
-  const nomeMd = norm(atual.mentorado)?.nome ?? null;
+  const mtAtual = norm(atual.mentor);
+  const nomeMentor = mtAtual?.nome_social ?? mtAtual?.nome ?? null;
+  const mdAtual = norm(atual.mentorado);
+  const nomeMd = mdAtual?.nome_social ?? mdAtual?.nome ?? null;
+  const jovemAtualProfileId = mdAtual?.profile_id ?? null;
   let nomeNovo: string | null = null;
+  let jovemNovoProfileId: string | null = null;
   if (lado === "mentor") {
     const { data: p } = await supabase
-      .from("profiles").select("nome").eq("id", novoId).single();
-    nomeNovo = p?.nome ?? null;
+      .from("profiles").select("nome, nome_social").eq("id", novoId).single();
+    nomeNovo = p?.nome_social ?? p?.nome ?? null;
   } else {
     const { data: m } = await supabase
-      .from("mentorados").select("nome").eq("id", novoId).single();
-    nomeNovo = m?.nome ?? null;
+      .from("mentorados").select("nome, nome_social, profile_id").eq("id", novoId).single();
+    nomeNovo = m?.nome_social ?? m?.nome ?? null;
+    jovemNovoProfileId = m?.profile_id ?? null;
   }
   await notificar(
     supabase,
@@ -2550,6 +2479,36 @@ export async function remanejarDupla(
             href: `/duplas/${novaDuplaId}`,
           }
         : null,
+      // o jovem da troca também tem sino: troca de mentor avisa quem fica;
+      // troca de mentorado fecha a jornada de quem sai e abre a de quem entra
+      lado === "mentor"
+        ? {
+            profile_id: jovemAtualProfileId,
+            tipo: "dupla_formada",
+            titulo: "Seu mentor mudou",
+            corpo: nomeNovo
+              ? `Agora a mentoria é com ${nomeNovo}. A coordenação reorganizou as duplas.`
+              : "A coordenação reorganizou as duplas.",
+            href: "/jovem",
+          }
+        : {
+            profile_id: jovemNovoProfileId,
+            tipo: "dupla_formada",
+            titulo: "Sua dupla foi formada",
+            corpo: nomeMentor
+              ? `Agora a mentoria é com ${nomeMentor}.`
+              : "A mentoria começou. Combine o 1º encontro com seu mentor.",
+            href: "/jovem",
+          },
+      lado === "mentorado"
+        ? {
+            profile_id: jovemAtualProfileId,
+            tipo: "dupla_formada",
+            titulo: "Sua dupla foi encerrada",
+            corpo: "A coordenação reorganizou as duplas. Fale com ela se tiver dúvidas.",
+            href: "/jovem",
+          }
+        : null,
     ].filter((r): r is NonNullable<typeof r> => r !== null),
     eu.id
   );
@@ -2559,6 +2518,12 @@ export async function remanejarDupla(
   revalidatePath(`/duplas/${novaDuplaId}`);
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${saiId}`);
+  // a ficha antiga vira "encerrada" na mesma revalidation; navegar daqui
+  // evita o router.push do cliente ser descartado quando o menu/dialog
+  // desmonta (496/QW do remanejo). O `?remanejada=1` é o flash one-shot:
+  // o NEXT_REDIRECT corta o cliente antes de qualquer toast, então a
+  // confirmação mora na ficha de destino (RemanejoFlash)
+  if (redirecionar) redirect(`/duplas/${novaDuplaId}?remanejada=1`);
   return { ok: true, novaDuplaId };
 }
 
@@ -2594,6 +2559,13 @@ export async function importPessoas(rows: LinhaImportada[]) {
   // devolve todas as linhas pra coordenação, que é quem chega até aqui
   const { data: existentes } = await supabase.from("profiles_contato").select("email");
   const noBanco = new Set((existentes ?? []).map((p) => p.email.toLowerCase()));
+  // email de ficha de jovem também bloqueia a linha — um profile staff com o
+  // email do jovem ocupa a identidade e o vínculo mentorados.profile_id do
+  // login real não fecha mais (0177)
+  const { data: fichasJovens } = await supabase.from("mentorados").select("email");
+  const emailsJovem = new Set(
+    (fichasJovens ?? []).map((m) => normEmail(m.email ?? "")).filter(Boolean)
+  );
   const vistos = new Set<string>();
   const validas: Record<string, unknown>[] = [];
   // email → ficha de mentor (experiência/formação) — a correlação com o id
@@ -2632,6 +2604,9 @@ export async function importPessoas(rows: LinhaImportada[]) {
     const disp = eMentor ? parseDisponibilidade(String(r.disponibilidade ?? "")) : null;
     if (disp && "error" in disp) { puladas.push(`${nome}: ${disp.error}`); continue; }
     if (noBanco.has(email) || vistos.has(email)) { puladas.push(`${email}: já existe`); continue; }
+    if (emailsJovem.has(email)) {
+      puladas.push(`${nome}: e-mail já é de uma ficha de jovem`); continue;
+    }
     vistos.add(email);
     validas.push({ nome, email, whatsapp, role, ...ficha });
     if (exp || form || disp) {
@@ -2744,7 +2719,9 @@ export async function importMentorados(rows: LinhaImportada[]) {
       email: email || null,
       whatsapp,
       ong_origem: String(r.ong ?? "").trim() || null,
-      notas: String(r.notas ?? "").trim() || null,
+      // notas fora (mesma régua do create): coluna órfã da anamnese
+      // externa — a linha do CSV continua aceitando o cabeçalho, mas o
+      // valor não grava mais (REALIZA-384)
       ...ficha,
     });
   }
@@ -2762,6 +2739,33 @@ export async function importMentorados(rows: LinhaImportada[]) {
         await sincronizarMatchingPerfilMentorado(id);
       }
     });
+  }
+
+  // documentos dos recém-cadastrados (REALIZA-436) — idem createMentorado:
+  // sequencial de propósito e falha agregada num aviso, nunca derruba o
+  // lote. data_nascimento vem da view coord-only (o select da coluna na
+  // tabela é revogado desde a 0034)
+  const { data: pessoais } = await supabase
+    .from("mentorados_pessoal")
+    .select("id, data_nascimento")
+    .in("id", idsNovos);
+  const nascPorId = new Map(
+    (pessoais ?? []).map((p) => [p.id, p.data_nascimento])
+  );
+  const tplsDoc = await templatesMentoradoAtivos(supabase);
+  let docsFalharam = 0;
+  for (const id of idsNovos) {
+    const falhas = await emitirDocumentosMentorado(supabase, tplsDoc, {
+      mentoradoId: id,
+      dataNascimento: nascPorId.get(id),
+      createdBy: eu.id,
+    });
+    if (falhas.length) docsFalharam++;
+  }
+  if (docsFalharam) {
+    puladas.push(
+      `Aviso: documentos de assinatura não foram emitidos pra ${docsFalharam} cadastro(s). Emita pela ficha ou pelo "Enviar termos".`
+    );
   }
   revalidatePath("/pessoas");
   return { ok: true, criados: validas.length, puladas };
@@ -2789,7 +2793,7 @@ async function diretorioPareamento(supabase: Supa): Promise<DiretorioPar> {
     // (WP6b) e resolverPares decide por papel efetivo, não pelo primário
     supabase.from("profiles").select("id, nome, role, ativo, nome_social, profile_papeis(papel)"),
     supabase.from("profiles_contato").select("id, email"),
-    supabase.from("mentorados").select("id, nome, email, nome_social"),
+    supabase.from("mentorados").select("id, nome, email, nome_social, profile_id"),
     supabase
       .from("duplas")
       .select("mentor_id, mentorado_id, trilha, status, turma, created_at"),
@@ -2855,6 +2859,7 @@ function diretorioPareamentoDemo(): DiretorioPar {
       nome: m.nome,
       email: m.email,
       nome_social: m.nome_social ?? null,
+      profile_id: m.profile_id ?? null,
     })),
     duplas: d.duplas.map((x) => ({
       mentor_id: x.mentor.id,
@@ -2990,6 +2995,15 @@ export async function importDuplas(linhas: LinhaPar[]) {
             corpo: `${p.mentorado.nome} × ${p.mentor.nome}: acompanhe a ficha da dupla.`,
             href: `/duplas/${c.id}`,
           },
+          // jovem com conta recebe o marco no sino dele — mesmo aviso do
+          // cadastro manual (createDupla)
+          {
+            profile_id: p.mentorado.profile_id,
+            tipo: "dupla_formada",
+            titulo: "Sua dupla foi formada",
+            corpo: "A mentoria começou. Combine o 1º encontro com seu mentor.",
+            href: "/jovem",
+          },
         ];
       }),
       eu.id
@@ -3004,130 +3018,25 @@ export async function importDuplas(linhas: LinhaPar[]) {
 
 // ---------- encontros (mentor da dupla) ----------
 
-
-/** URL só http/https — javascript:/data: armazenável renderiza <a href> direto. */
-function urlOk(s: string): boolean {
-  try { return ["http:", "https:"].includes(new URL(s).protocol); } catch { return false; }
-}
-
-/** Aceita os dois formatos que o client manda: ISO com fuso ("...Z" / "+03:00")
- *  vira Date direto; `datetime-local` naïve ("YYYY-MM-DDTHH:mm", sem offset) é
- *  interpretado como horário de São Paulo (-03:00 fixo, sem horário de verão). */
-function parseDataHora(s: string): Date | null {
-  const d = new Date(/Z|[+-]\d{2}:?\d{2}$/.test(s) ? s : `${s}-03:00`);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-export async function agendarEncontro(formData: FormData) {
+/** Agenda ou remarca um encontro — a regra (inclusive o guard "a dupla
+ *  agenda", que a RLS larga de correções não cobriria) mora no core
+ *  compartilhado com a tool `agendar_encontro` do canal de IA. */
+export async function agendarEncontro(
+  formData: FormData
+): Promise<{ error?: string; ok?: boolean }> {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  // a regra "a dupla agenda" mora na action, não só na UI — a RLS deixaria
-  // a coord escrever (policy larga pra correções), então o contrato é aqui
-  if (eu.role === "coordenacao") {
-    return { error: "Quem agenda é a dupla. A coordenação acompanha o andamento." };
-  }
   const dupla_id = String(formData.get("dupla_id") ?? "");
-  const numero = Number(formData.get("numero"));
-  const data_hora = String(formData.get("data_hora") ?? "");
-  const link = String(formData.get("link") ?? "").trim() || null;
-  const motivo = String(formData.get("motivo") ?? "").trim();
-  const motivoOutro = String(formData.get("motivo_outro") ?? "").trim();
-  if (!dupla_id || !numero || !data_hora) return { error: "Data e horário são obrigatórios." };
-  const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", dupla_id).single();
-  // sem row a RLS escondeu (não é dele) ou a dupla não existe — os `d!`
-  // abaixo estourariam TypeError em vez do contrato { error }
-  if (!d) return { error: "Dupla não encontrada." };
-  if (d.status !== "ativa") return { error: "Essa dupla não está ativa." };
-  // DPP sem cronograma é dado inválido (o CHECK da 0061 impede criar, mas uma
-  // dupla antiga pode chegar aqui) — sem calendário o teto de número seria
-  // uma mentira; aponta a correção em vez de agendar contra nada
-  if (d.trilha !== "especialista" && !d.cronograma_id) {
-    return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
-  }
-  const quando = parseDataHora(data_hora);
-  if (!quando) return { error: "Confira a data." };
-
-  // não derruba um encontro já realizado (re-agendar apagaria o "realizado")
-  const { data: existente } = await supabase
-    .from("encontros").select("id, status, data_hora").eq("dupla_id", dupla_id).eq("numero", numero).maybeSingle();
-  if (existente?.status === "realizado") {
-    return { error: "Esse encontro já foi realizado e não pode ser remarcado." };
-  }
-
-  // trilha especialista (0074): sessão nova só nasce de pedido aceito —
-  // agendarEncontro continua servindo pra REMARCAR uma tentativa existente,
-  // nunca pra criar row do zero
-  if (d.trilha === "especialista" && !existente) {
-    return {
-      error:
-        "As sessões da trilha especialista nascem dos pedidos aceitos — combine com o jovem ou a coordenação.",
-    };
-  }
-
-  // agendamento é sempre pra frente — encontro que já aconteceu entra pelo fluxo
-  // retroativo (grava realizado_em); mover um agendado pro passado esconderia
-  // atraso. A mensagem aponta o controle que EXISTE, por contexto.
-  if (quando.getTime() <= Date.now()) {
-    return {
-      error: existente
-        ? "Essa data já passou. Se o encontro aconteceu, registre como foi ou marque 'não aconteceu' na ficha da dupla."
-        : "Essa data já passou. Use 'Registrar encontro já realizado' na ficha da dupla ou na agenda do dia.",
-    };
-  }
-  if (link && !urlOk(link)) return { error: "Confira o link: precisa ser um endereço completo (https://…)." };
-
-  // teto de nº por trilha — especialista conta TENTATIVAS (o CHECK do banco
-  // aceita até 24; aqui só passa row existente, então o teto é o do banco);
-  // DPP mede contra o calendário DA DUPLA (0061), nunca o global
-  const maxNum = d.trilha === "especialista"
-    ? 24
-    : (
-        await supabase
-          .from("ciclo_eventos").select("numero")
-          .eq("tipo", "encontro")
-          .eq("cronograma_id", d.cronograma_id!)
-          .order("numero", { ascending: false }).limit(1).maybeSingle()
-      ).data?.numero ?? 16;
-  if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
-    return { error: "Escolha um encontro da lista." };
-  }
-
-  // remarcação de verdade = a data mudou; salvar de novo com a mesma data
-  // (só pra trocar o link, p.ex.) não exige motivo nem mexe no já registrado.
-  // compara o instante, não a string — PostgREST devolve "+00:00", toISOString "Z"
-  const ehReagendamento =
-    existente != null &&
-    existente.data_hora != null &&
-    new Date(existente.data_hora).getTime() !== quando.getTime();
-  let motivoReagendamento: string | null = null;
-  if (ehReagendamento) {
-    if (!motivo) return { error: "Conte o motivo do reagendamento." };
-    if (motivo === "outro") {
-      if (motivoOutro.length < 2 || motivoOutro.length > 140) {
-        return { error: "Descreva o motivo do reagendamento (2 a 140 caracteres)." };
-      }
-      motivoReagendamento = motivoOutro;
-    } else {
-      const preset = MOTIVOS_REAGENDAMENTO.find((m) => m.value === motivo);
-      if (!preset) return { error: "Escolha um motivo de reagendamento." };
-      motivoReagendamento = preset.label;
-    }
-  }
-
-  // update preserva created_by; insert é a primeira vez do encontro.
-  // motivo_reagendamento só entra no payload quando houve remarcação — edição
-  // que não muda a data não pode sobrescrever o motivo já auditado
-  const payload = {
-    data_hora: quando.toISOString(),
-    link,
-    status: "agendado" as const,
-    ...(motivoReagendamento ? { motivo_reagendamento: motivoReagendamento } : {}),
-  };
-  const { error } = existente
-    ? await supabase.from("encontros").update(payload).eq("id", existente.id)
-    : await supabase.from("encontros").insert({ ...payload, dupla_id, numero, created_by: eu.id });
-  if (error) return { error: erroAmigavel(error) };
+  const r = await agendarEncontroCore(supabase, eu, {
+    dupla_id,
+    numero: Number(formData.get("numero")),
+    data_hora: String(formData.get("data_hora") ?? ""),
+    link: String(formData.get("link") ?? "").trim() || null,
+    motivo: String(formData.get("motivo") ?? "").trim(),
+    motivo_outro: String(formData.get("motivo_outro") ?? "").trim(),
+  });
+  if ("error" in r) return r;
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/agenda");
@@ -3233,7 +3142,7 @@ export async function salvarLinkEncontro(encontroId: string, link: string | null
     // já passado não tem como trocar só o link por ela; a saída honesta é a
     // remarcação, que edita data e link juntos
     if (encontro.data_hora == null || new Date(encontro.data_hora).getTime() <= Date.now()) {
-      return { error: "Esse encontro já passou — pra trocar o link, remarque a data junto." };
+      return { error: "Esse encontro já passou. Pra trocar o link, remarque a data junto." };
     }
     const { data, error } = await supabase.rpc("agendar_encontro_mentorado", {
       p_dupla: encontro.dupla_id,
@@ -3295,7 +3204,7 @@ export async function registrarEncontroRetroativo(
   // DPP sem cronograma não tem calendário pra medir teto/piso — aponta a
   // correção em vez de registrar contra nada
   if (d.trilha !== "especialista" && !d.cronograma_id) {
-    return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
+    return { error: "Essa dupla está sem cronograma. A coordenação vincula um na edição da dupla." };
   }
 
   const quando = parseDataHora(dataHora);
@@ -3343,7 +3252,7 @@ export async function registrarEncontroRetroativo(
     if ((realizados ?? 0) >= 5) {
       return {
         error:
-          "O guia prevê 5 sessões por trilha de especialista — essa já completou.",
+          "O guia prevê 5 sessões por trilha de especialista: essa já completou.",
       };
     }
     const { data: ultimos } = await supabase
@@ -3424,7 +3333,7 @@ export async function salvarRegistro(formData: FormData) {
     return { error: "Revise os campos: um dos valores não é válido." };
   }
 
-  const { data: d } = await supabase.from("duplas").select("status").eq("id", dupla_id).single();
+  const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", dupla_id).single();
   // 'concluida' entra junto: o fechamento automático (0102) vira status no
   // instante do último encontro — trancar aqui impediria até editar o
   // registro que acabou de fechar a jornada. Pausada/encerrada seguem fora.
@@ -3435,7 +3344,7 @@ export async function salvarRegistro(formData: FormData) {
   // só registra encontro da própria dupla que já aconteceu (ou foi marcado realizado)
   const { data: encDb } = await supabase
     .from("encontros")
-    .select("dupla_id, numero, status, data_hora, realizado_em")
+    .select("dupla_id, numero, status, data_hora, realizado_em, sessao_id, duracao_min")
     .eq("id", encontro_id)
     .single();
   if (!encDb || encDb.dupla_id !== dupla_id) return { error: "Não foi possível identificar o encontro. Recarregue a página." };
@@ -3443,21 +3352,337 @@ export async function salvarRegistro(formData: FormData) {
   if (encDb.status !== "realizado" && !jaPassou) {
     return { error: "Esse encontro ainda não aconteceu." };
   }
+  // encontro coberto pela sessão de outro não recebe registro próprio — o
+  // conteúdo dele mora no registro da âncora (018)
+  const { data: cobertor } = await supabase
+    .from("encontros")
+    .select("id, numero, registro:registros!inner(cobertura)")
+    .eq("dupla_id", dupla_id)
+    .filter("registro.cobertura", "cs", `{${encDb.numero}}`)
+    .neq("id", encontro_id)
+    .maybeSingle();
+  if (cobertor) {
+    return {
+      error: `Esse encontro já foi coberto pelo registro do ${cobertor.numero}º encontro.`,
+    };
+  }
 
   const atividades = formData.getAll("atividade").map(String);
   const atividadeOutro = String(formData.get("atividade_outro") ?? "").trim();
   if (atividadeOutro) atividades.push(atividadeOutro);
 
-  // update preserva created_by de quem registrou primeiro; insert marca o autor
+  const tema = String(formData.get("tema") ?? "").trim() || null;
+  const ferramenta = String(formData.get("ferramenta") ?? "").trim() || null;
+  const reflexoes = String(formData.get("reflexoes") ?? "").trim() || null;
+  const observacoes = String(formData.get("observacoes") ?? "").trim() || null;
+  // registro só de defaults não é entrega: sem conteúdo o encontro segue
+  // pendente (mesma régua do ciclo), então recusa antes de qualquer escrita
+  if (!registroTemConteudo({ tema, reflexoes, observacoes, atividades })) {
+    return {
+      error:
+        "Preencha ao menos um campo do registro: tema, reflexões, observações ou atividade.",
+    };
+  }
+
+  // ---- sessão combinada (018): preparação ANTES de qualquer flip pra
+  // realizado — o trigger de avaliação só minta na âncora quando as rows
+  // cobertas já carregam o sessao_id do grupo ----
+  // avisos acumulam falhas de best-effort pós-gravação (declarado aqui: a
+  // preparação da sessão também avisa)
+  const avisos: string[] = [];
+  // sessão que cobriu mais de um passo do guia: UM registro fica na âncora
+  // (menor nº do grupo) com os demais em `registros.cobertura` — os cobertos
+  // viram realizado na MESMA sessão (sessao_id, data_hora e duração iguais),
+  // nunca um clone do payload. A régua de quais nºs valem é a
+  // passosCobertosCandidatos, revalidada aqui (ficha e rota oferecem só o
+  // que o servidor aceita).
+  const cobertos: number[] = [];
+  const cobriu = [
+    ...new Set(formData.getAll("cobriu_numero").map((v) => Number(String(v)))),
+  ].filter((n) => Number.isInteger(n) && n !== encDb.numero);
+  if (cobriu.length && d?.trilha === "especialista") {
+    avisos.push(
+      "A sessão combinada não se aplica à trilha de especialista: cada sessão é registrada na própria linha."
+    );
+    cobriu.length = 0;
+  }
+  // sessão planejada (018/519): a row já pertence a um grupo — o registro
+  // é DA SESSÃO. Os demais membros entram na cobertura mesmo sem o
+  // checkbox marcado (grupo fechado), e um segundo registro no grupo é
+  // recusado: o conteúdo mora na âncora, uma vez só.
+  if (encDb.sessao_id) {
+    const { data: grupo } = await supabase
+      .from("encontros")
+      .select("id, numero")
+      .eq("dupla_id", dupla_id)
+      .eq("sessao_id", encDb.sessao_id);
+    const outros = (grupo ?? []).filter((g) => g.id !== encontro_id);
+    if (outros.length) {
+      const { data: regGrupo } = await supabase
+        .from("registros")
+        .select("encontro_id")
+        .in("encontro_id", outros.map((g) => g.id))
+        .limit(1)
+        .maybeSingle();
+      if (regGrupo) {
+        const ancoraOutro = outros.find(
+          (g) => g.id === regGrupo.encontro_id
+        );
+        return {
+          error: `Essa sessão já foi registrada. O registro mora no ${ancoraOutro?.numero ?? "primeiro"}º encontro do grupo.`,
+        };
+      }
+      for (const g of outros)
+        if (!cobriu.includes(g.numero)) cobriu.push(g.numero);
+    }
+  }
+  // âncora = menor nº da sessão: a row que carrega o registro e minta o
+  // link de avaliação (trigger 0226). Default = o encontro postado.
+  let ancoraId = encontro_id;
+  let ancoraNumero = encDb.numero;
+  let cobertura: number[] = [];
+  // rows cobertas: existentes esperam o flip; faltantes são criadas já na
+  // sessão. `quando` é a data do FATO — a mesma pra todo o grupo (mesma
+  // sessão física); o fallback é defensivo.
+  const quando = encDb.realizado_em ?? encDb.data_hora ?? new Date().toISOString();
+  type Coberta = {
+    id: string | null;
+    numero: number;
+    status: string | null;
+    sessaoId: string | null;
+    // estado anterior da row — insumo do rollback da fase 1
+    dataHora: string | null;
+    duracaoMin: number | null;
+  };
+  const cobertas: Coberta[] = [];
+  let sessaoId: string | null = encDb.sessao_id ?? null;
+  if (cobriu.length) {
+    const cronId = d?.cronograma_id ?? null;
+    const { data: evs } = cronId
+      ? await supabase
+          .from("ciclo_eventos")
+          .select("numero, data")
+          .eq("tipo", "encontro")
+          .eq("cronograma_id", cronId)
+          .order("numero", { ascending: true })
+      : { data: null };
+    const oficial = new Map<number, string | null>(
+      (evs ?? [])
+        .filter((e) => e.numero != null)
+        .map((e) => [e.numero as number, e.data])
+    );
+    const maxNum = oficial.size ? Math.max(...oficial.keys()) : 16;
+    const hoje = new Date().toISOString().slice(0, 10);
+    for (const m of [...cobriu].sort((a, b) => a - b)) {
+      if (m < 1 || m >= maxNum) {
+        avisos.push(`O ${m}º encontro não está no guia da dupla.`);
+        continue;
+      }
+      const { data: enc2 } = await supabase
+        .from("encontros")
+        .select("id, status, data_hora, sessao_id, duracao_min")
+        .eq("dupla_id", dupla_id)
+        .eq("numero", m)
+        .maybeSingle();
+      if (!enc2) {
+        // sem row: só passo oficial já vencido — criar antes pularia o
+        // gating da jornada (mesma régua da 0208)
+        const dataOficial = oficial.get(m);
+        if (!dataOficial || dataOficial > hoje) {
+          avisos.push(`O ${m}º encontro ainda não chegou na data oficial do guia.`);
+          continue;
+        }
+        cobertas.push({
+          id: null,
+          numero: m,
+          status: null,
+          sessaoId: null,
+          dataHora: null,
+          duracaoMin: null,
+        });
+        continue;
+      }
+      if (enc2.status === "realizado") {
+        // realizado com registro tem conteúdo próprio — a sessão não cobre
+        // quem já contou a história (o fato e o registro ficam intactos)
+        const { data: reg2 } = await supabase
+          .from("registros")
+          .select("id")
+          .eq("encontro_id", enc2.id)
+          .maybeSingle();
+        if (reg2) {
+          avisos.push(`O ${m}º encontro já tem registro.`);
+          continue;
+        }
+      } else if (enc2.status === "agendado" || enc2.status === "remarcado") {
+        // compromisso futuro não é coberto por checkbox — desmarcar é gesto
+        // próprio da dupla (régua da 0207)
+        if (enc2.data_hora != null && new Date(enc2.data_hora) > new Date()) {
+          avisos.push(
+            `O ${m}º encontro ainda está marcado pro futuro. Desmarque antes de cobrir.`
+          );
+          continue;
+        }
+      } else {
+        avisos.push(
+          `O ${m}º encontro está ${enc2.status === "nao_aconteceu" ? "marcado como não realizado" : "cancelado"}. Desfaça na ficha antes de cobrir.`
+        );
+        continue;
+      }
+      // row que já pertence a OUTRA sessão não migra — a sessão planejada
+      // (plano_aplicar_sessao) é um grupo fechado
+      if (enc2.sessao_id && sessaoId && enc2.sessao_id !== sessaoId) {
+        avisos.push(`O ${m}º encontro já faz parte de outra sessão combinada.`);
+        continue;
+      }
+      cobertas.push({
+        id: enc2.id,
+        numero: m,
+        status: enc2.status,
+        sessaoId: enc2.sessao_id ?? null,
+        dataHora: enc2.data_hora,
+        duracaoMin: enc2.duracao_min,
+      });
+    }
+    if (cobertas.length) {
+      // grupo fechado: o sessao_id que já existe em alguma row manda —
+      // planejado pela RPC do plano ou gerado agora
+      sessaoId =
+        sessaoId ??
+        cobertas.find((c) => c.sessaoId)?.sessaoId ??
+        crypto.randomUUID();
+      const numeros = [encDb.numero, ...cobertas.map((c) => c.numero)];
+      ancoraNumero = Math.min(...numeros);
+      const ancoraCoberta =
+        ancoraNumero === encDb.numero
+          ? null
+          : cobertas.find((c) => c.numero === ancoraNumero) ?? null;
+      if (ancoraCoberta) ancoraId = ancoraCoberta.id ?? ancoraId;
+      // FASE 1 — linka sessao_id/data_hora/duração em TODAS as rows antes de
+      // qualquer status virar realizado (o trigger lê sessao_id no flip:
+      // coberta com número menor no grupo não minta link próprio). O update
+      // sem `status` não dispara o trigger — mexer em row já realizado é
+      // seguro aqui.
+      // A fase é atômica (P1): falha de link/insert reverte o que já foi
+      // escrito e apaga rows criadas — a sessão não pode nascer pela
+      // metade, senão a cobertura gravada prometeria passos que nunca
+      // viraram realizado (cobertura fantasma).
+      type Original = {
+        sessao_id: string | null;
+        data_hora: string | null;
+        duracao_min: number | null;
+      };
+      const originais = new Map<string, Original>([
+        [
+          encontro_id,
+          {
+            sessao_id: encDb.sessao_id ?? null,
+            data_hora: encDb.data_hora ?? null,
+            duracao_min: encDb.duracao_min ?? null,
+          },
+        ],
+      ]);
+      for (const c of cobertas) {
+        if (c.id)
+          originais.set(c.id, {
+            sessao_id: c.sessaoId,
+            data_hora: c.dataHora,
+            duracao_min: c.duracaoMin,
+          });
+      }
+      const inseridos: string[] = [];
+      const desfazerSessao = async () => {
+        // rollback best-effort no caminho de erro: uma row restaurada vale
+        // mais que nenhuma, e linha criada sai do mapa de qualquer jeito
+        for (const [id, o] of originais) {
+          if (inseridos.includes(id)) continue;
+          await supabase
+            .from("encontros")
+            .update({
+              sessao_id: o.sessao_id,
+              data_hora: o.data_hora,
+              duracao_min: o.duracao_min,
+            })
+            .eq("id", id);
+        }
+        if (inseridos.length)
+          await supabase.from("encontros").delete().in("id", inseridos);
+      };
+      const sessaoUpdate = {
+        sessao_id: sessaoId,
+        data_hora: quando,
+        ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+      };
+      // encDb primeiro: quando ele é a âncora, o sessao_id dele precisa
+      // estar gravado antes das rows cobertas já-realizadas receberem o
+      // update — nenhuma delas pode parecer âncora em tempo nenhum
+      const { error: linkEncErr } = await supabase
+        .from("encontros")
+        .update({ sessao_id: sessaoId, ...(duracaoRaw ? { duracao_min: duracaoMin } : {}) })
+        .eq("id", encontro_id);
+      if (linkEncErr) {
+        await desfazerSessao();
+        return { error: erroAmigavel(linkEncErr) };
+      }
+      for (const c of cobertas) {
+        if (c.id == null) continue;
+        const { error: linkErr } = await supabase
+          .from("encontros")
+          .update(sessaoUpdate)
+          .eq("id", c.id);
+        if (linkErr) {
+          await desfazerSessao();
+          return {
+            error: `Não foi possível ligar o ${c.numero}º encontro à sessão. Tente de novo.`,
+          };
+        }
+        c.sessaoId = sessaoId;
+      }
+      // faltante entra já na sessão, ainda agendado — o flip pra realizado
+      // vem na fase 2, junto das demais cobertas
+      for (const c of cobertas) {
+        if (c.id != null) continue;
+        const { data: novo, error: novoErr } = await supabase
+          .from("encontros")
+          .insert({
+            dupla_id,
+            numero: c.numero,
+            data_hora: quando,
+            status: "agendado",
+            origem: "externo",
+            sessao_id: sessaoId,
+            created_by: eu.id,
+            ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+          })
+          .select("id")
+          .single();
+        if (novoErr || !novo) {
+          await desfazerSessao();
+          return {
+            error: `Não foi possível cobrir o ${c.numero}º encontro. Tente de novo.`,
+          };
+        }
+        c.id = novo.id as string;
+        inseridos.push(novo.id as string);
+        c.sessaoId = sessaoId;
+      }
+      // a âncora pode ser uma row que acabou de nascer — resolve o id agora
+      if (ancoraCoberta && ancoraCoberta.id) ancoraId = ancoraCoberta.id;
+    }
+  }
+
+  // update preserva created_by de quem registrou primeiro; insert marca o
+  // autor. Com sessão combinada o registro mora na ÂNCORA — o existente a
+  // conferir é o dela, não o do encontro postado.
   const { data: regExistente } = await supabase
-    .from("registros").select("id, precisa_apoio").eq("encontro_id", encontro_id).maybeSingle();
+    .from("registros").select("id, precisa_apoio").eq("encontro_id", ancoraId).maybeSingle();
   // 0084: flag ligada abre o chamado pelo trigger registros_apoio_chamado_sync
   // (que já notifica a equipe com chamado_aberto) — nada de pedido_apoio aqui
   const payload = {
-    tema: String(formData.get("tema") ?? "").trim() || null,
-    ferramenta: String(formData.get("ferramenta") ?? "").trim() || null,
-    reflexoes: String(formData.get("reflexoes") ?? "").trim() || null,
-    observacoes: String(formData.get("observacoes") ?? "").trim() || null,
+    tema,
+    ferramenta,
+    reflexoes,
+    observacoes,
     // pedido de apoio é "sticky": editar o registro não desmarca — só a
     // coordenação resolve (resolverApoio), então update faz OR com o que já está
     precisa_apoio:
@@ -3481,6 +3706,9 @@ export async function salvarRegistro(formData: FormData) {
       status: "realizado",
       realizado_em: encDb.realizado_em ?? encDb.data_hora,
       ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+      // com sessão combinada o sessao_id entra JUNTO do flip — o trigger de
+      // avaliação lê o grupo na mesma transição e minta só na âncora
+      ...(sessaoId ? { sessao_id: sessaoId } : {}),
     })
     .eq("id", encontro_id).select("id");
   if (encErr) return { error: erroAmigavel(encErr) };
@@ -3488,10 +3716,72 @@ export async function salvarRegistro(formData: FormData) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
 
+  // FASE 2 — as rows cobertas viram realizado na mesma sessão (sessao_id já
+  // gravado em todas na fase 1: o trigger não minta link nelas). Cada uma
+  // fica realizado com a data_hora, a duração e o realizado_em da sessão.
+  for (const c of cobertas) {
+    if (c.id == null || c.sessaoId !== sessaoId) continue;
+    if (c.status === "realizado") {
+      // já realizado sem registro: a sessão cobre com o follow-up — o fato
+      // (realizado_em de quando aconteceu) fica intacto
+      cobertos.push(c.numero);
+      continue;
+    }
+    const { error: upErr } = await supabase
+      .from("encontros")
+      .update({
+        status: "realizado",
+        data_hora: quando,
+        realizado_em: quando,
+        sessao_id: sessaoId,
+        ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+      })
+      .eq("id", c.id)
+      .in("status", ["agendado", "remarcado"]);
+    if (upErr) {
+      avisos.push(`Não foi possível cobrir o ${c.numero}º encontro.`);
+    } else {
+      cobertos.push(c.numero);
+    }
+  }
+  // a âncora pode ser uma coberta que ainda não virou realizado — o flip
+  // dela é o que minta o link de avaliação da sessão inteira
+  const ancoraCobertaRow = cobertas.find((c) => c.numero === ancoraNumero);
+  if (ancoraCobertaRow?.id && ancoraCobertaRow.status !== "realizado") {
+    const { error: ancErr } = await supabase
+      .from("encontros")
+      .update({
+        status: "realizado",
+        data_hora: quando,
+        realizado_em: quando,
+        sessao_id: sessaoId,
+        ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+      })
+      .eq("id", ancoraCobertaRow.id)
+      .in("status", ["agendado", "remarcado"]);
+    if (ancErr) {
+      return { error: "A sessão foi ligada, mas o encontro âncora não virou realizado. Tente de novo." };
+    }
+    cobertos.push(ancoraCobertaRow.numero);
+  }
+
+  // a cobertura gravada sai das rows que a sessão de fato cobriu (P1),
+  // nunca do pedido — falha de preparação já virou erro acima e falha de
+  // flip virou aviso com o nº de fora, sem promessa fantasma
+  cobertura = coberturaDoRegistro(ancoraNumero, encDb.numero, cobertos);
+
   const { data: registro, error } = regExistente
-    ? await supabase.from("registros").update(payload).eq("id", regExistente.id).select("id").single()
+    ? await supabase.from("registros").update({ ...payload, cobertura }).eq("id", regExistente.id).select("id").single()
     : await supabase
-        .from("registros").insert({ ...payload, encontro_id, created_by: eu.id }).select("id").single();
+        .from("registros")
+        .insert({
+          ...payload,
+          encontro_id: ancoraId,
+          cobertura,
+          created_by: eu.id,
+        })
+        .select("id")
+        .single();
   if (error) return { error: erroAmigavel(error) };
 
   // encaminhamentos vêm como JSON por linha (descrição pode ter qualquer
@@ -3528,17 +3818,24 @@ export async function salvarRegistro(formData: FormData) {
         .eq("dupla_id", dupla_id)
     : { data: null };
   const plano = reconciliaCombinados(existentes ?? [], enc);
-  for (const u of plano.atualizar) {
-    // status nunca entra — feito/pendente é preservado; dupla+registro no
-    // where impedem cruzar pra combinado de outra dupla ou outro registro
-    const { error: upErr } = await supabase
-      .from("encaminhamentos")
-      .update({ descricao: u.descricao, responsavel: u.responsavel, prazo: u.prazo })
-      .eq("id", u.id)
-      .eq("dupla_id", dupla_id)
-      .eq("registro_id", registro.id);
-    if (upErr) return { error: erroAmigavel(upErr) };
-  }
+  // o registro e o status do encontro já estão gravados — daqui em diante
+  // uma falha NÃO é "o registro falhou": vira aviso no toast do ok (mesmo
+  // padrão do bloco `concluir` abaixo), nunca { error } sobre estado
+  // parcialmente reconciliado (avisos já vem acumulando da preparação)
+  let reconcileFalhou = false;
+  // status nunca entra — feito/pendente é preservado; dupla+registro no
+  // where impedem cruzar pra combinado de outra dupla ou outro registro
+  const updates = await Promise.all(
+    plano.atualizar.map((u) =>
+      supabase
+        .from("encaminhamentos")
+        .update({ descricao: u.descricao, responsavel: u.responsavel, prazo: u.prazo })
+        .eq("id", u.id)
+        .eq("dupla_id", dupla_id)
+        .eq("registro_id", registro.id)
+    )
+  );
+  if (updates.some((r) => r.error)) reconcileFalhou = true;
   // delete só com a lista completa da edição (combinados_completos) — o
   // form novo sobre registro que já existe (aba desatualizada) só insere
   if (formData.get("combinados_completos") === "1" && plano.remover.length) {
@@ -3548,7 +3845,7 @@ export async function salvarRegistro(formData: FormData) {
       .in("id", plano.remover)
       .eq("dupla_id", dupla_id)
       .eq("registro_id", registro.id);
-    if (delErr) return { error: erroAmigavel(delErr) };
+    if (delErr) reconcileFalhou = true;
   }
   if (plano.inserir.length) {
     const { error: encErr } = await supabase
@@ -3556,11 +3853,14 @@ export async function salvarRegistro(formData: FormData) {
       .insert(plano.inserir.map((t) => ({
         dupla_id,
         registro_id: registro.id,
-        numero: encDb.numero,
+        numero: ancoraNumero,
         created_by: eu.id,
         ...t,
       })));
-    if (encErr) return { error: erroAmigavel(encErr) };
+    if (encErr) reconcileFalhou = true;
+  }
+  if (reconcileFalhou) {
+    avisos.push("O registro foi salvo, mas nem todos os combinados entraram.");
   }
 
   // combinados de encontros anteriores marcados como feitos neste registro —
@@ -3570,7 +3870,6 @@ export async function salvarRegistro(formData: FormData) {
     ...new Set(formData.getAll("concluir_encaminhamento").map(String).filter(Boolean)),
   ];
   let concluidos = 0;
-  let aviso: string | undefined;
   if (concluirIds.length) {
     const { data: feitos, error: concErr } = await supabase
       .from("encaminhamentos")
@@ -3578,25 +3877,73 @@ export async function salvarRegistro(formData: FormData) {
       .in("id", concluirIds)
       .eq("dupla_id", dupla_id)
       .select("id");
+    // as falhas acumulam no toast: reconciliação e conclusão são blocos
+    // independentes e cada um falhou de um jeito — relatar só o primeiro
+    // esconderia o outro
     if (concErr) {
-      aviso = "Não foi possível marcar os combinados anteriores como feitos. Marque na lista de combinados.";
+      avisos.push("Não foi possível marcar os combinados anteriores como feitos.");
     } else {
       concluidos = feitos?.length ?? 0;
       if (concluidos < concluirIds.length) {
-        aviso = `Só ${concluidos} de ${concluirIds.length} combinados foram marcados como feitos. Confira a lista de combinados.`;
+        avisos.push(`Só ${concluidos} de ${concluirIds.length} combinados foram marcados como feitos.`);
       }
     }
   }
 
-  // o dia ganha snapshot na hora do evento, não só no tick — fire-and-
-  // forget: a RPC é idempotente (unique dupla_id+dia, reescrever é inócuo)
-  void snapshotDuplaHoje(dupla_id).catch(() => {});
+  const aviso = avisos.length
+    ? `${avisos.join(" ")} Confira a lista de combinados.`
+    : undefined;
+
+  // flag "preciso de apoio" recém-ligada → o trigger do 0084 abriu o
+  // chamado dentro da transação, sem action no caminho: o e-mail
+  // redundante pro staff não sairia. A RPC definer devolve o chamado
+  // recém-nascido + os destinatários (o mentor não lê e-mail de profile
+  // alheio) e o envio segue o padrão dos chamados — depois da resposta,
+  // nunca bloqueando o registro.
+  if (formData.get("precisa_apoio") === "on" && !regExistente?.precisa_apoio) {
+    const { data: ch } = await supabase.rpc("chamado_do_registro", {
+      p_registro_id: registro.id,
+    });
+    const dests = ((ch?.destinatarios ?? []) as { email?: string | null }[])
+      .map((d) => d.email)
+      .filter((e): e is string => !!e);
+    if (ch?.id && dests.length) {
+      void enviaEmailChamadoDepois(supabase, {
+        chamadoId: ch.id as string,
+        para: dests,
+        assunto: `Chamado ${ch.numero}: pedido de apoio no registro`,
+        html: emailChamadoUrgencia({
+          numero: String(ch.numero ?? ""),
+          assunto: String(ch.assunto ?? "Pedido de apoio no registro"),
+          categoria: "outro",
+          autorNome: eu.nome,
+          href: `${SITE_URL}/chamados?c=${ch.id}`,
+        }),
+        contexto: "salvarRegistro",
+      });
+    }
+  }
+
+  // o dia ganha snapshot na hora do evento, não só no tick — after() pra
+  // a promessa não morrer no flush da resposta serverless; a RPC é
+  // idempotente (unique dupla_id+dia, reescrever é inócuo)
+  after(() => snapshotDuplaHoje(dupla_id).catch(() => {}));
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/agenda");
   revalidatePath("/registros");
   revalidatePath(`/duplas/${dupla_id}`);
-  return { ok: true, concluidos, aviso };
+  // registroEncontroId = a âncora (018): em sessão combinada o form foi
+  // aberto numa coberta mas a row do registro mora na âncora — o posSave
+  // precisa dela pra consulta de evidências e o encadeamento
+  return {
+    ok: true,
+    concluidos,
+    aviso,
+    cobertos,
+    registroId: registro.id as string,
+    registroEncontroId: ancoraId,
+  };
 }
 
 // ---------- notas do mentor (plano de aula / lembretes pré-encontro) ----------
@@ -3617,7 +3964,7 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
   if (!d) return { error: "Dupla não encontrada." };
   if (d.status !== "ativa") return { error: "Essa dupla não está ativa." };
   if (d.trilha !== "especialista" && !d.cronograma_id) {
-    return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
+    return { error: "Essa dupla está sem cronograma. A coordenação vincula um na edição da dupla." };
   }
 
   // teto de nº por trilha — a nota segue o passo do guia (16 DPP / 5
@@ -3639,9 +3986,16 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
   if (limpo.length > 10000) return { error: "Anotação muito longa (máx. 10.000 caracteres)." };
 
   if (!limpo) {
-    const { error } = await supabase
-      .from("encontro_notas").delete().eq("dupla_id", duplaId).eq("numero", numero);
+    // o .select("id") denuncia o delete que não removeu nada — row sumida
+    // na RLS (ou apagada por outra sessão) voltaria ok silencioso e a
+    // tela continuaria mostrando a nota como salva
+    const { data, error } = await supabase
+      .from("encontro_notas").delete().eq("dupla_id", duplaId).eq("numero", numero)
+      .select("id");
     if (error) return { error: erroAmigavel(error) };
+    if (!data?.length) {
+      return { error: "Não foi possível apagar. Recarregue a página e tente de novo." };
+    }
   } else {
     // update preserva created_by de quem anotou primeiro; insert marca o autor
     const { data: existente } = await supabase
@@ -3807,8 +4161,10 @@ export async function editarEncaminhamento(id: string, duplaId: string, formData
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  // o texto do acordo é da dupla — a coord só marca feito (toggleEncaminhamento)
-  if (eu.role === "coordenacao") {
+  // o texto do acordo é da dupla — a coord só marca feito (toggleEncaminhamento).
+  // allowlist de mentor como em criarCombinadoEncontro: blocklist por role
+  // deixaria passar jovem/supervisor até a RLS negar no banco
+  if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
     return { error: "O combinado é da dupla. A coordenação só pode marcar como feito." };
   }
   const { data: dupla } = await supabase
@@ -3846,7 +4202,8 @@ export async function excluirEncaminhamento(id: string, duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (eu.role === "coordenacao") {
+  // mesma allowlist do editar/criar — o combinado é da dupla
+  if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
     return { error: "O combinado é da dupla. A coordenação só pode marcar como feito." };
   }
   const { data: dupla } = await supabase
@@ -3885,7 +4242,7 @@ export async function resolverApoio(registroId: string, duplaId: string) {
           : erroAmigavel(error),
     };
   }
-  void snapshotDuplaHoje(duplaId).catch(() => {});
+  after(() => snapshotDuplaHoje(duplaId).catch(() => {}));
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/registros");
@@ -3950,6 +4307,53 @@ export async function marcarCombinadoFeito(id: string, feito: boolean) {
           : erroAmigavel(error),
     };
   }
+  revalidatePath("/jovem");
+  return { ok: true };
+}
+
+/** O jovem cria um combinado próprio (REALIZA-526): nasce "livre" — sem
+ *  âncora de encontro nem de registro (numero/registro_id null, nullable
+ *  desde 0157) e sempre responsavel='mentorado', então ele aparece na
+ *  jovem_encaminhamentos como qualquer combinado dele e o marcar_combinado
+ *  segue valendo. O reconcile do salvarRegistro não toca (só mexe nas
+ *  linhas do registro editado — registro_id dele).
+ *  ESCRITA REAL depende da policy que o lead aplica — SQL sugerido no
+ *  relatório da frente (encaminhamentos_mentorado_insert FOR INSERT WITH
+ *  CHECK: my_role()='mentorado' + responsavel='mentorado' + numero is null
+ *  + registro_id is null + dupla_id in jovem_duplas). Sem ela o insert
+ *  responde RLS e a UI mostra o erro honesto — nada de cast por cima. */
+export async function criarCombinadoJovem(
+  duplaId: string,
+  descricao: string,
+  prazo?: string | null
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Só o mentorado cria os próprios combinados." };
+  }
+
+  const limpo = descricao.trim();
+  if (limpo.length < 2)
+    return { error: "Escreva o combinado antes de adicionar." };
+  if (limpo.length > 500)
+    return { error: "Combinado muito longo (máx. 500 caracteres)." };
+  const prazoLimpo = prazo?.trim() ?? "";
+  if (prazoLimpo && !/^\d{4}-\d{2}-\d{2}$/.test(prazoLimpo)) {
+    return { error: "Confira a data do prazo." };
+  }
+
+  const { error } = await supabase.from("encaminhamentos").insert({
+    dupla_id: duplaId,
+    numero: null,
+    descricao: limpo,
+    responsavel: "mentorado",
+    prazo: prazoLimpo || null,
+    created_by: eu.id,
+  });
+  if (error) return { error: erroAmigavel(error) };
+
   revalidatePath("/jovem");
   return { ok: true };
 }
@@ -4508,6 +4912,17 @@ export async function registrarDocumentoPessoa(
   if (!DOCUMENTO_PATH_RE.test(path)) {
     return { error: "Revise os campos: um dos valores não é válido." };
   }
+  // conta de jovem não recebe anexo de staff — a ficha canônica é o alvo
+  if (tipo === "profile") {
+    const { data: ficha } = await supabase
+      .from("mentorados")
+      .select("id")
+      .eq("profile_id", pessoaId)
+      .maybeSingle();
+    if (ficha) {
+      return { error: "Essa conta pertence a um jovem do programa. Use a ficha dele." };
+    }
+  }
   const { data, error } = await supabase
     .from("documentos_pessoa")
     .insert({
@@ -4941,7 +5356,7 @@ export async function listarNotificacoes() {
   const [{ data, error: errItens }, { count, error: errCount }] = await Promise.all([
     supabase
       .from("notificacoes")
-      .select("id, tipo, titulo, corpo, href, lida_em, created_at")
+      .select("id, tipo, titulo, corpo, href, lida_em, created_at, created_by")
       .eq("profile_id", eu.id)
       .order("created_at", { ascending: false })
       .limit(15),
@@ -4955,7 +5370,13 @@ export async function listarNotificacoes() {
     console.error("listarNotificacoes:", errItens ?? errCount);
     return { error: "Não foi possível carregar as notificações." };
   }
-  return { ok: true, itens: data ?? [], naoLidas: count ?? 0 };
+  return {
+    ok: true,
+    itens: relerTitulosNotificacao(
+      await relerPlanoPropostoDeMembro(supabase, eu, data ?? [])
+    ),
+    naoLidas: count ?? 0,
+  };
 }
 
 export async function marcarNotificacaoLida(id: string) {
@@ -4996,5 +5417,29 @@ export async function marcarTodasNotificacoesLidas() {
     .eq("profile_id", eu.id)
     .is("lida_em", null);
   if (error) return { error: "Não foi possível marcar como lidas." };
+  return { ok: true };
+}
+
+/** Registra a abertura do material (0196) — chamada pelo clique do card, pela
+ *  página de documento nativo e pela rota /api/material. Upsert mantém a
+ *  leitura mais recente; a chamada é fire-and-forget: falha só loga, nunca
+ *  interrompe a navegação. */
+export async function marcarMaterialLido(ref: string) {
+  if (await demoAtivo()) {
+    await marcarDemoMaterialLido(ref);
+    return { ok: true };
+  }
+  const { supabase, me: eu } = await me();
+  if (!eu) return { ok: true }; // visitante sem sessão não marca — silencioso
+  const { error } = await supabase
+    .from("material_leituras")
+    .upsert(
+      { profile_id: eu.id, ref, lido_em: new Date().toISOString() },
+      { onConflict: "profile_id,ref" }
+    );
+  if (error) {
+    console.error("marcarMaterialLido:", error);
+    return { error: "Não foi possível registrar a leitura." };
+  }
   return { ok: true };
 }

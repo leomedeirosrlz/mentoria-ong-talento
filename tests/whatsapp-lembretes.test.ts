@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { msgsContato } from "@/lib/whatsapp-msgs";
+import { msgApresentacaoJovem, msgsContato } from "@/lib/whatsapp-msgs";
 import { msgLinkWhatsApp } from "@/components/forms/link-shared";
 import { acaoWhatsAppDupla } from "@/lib/acao-lembrete";
 import { lembreteDaDupla } from "@/components/agenda-partes";
@@ -18,11 +18,12 @@ import type {
 
 const HOJE = new Date("2026-10-07T20:00:00-03:00");
 
-function mkProfile(nome: string): Profile {
+function mkProfile(nome: string, nome_social: string | null = null): Profile {
   return {
     id: `p-${nome}`,
     user_id: null,
     nome,
+    nome_social,
     email: `${nome}@x.test`,
     whatsapp: null,
     role: "mentor_dpp",
@@ -199,6 +200,41 @@ describe("deep-link do nudge Lembrar", () => {
     expect(acao.nudge?.destino).toBe("mentor");
   });
 
+  it("acaoWhatsAppDupla: registro vazio legado ainda é pendência para o nudge", () => {
+    const d = mkDupla({
+      encontros: [
+        mkEncontro({
+          id: "e-8",
+          numero: 8,
+          status: "realizado",
+          data_hora: "2026-10-06T22:00:00Z",
+          realizado_em: "2026-10-06T22:00:00Z",
+          registro: {
+            id: "r-8",
+            tema: null,
+            reflexoes: null,
+            observacoes: null,
+            atividades: [],
+          } as unknown as Encontro["registro"],
+        }),
+      ],
+    });
+    const saude = mkSaude({
+      sinais: [
+        { tipo: "registro_pendente", tom: "atencao", texto: "registro" },
+      ],
+    });
+    const acao = acaoWhatsAppDupla({
+      dupla: d,
+      saude,
+      hoje: HOJE,
+      ultimoNudge: null,
+      meuNome: "Joana",
+      tituloNudge: "Lembrete da coordenação",
+    });
+    expect(acao.nudge?.href).toBe("/duplas/d1#registrar-e-8");
+  });
+
   it("acaoWhatsAppDupla: sem pendência operacional fica na ficha", () => {
     const d = mkDupla();
     const saude = mkSaude({
@@ -268,5 +304,55 @@ describe("deep-link do nudge Lembrar", () => {
     expect(l.href).toBeUndefined();
     // e o texto staff→mentor sai assinado (antes ia sem remetente)
     expect(l.corpo).toContain("Joana, da equipe do Realiza.vc");
+  });
+});
+
+describe("nome social nas mensagens — a regra nome_social || nome", () => {
+  // o mentorado já ia com nome social; o mentor ia civil em acao-lembrete
+  // e lembreteDaDupla — quem recebe conhece a pessoa pelo nome que ela usa
+  it("acaoWhatsAppDupla: mensagem e destNome usam o nome social do mentor", () => {
+    const d = mkDupla({
+      mentor: mkProfile("André Lima", "Déa Lim"),
+    });
+    const saude = mkSaude({
+      sinais: [{ tipo: "atraso", tom: "atencao", texto: "atraso" }],
+    });
+    const acao = acaoWhatsAppDupla({
+      dupla: d,
+      saude,
+      hoje: HOJE,
+      ultimoNudge: null,
+      meuNome: "Joana",
+      tituloNudge: "Lembrete da coordenação",
+    });
+    expect(acao.destNome).toBe("Déa Lim");
+    expect(acao.destinatarios.mentor.nome).toBe("Déa Lim");
+    expect(acao.destinatarios.mentor.mensagem).toContain("Oi Déa,");
+    expect(acao.destinatarios.mentorado.mensagem).toContain(
+      "a mentoria com Déa"
+    );
+  });
+
+  it("lembreteDaDupla: o texto pro mentor abre com o nome social", () => {
+    const d = mkDupla({
+      mentor: mkProfile("André Lima", "Déa Lim"),
+    });
+    const l = lembreteDaDupla(d, "atraso", [], "Joana", HOJE);
+    expect(l.corpo).toContain("Oi Déa,");
+    expect(l.corpo).not.toContain("André");
+  });
+});
+
+describe("msgApresentacaoJovem — apresentação única do jovem", () => {
+  it("adulto e equipe: mentorado(a) do programa", () => {
+    expect(msgApresentacaoJovem("Ana")).toBe(
+      "Olá! Sou Ana, mentorado(a) do programa Realiza.vc."
+    );
+  });
+
+  it("colega de turma", () => {
+    expect(msgApresentacaoJovem("Ana", true)).toBe(
+      "Olá! Sou Ana, da sua turma no programa Realiza.vc."
+    );
   });
 });

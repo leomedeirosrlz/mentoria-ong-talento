@@ -36,7 +36,7 @@ const larissa = (encontros: Dupla["encontros"]) =>
 const feitos = (n: number) =>
   Array.from({ length: n }, (_, i) => ({
     ...encRealizado(i + 1, "2025-08-05"),
-    registro: { id: `r${i + 1}` } as never,
+    registro: { id: `r${i + 1}`, tema: "Escuta ativa" } as never,
   }));
 
 describe("painelDuplasDoDia — Neste dia", () => {
@@ -130,10 +130,29 @@ describe("demais casos da regra", () => {
   it("oficial realizado e registrado é história: não entra na semana", () => {
     const d = ana([
       ...feitos(7),
-      { ...encRealizado(8, QUINTA), registro: { id: "r8" } as never },
+      { ...encRealizado(8, QUINTA), registro: { id: "r8", tema: "Escuta ativa" } as never },
     ]);
     const p = painel([d], SABADO);
     expect(p.semana).toEqual([]);
+  });
+
+  it("oficial com registro vazio legado ainda entra: não é história", () => {
+    const d = ana([
+      ...feitos(7),
+      {
+        ...encRealizado(8, QUINTA),
+        registro: {
+          id: "r8",
+          tema: null,
+          reflexoes: null,
+          observacoes: null,
+          atividades: [],
+        } as never,
+      },
+    ]);
+    const p = painel([d], SABADO);
+    expect(tipos(p.semana[0].linhas)).toEqual(["encontro"]);
+    expect(numeros(p.semana[0].linhas)).toEqual([8]);
   });
 
   it("oficial marcado como não aconteceu pede remarcar (reagendar)", () => {
@@ -202,7 +221,7 @@ describe("encontro com data na semana fora do nº oficial", () => {
     // oficial da semana é o 8º; a dupla já marcou o 9º pra quinta
     const d = ana([
       ...Array.from({ length: 8 }, (_, i) =>
-        ({ ...encRealizado(i + 1, "2025-08-05"), registro: { id: `r${i}` } as never })
+        ({ ...encRealizado(i + 1, "2025-08-05"), registro: { id: `r${i}`, tema: "Escuta ativa" } as never })
       ),
       encAgendado(9, QUINTA),
     ]);

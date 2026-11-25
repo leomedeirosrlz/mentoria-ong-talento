@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   AddressBook,
   ArrowLeft,
@@ -24,7 +24,6 @@ import {
   HandHeart,
   Handshake,
   Heart,
-  ImageSquare,
   LinkedinLogo,
   ListChecks,
   MapPin,
@@ -35,8 +34,10 @@ import {
   PencilLine,
   SealCheck,
   ShieldCheck,
+  Signature,
   Signpost,
   Tag,
+  Target,
   ThumbsUp,
   TrafficSignal,
   User,
@@ -56,10 +57,9 @@ import {
   AVATAR_MAX_BYTES,
   avisoImagemGrande,
 } from "@/lib/avatar";
-import { AssinaturaForm } from "@/components/assinatura-form";
 import { CaixaSelecao } from "@/components/ui/caixa-selecao";
 import { TagInput } from "@/components/tag-input";
-import { TermoVoluntarioDoc } from "@/components/termo-doc";
+import { PassoTermo } from "@/components/termo-vivo";
 import {
   CampoDisponibilidade,
   CampoGenero,
@@ -70,6 +70,7 @@ import {
   SENTINEL_VAZIO,
 } from "@/components/campos-pessoais";
 import { Button } from "@/components/ui/button";
+import { Etapa, useTrocaDeEtapa } from "@/components/ui/etapa";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,25 +85,30 @@ import type {
   Profile,
 } from "@/lib/types";
 import { Logo } from "@/components/logo";
-import { LizaBlob } from "@/components/liza/liza-blob";
-import { cn } from "cn";
+import { LizaOnboarding } from "@/components/liza/liza-onboarding";
+import {
+  PassoRecursos,
+  type RecursoTour,
+} from "@/components/onboarding-recursos";
+import { STATUS_CEP, useBuscaCep } from "@/lib/use-busca-cep";
+import { cn } from "@/lib/utils";
 
 /** Um form por passo — o botão do footer fixo submete via atributo `form`. */
 const FORM_ID = "onboarding-passo";
-
-type Recurso = {
-  icon: Icon;
-  texto: string;
-  /** nome-base do print em public/onboarding (scripts/capturar-onboarding.mjs):
-   *  `<img>.webp` é a coluna de conteúdo no desktop, `<img>-m.webp` a tela do
-   *  celular. Sem img o item fica só como texto (o mentorado não passa aqui) */
-  img?: string;
-  alt?: string;
+/** O passo do termo tem form próprio (AssinaturaForm): o primário do rodapé
+ *  fixo submete via `form` mesmo estando fora dele (REALIZA-497). */
+const TERMO_FORM_ID = "onboarding-termo";
+/** Primeiro campo de cada bloco "Sobre você" que fecha em resumo — o
+ *  Editar devolve o foco pra ele ao expandir (o botão desmonta junto
+ *  com o resumo). */
+const PRIMEIRO_CAMPO_SOBRE: Record<number, string> = {
+  0: "ob-social",
+  1: "ob-cargo",
 };
 
 /** "O que você pode fazer aqui" — os pontos que mudam a rotina de cada papel,
  *  cada um com a tela real onde ele acontece. */
-const RECURSOS: Record<AppRole, Recurso[]> = {
+const RECURSOS: Record<AppRole, RecursoTour[]> = {
   coordenacao: [
     { icon: TrafficSignal, texto: "Andamento das duplas", img: "coordenacao-home", alt: "Visão geral da coordenação: turmas, situação das duplas e o que precisa de você hoje" },
     { icon: HandHeart, texto: "Pedidos de apoio", img: "coordenacao-dupla", alt: "Ficha de uma dupla em risco com apoio aberto e especialista solicitado" },
@@ -121,6 +127,7 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
     { icon: CalendarCheck, texto: "Agendar e registrar encontros", img: "mentor_dpp-dupla", alt: "Ficha da dupla com o próximo encontro e o botão de remarcar" },
     { icon: Users, texto: "Minhas duplas", img: "mentor_dpp-duplas", alt: "Lista das suas duplas com o próximo passo de cada uma" },
     { icon: MapTrifold, texto: "Jornada dos encontros", img: "mentor_dpp-home", alt: "Visão geral do mentor com a jornada dos encontros" },
+    { icon: Target, texto: "PDM do mentorado: metas e plano vivem na plataforma", img: "mentor_dpp-pdm", alt: "Aba Instrumentos da dupla com o PDM aberto: metas, indicadores e submetas" },
     { icon: HandHeart, texto: "Pedir apoio", img: "mentor_dpp-apoio", alt: "Meus chamados: pedidos de apoio à coordenação e o andamento de cada um" },
     { icon: UserPlus, texto: "Mentor especialista", img: "mentor_dpp-especialista", alt: "Agenda por mentorado com o pedido de especialista em andamento" },
     { icon: FolderOpen, texto: "Materiais de apoio", img: "mentor_dpp-materiais", alt: "Materiais de apoio do encontro desta semana" },
@@ -132,58 +139,15 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
     { icon: FolderOpen, texto: "Materiais de apoio", img: "mentor_especialista-materiais", alt: "Materiais de apoio da mentoria especializada" },
   ],
   // o jovem não passa por este wizard (o dele é o OnboardingJovem do
-  // /jovem, REALIZA-114) — a entrada existe porque o Record pede todos os
-  // papéis e as demos/queries compartilham a lista
+  // /jovem, REALIZA-114, com um passo de recursos próprio) — a entrada
+  // existe porque o Record pede todos os papéis e as demos/queries
+  // compartilham a lista
   mentorado: [
     { icon: CalendarCheck, texto: "Sua agenda de encontros com o mentor." },
     { icon: ListChecks, texto: "Os combinados que ficaram pra você." },
     { icon: FolderOpen, texto: "Os materiais de apoio do programa." },
   ],
 };
-
-const printDesktop = (img: string) => `/onboarding/${img}.webp`;
-const printMobile = (img: string) => `/onboarding/${img}-m.webp`;
-
-/** 1px transparent gif — <img> fallback when the <source media> doesn't
- *  match, so the other breakpoint downloads zero bytes (see PrintShot). */
-const PIXEL_VAZIO =
-  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-
-/** Screen print pinned to one breakpoint: the <source media> only supplies
- *  the file where it actually renders — elsewhere the <img> falls back to
- *  the empty pixel and never hits the network. Plain <img> (no next/image):
- *  the files are captured at the exact display size, and the old `priority`
- *  eagerly fetched the ~100KB DESKTOP print inside a `hidden` figure on
- *  mobile (and the mobile one on desktop). eager/high on the active shot is
- *  now safe — on the wrong breakpoint it resolves to the pixel, not bytes. */
-function PrintShot({
-  src,
-  media,
-  ativo,
-  alt,
-}: {
-  src: string;
-  /** media query of the breakpoint that uses this print */
-  media: string;
-  ativo: boolean;
-  alt: string;
-}) {
-  return (
-    <picture className="contents">
-      <source media={media} srcSet={src} />
-      <img
-        src={PIXEL_VAZIO}
-        alt={alt}
-        loading={ativo ? "eager" : "lazy"}
-        fetchPriority={ativo ? "high" : "auto"}
-        className={cn(
-          "absolute inset-0 size-full object-cover object-top transition-opacity duration-300",
-          ativo ? "opacity-100" : "opacity-0"
-        )}
-      />
-    </picture>
-  );
-}
 
 // índices dos passos por papel — as declarações (voluntário + LGPD) abrem o
 // fluxo pra garantir o consent antes de qualquer dado pedido; o "Sobre você"
@@ -195,38 +159,11 @@ function PrintShot({
 // qualquer papel
 const PASSO_DECLARACOES = 1;
 const PASSO_SOBRE = (ehMentor: boolean) => (ehMentor ? 7 : 3);
-const SUBPASSOS_SOBRE = 3;
-const PASSO_PAREAMENTO = 10;
-const PASSO_DISPONIBILIDADE = 11;
-
-/** Moldura de "janela de navegador" pros prints de tela reais — os três
- *  pontinhos vendem "isso é o produto de verdade" sem custar copy. */
-function MolduraTela({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "overflow-hidden rounded-2xl border border-border bg-card shadow-border",
-        className
-      )}
-    >
-      <div
-        aria-hidden
-        className="flex items-center gap-1.5 border-b border-border/60 bg-muted/60 px-3 py-2"
-      >
-        <span className="size-2 rounded-full bg-border" />
-        <span className="size-2 rounded-full bg-border" />
-        <span className="size-2 rounded-full bg-border" />
-      </div>
-      {children}
-    </div>
-  );
-}
+// review 21/11 (REALIZA-497): pro mentor os 4 passos da ficha/pareamento
+// viraram 2 telas de confirmação — o dado que a importação já trouxe fecha
+// em resumo com Editar próprio e o pareamento se junta à motivação; os
+// outros papéis seguem com os 3 sub-passos
+const SUBPASSOS_SOBRE = (ehMentor: boolean) => (ehMentor ? 2 : 3);
 
 /** Label com micro-ícone do assunto — no primeiro acesso o ícone ancora o
  *  campo antes da leitura (os forms densos do app seguem com label puro). */
@@ -284,16 +221,26 @@ export function OnboardingFlow({
     temPapel(me, "mentor_dpp") || temPapel(me, "mentor_especialista");
   // a declaração do passo 1 (não a prop) decide se o termo existe no fim:
   // desmarcar "Sou voluntário(a)" ali encolhe o wizard na hora e o termo
-  // nunca renderiza — o freeze que existia era contra o router.refresh()
-  // pós-assinatura mexendo na prop, e estado local não sofre com refresh
+  // nunca renderiza. O status da prop é congelado no mount: o revalidatePath
+  // pós-assinatura reentrega "assinado" e recalcular o total no meio da sessão
+  // deixaria o step órfão (sem fechamento, sem carinha e com header N+1/N)
   const [souVoluntario, setSouVoluntario] = useState(me.voluntario !== false);
-  const temTermo = assinaturaTermo?.status !== "assinado" && souVoluntario;
+  const [assinaturaInicial] = useState(
+    () => assinaturaTermo?.status === "assinado"
+  );
+  const temTermo = !assinaturaInicial && souVoluntario;
   // coord/supervisor: boas-vindas + declarações + recursos + ficha pessoal
-  // em 3 sub-passos + fechamento (7); mentores: + foto, apresentação,
-  // pareamento e disponibilidade (13); termo pendente adiciona 1 passo
-  const total = (ehMentor ? 13 : 7) + (temTermo ? 1 : 0);
-  const [step, setStep] = useState(0);
+  // em 3 sub-passos + fechamento (7); mentores: + foto, apresentação, os 2
+  // passos "Sobre você" fundidos (497) e a disponibilidade (11); termo
+  // pendente adiciona 1 passo
+  const total = (ehMentor ? 11 : 7) + (temTermo ? 1 : 0);
+  // wizard pelo kit (ui/etapa): o índice já vem clampado — o total encolhe
+  // quando a pessoa desmarca "voluntário" (e o status da prop pode chegar
+  // assinado depois), sem o valuenow > valuemax do bug. A direção alimenta
+  // o slide da Etapa; o foco segue no efeito próprio (scroll + título)
+  const { etapa: step, direcao, irPara } = useTrocaDeEtapa(total);
   const [termoOk, setTermoOk] = useState(false);
+  const [pendingTermo, setPendingTermo] = useState(false);
   const [pending, start] = useTransition();
   const tituloRef = useRef<HTMLHeadingElement>(null);
 
@@ -316,29 +263,34 @@ export function OnboardingFlow({
   const [genero, setGenero] = useState(pessoal?.genero ?? "");
   const [cidade, setCidade] = useState(me.cidade ?? "");
   const [uf, setUf] = useState(me.uf ?? "");
+  // o CEP do "Sobre você" é só alavanca do ViaCEP: profiles não guarda
+  // CEP (ele é dado civil) — o valor digitado vira prefill do termo no
+  // fim do wizard e a busca preenche cidade/UF aqui mesmo
+  const buscaCep = useBuscaCep({
+    onEndereco: (endereco) => {
+      setCidade(endereco.cidade);
+      setUf(endereco.uf);
+    },
+  });
   const [cargo, setCargo] = useState(me.cargo ?? "");
   const [empresa, setEmpresa] = useState(me.empresa ?? "");
   const [origem, setOrigem] = useState(me.origem ?? "");
   const [interesses, setInteresses] = useState<string[]>(me.interesses ?? []);
   const [motivacao, setMotivacao] = useState(pessoal?.motivacao ?? "");
   const [consent, setConsent] = useState(false);
-  // feature whose screen illustrates the "what you can do" step — hover,
-  // focus or tap on a row swaps the shot (last gesture wins); on mobile the
-  // frame pins under the header so the tap feedback stays in view
-  const [recursoAtivo, setRecursoAtivo] = useState(() =>
-    Math.max(0, RECURSOS[me.role ?? "mentor_dpp"].findIndex((r) => r.img))
-  );
-  // só o ativo e o anterior ficam montados — o crossfade de 300ms precisa
-  // dos dois, mas cada webp conta request: sem o recorte todas as imgs do
-  // papel baixavam ao entrar no passo
-  const [recursoAnterior, setRecursoAnterior] = useState(recursoAtivo);
-  useEffect(() => {
-    const t = setTimeout(() => setRecursoAnterior(recursoAtivo), 350);
-    return () => clearTimeout(t);
-  }, [recursoAtivo]);
   // sub-passos do "Sobre você" colapsam quando a importação da coordenação já
   // preencheu — "Corrigir" expande o form de volta pra editar
   const [editarSobre, setEditarSobre] = useState<Record<number, boolean>>({});
+  // bloco cujo resumo acabou de expandir — o efeito devolve o foco pro
+  // primeiro campo dele depois do commit (o botão Editar desmonta junto)
+  const focoEditarRef = useRef<number | null>(null);
+  useEffect(() => {
+    const sub = focoEditarRef.current;
+    if (sub == null) return;
+    focoEditarRef.current = null;
+    const id = PRIMEIRO_CAMPO_SOBRE[sub];
+    if (id) document.getElementById(id)?.focus();
+  }, [editarSobre]);
 
   // ficha de mentor (0034) — pareamento + grade semanal, já preenchidos se
   // a coordenação importou (mentor_profiles é legível pelo dono)
@@ -369,14 +321,18 @@ export function OnboardingFlow({
   }, [step]);
 
   const primeiroNome = me.nome.trim().split(/\s+/)[0] || me.nome;
-  const ultimo = step === total - 1;
+  const ultimo = step >= total - 1;
   // passos de ficha/perfil são opcionais — ganham o ghost "Pular etapa" e a
   // saída "Pular tudo"; faixa contínua do primeiro passo de ficha
   // até a disponibilidade (mentor) ou o fim dos sub-passos (coord/superv.)
   const passoSobre = PASSO_SOBRE(ehMentor);
+  const subpassosSobre = SUBPASSOS_SOBRE(ehMentor);
+  // grade do mentor fica logo depois dos sub-passos — era um índice fixo
+  // quando o "Sobre você" tinha 4 telas
+  const passoDisponibilidadeIdx = passoSobre + subpassosSobre;
   const ultimoComCampos = ehMentor
-    ? PASSO_DISPONIBILIDADE
-    : passoSobre + SUBPASSOS_SOBRE - 1;
+    ? passoDisponibilidadeIdx
+    : passoSobre + subpassosSobre - 1;
   const passoComCampos = step >= 3 && step <= ultimoComCampos;
   // o termo é penúltimo (antes do "Tudo certo") e fica FORA do <form>
   // compartilhado: o AssinaturaForm tem form e submit próprios. -1 quando a
@@ -385,7 +341,9 @@ export function OnboardingFlow({
   const ehPassoTermo = step === passoTermo;
 
   function avancar() {
-    setStep((s) => Math.min(s + 1, total - 1));
+    // foco fica no efeito [step] da superfície (scroll + título) — irPara
+    // com alvo null marca só a direção do slide
+    irPara(step + 1, null);
   }
 
   /** "Pular etapa" com campo preenchido: o que a pessoa digitou é dela —
@@ -517,26 +475,60 @@ export function OnboardingFlow({
           onChange={(v) => setGenero(v === SENTINEL_VAZIO ? "" : v)}
           icon={GenderIntersex}
         />
-        {/* cidade + UF na mesma linha: um conceito só (onde) e o select de
-            2 letras não precisa de uma linha inteira */}
-        <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-3">
-          <div className="space-y-2">
-            <Rotulo htmlFor="ob-cidade" icon={MapPin}>Cidade</Rotulo>
+      </div>
+      {/* CEP + cidade + UF na mesma linha: um conceito só (onde). O CEP
+          vem primeiro porque o ViaCEP preenche os outros dois — edição
+          manual posterior sempre vence o autofill */}
+      <div className="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_6.5rem]">
+        <div className="space-y-2">
+          <Rotulo htmlFor="ob-cep" icon={Signpost}>CEP</Rotulo>
+          <div className="relative">
             <Input
-              id="ob-cidade"
-              name="cidade"
-              maxLength={100}
-              autoCapitalize="words"
-              value={cidade}
-              onChange={(e) => setCidade(e.target.value)}
+              id="ob-cep"
+              name="cep"
+              inputMode="numeric"
+              autoComplete="postal-code"
+              maxLength={9}
+              placeholder="00000-000"
+              value={buscaCep.cep}
+              onChange={(e) => buscaCep.onCepChange(e.target.value)}
+              onBlur={(e) => buscaCep.onCepBlur(e.currentTarget.value)}
+              aria-describedby="ob-cep_status"
             />
+            {buscaCep.buscando && (
+              <CircleNotch
+                size={16}
+                aria-hidden
+                className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground"
+              />
+            )}
           </div>
-          <CampoUf
-            value={uf}
-            onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
-            icon={Flag}
+          {buscaCep.status !== "idle" && (
+            <p
+              id="ob-cep_status"
+              aria-live="polite"
+              className="text-xs text-muted-foreground"
+            >
+              {STATUS_CEP[buscaCep.status]}
+            </p>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Rotulo htmlFor="ob-cidade" icon={MapPin}>Cidade</Rotulo>
+          <Input
+            id="ob-cidade"
+            name="cidade"
+            maxLength={100}
+            autoCapitalize="words"
+            value={cidade}
+            onChange={(e) => setCidade(e.target.value)}
           />
         </div>
+        <CampoUf
+          value={uf}
+          onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
+          icon={Flag}
+        />
       </div>
     </div>
   );
@@ -601,12 +593,15 @@ export function OnboardingFlow({
 
   // sub-passos burocráticos já preenchidos pela importação da coordenação
   // viram resumo compacto com "Corrigir" — "o que te move" fica sempre
-  // aberto porque interesses/motivação são o dado que alimenta o matching
-  const sobrePreenchido = [
+  // aberto porque interesses/motivação são o dado que alimenta o matching.
+  // Congelado no mount (padrão assinaturaInicial): recalcular por render
+  // trocava campos↔resumo na tecla que completava o bloco e derrubava o
+  // input focado — parcial abre campos, completo abre resumo (503)
+  const [sobrePreenchido] = useState(() => [
     !!(nascimento && genero && cidade && uf),
     !!(cargo && empresa),
     false,
-  ];
+  ]);
   const resumoItensSobre: [string, string][][] = [
     [
       ["Nome social", nomeSocial],
@@ -626,18 +621,21 @@ export function OnboardingFlow({
     ],
     [],
   ];
-  const resumoSobre = (sub: number) => (
+  const resumoSobre = (sub: number, rotulo = "Já temos esses dados do cadastro") => (
     <div className="rounded-2xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-center justify-between gap-3">
         <p className="flex items-center gap-1.5 text-sm font-medium">
           <ClipboardText size={15} className="text-muted-foreground" aria-hidden />
-          Já temos esses dados do cadastro
+          {rotulo}
         </p>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => setEditarSobre((s) => ({ ...s, [sub]: true }))}
+          onClick={() => {
+            focoEditarRef.current = sub;
+            setEditarSobre((s) => ({ ...s, [sub]: true }));
+          }}
         >
           Editar
         </Button>
@@ -657,8 +655,40 @@ export function OnboardingFlow({
     </div>
   );
 
-  /** Passo "Pareamento" (mentor, 0034) — o que ajuda a coordenação a escolher
-   *  a dupla: preferência de gênero do par + a bagagem que entra na ficha. */
+  // mentor (497): a 1ª tela "Sobre você" confirma os dois blocos que a
+  // importação costuma trazer — cada um fecha num resumo com Editar
+  // próprio; sem importação (ou com buraco) o bloco abre os campos. Todos
+  // os `name`s seguem no FormData do passo — o patch salvo é o mesmo dos
+  // dois envios anteriores, num só
+  const passoSobreDados = (
+    <div className="space-y-6">
+      {[
+        { rotulo: "Quem você é", sub: 0, campos: passoSobreIdentidade },
+        { rotulo: "Seu trabalho", sub: 1, campos: passoSobreProfissional },
+      ].map((grupo) => (
+        <section
+          key={grupo.rotulo}
+          aria-label={grupo.rotulo}
+          className="space-y-3"
+        >
+          {sobrePreenchido[grupo.sub] && !editarSobre[grupo.sub] ? (
+            resumoSobre(grupo.sub, grupo.rotulo)
+          ) : (
+            <>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                {grupo.rotulo}
+              </p>
+              {grupo.campos}
+            </>
+          )}
+        </section>
+      ))}
+    </div>
+  );
+
+  /** Blocos do "Pareamento" (mentor, 0034) — preferência de gênero do par +
+   *  a bagagem que entra na ficha. Na 497 a tela própria foi fundida no
+   *  2º "Sobre você" do mentor, mas os campos e os nomes são os mesmos. */
   const passoPareamento = (
     <div className="space-y-4">
       <CampoPrefGenero
@@ -699,16 +729,41 @@ export function OnboardingFlow({
     <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
   );
 
+  // mentor (497): a 2ª tela "Sobre você" junta o que a coordenação cruza
+  // pra formar a dupla — interesses/motivação (sempre abertos) + a
+  // preferência de par e a bagagem que antes tinham tela própria
+  const passoSobreDupla = (
+    <div className="space-y-6">
+      <section aria-label="O que te move" className="space-y-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          O que te move
+        </p>
+        {passoSobreMotivacao}
+      </section>
+      <section aria-label="Pra formar sua dupla" className="space-y-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          Pra formar sua dupla
+        </p>
+        {passoPareamento}
+      </section>
+    </div>
+  );
+
   const titulo = (() => {
-    if (step === passoSobre) return "Sobre você: quem você é";
-    if (step === passoSobre + 1) return "Sobre você: seu trabalho";
-    if (step === passoSobre + 2) return "Sobre você: o que te move";
-    if (ehMentor && step === PASSO_PAREAMENTO) return "O que ajuda a formar sua dupla";
-    if (ehMentor && step === PASSO_DISPONIBILIDADE) return "Quando você pode encontrar sua dupla";
+    if (step === passoSobre)
+      return ehMentor
+        ? "Sobre você: confira seus dados"
+        : "Sobre você: quem você é";
+    if (step === passoSobre + 1)
+      return ehMentor
+        ? "Sobre você: o que ajuda a formar sua dupla"
+        : "Sobre você: seu trabalho";
+    if (!ehMentor && step === passoSobre + 2) return "Sobre você: o que te move";
+    if (ehMentor && step === passoDisponibilidadeIdx) return "Quando você pode encontrar sua dupla";
     if (ehPassoTermo) return "Termo de adesão ao trabalho voluntário";
     switch (step) {
       case 0:
-        return `Bem-vindo(a) ao Realiza.vc, ${primeiroNome}!`;
+        return `Boas-vindas ao Realiza.vc, ${primeiroNome}!`;
       case 1:
         return "Antes de tudo: duas confirmações";
       case 2:
@@ -730,16 +785,16 @@ export function OnboardingFlow({
 
   const hint = (() => {
     if (step === passoSobre)
-      return "Como você se apresenta e onde vive. Nascimento e gênero ficam visíveis só pra coordenação.";
-    if (step === passoSobre + 1)
-      return "Cargo, empresa e como você chegou: contexto rápido pra equipe te conhecer.";
-    if (step === passoSobre + 2)
       return ehMentor
-        ? "Interesses e motivação ajudam a formar a sua dupla; a motivação fica só com a coordenação."
-        : "Interesses e motivação ajudam a equipe a te conhecer; a motivação fica só com a coordenação.";
-    if (ehMentor && step === PASSO_PAREAMENTO)
-      return "A coordenação usa isso pra escolher a dupla: tudo opcional, dá pra completar depois no Perfil.";
-    if (ehMentor && step === PASSO_DISPONIBILIDADE)
+        ? "O cadastro já trouxe estes dados: confira os dois blocos e corrija o que precisar. Nascimento e gênero ficam visíveis só pra coordenação."
+        : "Como você se apresenta e onde vive. Nascimento e gênero ficam visíveis só pra coordenação.";
+    if (step === passoSobre + 1)
+      return ehMentor
+        ? "Interesses, motivação e a sua bagagem ajudam a coordenação a formar a sua dupla. Tudo opcional, dá pra completar depois no Perfil; a motivação fica só com a coordenação."
+        : "Cargo, empresa e como você chegou: contexto rápido pra equipe te conhecer.";
+    if (!ehMentor && step === passoSobre + 2)
+      return "Interesses e motivação ajudam a equipe a te conhecer; a motivação fica só com a coordenação.";
+    if (ehMentor && step === passoDisponibilidadeIdx)
       return "Toque nos dias e períodos em que você costuma ter agenda livre. A coordenação cruza com a do mentorado.";
     if (ehPassoTermo)
       return demo
@@ -792,98 +847,59 @@ export function OnboardingFlow({
     ) : null;
 
   const corpo = (() => {
-    if (step >= passoSobre && step < passoSobre + SUBPASSOS_SOBRE) {
+    if (step >= passoSobre && step < passoSobre + subpassosSobre) {
       const sub = step - passoSobre;
+      if (ehMentor) return sub === 0 ? passoSobreDados : passoSobreDupla;
       return sobrePreenchido[sub] && !editarSobre[sub]
         ? resumoSobre(sub)
         : PASSOS_SOBRE[sub];
     }
-    if (ehMentor && step === PASSO_PAREAMENTO) return passoPareamento;
-    if (ehMentor && step === PASSO_DISPONIBILIDADE) return passoDisponibilidade;
-    // o termo tem form próprio (AssinaturaForm) — intercepta antes do switch
-    // porque o índice colide com o case 6 (linkedin) pra coord/supervisor
+    if (ehMentor && step === passoDisponibilidadeIdx) return passoDisponibilidade;
+    // o termo tem form próprio (AssinaturaForm dentro do PassoTermo) —
+    // intercepta antes do switch porque o índice colide com o case 6
+    // (linkedin) pra coord/supervisor. Na demo o fluxo é o real inteiro —
+    // documento, dados civis da persona e o form — só a gravação é simulada
+    // (cookie demo_termo; os espelhos leem como "assinado" e a via em PDF
+    // sai com o que foi digitado). O documento interpola o que a pessoa
+    // digita e o primário fica no rodapé fixo (497)
     if (ehPassoTermo) {
-      // demo: o fluxo real inteiro — documento, dados civis da persona e o
-      // form — só a gravação é simulada (cookie demo_termo; os espelhos
-      // leem como "assinado" e a via em PDF sai com o que foi digitado)
-      if (demo) {
-        return (
-          <div className="space-y-4">
-            <TermoVoluntarioDoc
-              civis={civis}
-              continuar={{
-                href: "#ob-termo-dados",
-                rotulo: "Continuar para seus dados ↓",
-              }}
-            />
-            <div id="ob-termo-dados" className="scroll-mt-[calc(6rem+env(safe-area-inset-top))] space-y-2">
-              <h2 className="text-base font-semibold">Seus dados para assinar</h2>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {civis
-                  ? "Já temos seus dados do cadastro: confira, corrija se preciso e assine."
-                  : "Pra assinar precisamos dos seus dados civis: preencha como no documento de identidade. Eles entram no termo exatamente como digitados."}{" "}
-                Na demonstração a assinatura é simulada: nada sai do seu navegador.
-              </p>
-            </div>
-            <AssinaturaForm
-              modo="termo"
-              acao={(fd) => assinarTermoDemo(me.role ?? "mentor_dpp", fd)}
-              dados={civis}
-              onSucesso={() => {
-                setTermoOk(true);
-                avancar();
-              }}
-            />
-          </div>
-        );
-      }
       return (
-        <div className="space-y-4">
-          <TermoVoluntarioDoc
-            civis={civis}
-            continuar={{
-              href: "#ob-termo-dados",
-              rotulo: "Continuar para seus dados ↓",
-            }}
-          />
-          <div id="ob-termo-dados" className="scroll-mt-[calc(6rem+env(safe-area-inset-top))] space-y-2">
-            <h2 className="text-base font-semibold">Seus dados para assinar</h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {civis
-                ? "Já temos seus dados do cadastro: confira, corrija se preciso e assine."
-                : "Pra assinar precisamos dos seus dados civis: preencha como no documento de identidade. Eles entram no termo exatamente como digitados."}{" "}
-              Eles ficam restritos à coordenação e ao termo, não aparecem no seu perfil.
-            </p>
-          </div>
-          <AssinaturaForm
-            modo="termo"
-            acao={assinarTermo}
-            dados={
-              civis ?? {
-                // prefill com o que o wizard já coletou — os dados civis são
-                // um silo à parte (RPC 0046), mas nascimento/cidade/UF valem
-                // nos dois mundos
-                nome_civil: null,
-                rg: null,
-                cpf: null,
-                data_nascimento: nascimento || null,
-                endereco: {
-                  logradouro: null,
-                  numero: null,
-                  complemento: null,
-                  bairro: null,
-                  cidade: cidade || null,
-                  uf: uf || null,
-                  cep: null,
-                },
-              }
+        <PassoTermo
+          doc="voluntario"
+          civis={civis}
+          dados={
+            civis ?? {
+              // prefill com o que o wizard já coletou — os dados civis são
+              // um silo à parte (RPC 0046), mas nascimento/cidade/UF/CEP
+              // valem nos dois mundos
+              nome_civil: null,
+              rg: null,
+              cpf: null,
+              data_nascimento: nascimento || null,
+              endereco: {
+                logradouro: null,
+                numero: null,
+                complemento: null,
+                bairro: null,
+                cidade: cidade || null,
+                uf: uf || null,
+                cep: buscaCep.cep.replace(/\D/g, "") || null,
+              },
             }
-            onSucesso={() => {
-              setTermoOk(true);
-              avancar();
-            }}
-          />
-        </div>
+          }
+          acao={
+            demo
+              ? (fd) => assinarTermoDemo(me.role ?? "mentor_dpp", fd)
+              : assinarTermo
+          }
+          demo={!!demo}
+          formId={TERMO_FORM_ID}
+          onSucesso={() => {
+            setTermoOk(true);
+            avancar();
+          }}
+          onPendingChange={setPendingTermo}
+        />
       );
     }
     switch (step) {
@@ -933,134 +949,8 @@ export function OnboardingFlow({
           </div>
         );
       }
-      case 2: {
-        const recursos = RECURSOS[me.role ?? "mentor_dpp"];
-        const ativo = recursos[recursoAtivo];
-        return (
-          <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:items-start sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)]">
-            {/* mobile: the frame pins under the fixed header while the list
-                scrolls beneath — a tap swaps the shot in place, no layout
-                shift. The band is opaque and edge-to-edge (-mx-4 cancels the
-                page gutter) so rows slide under it without peeking through
-                the gap to the header */}
-            {ativo?.img && (
-              <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 bg-background px-4 pb-3 pt-2 sm:hidden">
-                {/* portrait shot at its native 3:4 — height-driven so the
-                    whole capture shows uncropped (width follows the ratio);
-                    object-top keeps the app chrome in frame on any drift */}
-                <div className="relative mx-auto aspect-[3/4] h-[clamp(11rem,42dvh,16rem)] overflow-hidden rounded-2xl border border-border bg-card shadow-border" aria-live="polite">
-                  {recursos.map(
-                    (r, i) =>
-                      r.img &&
-                      (i === recursoAtivo || i === recursoAnterior) && (
-                        <PrintShot
-                          key={`m-${r.img}`}
-                          src={printMobile(r.img)}
-                          media="(max-width: 639.98px)"
-                          ativo={i === recursoAtivo}
-                          alt={i === recursoAtivo ? (r.alt ?? "") : ""}
-                        />
-                      )
-                  )}
-                </div>
-              </div>
-            )}
-            <ul className="space-y-2">
-              {recursos.map((r, i) => {
-                const aceso = !!r.img && i === recursoAtivo;
-                const cartao = cn(
-                  "flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left outline-none transition-colors sm:px-4 sm:py-3",
-                  aceso
-                    ? "border-[var(--brand-lime)] bg-[var(--brand-lime)]/10"
-                    : cn(
-                        "border-border bg-card",
-                        r.img && "hover:border-foreground/40"
-                      )
-                );
-                const conteudo = (
-                  <>
-                    {/* o disco lime é sinal de estado (mesma regra do
-                        CaixaSelecao): neutro no repouso, aceso no ativo */}
-                    <span
-                      className={cn(
-                        "grid size-10 shrink-0 place-items-center rounded-full transition-colors",
-                        aceso
-                          ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      <r.icon size={18} weight="fill" aria-hidden />
-                    </span>
-                    <span className="text-sm leading-snug">{r.texto}</span>
-                    {/* the small screen icon marks which rows have a shot to
-                        preview — a caret read as a dropdown that never opened */}
-                    {r.img && (
-                      <ImageSquare
-                        size={16}
-                        aria-hidden
-                        className={cn(
-                          "ml-auto shrink-0 transition-colors",
-                          aceso ? "text-foreground" : "text-muted-foreground/70"
-                        )}
-                      />
-                    )}
-                  </>
-                );
-                return (
-                  <li key={r.texto}>
-                    {r.img ? (
-                      <button
-                        type="button"
-                        onMouseEnter={() => setRecursoAtivo(i)}
-                        onFocus={() => setRecursoAtivo(i)}
-                        onClick={() => setRecursoAtivo(i)}
-                        aria-current={aceso || undefined}
-                        className={cn(
-                          cartao,
-                          "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring/60"
-                        )}
-                      >
-                        {conteudo}
-                      </button>
-                    ) : (
-                      <div className={cartao}>{conteudo}</div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            {/* desktop: a coluna de conteúdo da tela real ao lado, com
-                crossfade — capturada a 876px, sai perto do tamanho real */}
-            {ativo?.img && (
-              // a largura acompanha a altura da janela (24rem = header,
-              // balão e footer fixos): em 1280×720 a moldura passava do
-              // footer e a página rolava; assim a proporção do print se mantém
-              <figure className="hidden sm:sticky sm:top-20 sm:block sm:max-w-[calc((100dvh-24rem)*73/60)]">
-                <MolduraTela>
-                  <div className="relative aspect-[73/60]" aria-live="polite">
-                    {recursos.map(
-                      (r, i) =>
-                        r.img &&
-                        (i === recursoAtivo || i === recursoAnterior) && (
-                          <PrintShot
-                            key={r.img}
-                            src={printDesktop(r.img)}
-                            media="(min-width: 640px)"
-                            ativo={i === recursoAtivo}
-                            alt={i === recursoAtivo ? (r.alt ?? "") : ""}
-                          />
-                        )
-                    )}
-                  </div>
-                </MolduraTela>
-                <figcaption className="mt-2 px-1 text-xs text-muted-foreground">
-                  {ativo.alt}
-                </figcaption>
-              </figure>
-            )}
-          </div>
-        );
-      }
+      case 2:
+        return <PassoRecursos recursos={RECURSOS[me.role ?? "mentor_dpp"]} />;
       case 3:
         return (
           <div className="flex flex-col items-center gap-3 py-1">
@@ -1193,9 +1083,11 @@ export function OnboardingFlow({
                 });
                 return;
               }
-              setStep((s) => s - 1);
+              irPara(step - 1, null);
             }}
-            disabled={(step === 0 && !demo) || pending}
+            // pendingTermo trava o Voltar no meio do submit do termo —
+            // sair do passo desmontava o form com a action voando
+            disabled={(step === 0 && !demo) || pending || pendingTermo}
             aria-label={
               step === 0 && demo ? "Escolher outro papel" : "Voltar um passo"
             }
@@ -1218,8 +1110,8 @@ export function OnboardingFlow({
             className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
           >
             <div
-              className="h-full rounded-full bg-[var(--brand-lime)] transition-all duration-500"
-              style={{ width: `${((step + 1) / total) * 100}%` }}
+              className="h-full origin-left rounded-full bg-[var(--brand-lime)] transition-transform duration-500"
+              style={{ transform: `scaleX(${(step + 1) / total})` }}
             />
           </div>
           <span aria-hidden className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
@@ -1238,21 +1130,22 @@ export function OnboardingFlow({
           pb-40 no mobile cobre o footer empilhado (~154px com safe-area) */}
       <main
         className={cn(
-          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-40 pt-[calc(5rem+env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] transition-[max-width] duration-500 sm:justify-center sm:px-6 sm:pb-32",
+          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-40 pt-[calc(5rem+env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:justify-center sm:px-6 sm:pb-32",
+          // sem transition-[max-width]: a spec 028 bane max-width em
+          // transição (layout por frame) — a largura muda seca junto do
+          // slide da etapa, que já sinaliza a mudança
           step === 2 && "sm:max-w-6xl"
         )}
       >
         <Logo size="sm" className="mb-6 self-start" />
-        <div key={step} className="animate-rise">
+        {/* remount por passo é deliberado (FormData por passo) — a Etapa
+            com key mantém o remount e traz o slide direcional */}
+        <Etapa key={step} direcao={direcao}>
           <div className="flex items-end gap-3">
             {/* a Liza abre e fecha a jornada — a cauda do balão aponta pra
                 ela; nos passos do meio ela sai pra não disputar o form */}
             {(step === 0 || ultimo) && (
-              <LizaBlob
-                estado={ultimo ? "pronto" : "atento"}
-                tamanho={64}
-                className="mb-1 shrink-0"
-              />
+              <LizaOnboarding ultimo={ultimo} />
             )}
             <div className="min-w-0 flex-1 rounded-3xl rounded-bl-md border border-border bg-card px-5 py-4 sm:max-w-xl">
               <h1
@@ -1266,13 +1159,21 @@ export function OnboardingFlow({
             </div>
           </div>
           {passoComCampos ? (
-            <form id={FORM_ID} onSubmit={salvarPasso} className="mt-5">
+            // noValidate: a validação é a da action (mensagens pt-BR);
+            // campos opcionais com formato (o type=url do LinkedIn) não
+            // podem travar Continuar nem Pular etapa na bolha nativa
+            <form
+              id={FORM_ID}
+              onSubmit={salvarPasso}
+              noValidate
+              className="mt-5"
+            >
               {corpo}
             </form>
           ) : (
             corpo && <div className="mt-5">{corpo}</div>
           )}
-        </div>
+        </Etapa>
       </main>
 
       {/* footer fixo: "Pular etapa" nos passos opcionais + primário.
@@ -1284,16 +1185,16 @@ export function OnboardingFlow({
           {(passoComCampos || ehPassoTermo) && (
             <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-3">
               {/* no termo o ghost é "Assinar depois": avança sem gravar —
-                  a pendência segue como ausência de assinatura. Nos demais
+                  a pendência segue como ausência de assinatura, agora ao
+                  lado do primário real que submete o form (497). Nos demais
                   passos da demo sem form o primário cobre o pulo; no termo
-                  demo ele aparece porque o primário some (paridade com o
-                  fluxo real: quem decide é o botão dentro do form) */}
+                  demo ele aparece também (paridade com o fluxo real) */}
               {(passoComCampos || ehPassoTermo || !demo) && (
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={pularEtapa}
-                  disabled={pending}
+                  disabled={pending || pendingTermo}
                 >
                   {ehPassoTermo ? "Assinar depois" : "Pular etapa"}
                 </Button>
@@ -1320,11 +1221,26 @@ export function OnboardingFlow({
               submit no MESMO clique dispara o form do passo seguinte — o
               default action do clique é avaliado depois do re-render, então
               "Continuar" avançava 2 passos (pulava a foto).
-              No passo do termo o primário some: o submit mora dentro do
-              AssinaturaForm e um "Continuar" ao lado de "Assinar depois"
-              seria ambíguo — na demo vale o mesmo, o form simulado é que
-              conduz */}
-          {!ehPassoTermo && (
+              No passo do termo o primário vira o submit do AssinaturaForm
+              (form=id, sem botão interno): o "Assinar" fica sempre à vista
+              no rodapé e "Assinar depois" segue como a saída secundária
+              (497) — na demo vale o mesmo, o form simulado é que conduz */}
+          {ehPassoTermo ? (
+            <Button
+              type="submit"
+              form={TERMO_FORM_ID}
+              formNoValidate
+              disabled={pending || pendingTermo}
+              className="h-11 w-full font-semibold sm:flex-1"
+            >
+              {pendingTermo ? (
+                <CircleNotch className="animate-spin" aria-hidden />
+              ) : (
+                <Signature aria-hidden />
+              )}
+              {pendingTermo ? "Assinando…" : "Assinar eletronicamente"}
+            </Button>
+          ) : (
             <Button
               type="button"
               onClick={() => {
@@ -1344,7 +1260,7 @@ export function OnboardingFlow({
               className="h-11 w-full font-semibold sm:flex-1"
             >
               {pending
-                ? ultimo || ehPassoTermo
+                ? ultimo
                   ? "Entrando…"
                   : "Salvando…"
                 : ultimo

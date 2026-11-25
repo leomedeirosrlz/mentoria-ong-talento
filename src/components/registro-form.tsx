@@ -1,10 +1,11 @@
 "use client";
 
-import { type CSSProperties, useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CaretLeft, CaretRight, Paperclip, Plus, Trash, X } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { salvarRegistro } from "@/lib/actions";
+import { abrirAncoraRegistro } from "@/lib/ancora-registro";
 import { demoAtivoClient } from "@/lib/demo/shared";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -36,11 +37,15 @@ import {
   recusaDoAnexo,
 } from "@/components/anexos-registro";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DialogFooter } from "@/components/ui/dialog";
+import { Etapa, FadeTroca, useTrocaDeEtapa } from "@/components/ui/etapa";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { novoUuid } from "@/lib/uuid";
+import { listaEncontros } from "@/lib/plano-combinado";
+import { META_PASSOS_PLANO } from "@/lib/plano-em-dia.data";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -72,7 +77,7 @@ const DURACAO_OPCOES: Record<string, string> = {
   "120": "2h",
 };
 
-const ETAPAS = ["Como foi", "Sinais de atenção", "Combinados"] as const;
+const ETAPAS = ["Como foi", "Atividades e desempenho", "Combinados"] as const;
 
 /** Rascunho local do form — autosave no localStorage pra refresh não perder tudo. */
 type RegistroDraft = {
@@ -94,6 +99,19 @@ type RegistroDraft = {
   concluirIds: string[];
 };
 
+/** Reads another encounter's saved draft — the double-session chain uses it
+ *  to overlay shared fields without wiping partial work the mentor started. */
+function rascunhoDoEncontro(encontroId: string): RegistroDraft | null {
+  try {
+    const raw = localStorage.getItem(`registro-draft-${encontroId}`);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    return d && typeof d === "object" ? (d as RegistroDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function RegistroForm({
   encontroId,
   duplaId,
@@ -105,6 +123,12 @@ export function RegistroForm({
   onSaved,
   embutido = false,
   origem,
+  proximosRegistros = null,
+  cobertura = null,
+  sessaoGrupo = null,
+  titulo = true,
+  irParaAposSalvar,
+  onEncadear,
 }: {
   encontroId: string;
   duplaId: string;
@@ -128,6 +152,31 @@ export function RegistroForm({
    *  derivam de `encontro.origem` ("externo" = retroativo); sem a prop o
    *  form infere do `registro` (edição) — nunca afeta comportamento. */
   origem?: "novo" | "retroativo";
+  /** Encontros ainda devendo registro, em ordem de nº (REALIZA-397): o
+   *  pós-save oferece "Registrar o Nº também?" pro primeiro que a sessão
+   *  NÃO cobriu — a cobertura já deu o registro dele. O clique abre a linha
+   *  do encontro pela âncora `#registrar-{id}` com os campos compartilhados
+   *  preenchidos pelo rascunho. Só a ficha da dupla passa. */
+  proximosRegistros?: { encontroId: string; numero: number }[] | null;
+  /** Passos do guia que esta sessão pode cobrir junto (007 US11) — o
+   *  checkbox marca nºs e cada um ganha o próprio registro com o mesmo
+   *  conteúdo no salvarRegistro. Só criação DPP recebe (edição e trilha
+   *  especialista ficam de fora). */
+  cobertura?: { numero: number; titulo: string }[] | null;
+  /** Demais membros do grupo sessao_id DESTE encontro (sessão planejada,
+   *  018): entram travados na cobertura — grupo fechado, o servidor une
+   *  mesmo sem checkbox, então a tela nasce marcada e não desmarca. */
+  sessaoGrupo?: { numero: number; titulo: string }[] | null;
+  /** Título interno "Registro do encontro" — a rota dedicada passa `false`
+   *  porque o `h1` da página já nomeia a tarefa. */
+  titulo?: boolean;
+  /** Destino do "Concluir" quando o host tem uma URL própria: `replace`
+   *  sem `refresh` (evita a corrida entre navegação e re-render). */
+  irParaAposSalvar?: string;
+  /** Encadear no próximo encontro: o rascunho compartilhado é gravado aqui e
+   *  a navegação é do host (rota) — sem ele, o form segue escrevendo o hash
+   *  da ficha (fallback do PR1). */
+  onEncadear?: (encontroId: string) => void;
 }) {
   // edição nasce com os combinados já gravados pelo registro — o id de
   // banco viaja na linha e volta no submit (o Adicionar usa uuid local,
@@ -146,21 +195,39 @@ export function RegistroForm({
   // duracao_min mora em `encontros`, não em `registros` — o form não recebe o
   // encontro, então o default é o padrão do guia (60). O salvarRegistro grava.
   const [duracaoMin, setDuracaoMin] = useState("60");
+  // sessão combinada (018): nºs marcados como cobertos — controlado pra o
+  // aviso de prática reagir na hora e a duração sugerir 2h no primeiro check.
+  // O grupo planejado nasce dentro: a sessão dele já está decidida no plano
+  const [cobertosSel, setCobertosSel] = useState<Set<number>>(
+    () => new Set((sessaoGrupo ?? []).map((g) => g.numero))
+  );
+  // par de passos adjacentes onde o de baixo pede prática (META 4–8): a
+  // fusão na mesma sessão apaga a semana de exercício entre eles — aviso
+  // pedagógico em duas partes, a marcação é a decisão consciente
+  const sessaoCortaPratica = (() => {
+    if (evento?.numero == null || cobertosSel.size === 0) return null;
+    const grupo = new Set([evento.numero, ...cobertosSel]);
+    const pares = [...grupo]
+      .filter(
+        (n) =>
+          META_PASSOS_PLANO[n]?.exige === "pratica" && grupo.has(n + 1)
+      )
+      .sort((a, b) => a - b)
+      .map((n) => `${n} e ${n + 1}`);
+    return pares.length ? pares.join("; ") : null;
+  })();
   const [restored, setRestored] = useState<RegistroDraft | null>(null);
   // avaliacao é o único obrigatório não-textual — erro inline pt-BR em vez do
   // balão nativo do browser (que nem indica qual campo faltou)
   const [erroAvaliacao, setErroAvaliacao] = useState(false);
-  const [etapa, setEtapa] = useState(0);
-  // direção da última troca de etapa — alimenta o --dir do .animate-enter-x
-  const [direcao, setDirecao] = useState<1 | -1>(1);
+  // wizard de 3 etapas pelo kit (ui/etapa): slide direcional + foco no
+  // heading novo pós-commit — as etapas seguem montadas sob `hidden`
+  const { etapa, direcao, irPara, tituloEtapaRef } =
+    useTrocaDeEtapa<HTMLHeadingElement>(ETAPAS.length);
   const [pending, start] = useTransition();
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
-  const tituloEtapaRef = useRef<HTMLHeadingElement>(null);
   const addEncRef = useRef<HTMLButtonElement>(null);
-  // foco pedido junto com a troca de etapa — o efeito roda depois do commit,
-  // quando o `hidden` da seção alvo já saiu da árvore renderizada
-  const focoPendente = useRef<"titulo" | "avaliacao" | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoredOnce = useRef(false);
   // num desmonte o formRef já foi zerado quando o cleanup passivo roda — o
@@ -187,6 +254,19 @@ export function RegistroForm({
     anexos: RegistroAnexo[];
     /** arquivos do passo 3 que não subiram — o uploader fica logo abaixo */
     falhas: number;
+    /** chain target for a double session (REALIZA-397): the shared fields
+     *  captured at save time — the next form opens prefilled through its
+     *  own draft, each registro still saved independently */
+    chain?: {
+      encontroId: string;
+      numero: number;
+      shared: {
+        duracaoMin: string;
+        avaliacao: string;
+        dificuldade: string;
+        proximoPasso: string;
+      };
+    };
   } | null>(null);
   // evidências escolhidas no passo 3 do registro NOVO — ficam no navegador
   // até o save: o FK do anexo exige a row do registro, então elas sobem
@@ -199,6 +279,8 @@ export function RegistroForm({
   const [fechado, setFechado] = useState(false);
   // trilha pra linha de privacidade (K6) — quando o host não repassa
   const [trilhaForm, setTrilhaForm] = useState<Trilha | null>(trilha);
+  // substantivo dos rótulos: "sessão" na trilha esp, "encontro" na DPP
+  const sessao = trilhaForm === "especialista";
 
   // ---------- telemetria do preenchimento (REALIZA-217, fase 1) ----------
   // Uma linha por abertura do form; fire-and-forget — a RPC pode falhar ou
@@ -210,14 +292,22 @@ export function RegistroForm({
   const tentativaIniciada = useRef(false);
   // marco zero da duração: o cliente mede (o server só carimba `inicio`) —
   // "quanto tempo o form ficou aberto até o salvar", o número da issue
-  const inicioMs = useRef(Date.now());
+  const inicioMs = useRef<number>(0);
   // tempo acumulado por passo do wizard — o estado `etapa` é 0-based, mas
   // no payload a chave casa com o "Passo N de 3" da interface
   const etapasMs = useRef<Record<number, number>>({});
-  const etapaDesde = useRef(Date.now());
+  const etapaDesde = useRef<number>(0);
   const etapaMedida = useRef(0);
   // atividade desde a última batida — o heartbeat só sai se algo mudou
   const telemetriaDirty = useRef(false);
+  // relógios de duração: inicializados no efeito (não no render) pra não
+  // violar a pureza do React Compiler; o efeito roda antes de qualquer
+  // interação que possa salvar
+  useEffect(() => {
+    const agora = Date.now();
+    inicioMs.current = agora;
+    etapaDesde.current = agora;
+  }, []);
 
   /** {1..3: ms} das etapas — inclui o parcial da etapa corrente, pra última
    *  batida antes do abandono já contar o passo em andamento. */
@@ -237,7 +327,9 @@ export function RegistroForm({
   // primeiras interações — o flush ao resolver não perde a atividade que
   // já aconteceu (telemetriaDirty cobre a janela)
   useEffect(() => {
-    if (demo || tentativaIniciada.current) return;
+    // o form recusado (registro && !onSaved → null, mais abaixo) nunca
+    // renderiza — contar tentativa poluiria a métrica com sessão fantasma
+    if (demo || tentativaIniciada.current || (registro && onSaved == null)) return;
     tentativaIniciada.current = true;
     const o = registro ? "edicao" : (origem ?? "novo");
     iniciarTentativa(duplaId, encontroId, o)
@@ -249,7 +341,7 @@ export function RegistroForm({
         }
       })
       .catch(() => {});
-  }, [demo, duplaId, encontroId, registro, origem, etapasSnapshot]);
+  }, [demo, duplaId, encontroId, registro, origem, onSaved, etapasSnapshot]);
 
   // troca de passo: fecha a fatia da etapa anterior e já manda a batida —
   // a etapa em que o mentor desiste é o dado que o redesign precisa
@@ -343,12 +435,18 @@ export function RegistroForm({
         !draft.encaminhamentos.some((t) => t.descricao.trim()) &&
         !draft.concluirIds.length;
       // rascunho vazio não vale guardar (e evita banner fantasma na próxima abertura)
-      if (vazio) localStorage.removeItem(draftKey);
-      else localStorage.setItem(draftKey, JSON.stringify(draft));
+      if (vazio) {
+        // o replay de mount do StrictMode (dev) roda o flush de desmonte
+        // antes do restore ler o rascunho — apagar aqui sumiria um rascunho
+        // que este form nem chegou a carregar (o semeado pelo "Registrar o
+        // Nº também" é o caso real: nasce no clique anterior à navegação)
+        if (!restoredOnce.current && !registro) return;
+        localStorage.removeItem(draftKey);
+      } else localStorage.setItem(draftKey, JSON.stringify(draft));
     } catch {
       // modo privado pode negar localStorage — falha silenciosa é ok aqui
     }
-  }, [demo, draftKey, encaminhamentos, concluirIds]);
+  }, [demo, draftKey, encaminhamentos, concluirIds, registro]);
 
   const scheduleSave = useCallback(() => {
     // toda mudança no form passa por aqui — a mesma marca alimenta o
@@ -468,38 +566,19 @@ export function RegistroForm({
     setRestored(null);
   }
 
-  // foco pedido junto com a troca de etapa: o heading novo anuncia onde o
-  // mentor está; quando a troca foi o portão da avaliação, o foco cai no campo
-  useEffect(() => {
-    const alvo = focoPendente.current;
-    if (!alvo) return;
-    focoPendente.current = null;
-    if (alvo === "avaliacao") focarAvaliacao();
-    else tituloEtapaRef.current?.focus();
-  });
-
+  // o portão da avaliação foca o campo que faltou — a agenda de foco do hook
+  // entrega depois do commit, com a etapa 1 já fora do `hidden`
   function focarAvaliacao() {
     formRef.current
       ?.querySelector<HTMLElement>('input[name="avaliacao"]')
       ?.focus();
   }
 
-  function irPara(proxima: number) {
-    focoPendente.current = "titulo";
-    setDirecao(proxima > etapa ? 1 : -1);
-    setEtapa(proxima);
-  }
-
   function cobrarAvaliacao() {
     setErroAvaliacao(true);
-    if (etapa === 0) {
-      focarAvaliacao();
-    } else {
-      // Enter/submit fora da etapa 1 devolve o mentor pra lá e foca o campo
-      focoPendente.current = "avaliacao";
-      setDirecao(-1);
-      setEtapa(0);
-    }
+    // Enter/submit fora da etapa 1 devolve o mentor pra lá — na própria
+    // etapa 1 o mesmo irPara resolve o pendente na hora, sem navegar
+    irPara(0, focarAvaliacao);
   }
 
   function avancar() {
@@ -545,6 +624,13 @@ export function RegistroForm({
     [...concluirIds]
       .filter((id) => pendentes.has(id))
       .forEach((id) => fd.append("concluir_encaminhamento", id));
+    // a sessão já cobriu esses nºs no salvarRegistro — a fila do "registrar
+    // também" pula os cobertos e oferece o primeiro pendente de verdade
+    const cobertosForm = new Set(
+      fd.getAll("cobriu_numero").map((v) => Number(String(v)))
+    );
+    const proximoPendente =
+      proximosRegistros?.find((p) => !cobertosForm.has(p.numero)) ?? null;
     start(async () => {
       // duração da sessão até o gesto de salvar — o round-trip da action
       // não conta como tempo de preenchimento
@@ -556,12 +642,20 @@ export function RegistroForm({
           if (res?.aviso) {
             toast.warning("Registro salvo.", { description: res.aviso });
           } else {
-            toast.success("Registro salvo.", {
-              description: res?.concluidos
+            const detalhes = [
+              res?.concluidos
                 ? res.concluidos === 1
                   ? "1 combinado marcado como feito."
                   : `${res.concluidos} combinados marcados como feitos.`
-                : undefined,
+                : null,
+              res?.cobertos?.length
+                ? `Também cobriu ${res.cobertos
+                    .map((n) => (sessao ? `a ${n}ª sessão` : `o ${n}º encontro`))
+                    .join(" e ")}.`
+                : null,
+            ].filter(Boolean);
+            toast.success("Registro salvo.", {
+              description: detalhes.length ? detalhes.join(" ") : undefined,
             });
           }
           salvoOk.current = true;
@@ -589,7 +683,7 @@ export function RegistroForm({
             const { data: reg } = await createClient()
               .from("registros")
               .select("id, created_by")
-              .eq("encontro_id", encontroId)
+              .eq("id", res?.registroId ?? "")
               .maybeSingle();
             // fecha a sessão de preenchimento mesmo sem a row à mão — a
             // duração vale mais que o link pro registro
@@ -611,6 +705,18 @@ export function RegistroForm({
                 aviso: res?.aviso,
                 anexos: enviados,
                 falhas,
+                chain: proximoPendente
+                  ? {
+                      encontroId: proximoPendente.encontroId,
+                      numero: proximoPendente.numero,
+                      shared: {
+                        duracaoMin: String(fd.get("duracao_min") ?? "60"),
+                        avaliacao: String(fd.get("avaliacao") ?? ""),
+                        dificuldade,
+                        proximoPasso,
+                      },
+                    }
+                  : undefined,
               });
             } else {
               // sem a row à mão não dá pra montar o uploader — cai no fluxo
@@ -627,6 +733,12 @@ export function RegistroForm({
   }
 
   function fecharPosSave() {
+    // host com URL própria (rota dedicada): replace e nenhum refresh — o
+    // refresh antigo podia competir com a navegação e trocar o toast
+    if (irParaAposSalvar) {
+      router.replace(irParaAposSalvar);
+      return;
+    }
     // host com onSaved (detalhe do dia) fecha o dialog; sem callback
     // (ficha) o form recolhe no "salvo" mínimo e o refresh troca o card
     if (onSaved) onSaved();
@@ -634,44 +746,77 @@ export function RegistroForm({
     router.refresh();
   }
 
-  // K1 — criação bem-sucedida cede a tela pra etapa de evidências no
-  // mesmo container (dialog da agenda ou card inline da ficha): o FK do
-  // anexo exige a row gravada, por isso a etapa existe só depois do save
-  if (posSave) {
-    if (fechado)
-      return (
-        <p className="py-2 text-sm text-muted-foreground">
-          Registro salvo. As evidências ficam na ficha da dupla.
-        </p>
-      );
-    return (
-      <PosSaveRegistro
-        registroId={posSave.registroId}
-        duplaId={duplaId}
-        autorId={posSave.autorId}
-        aviso={posSave.aviso}
-        anexos={posSave.anexos}
-        falhas={posSave.falhas}
-        onFechar={fecharPosSave}
-        embutido={embutido}
-      />
-    );
+  // double session (REALIZA-397): seeds the next encounter's draft with the
+  // shared fields and opens its own form — the hash anchor on the ficha, or
+  // the host's own navigation on the dedicated route. The draft is what
+  // carries the shared fields; each encounter is saved separately.
+  function encadearProximo() {
+    const chain = posSave?.chain;
+    if (!chain) return;
+    if (!demo) {
+      try {
+        const chave = `registro-draft-${chain.encontroId}`;
+        // overlay the shared fields on any existing partial draft — a draft
+        // the mentor started on the target must not be wiped by the chain
+        const anterior = rascunhoDoEncontro(chain.encontroId);
+        const draft: RegistroDraft = {
+          ...(anterior ?? {
+            tema: "", ferramenta: "", reflexoes: "", observacoes: "",
+            atividades: [], atividadeOutro: "",
+            dificuldadeDetalhe: "", proximoPassoDetalhe: "",
+            precisaApoio: false, encaminhamentos: [], concluirIds: [],
+          }),
+          savedAt: new Date().toISOString(),
+          duracaoMin: chain.shared.duracaoMin,
+          avaliacao: chain.shared.avaliacao,
+          dificuldade: chain.shared.dificuldade,
+          proximoPasso: chain.shared.proximoPasso,
+        };
+        localStorage.setItem(chave, JSON.stringify(draft));
+      } catch {
+        // storage indisponível — o próximo form abre vazio, segue o jogo
+      }
+    }
+    if (onEncadear) {
+      onEncadear(chain.encontroId);
+      return;
+    }
+    // a âncora vai pelo pushState patcheado (location.hash = morria no
+    // write hashless do HistoryUpdater pós-action) e o realiza:hash acorda
+    // o RegistroInline da linha alvo — pushState não dispara hashchange
+    abrirAncoraRegistro(chain.encontroId);
+    fecharPosSave();
   }
 
-  return (
+  // o form da linha é superfície de CRIAÇÃO (o inline nunca passa onSaved —
+  // quem edita é o EditarRegistro, sempre com callback). Chegando registro
+  // — o refresh pós-save, uma âncora velha ou a gravação em outra aba —
+  // quem exibe o salvo é o RegistroDetails: null esvazia o painel e o
+  // empty:hidden colapsa a faixa. Exceção: o posSave em andamento — a
+  // oferta "registrar o próximo também" sobrevive ao refresh que entregou
+  // o registro (o form segue montado pra isso)
+  if (registro && onSaved == null && (!posSave || fechado)) return null;
+
+  const corpoForm = (
     <form
       ref={formRef}
       onSubmit={submit}
       onChange={scheduleSave}
+      // a página tem outro <form> no shell (a Liza) — o e2e escopa por aqui
+      data-testid="registro-form"
       className={cn(
         "space-y-5",
         !embutido && "rounded-xl bg-card p-5 shadow-[var(--shadow-border)]"
       )}
     >
       <div>
-        {!embutido && (
+        {!embutido && titulo && (
           <p className="text-sm font-medium">
-            {registro ? "Editar registro" : "Registro do encontro"}
+            {registro
+              ? "Editar registro"
+              : sessao
+                ? "Registro da sessão"
+                : "Registro do encontro"}
           </p>
         )}
         {evento && (
@@ -731,57 +876,107 @@ export function RegistroForm({
         </ol>
       </div>
 
-      <div
-        hidden={etapa !== 0}
-        className="animate-enter-x"
-        style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
-      >
+      <Etapa ativa={etapa === 0} direcao={direcao}>
         <div className="space-y-5">
-          {combinadosPendentes && combinadosPendentes.length > 0 && (
-            <fieldset className="min-w-0 space-y-2">
-              <legend className="text-sm font-medium">Da última vez: marcar como feito?</legend>
-              {combinadosPendentes.map((c) => {
-                const vencido = c.prazo != null && c.prazo < hojeStr;
-                return (
-                  <label key={c.id} className="flex min-h-11 cursor-pointer items-start gap-3 py-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={concluirIds.has(c.id)}
-                      onChange={(e) =>
-                        setConcluirIds((prev) => {
-                          const next = new Set(prev);
-                          if (e.target.checked) next.add(c.id);
-                          else next.delete(c.id);
-                          return next;
-                        })
-                      }
-                      className="mt-0.5 size-5 shrink-0 accent-primary"
-                    />
-                    <span className="min-w-0">
-                      {c.descricao}
-                      <span className="text-muted-foreground">
-                        {" "}· {c.responsavel === "mentor" ? "Mentor" : "Mentorado"}
-                        {c.prazo && ` · até ${formatDiaMes(c.prazo)}`}
-                      </span>
-                      {vencido && <span className="text-[var(--warn-text)]"> (vencido)</span>}
-                    </span>
-                  </label>
-                );
-              })}
-            </fieldset>
-          )}
-
+          {/* "Aconteceu como planejado?" pergunta na linguagem do mentor e
+              grava no mesmo `avaliacao` de 4 pontos que alimenta trajetória
+              e semáforo: melhor que o planejado = excelente, sim = boa,
+              em parte = regular, não = baixa. Fica no passo 1 porque é a
+              única resposta obrigatória — o portão do Avançar cobre aqui */}
           <fieldset className="min-w-0 space-y-2">
-            <legend className="text-sm font-medium">O que foi realizado neste encontro</legend>
+            <legend className="text-sm font-medium">Aconteceu como planejado?</legend>
+            <div
+              role="radiogroup"
+              aria-invalid={erroAvaliacao || undefined}
+              aria-describedby={erroAvaliacao ? `avaliacao-erro-${encontroId}` : undefined}
+              onChange={() => setErroAvaliacao(false)}
+              className="flex flex-wrap gap-2"
+            >
+              {(["excelente", "boa", "regular", "baixa"] as const).map((v) => (
+                <label key={v} className="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="avaliacao"
+                    value={v}
+                    defaultChecked={registro?.avaliacao === v}
+                    className="peer sr-only"
+                  />
+                  <span className="inline-flex min-h-11 items-center rounded-lg border border-border px-3.5 py-2.5 text-sm font-medium transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-ring md:min-h-9 md:py-1.5">
+                    {v === "excelente"
+                      ? "Melhor que o planejado"
+                      : v === "boa"
+                        ? "Sim"
+                        : v === "regular"
+                          ? "Em parte"
+                          : "Não"}
+                  </span>
+                </label>
+              ))}
+            </div>
+            {erroAvaliacao && (
+              <p
+                id={`avaliacao-erro-${encontroId}`}
+                role="alert"
+                className="text-sm font-medium text-[var(--danger)]"
+              >
+                Diga se aconteceu como planejado pra continuar.
+              </p>
+            )}
+          </fieldset>
+
+          <div className="space-y-2 sm:max-w-xs">
+            <Label id="duracao-label">
+              {sessao ? "Duração da sessão" : "Duração do encontro"}
+            </Label>
+            <Select
+              name="duracao_min"
+              value={duracaoMin}
+              items={DURACAO_OPCOES}
+              onValueChange={(v) => setDuracaoMin(v ?? "60")}
+            >
+              <SelectTrigger id="duracao-select" aria-labelledby="duracao-label duracao-select"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="30">30 min</SelectItem>
+                <SelectItem value="45">45 min</SelectItem>
+                <SelectItem value="60">1h</SelectItem>
+                <SelectItem value="90">1h30</SelectItem>
+                <SelectItem value="120">2h</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="reflexoes">Principais reflexões</Label>
+            <Textarea
+              id="reflexoes"
+              name="reflexoes"
+              rows={3}
+              defaultValue={registro?.reflexoes ?? ""}
+              placeholder={
+                sessao
+                  ? "Suas observações sobre a sessão, combinados e próximos passos."
+                  : "Suas observações sobre o encontro, combinados e próximos passos."
+              }
+            />
+          </div>
+        </div>
+      </Etapa>
+
+      <Etapa ativa={etapa === 1} direcao={direcao}>
+        <div className="space-y-5">
+          <fieldset className="min-w-0 space-y-2">
+            <legend className="text-sm font-medium">
+              {sessao
+                ? "O que foi realizado nesta sessão"
+                : "O que foi realizado neste encontro"}
+            </legend>
             <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
               {ATIVIDADES_ENCONTRO.map((a) => (
                 <label key={a} className="flex min-h-11 items-center gap-2 py-2 text-sm cursor-pointer md:min-h-0 md:py-0">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     name="atividade"
                     value={a}
                     defaultChecked={registro?.atividades.includes(a)}
-                    className="size-5 shrink-0 accent-primary"
                   />
                   {a}
                 </label>
@@ -796,7 +991,101 @@ export function RegistroForm({
             />
           </fieldset>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          {/* sessão combinada (018): o encontro físico valeu por mais de um
+              passo do guia — UM registro fica na âncora cobrindo os demais,
+              que viram realizado na mesma sessão (sem registro próprio).
+              Só na criação: editar depois não abre caminho pra cobrir
+              retroativo. Com sessão PLANEJADA (sessaoGrupo) os membros do
+              grupo entram travados — fechados no plano, não se desmarcam */}
+          {!registro &&
+            ((cobertura?.length ?? 0) > 0 || (sessaoGrupo?.length ?? 0) > 0) && (
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-sm font-medium">
+                A sessão cobriu outro encontro do guia?
+              </legend>
+              <p className="text-xs text-muted-foreground">
+                {sessaoGrupo && sessaoGrupo.length > 0
+                  ? `Os encontros ${listaEncontros(sessaoGrupo.map((g) => g.numero))} fazem parte da mesma sessão combinada. Todos ficam realizados e este registro vale pelo grupo.${
+                      (cobertura ?? []).filter(
+                        (c) => !sessaoGrupo.some((g) => g.numero === c.numero)
+                      ).length > 0
+                        ? " Marque se a mesma sessão cobriu mais passos do guia."
+                        : ""
+                    }`
+                  : "Marque os encontros que esta mesma sessão cobriu. Todos ficam realizados e este registro vale pelos dois — o conteúdo aparece uma vez só, no primeiro deles."}
+              </p>
+              <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                {(sessaoGrupo ?? []).map((g) => (
+                  <label
+                    key={`grupo-${g.numero}`}
+                    className="flex min-h-11 min-w-0 items-center gap-3 py-1.5 text-sm md:min-h-0"
+                  >
+                    <Checkbox checked disabled />
+                    {/* checkbox travado não posta — o hidden carrega o nº
+                        pro salvarRegistro (que uniria o grupo de qualquer
+                        jeito; aqui ele também aparece no payload) */}
+                    <input type="hidden" name="cobriu_numero" value={g.numero} />
+                    <span className="min-w-0 truncate">
+                      {g.numero}º encontro
+                      {g.titulo && (
+                        <span className="text-muted-foreground"> · {g.titulo}</span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+                {(cobertura ?? [])
+                  .filter(
+                    (c) =>
+                      !(sessaoGrupo ?? []).some((g) => g.numero === c.numero)
+                  )
+                  .map((c) => (
+                  <label
+                    key={c.numero}
+                    // min-w-0 no item do grid: sem ele o título longo força a
+                    // largura da coluna e o truncate do span nunca engata
+                    className="flex min-h-11 min-w-0 items-center gap-3 py-1.5 text-sm cursor-pointer md:min-h-0"
+                  >
+                    <Checkbox
+                      name="cobriu_numero"
+                      value={String(c.numero)}
+                      checked={cobertosSel.has(c.numero)}
+                      onCheckedChange={(marcado) => {
+                        setCobertosSel((prev) => {
+                          const next = new Set(prev);
+                          if (marcado) next.add(c.numero);
+                          else next.delete(c.numero);
+                          return next;
+                        });
+                        // sessão que cobre dois passos costuma durar 2h —
+                        // sugere sem tirar a escolha (só no primeiro check)
+                        if (marcado && cobertosSel.size === 0 && duracaoMin === "60") {
+                          setDuracaoMin("120");
+                        }
+                      }}
+                    />
+                    <span className="min-w-0 truncate">
+                      {sessao ? `sessão ${c.numero}` : `${c.numero}º encontro`}
+                      <span className="text-muted-foreground"> · {c.titulo}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              {/* aviso pedagógico (018): fundir um passo de prática com o
+                  seguinte apaga a semana de exercício que a trilha pede
+                  entre eles — o registro cobre mesmo assim, mas a dupla
+                  decide sabendo o custo */}
+              {sessaoCortaPratica && (
+                <p className="text-xs text-[var(--warn-text)]">
+                  Os passos {sessaoCortaPratica} pedem uma semana de prática
+                  entre eles — numa sessão só essa semana não acontece. Se a
+                  dupla combinou assim, vale cobrir mesmo assim; a prática
+                  pode entrar nas reflexões ou num combinado.
+                </p>
+              )}
+            </fieldset>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="tema">Tema trabalhado</Label>
               <Input
@@ -831,80 +1120,8 @@ export function RegistroForm({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label id="duracao-label">Duração do encontro</Label>
-              <Select
-                name="duracao_min"
-                value={duracaoMin}
-                items={DURACAO_OPCOES}
-                onValueChange={(v) => setDuracaoMin(v ?? "60")}
-              >
-                <SelectTrigger id="duracao-select" aria-labelledby="duracao-label duracao-select"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30">30 min</SelectItem>
-                  <SelectItem value="45">45 min</SelectItem>
-                  <SelectItem value="60">1h</SelectItem>
-                  <SelectItem value="90">1h30</SelectItem>
-                  <SelectItem value="120">2h</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="reflexoes">Principais reflexões</Label>
-            <Textarea
-              id="reflexoes"
-              name="reflexoes"
-              rows={3}
-              defaultValue={registro?.reflexoes ?? ""}
-              placeholder="Suas observações sobre o encontro, combinados e próximos passos."
-            />
-          </div>
-
-          <fieldset className="min-w-0 space-y-2">
-            <legend className="text-sm font-medium">Desempenho e participação do mentorado</legend>
-            <div
-              role="radiogroup"
-              aria-invalid={erroAvaliacao || undefined}
-              aria-describedby={erroAvaliacao ? `avaliacao-erro-${encontroId}` : undefined}
-              onChange={() => setErroAvaliacao(false)}
-              className="flex flex-wrap gap-2"
-            >
-              {(["excelente", "boa", "regular", "baixa"] as const).map((v) => (
-                <label key={v} className="cursor-pointer">
-                  <input
-                    type="radio"
-                    name="avaliacao"
-                    value={v}
-                    defaultChecked={registro?.avaliacao === v}
-                    className="peer sr-only"
-                  />
-                  <span className="inline-flex min-h-11 items-center rounded-lg border border-border px-3.5 py-2.5 text-sm font-medium transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-ring md:min-h-9 md:py-1.5">
-                    {v === "boa" ? "Boa" : v === "baixa" ? "Baixa" : v === "regular" ? "Regular" : "Excelente"}
-                  </span>
-                </label>
-              ))}
-            </div>
-            {erroAvaliacao && (
-              <p
-                id={`avaliacao-erro-${encontroId}`}
-                role="alert"
-                className="text-sm font-medium text-[var(--danger)]"
-              >
-                Escolha uma avaliação pra continuar.
-              </p>
-            )}
-          </fieldset>
-        </div>
-      </div>
-
-      <div
-        hidden={etapa !== 1}
-        className="animate-enter-x"
-        style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
-      >
-        <div className="space-y-4">
           <div className="space-y-2 sm:max-w-sm">
             <Label id="dificuldade-label">Dificuldade que precisa de atenção</Label>
             <Select name="dificuldade" value={dificuldade} items={DIFICULDADE_OPCOES} onValueChange={(v) => setDificuldade(v ?? "nenhuma")}>
@@ -931,11 +1148,11 @@ export function RegistroForm({
           </div>
 
           <label className="flex items-start gap-3 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/8 px-4 py-3 text-sm cursor-pointer">
-            <input
-              type="checkbox"
+            <Checkbox
               name="precisa_apoio"
               defaultChecked={registro?.precisa_apoio}
-              className="mt-0.5 accent-[var(--warn)]"
+              tom="warn"
+              className="mt-0.5"
             />
             <span>
               <span className="font-medium">Preciso de apoio</span> · sinalizar a coordenação ou o
@@ -943,14 +1160,43 @@ export function RegistroForm({
             </span>
           </label>
         </div>
-      </div>
+      </Etapa>
 
-      <div
-        hidden={etapa !== 2}
-        className="animate-enter-x"
-        style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
-      >
-        <div className="space-y-4">
+      <Etapa ativa={etapa === 2} direcao={direcao}>
+        <div className="space-y-5">
+          {combinadosPendentes && combinadosPendentes.length > 0 && (
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-sm font-medium">Da última vez: marcar como feito?</legend>
+              {combinadosPendentes.map((c) => {
+                const vencido = c.prazo != null && c.prazo < hojeStr;
+                return (
+                  <label key={c.id} className="flex min-h-11 cursor-pointer items-start gap-3 py-2 text-sm">
+                    <Checkbox
+                      checked={concluirIds.has(c.id)}
+                      onCheckedChange={(marcado) =>
+                        setConcluirIds((prev) => {
+                          const next = new Set(prev);
+                          if (marcado) next.add(c.id);
+                          else next.delete(c.id);
+                          return next;
+                        })
+                      }
+                      className="mt-0.5"
+                    />
+                    <span className="min-w-0">
+                      {c.descricao}
+                      <span className="text-muted-foreground">
+                        {" "}· {c.responsavel === "mentor" ? "Mentor" : "Mentorado"}
+                        {c.prazo && ` · até ${formatDiaMes(c.prazo)}`}
+                      </span>
+                      {vencido && <span className="text-[var(--warn-text)]"> (vencido)</span>}
+                    </span>
+                  </label>
+                );
+              })}
+            </fieldset>
+          )}
+
           <div className="space-y-2 sm:max-w-sm">
             <Label id="proximo-passo-label">Próximo passo do acompanhamento</Label>
             <Select name="proximo_passo" value={proximoPasso} items={PROXIMO_PASSO_LABEL} onValueChange={(v) => setProximoPasso(v ?? "continuar")}>
@@ -979,7 +1225,9 @@ export function RegistroForm({
               <div>
                 <p className="text-sm font-medium">Novos combinados</p>
                 <p className="text-xs text-muted-foreground">
-                  O que a dupla combinou de fazer até o próximo encontro.
+                  {sessao
+                    ? "O que a dupla combinou de fazer até a próxima sessão."
+                    : "O que a dupla combinou de fazer até o próximo encontro."}
                 </p>
               </div>
               <Button
@@ -1057,8 +1305,9 @@ export function RegistroForm({
                 <div>
                   <p className="text-sm font-medium">Evidências</p>
                   <p className="text-xs text-muted-foreground">
-                    Foto do encontro, print ou atividade feita: PDF ou imagem
-                    até 10&nbsp;MB. Opcional.
+                    {sessao ? "Foto da sessão" : "Foto do encontro"}, print ou
+                    atividade feita: PDF ou imagem até 50&nbsp;MB. Fotos são
+                    comprimidas automaticamente. Opcional.
                   </p>
                 </div>
                 <Button
@@ -1116,7 +1365,7 @@ export function RegistroForm({
                         size="icon"
                         aria-label={`Tirar ${f.name}`}
                         disabled={pending}
-                        className="size-8 shrink-0 text-muted-foreground"
+                        className="size-11 shrink-0 text-muted-foreground md:size-8"
                         onClick={() =>
                           setArquivos((l) => l.filter((_, j) => j !== i))
                         }
@@ -1130,7 +1379,7 @@ export function RegistroForm({
             </div>
           )}
         </div>
-      </div>
+      </Etapa>
 
       {/* rodapé do wizard — sticky pra Avançar/Salvar ficarem à mão no mobile
           (o painel inline usa overflow:clip — sem scrollport, o sticky segue
@@ -1173,12 +1422,52 @@ export function RegistroForm({
           // página fica sob o overlay e não interfere
           <DialogFooter sticky>{botoes}</DialogFooter>
         ) : (
-          <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] -mx-5 -mb-5 flex items-center gap-2 rounded-b-xl border-t bg-card px-5 py-3 md:bottom-0">
+          // pr-16 no mobile: o FAB da Liza flutua nesta mesma faixa (acima
+          // da bottom-nav, 530) — a faixa direita reserva o lugar dele e o
+          // Avançar/Salvar nunca nasce coberto. No md+ o footer ancora no
+          // painel e o FAB vai pro canto do viewport: sem reserva.
+          <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] -mx-5 -mb-5 flex items-center gap-2 rounded-b-xl border-t bg-card pl-5 pr-16 py-3 md:pr-5 md:bottom-0">
             {botoes}
           </div>
         );
       })()}
     </form>
+  );
+
+  // K1 — criação bem-sucedida cede a tela pra etapa de evidências no mesmo
+  // container (dialog da agenda ou card inline da ficha): o FK do anexo
+  // exige a row gravada, por isso a etapa existe só depois do save. Troca de
+  // estado por crossfade — e o painel novo recebe o foco, senão ele caía no
+  // <body> quando o form (com o Salvar clicado) desmontava
+  return (
+    <FadeTroca
+      chave={posSave ? (fechado ? "fechado" : "pos-save") : "form"}
+      foco
+    >
+      {posSave ? (
+        fechado ? (
+          <p className="py-2 text-sm text-muted-foreground">
+            Registro salvo. As evidências ficam na ficha da dupla.
+          </p>
+        ) : (
+          <PosSaveRegistro
+            registroId={posSave.registroId}
+            duplaId={duplaId}
+            autorId={posSave.autorId}
+            aviso={posSave.aviso}
+            anexos={posSave.anexos}
+            falhas={posSave.falhas}
+            proximoNumero={posSave.chain?.numero ?? null}
+            onEncadear={posSave.chain ? encadearProximo : undefined}
+            onFechar={fecharPosSave}
+            embutido={embutido}
+            sessao={sessao}
+          />
+        )
+      ) : (
+        corpoForm
+      )}
+    </FadeTroca>
   );
 }
 
@@ -1194,8 +1483,11 @@ function PosSaveRegistro({
   aviso,
   anexos,
   falhas,
+  proximoNumero = null,
+  onEncadear,
   onFechar,
   embutido = false,
+  sessao = false,
 }: {
   registroId: string;
   duplaId: string;
@@ -1205,6 +1497,12 @@ function PosSaveRegistro({
   anexos: RegistroAnexo[];
   /** quantas do passo 3 não subiram */
   falhas: number;
+  /** trilha esp — a dica de evidência fala "foto da sessão" */
+  sessao?: boolean;
+  /** double session (REALIZA-397): outro encontro da dupla ainda deve
+   *  registro — o botão encadeado abre o form dele já preenchido */
+  proximoNumero?: number | null;
+  onEncadear?: () => void;
   onFechar: () => void;
   /** dentro de dialog o rodapé é o DialogFooter compartilhado; inline ele
       segue a barrinha própria do card */
@@ -1228,8 +1526,9 @@ function PosSaveRegistro({
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Foto do encontro, print, atividade feita: PDF ou imagem até
-            10&nbsp;MB. Dá pra anexar depois na ficha da dupla também.
+            {sessao ? "Foto da sessão" : "Foto do encontro"}, print, atividade
+            feita: PDF ou imagem até 10&nbsp;MB. Dá pra anexar depois na ficha
+            da dupla também.
           </p>
         )}
         {aviso && <p className="text-xs text-muted-foreground">{aviso}</p>}
@@ -1244,12 +1543,22 @@ function PosSaveRegistro({
       />
       {embutido ? (
         <DialogFooter>
+          {onEncadear && proximoNumero != null && (
+            <Button type="button" variant="outline" onClick={onEncadear}>
+              Registrar o {proximoNumero}º também
+            </Button>
+          )}
           <Button type="button" onClick={onFechar}>
             Concluir
           </Button>
         </DialogFooter>
       ) : (
-        <div className="flex justify-end border-t pt-3">
+        <div className="flex justify-end gap-2 border-t pt-3">
+          {onEncadear && proximoNumero != null && (
+            <Button type="button" variant="outline" onClick={onEncadear}>
+              Registrar o {proximoNumero}º também
+            </Button>
+          )}
           <Button type="button" onClick={onFechar}>
             Concluir
           </Button>

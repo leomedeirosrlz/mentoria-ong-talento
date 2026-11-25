@@ -20,6 +20,7 @@ import type {
   ChamadoStatus,
   Profile,
 } from "@/lib/types";
+import { vozChamado } from "@/lib/types";
 import {
   CHAMADO_CATEGORIA_LABEL,
   CHAMADO_STATUS_LABEL,
@@ -51,7 +52,37 @@ const STATUS_TOM: Record<ChamadoStatus, string> = {
   resolvido: "border-[var(--ok)]/50 bg-[var(--ok)]/10 text-[var(--ok-text)]",
 };
 
+// pro autor "aberto" e "em atendimento" são informação ("a equipe recebeu",
+// "alguém cuida"), não alerta — vermelho/âmbar medem a urgência da FILA do
+// staff ("Sem dono" em vermelho faz sentido pra ela). O resolvido segue
+// verde: é boa notícia dos dois lados. Ícone + texto carregam o sentido.
+const STATUS_TOM_AUTOR: Record<ChamadoStatus, string> = {
+  aberto: "border-border text-muted-foreground",
+  em_atendimento: "border-border text-muted-foreground",
+  resolvido: STATUS_TOM.resolvido,
+};
+
 const primeiroNome = (n: string) => n.split(" ")[0];
+
+// ---------- vocabulário por papel (R15) ----------
+// O jovem "pede ajuda", o mentor "pede apoio" e a equipe abre "chamado" —
+// entrada (trigger/menu/card) e título do dialog dividem o mesmo verbo.
+
+/** O verbo do gesto de abrir — entrada, trigger e título do dialog. */
+export function rotuloAberturaChamado(papel: string): string {
+  const v = vozChamado(papel);
+  return v === "jovem"
+    ? "Pedir ajuda"
+    : v === "mentor"
+      ? "Pedir apoio"
+      : "Novo chamado";
+}
+
+/** O botão de envio dentro do dialog — o pedido é do autor, o chamado é
+ *  da equipe. */
+export function rotuloEnvioChamado(papel: string): string {
+  return vozChamado(papel) === "equipe" ? "Abrir chamado" : "Enviar pedido";
+}
 
 /** Pill de status do chamado. `visao` muda a fala: pra equipe o aberto sem
  *  dono é "Sem dono" (a fila é o trabalho dela); pro autor é "Aguardando a
@@ -101,7 +132,11 @@ export function ChamadoStatusBadge({
   return (
     <Badge
       variant="outline"
-      className={cn("font-normal", STATUS_TOM[status], className)}
+      className={cn(
+        "font-normal",
+        (visao === "autor" ? STATUS_TOM_AUTOR : STATUS_TOM)[status],
+        className
+      )}
     >
       <Icone size={11} aria-hidden />
       {texto}

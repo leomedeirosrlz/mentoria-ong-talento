@@ -18,7 +18,7 @@ export type Interacao = {
   canal: InteracaoCanal;
   created_at: string;
   /** Autor do contato — vem do embed `autor:profiles!interacoes_autor_id_fkey(nome)`. */
-  autor: { nome: string } | null;
+  autor: { nome: string; nome_social?: string | null } | null;
 };
 
 /** Último contato registrado em cada dupla — Record indexado por dupla_id.

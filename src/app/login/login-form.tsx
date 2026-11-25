@@ -8,42 +8,38 @@ import { CircleNotch, EnvelopeSimple, Key, WarningCircle } from "@phosphor-icons
 import { createAuthClient, createOtpClient } from "@/lib/supabase/client";
 import { limparCookiesDemo } from "@/lib/demo/shared";
 import { SiteFooter } from "@/components/site-footer";
-import { fade, T, EASE } from "@/components/motion";
+import { T, EASE } from "@/components/motion";
 import { Button } from "@/components/ui/button";
+import { FadeTroca } from "@/components/ui/etapa";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { cn, pathInterno } from "@/lib/utils";
 import { novoUuid } from "@/lib/uuid";
+import {
+  cooldownRestante,
+  gravarPedido,
+  JANELA_PEDIDO,
+  lerPedido,
+  limparPedido,
+  type PedidoLogin,
+} from "@/lib/login-pedido";
+import {
+  ehErroInfraSignup,
+  INSTAVEL,
+  mensagemErro,
+  NAO_CADASTRADO,
+  pedirAcessoHref,
+} from "@/lib/login-erros";
 
 // janela do resend do supabase — quando o 429 traz "after N seconds" usa o N real
 const COOLDOWN = 60;
 
-function mensagemErro(error: { message: string; code?: string }, modo: "link" | "senha"): string {
-  const texto = `${error.code ?? ""} ${error.message}`.toLowerCase();
-  if (texto.includes("invalid_credentials") || texto.includes("invalid login credentials")) {
-    return "E-mail ou senha incorretos. Confira e tente de novo.";
-  }
-  if (texto.includes("email_not_confirmed") || texto.includes("email not confirmed")) {
-    return "Confirme seu e-mail antes de entrar.";
-  }
-  // e-mail fora da allowlist: o trigger 0045 aborta o insert e o GoTrue
-  // devolve um 500 genérico; otp_disabled cobre signup desligado no painel
-  if (
-    texto.includes("otp_disabled") ||
-    texto.includes("signups not allowed") ||
-    texto.includes("database error saving new user") ||
-    texto.includes("cadastrados do programa")
-  ) {
-    return "E-mail não cadastrado. Fale com a coordenação pra liberar seu acesso.";
-  }
-  return modo === "link"
-    ? "Não foi possível enviar o link. Confira o e-mail ou tente de novo em alguns minutos."
-    : "Não foi possível entrar. Tente de novo em alguns minutos.";
-}
-
 export function LoginForm() {
-  const [email, setEmail] = useState("");
+  const params = useSearchParams();
+  // ?e= pré-seleciona o e-mail — o rodapé do convite de acesso cai aqui com
+  // o endereço pronto pra pedir link novo quando o do convite expira (0180)
+  const [email, setEmail] = useState(() => params.get("e")?.trim() ?? "");
   const [senha, setSenha] = useState("");
   const [modo, setModo] = useState<"link" | "senha">("link");
   const [enviado, setEnviado] = useState(false);
@@ -53,26 +49,21 @@ export function LoginForm() {
   const [erro, setErro] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const params = useSearchParams();
   const supabase = useMemo(() => createAuthClient(), []);
   // client implícito só pro pedido do link — o ssr força pkce, que prende o
   // acesso ao browser que pediu (ver createOtpClient)
   const otp = useMemo(() => createOtpClient(), []);
-  // nonce do handoff: viaja no link (?h=) — a aba que abre devolve os tokens
-  // pro servidor, e esta aba os resgata no poll (login_handoffs, 0049). É o
-  // que faz a sessão chegar na aba que pediu mesmo se o link abrir em outro
-  // navegador/app de e-mail — cookies não atravessam, a RPC atravessa.
-  const handoffRef = useRef<string | null>(null);
-  // e-mail do pedido que gerou o nonce — os tokens resgatados são bearer:
-  // a sessão só entra se o e-mail bater (fixação via depósito de tokens
-  // alheios morre na checagem do poll)
-  const emailPedidoRef = useRef<string | null>(null);
-  // o painel "enviado" monta só depois do exit do form (mode="wait") — um
-  // useEffect([enviado]) dispararia com o ref ainda null e perderia o foco;
-  // ref callback foca quando o nó existe de verdade
-  const focoEnviado = useCallback((el: HTMLDivElement | null) => {
-    el?.focus();
-  }, []);
+  // o pedido vivo: h (nonce) viaja no link (?h=) — a aba que abre devolve
+  // os tokens pro servidor, e esta aba os resgata no poll (login_handoffs,
+  // 0049). É o que faz a sessão chegar na aba que pediu mesmo se o link
+  // abrir em outro navegador/app de e-mail — cookies não atravessam, a RPC
+  // atravessa. O e-mail do pedido acompanha porque os tokens resgatados são
+  // bearer: a sessão só entra se o e-mail bater (fixação via depósito de
+  // tokens alheios morre na checagem do poll). h+email+em vivem juntos num
+  // objeto só — restaurar um sem o outro criaria mismatch (emailPedido
+  // null) ou deadline errado; o em régua janela do link e o cooldown.
+  // Espelhado na sessionStorage (login-pedido) pra sobreviver a reload.
+  const pedidoRef = useRef<PedidoLogin | null>(null);
 
   // destino pós-login: ?next= do middleware (link protegido) + o #registrar-{id}
   // que o browser manteve na barra durante o redirect — o #error= do verify
@@ -102,11 +93,41 @@ export function LoginForm() {
     router.replace(urlErroLink());
   }, [router, urlErroLink]);
 
+  // o pedido sobrevive a reload/reabertura da aba: remonta o painel e o
+  // poll retoma de onde parou. NÃO no initializer — sessionStorage no SSR
+  // não existe e o valor divergiria da hidratação; effect de mount é o
+  // lugar certo. ?erro= na URL = link queimado consumido aqui: o pedido
+  // morreu junto, limpa em vez de restaurar um nonce morto
+  useEffect(() => {
+    // restaurar mora em função própria como o falhar() do /auth/link —
+    // setState direto no corpo do efeito cascateia render
+    const restaurar = () => {
+      if (params.get("erro") != null) {
+        pedidoRef.current = null;
+        limparPedido();
+        return;
+      }
+      // restaura uma vez — um pedido já vivo (pedirLink desta montagem) não
+      // é sobrescrito por uma row mais velha do storage
+      if (pedidoRef.current) return;
+      const pedido = lerPedido();
+      if (!pedido) return;
+      pedidoRef.current = pedido;
+      setEmail(pedido.email);
+      setEnviado(true);
+      setCooldown(cooldownRestante(pedido.em));
+    };
+    restaurar();
+  }, [params]);
+
   // destino pós-login com sessão: quem nunca definiu senha (nem dispensou o
   // onboarding) passa por ele primeiro — o desvio que o /auth/confirm fazia
   // no fluxo pkce, agora aplicado na aba que AGUARDA o link
   const entrar = useCallback(
     (session: Session | null) => {
+      // sessão real = saída terminal do funil — o pedido morre junto
+      pedidoRef.current = null;
+      limparPedido();
       // login real venceu — a demo (se estava ativa) morre junto
       limparCookiesDemo();
       const destino = destinoFinal();
@@ -206,10 +227,22 @@ export function LoginForm() {
       }
       // link aberto em outro navegador/app: a aba do e-mail depositou os
       // tokens no handoff — resgata aqui (uso único) e assina nesta aba
-      const nonce = handoffRef.current;
-      if (!nonce) return;
+      const pedido = pedidoRef.current;
+      if (!pedido) return;
+      // deadline do pedido (em + janela): o link OTP vale 1h — passado
+      // disso nem o clique mais válido resolve, e sem saída o painel gira
+      // o poll até a pessoa desistir. Depois do getSession de propósito:
+      // uma sessão que já chegou entra mesmo com o pedido vencido
+      if (Date.now() - pedido.em > JANELA_PEDIDO) {
+        entrou = true;
+        pedidoRef.current = null;
+        limparPedido();
+        setEnviado(false);
+        setErro("O link expirou. Peça um novo pra entrar.");
+        return;
+      }
       const { data: h } = await supabase.rpc("pegar_login_handoff", {
-        p_nonce: nonce,
+        p_nonce: pedido.h,
       });
       const tokens = h as {
         access_token?: string;
@@ -222,6 +255,8 @@ export function LoginForm() {
       // sentido: é o mesmo navegador)
       if (tokens?.failed) {
         entrou = true;
+        pedidoRef.current = null;
+        limparPedido();
         setEnviado(false);
         router.replace(urlErroLink());
         return;
@@ -230,10 +265,10 @@ export function LoginForm() {
       // morreram no servidor e nunca vão chegar; esperar era spinner eterno
       if (tokens?.expired) {
         entrou = true;
+        pedidoRef.current = null;
+        limparPedido();
         setEnviado(false);
-        setErro(
-          "O link expirou antes de ser aberto. Peça um novo — ele vale por 1 hora."
-        );
+        setErro("O link expirou antes de ser aberto. Peça um novo link.");
         return;
       }
       if (!tokens?.access_token || !tokens.refresh_token) return;
@@ -246,6 +281,8 @@ export function LoginForm() {
       // esperar num nonce consumido não resolve nada
       if (error || !s.session) {
         entrou = true;
+        pedidoRef.current = null;
+        limparPedido();
         setEnviado(false);
         router.replace(urlErroLink());
         return;
@@ -255,8 +292,10 @@ export function LoginForm() {
       // o link — mismatch derruba a sessão plantada na hora
       const { data: u } = await supabase.auth.getUser();
       const emailSessao = (u.user?.email ?? s.session.user.email)?.toLowerCase();
-      if (emailSessao !== emailPedidoRef.current) {
+      if (emailSessao !== pedido.email) {
         entrou = true;
+        pedidoRef.current = null;
+        limparPedido();
         await supabase.auth.signOut();
         setEnviado(false);
         setErro("Este link não corresponde a este e-mail. Peça um novo.");
@@ -317,19 +356,36 @@ export function LoginForm() {
         if (seg) {
           setEnviado(true);
           setCooldown(Number(seg[1]));
-        } else if (error.code === "over_email_send_rate_limit") {
-          setErro(
-            "Muita gente pediu link agora e o envio pausou. Tente de novo em alguns minutos — se persistir, fale com a coordenação."
-          );
+        } else if (
+          error.code === "over_email_send_rate_limit" ||
+          error.code === "over_request_rate_limit"
+        ) {
+          // limite de envios/pedidos do GoTrue: pausa temporária, não erro
+          // do e-mail — o cooldown segura o reenvio pra não martelar
+          setErro("Muitos pedidos de uma vez. Tente de novo em alguns minutos.");
+          setCooldown(COOLDOWN);
+        } else if (ehErroInfraSignup(error)) {
+          // 500 pelado do signup: allowlist-miss ou infra? A RPC anon
+          // confere a allowlist de verdade; se ela falhar assume instável —
+          // acusar "não cadastrado" numa pessoa cadastrada é o pior erro
+          const { data: liberado } = await supabase.rpc("email_liberado", {
+            p_email: email.trim().toLowerCase(),
+          });
+          setErro(liberado === false ? NAO_CADASTRADO : INSTAVEL);
         } else {
           setErro(mensagemErro(error, "link"));
         }
       } else {
         // o nonce só vale pro link que saiu de verdade — num 429 nenhum
-        // e-mail novo carrega este h, e sobrescrever o ref orfanaria o
-        // nonce do link anterior que ainda pode ser clicado
-        handoffRef.current = handoff;
-        emailPedidoRef.current = email.trim().toLowerCase();
+        // e-mail novo carrega este h, e sobrescrever o ref (ou a storage)
+        // orfanaria o nonce do link anterior que ainda pode ser clicado
+        const pedido: PedidoLogin = {
+          h: handoff,
+          email: email.trim().toLowerCase(),
+          em: Date.now(),
+        };
+        pedidoRef.current = pedido;
+        gravarPedido(pedido);
         setEnviado(true);
         setCooldown(COOLDOWN);
       }
@@ -394,6 +450,7 @@ export function LoginForm() {
   // link expirado/usado chega como ?erro=link-invalido (de /auth/confirm ou
   // do normalizador de #error=) — merece tela própria, não o form com um aviso
   const erroLink = params.get("erro") != null;
+  const painel = erroLink ? "erro-link" : enviado ? "enviado" : "form";
 
   return (
     // flex + m-auto (não place-items-center): com o teclado virtual
@@ -449,18 +506,12 @@ export function LoginForm() {
         </div>
 
         {/* feedback: crossfade form ↔ confirmação — o painel sucede o form no
-            mesmo espaço em vez de corte seco (§2); ref/tabIndex de foco migram
-            pro motion.div entrante */}
-        <AnimatePresence mode="wait" initial={false}>
-          {erroLink ? (
-            <motion.div
-              key="erro-link"
-              ref={focoEnviado}
-              tabIndex={-1}
-              {...fade}
-              transition={T.enter}
-              className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6 outline-none"
-            >
+            mesmo espaço em vez de corte seco (§2). Troca de estado do kit:
+            o painel entrante recebe o foco — menos o form, que tem autoFocus
+            próprio no campo de e-mail */}
+        <FadeTroca chave={painel} foco={painel !== "form"}>
+          {painel === "erro-link" ? (
+            <div className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6 outline-none">
               <div className="grid size-10 place-items-center rounded-full bg-destructive/10 text-destructive">
                 <WarningCircle size={20} weight="bold" aria-hidden="true" />
               </div>
@@ -472,6 +523,9 @@ export function LoginForm() {
                 type="button"
                 className="mt-5 w-full"
                 onClick={() => {
+                  // saída terminal: o card de erro é o fim deste pedido
+                  pedidoRef.current = null;
+                  limparPedido();
                   const next = params.get("next");
                   router.replace(
                     `/login${next ? `?next=${encodeURIComponent(next)}` : ""}`
@@ -480,16 +534,9 @@ export function LoginForm() {
               >
                 Pedir novo link
               </Button>
-            </motion.div>
-          ) : enviado ? (
-            <motion.div
-              key="enviado"
-              ref={focoEnviado}
-              tabIndex={-1}
-              {...fade}
-              transition={T.enter}
-              className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6 outline-none"
-            >
+            </div>
+          ) : painel === "enviado" ? (
+            <div className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6 outline-none">
               <div className="grid size-10 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
                 <EnvelopeSimple size={20} weight="bold" aria-hidden="true" />
               </div>
@@ -497,7 +544,13 @@ export function LoginForm() {
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
                 Enviamos um link para{" "}
                 <span className="font-medium text-foreground">{email}</span>. Se
-                não chegar em alguns minutos, confira o spam.
+                não chegar em alguns minutos, confira a pasta de spam ou lixo
+                eletrônico.
+              </p>
+              {/* reenvio invalida o anterior — evita o clique no e-mail
+                  velho que cai no card de link inválido */}
+              <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                Pediu mais de uma vez? Só o link mais recente funciona.
               </p>
               <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                 <CircleNotch size={13} className="animate-spin shrink-0" aria-hidden="true" />
@@ -507,7 +560,15 @@ export function LoginForm() {
                 {/* falha do reenvio — o form está desmontado, o erro mora aqui */}
                 {erro && (
                   <p role="alert" className="text-sm text-destructive">
-                    {erro}
+                    {erro}{" "}
+                    {erro === NAO_CADASTRADO && (
+                      <a
+                        href={pedirAcessoHref(email)}
+                        className="inline-flex min-h-8 items-center font-medium text-foreground underline underline-offset-2"
+                      >
+                        Pedir acesso
+                      </a>
+                    )}
                   </p>
                 )}
                 <Button
@@ -531,6 +592,11 @@ export function LoginForm() {
                   size="sm"
                   className="w-full"
                   onClick={() => {
+                    // troca de e-mail = pedido novo: o nonce anterior morre
+                    // junto senão um clique no link velho entraria na conta
+                    // errada depois de um novo pedido
+                    pedidoRef.current = null;
+                    limparPedido();
                     setEnviado(false);
                     setCooldown(0);
                     setErro(null);
@@ -539,14 +605,9 @@ export function LoginForm() {
                   Usar outro e-mail
                 </Button>
               </div>
-            </motion.div>
+            </div>
           ) : (
-            <motion.div
-              key="form"
-              {...fade}
-              transition={T.enter}
-              className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6"
-            >
+            <div className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6">
               {/* segmento concêntrico: raio externo = interno + padding (8+4=12).
                   escolha excludente → radio com legend (não tablist): setas e
                   estado "selecionado" vêm de graça, sem tabpanel nem roving tabindex */}
@@ -645,7 +706,17 @@ export function LoginForm() {
 
                 {erro && (
                   <p role="alert" className="text-sm text-destructive">
-                    {erro}
+                    {erro}{" "}
+                    {/* allowlist miss gets a real way out: the mailto carries
+                        the typed email in the body so it is not retyped (REALIZA-35) */}
+                    {erro === NAO_CADASTRADO && (
+                      <a
+                        href={pedirAcessoHref(email)}
+                        className="inline-flex min-h-8 items-center font-medium text-foreground underline underline-offset-2"
+                      >
+                        Pedir acesso
+                      </a>
+                    )}
                   </p>
                 )}
 
@@ -661,9 +732,10 @@ export function LoginForm() {
                       role="status"
                       className="rounded-lg border border-border px-3 py-2.5 text-center text-xs leading-relaxed text-muted-foreground"
                     >
-                      Link de redefinição enviado pra{" "}
-                      <span className="font-medium text-foreground">{email}</span>.
-                      Abra o e-mail pra criar a nova senha.
+                      Se esse e-mail estiver cadastrado, o link de
+                      redefinição chega em alguns minutos. Não chegou? Confira
+                      o spam ou lixo eletrônico, ou entre pelo link de e-mail,
+                      que não precisa de senha.
                     </p>
                   ) : (
                     <div className="space-y-1">
@@ -694,9 +766,9 @@ export function LoginForm() {
                     </div>
                   ))}
               </form>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </FadeTroca>
         <SiteFooter className="mt-10" />
       </div>
     </div>

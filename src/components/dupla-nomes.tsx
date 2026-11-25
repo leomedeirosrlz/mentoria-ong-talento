@@ -1,3 +1,5 @@
+import { HighlightText } from "@/components/highlight-text";
+
 /** Lockup "Mentor e Mentorado" — a ordem fixa mentor→mentorado é a chave
  *  não-cromática; o dot amarelo no mentorado é redundância (PV-2), o mesmo
  *  marcador dos labels de parear. O pai controla peso, tamanho e truncate.
@@ -7,6 +9,7 @@ export function DuplaNomes({
   mentorado,
   onDark,
   truncar,
+  marca,
 }: {
   mentor: string;
   mentorado: string;
@@ -15,6 +18,8 @@ export function DuplaNomes({
   /** opt-in pra pais flex de largura limitada (lista/cards): cada nome corta
    *  com "…" próprio em vez do lockup clipar no meio do glifo */
   truncar?: boolean;
+  /** busca ativa — os trechos casados de cada nome ganham <mark> */
+  marca?: string;
 }) {
   return (
     <>
@@ -27,7 +32,7 @@ export function DuplaNomes({
             : undefined
         }
       >
-        {mentor}
+        {marca ? <HighlightText texto={mentor} query={marca} /> : mentor}
       </span>{" "}
       {/* o lockup "e • mentorado" é uma caixa só: o conector nunca quebra
           órfão no início de linha e, com truncar, corta junto ao nome */}
@@ -54,7 +59,9 @@ export function DuplaNomes({
           aria-hidden
           className="size-1.5 shrink-0 rounded-full bg-[var(--role-mentorado)] shadow-[0_0_0_1px_hsl(40_75%_38%/0.55)]"
         />
-        <span className={truncar ? "min-w-0 truncate" : undefined}>{mentorado}</span>
+        <span className={truncar ? "min-w-0 truncate" : undefined}>
+          {marca ? <HighlightText texto={mentorado} query={marca} /> : mentorado}
+        </span>
       </span>
     </>
   );

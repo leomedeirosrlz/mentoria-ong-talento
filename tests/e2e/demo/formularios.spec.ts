@@ -52,10 +52,12 @@ test.describe("demo — /formularios separa customs de instrumentos", () => {
       hasText: "Instrumentos do sistema",
     });
     await expect(sec).toBeVisible();
-    await expect(sec.getByRole("listitem")).toHaveCount(2);
+    // +1: o Checklist de competências do mentor (0190) também é sistema
+    await expect(sec.getByRole("listitem")).toHaveCount(3);
     for (const titulo of [
       /Inscrição de mentores · Matching de Mentores/,
       /Inscrição de mentorados · Matching de Mentorados/,
+      /Checklist de competências do mentor/,
     ]) {
       await expect(sec.getByRole("link", { name: titulo })).toBeVisible();
     }

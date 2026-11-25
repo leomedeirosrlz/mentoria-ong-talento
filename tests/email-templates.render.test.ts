@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { writeFileSync } from "node:fs";
 import {
   emailAviso,
+  emailConviteAcesso,
   emailMaterial,
   emailDocumentoAssinatura,
   emailSenhaAlterada,
@@ -75,5 +76,51 @@ describe("templates de e-mail", () => {
     expect(html).toContain("velho@exemplo.com");
     expect(html).toContain("novo@exemplo.com");
     expect(html).toContain("coordenação");
+  });
+
+  it("convite staff: boas-vindas, identidade da conta e link pessoal", () => {
+    const link = "https://app.test/auth/confirm?token_hash=h1&type=invite";
+    const html = emailConviteAcesso({
+      trilha: "staff",
+      primeiroNome: "Marina",
+      nome: "Marina Duarte",
+      papel: "Mentor DPP",
+      link,
+      email: "marina@exemplo.org",
+    });
+    dump("email-convite-staff", html);
+    expect(html).toContain("Boas-vindas");
+    expect(html).toContain("Oi, Marina!");
+    expect(html).toContain("sua dupla");
+    expect(html).toContain("Entrar na Mentoria Social");
+    expect(html).toContain("token_hash=h1&amp;type=invite");
+    expect(html).toContain("cerca de 1 hora");
+    // REALIZA-35: o e-mail diz de quem é a conta que o link abre —
+    // /auth/confirm não mostra identidade antes do verifyOtp
+    expect(html).toContain("<strong>Marina Duarte</strong>, Mentor DPP");
+    expect(html).toContain("no e-mail marina@exemplo.org");
+    // link expirado cai no /login com o endereço preenchido
+    expect(html).toContain("/login?e=marina%40exemplo.org");
+    expect(html).not.toContain("sua turma");
+  });
+
+  it("convite jovem: tagline de jornada com turma e instrumentos", () => {
+    const html = emailConviteAcesso({
+      trilha: "jovem",
+      primeiroNome: "Bia",
+      nome: "Ana Beatriz Silva",
+      papel: "Mentorado",
+      link: "https://app.test/auth/confirm?token_hash=h2&type=magiclink",
+      email: "bia@exemplo.org",
+    });
+    dump("email-convite-jovem", html);
+    expect(html).toContain("Sua jornada de mentoria");
+    expect(html).toContain("Oi, Bia!");
+    expect(html).toContain("sua turma");
+    expect(html).toContain("instrumentos");
+    expect(html).toContain("Entrar na Mentoria Social");
+    expect(html).toContain("<strong>Ana Beatriz Silva</strong>, Mentorado");
+    expect(html).not.toContain("sua dupla");
+    expect(html).not.toContain("—"); // sem travessão na copy visível
   });
 });

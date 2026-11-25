@@ -1,36 +1,29 @@
 "use client";
 
-import {
-  CalendarCheck,
-  CaretDown,
-  Check,
-  MapPin,
-  Sparkle,
-  UserCheck,
-} from "@phosphor-icons/react";
+import { Check, Sparkle, UserCheck } from "@phosphor-icons/react";
 import type { JovemEspecialista } from "@/lib/types";
 import type { VarianteCardEsp } from "@/lib/jovem-especialista";
-import { avatarPublicUrl } from "@/lib/avatar";
-import { Avatar } from "@/components/avatar";
-import { Badge } from "@/components/ui/badge";
+import { EspecialistaCatalogoCard } from "@/components/especialista-catalogo-card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 
-/** Card do cardápio de especialistas do jovem (WP6-R2, mock v6): a anatomia
- *  rica (foto+nome → cargo·empresa·cidade → chips de áreas → bio → recolhível
- *  "Experiência e formação" → "Atende: períodos" → CTA) com uma variante de
- *  estado por especialista — resolvida pelo caller via varianteDoCard. O
- *  card em si nunca abre o dialog: chama `onPedir(preEspId)` e o wrapper
- *  (`catalogo-jovem`) dispara o PedirEspecialistaDialog compartilhado — assim
- *  a preferência marcada aqui chega ao CTA "Pedir trilha" da página. */
+/** Card do cardápio de especialistas do jovem (WP6-R2 + 023): a anatomia
+ *  rica mora no EspecialistaCatalogoCard compartilhado; aqui ficam a
+ *  variante de estado por especialista (resolvida pelo caller via
+ *  varianteDoCard), a preferência e a SELEÇÃO — o pedido não é mais
+ *  modal: o CTA seleciona o card (aria-pressed + selo "Selecionado") e o
+ *  wrapper monta o painel de horário+texto sob a grade. `null` no
+ *  onSelecionar = o card "Qualquer especialista" do mural. */
 export function JovemEspecialistaCard({
   e,
   variante,
   preferido,
   onTogglePreferencia,
-  onPedir,
+  selecionado,
+  travado,
+  idCta,
+  onSelecionar,
   lotado,
+  href,
 }: {
   e: JovemEspecialista;
   /** Estado do card pra ESTE jovem — resolve quem é o especialista pra ele
@@ -40,25 +33,30 @@ export function JovemEspecialistaCard({
   /** Marcado como preferência no wrapper — vira chip "Sua preferência". */
   preferido: boolean;
   onTogglePreferencia: () => void;
-  /** Abre o dialog do pedido — `null` = broadcast pro mural. */
-  onPedir: (preEspId: string | null) => void;
+  /** Este card é o alvo do painel aberto — selo + aria-pressed (texto
+   *  visível, não só cor). */
+  selecionado?: boolean;
+  /** Enviando o pedido — a seleção trava até a resposta da action. */
+  travado?: boolean;
+  /** id do CTA de seleção — o wrapper devolve o foco a ele ao fechar. */
+  idCta?: string;
+  /** Seleciona o alvo do pedido — `null` = o card "Qualquer especialista". */
+  onSelecionar: (espId: string | null) => void;
   /** teto de pedidos em aberto já batido — o CTA sai de todos os cards */
   lotado: boolean;
+  /** Ficha da pessoa no diretório — o bloco nome/avatar vira link. */
+  href?: string;
 }) {
-  const nome = e.nome_social || e.nome;
-  const primeiro = nome.split(" ")[0];
-  const linha = [e.cargo, e.empresa].filter(Boolean).join(" · ");
-  const lugar = [e.cidade, e.uf].filter(Boolean).join(", ");
-  const formacao = [
-    ["Experiência", e.experiencia_previa],
-    ["Formação", e.formacao_externa],
-    ["Voluntariado", e.voluntariado],
-  ].filter((kv): kv is [string, string] => !!kv[1]);
+  const primeiro = (e.nome_social || e.nome).split(" ")[0];
 
-  const badge: { texto: string; cls: string } | null =
-    variante === "sua"
+  const badge: { texto: string; cls: string } | null = selecionado
+    ? {
+        texto: "Selecionado",
+        cls: "border-[var(--ok)]/50 bg-[var(--ok)]/10 text-[var(--ok-text)]",
+      }
+    : variante === "sua"
       ? {
-          texto: "Sua especialista",
+          texto: "Seu especialista",
           cls: "border-[var(--ok)]/50 text-[var(--ok-text)]",
         }
       : variante === "andamento"
@@ -77,176 +75,114 @@ export function JovemEspecialistaCard({
                 }
               : null;
 
+  const rodape =
+    variante === "andamento" ? (
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Seu pedido já está em aberto.{" "}
+        <a
+          href="#pedidos"
+          className="font-medium text-foreground underline underline-offset-2"
+        >
+          Ver meus pedidos
+        </a>
+      </p>
+    ) : lotado ? (
+      <p className="text-xs text-muted-foreground">
+        Você já tem 3 pedidos em aberto, o máximo por ciclo. Espere uma
+        resposta antes de pedir de novo.
+      </p>
+    ) : variante === "sua" ? (
+      <Button
+        id={idCta}
+        size="sm"
+        variant="outline"
+        className="w-full"
+        aria-pressed={selecionado}
+        disabled={travado}
+        onClick={() => onSelecionar(e.id)}
+      >
+        <Sparkle size={15} aria-hidden />
+        Pedir próxima sessão
+      </Button>
+    ) : variante === "sem_vagas" || variante === "sem_agenda" ? (
+      <>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {variante === "sem_vagas"
+            ? "Agenda cheia no momento. Seu pedido vai pro mural."
+            : "Ainda não liberou horários. Seu pedido vai pro mural."}
+        </p>
+        <Button
+          id={idCta}
+          size="sm"
+          variant="outline"
+          className="w-full"
+          disabled={travado}
+          onClick={() => onSelecionar(null)}
+        >
+          <Sparkle size={15} aria-hidden />
+          Pedir pro mural
+        </Button>
+      </>
+    ) : preferido ? (
+      <div className="space-y-2">
+        <p className="flex flex-wrap items-center gap-1.5 text-xs">
+          <button
+            type="button"
+            onClick={onTogglePreferencia}
+            aria-pressed
+            title="Tocar de novo desmarca a preferência"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-[var(--warn)]/60 bg-[var(--role-mentorado)]/15 px-3 font-medium text-[var(--warn-text)] transition-colors hover:bg-[var(--role-mentorado)]/25"
+          >
+            <Check size={12} weight="bold" aria-hidden />
+            Sua preferência
+          </button>
+          <span className="text-muted-foreground">
+            falta enviar o pedido
+          </span>
+        </p>
+        <Button
+          id={idCta}
+          size="sm"
+          className="w-full"
+          aria-pressed={selecionado}
+          disabled={travado}
+          onClick={() => onSelecionar(e.id)}
+        >
+          <Sparkle size={15} aria-hidden />
+          Continuar pedido com {primeiro}
+        </Button>
+      </div>
+    ) : (
+      <div className="space-y-2">
+        <Button
+          id={idCta}
+          size="sm"
+          className="w-full"
+          aria-pressed={selecionado}
+          disabled={travado}
+          onClick={() => onSelecionar(e.id)}
+        >
+          <Sparkle size={15} aria-hidden />
+          Pedir trilha com {primeiro}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full"
+          onClick={onTogglePreferencia}
+        >
+          <UserCheck size={15} aria-hidden />
+          Prefiro esta pessoa
+        </Button>
+      </div>
+    );
+
   return (
-    <Card className="flex h-full flex-col">
-      <CardContent className="flex flex-1 flex-col gap-3 py-4">
-        <div className="flex items-start gap-3">
-          <Avatar
-            nome={nome}
-            src={e.avatar_path ? avatarPublicUrl(e.avatar_path) : null}
-            size={44}
-          />
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium" title={nome}>
-              {nome}
-            </p>
-            {linha && (
-              <p className="truncate text-sm text-muted-foreground" title={linha}>
-                {linha}
-              </p>
-            )}
-            {lugar && (
-              <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin size={12} aria-hidden className="shrink-0" />
-                <span className="truncate">{lugar}</span>
-              </p>
-            )}
-          </div>
-          {badge && (
-            <Badge variant="outline" className={cn("shrink-0", badge.cls)}>
-              {badge.texto}
-            </Badge>
-          )}
-        </div>
-
-        {e.areas && e.areas.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {e.areas.slice(0, 4).map((a) => (
-              <Badge key={a} variant="secondary" className="font-normal">
-                {a}
-              </Badge>
-            ))}
-            {e.areas.length > 4 && (
-              <Badge variant="secondary" className="font-normal">
-                +{e.areas.length - 4}
-              </Badge>
-            )}
-          </div>
-        )}
-
-        {e.bio && (
-          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground sm:line-clamp-3">
-            {e.bio}
-          </p>
-        )}
-
-        {/* ficha curta recolhível — campo vazio não renderiza (a bio segue
-            sendo a linha editorial; aqui é o detalhe de currículo) */}
-        {formacao.length > 0 && (
-          <details className="group/exp rounded-lg border border-border/60">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8 [&::-webkit-details-marker]:hidden">
-              Experiência e formação
-              <CaretDown
-                size={12}
-                aria-hidden
-                className="ml-auto transition-transform group-open/exp:rotate-180"
-              />
-            </summary>
-            <dl className="space-y-1.5 border-t border-border/60 px-3 py-2.5">
-              {formacao.map(([rotulo, texto]) => (
-                <div key={rotulo}>
-                  <dt className="text-xs font-medium text-muted-foreground">
-                    {rotulo}
-                  </dt>
-                  <dd className="text-xs leading-relaxed">{texto}</dd>
-                </div>
-              ))}
-            </dl>
-          </details>
-        )}
-
-        {e.grade_resumo && e.grade_resumo.length > 0 && (
-          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-            <CalendarCheck size={13} aria-hidden className="mt-0.5 shrink-0" />
-            <span>
-              <span className="font-medium text-foreground/80">Atende:</span>{" "}
-              {e.grade_resumo.join(" · ")}
-            </span>
-          </p>
-        )}
-
-        <div className="mt-auto space-y-2 pt-1">
-          {variante === "andamento" ? (
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Seu pedido já está em aberto.{" "}
-              <a
-                href="#pedidos"
-                className="font-medium text-foreground underline underline-offset-2"
-              >
-                Ver meus pedidos
-              </a>
-            </p>
-          ) : lotado ? (
-            <p className="text-xs text-muted-foreground">
-              Você já tem 3 pedidos em aberto, o máximo por ciclo. Espere
-              uma resposta antes de pedir de novo.
-            </p>
-          ) : variante === "sua" ? (
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full"
-              onClick={() => onPedir(e.id)}
-            >
-              <Sparkle size={15} aria-hidden />
-              Pedir próxima sessão
-            </Button>
-          ) : variante === "sem_vagas" || variante === "sem_agenda" ? (
-            <>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                {variante === "sem_vagas"
-                  ? "Agenda cheia no momento. Seu pedido vai pro mural."
-                  : "Ainda não liberou horários. Seu pedido vai pro mural."}
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full"
-                onClick={() => onPedir(null)}
-              >
-                <Sparkle size={15} aria-hidden />
-                Pedir pro mural
-              </Button>
-            </>
-          ) : preferido ? (
-            <div className="space-y-2">
-              <p className="flex flex-wrap items-center gap-1.5 text-xs">
-                <button
-                  type="button"
-                  onClick={onTogglePreferencia}
-                  aria-pressed
-                  title="Tocar de novo desmarca a preferência"
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-[var(--warn)]/60 bg-[var(--role-mentorado)]/15 px-3 font-medium text-[var(--warn-text)] transition-colors hover:bg-[var(--role-mentorado)]/25"
-                >
-                  <Check size={12} weight="bold" aria-hidden />
-                  Sua preferência
-                </button>
-                <span className="text-muted-foreground">
-                  falta enviar o pedido
-                </span>
-              </p>
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={() => onPedir(e.id)}
-              >
-                <Sparkle size={15} aria-hidden />
-                Continuar pedido com {primeiro}
-              </Button>
-            </div>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full"
-              onClick={onTogglePreferencia}
-            >
-              <UserCheck size={15} aria-hidden />
-              Prefiro esta pessoa
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+    <EspecialistaCatalogoCard
+      e={e}
+      badge={badge}
+      href={href}
+      rodape={rodape}
+    />
   );
 }

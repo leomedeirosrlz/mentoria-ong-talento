@@ -21,14 +21,32 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 import { temPapel } from "@/lib/types";
-import type { Mentorado, Profile } from "@/lib/types";
+import type { JovemEspecialista, Mentorado, Profile } from "@/lib/types";
 import type { MentorProfile } from "@/lib/queries";
-import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
+import { esperaDesde, filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
+import {
+  PAPEL_TURMA_LABEL,
+  STATUS_PESSOA_LABEL,
+  docOkMentorado,
+  docsDevidosMentorado,
+  docsOkMentorado,
+  rankNaTurma,
+  statusDePessoa,
+  termoOkProfile,
+  turmasDePessoa,
+  type AlvoPessoa,
+  type MapasTurma,
+  type PapelTurma,
+  type StatusPessoa,
+  type StatusPessoas,
+} from "@/lib/pessoas-status";
+import { turmaLonga, turmaAno } from "@/lib/turma";
 import { cn, normaliza } from "@/lib/utils";
+import { fuzzyMatch } from "@/lib/fuzzy";
+import { HighlightText } from "@/components/highlight-text";
 import {
   comparaNome,
   foraDoPrograma,
-  idade,
   SITUACAO_MENTORADO_LABEL,
 } from "@/lib/ciclo";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -40,18 +58,35 @@ import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { filterChipCls } from "@/components/ui/filter-chip";
-import { Input } from "@/components/ui/input";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
+import { FiltrosButton } from "@/components/ui/filtros-button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  OpcaoCheck,
+  OpcaoPilula,
+  OVERLINE,
+} from "@/components/ui/filtro-opcoes";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { EspecialistaCatalogoCard } from "@/components/especialista-catalogo-card";
 
 const ehMentor = (p: Profile) =>
   temPapel(p, "mentor_dpp") || temPapel(p, "mentor_especialista");
+
+/** Alvo de filiação do profile — leva os papéis efetivos pra derivação
+ *  resolver a trilha da inscrição "aguardando" (REALIZA-383: especialista
+ *  sem papel DPP não espera par). */
+const alvoProfile = (p: Profile): AlvoPessoa => ({
+  tipo: "profile",
+  id: p.id,
+  role: p.role,
+  papeis: p.papeis,
+});
 
 // o card da fila só existe pra coordenação — quase 1k linhas fora do
 // chunk de quem visita /pessoas como mentor/supervisor (SSR mantido)
@@ -76,12 +111,22 @@ const ORDEM_PESSOAS_LABEL: Record<OrdemPessoas, string> = {
   pendencias: "Pendências primeiro",
 };
 
-/** Grupos da lista unificada (rodada out/2026) — a própria agrupação da
- *  página é o filtro: um dropdown só de categorias substituiu os selects
- *  de papel/trilha/status. "sempapel" = pré-cadastro aguardando papel,
- *  grupo que só a coordenação enxerga. */
+/** Rascunho do modal de filtros — aplica tudo de uma vez no "Aplicar"
+ *  (gramática de /registros). Agrupar e ordenar são controles de visão:
+ *  não contam no selo de ativos e o "Limpar" os preserva. */
+type DraftFiltros = {
+  agrupar: "papel" | "turma";
+  cat: string;
+  status: StatusPessoa | "todos";
+  pendencias: boolean;
+  ordem: OrdemPessoas;
+};
+
+/** Grupos da lista unificada — "por cargo" é o agrupamento padrão (a
+ *  inversão da REALIZA-39 pra turma foi revertida na 376; a leitura por
+ *  ciclo segue como alternativa). "sempapel" = pré-cadastro aguardando
+ *  papel, grupo que só a coordenação enxerga. */
 type Grupo = "equipe" | "supervisores" | "mentores" | "mentorados" | "sempapel";
-type CategoriaPessoas = "todos" | Grupo;
 
 const GRUPO_ORDEM: Grupo[] = [
   "equipe",
@@ -93,10 +138,37 @@ const GRUPO_ORDEM: Grupo[] = [
 
 const GRUPO_LABEL: Record<Grupo, string> = {
   equipe: "Coordenação e equipe",
-  supervisores: "Supervisores",
+  supervisores: "Auxiliares executivos",
   mentores: "Mentores",
   mentorados: "Mentorados",
   sempapel: "Sem papel",
+};
+
+/** Facetas de categoria do diretório (023) — o staff fora da coordenação
+ *  recorta por pills (o modal de filtros é coord-only). "Mentores DPP"
+ *  separa a trilha principal e "Especialistas" abre o catálogo rico no
+ *  lugar das linhas; o híbrido conta nas duas. */
+type CatDiretorio =
+  | "equipe"
+  | "supervisores"
+  | "mentores_dpp"
+  | "especialistas"
+  | "mentorados";
+
+const CATS_DIRETORIO: CatDiretorio[] = [
+  "equipe",
+  "supervisores",
+  "mentores_dpp",
+  "especialistas",
+  "mentorados",
+];
+
+const CAT_DIRETORIO_LABEL: Record<CatDiretorio, string> = {
+  equipe: GRUPO_LABEL.equipe,
+  supervisores: GRUPO_LABEL.supervisores,
+  mentores_dpp: "Mentores DPP",
+  especialistas: "Especialistas",
+  mentorados: GRUPO_LABEL.mentorados,
 };
 
 /** Grupo pelo papel primário: supervisor e jovem-com-conta têm seção
@@ -137,22 +209,18 @@ function pendenciasPessoa(
   return n;
 }
 
-/** Idem pros mentorados — o documento certo depende da idade (autorização
- *  do responsável pra menor, termo de participação pra maior). */
+/** Idem pros mentorados — os documentos devidos dependem da idade
+ *  (menor deve os dois: termo de participação E autorização do
+ *  responsável; maior, só o termo). Cada devido faltando conta. */
 function pendenciasMentorado(
   m: Mentorado,
   livre: boolean,
   docs: DocsPessoa | undefined
 ): number {
   const d = docs ?? DOCS_VAZIO;
-  const anos = idade(m.data_nascimento);
-  const menor = anos != null && anos < 18;
-  const docOk = menor
-    ? Boolean(m.documento_path) ||
-      d.assinado["autorizacao-responsavel"] !== undefined
-    : d.assinado["termo-mentorando"] !== undefined;
-  let n = 0;
-  if (!docOk) n++;
+  let n = docsDevidosMentorado(m).filter(
+    (slug) => !docOkMentorado(m, slug, d)
+  ).length;
   if (livre) n++;
   return n;
 }
@@ -178,21 +246,119 @@ function formatarWhatsApp(wa: string): string {
   return wa;
 }
 
+// ---------- status por pessoa (REALIZA-39) ----------
+// O vocabulário fechado do /pessoas — derivado dos mesmos insumos dos
+// badges que ele substitui (termo/docs via a mesma régua dos detalhes,
+// acesso via a view profiles_acesso da 0192). Só a coordenação vê.
+
+/** Estilo do chip de status — o primário é o badge cheio da régua; os
+ *  secundários (pendências que coexistem) vêm esmaecidos. */
+const STATUS_CHIP_CLS: Record<StatusPessoa, string> = {
+  inativo: "border-[var(--danger)]/50 text-[var(--danger)]",
+  convidado: "text-muted-foreground",
+  nao_acessou: "border-[var(--warn)]/60 text-[var(--warn-text)]",
+  termo_pendente: "border-[var(--warn)]/60 text-[var(--warn-text)]",
+  docs_pendentes: "border-[var(--warn)]/60 text-[var(--warn-text)]",
+  ativo: "border-[var(--ok)]/50 text-[var(--ok-text,var(--ok))]",
+};
+
+function StatusChips({ status }: { status: StatusPessoas }) {
+  return (
+    <>
+      <Badge
+        variant="outline"
+        className={cn("text-xs shrink-0", STATUS_CHIP_CLS[status.primario])}
+      >
+        {STATUS_PESSOA_LABEL[status.primario]}
+      </Badge>
+      {status.secundarios.map((s) => (
+        <Badge
+          key={s}
+          variant="outline"
+          className={cn("text-[11px] shrink-0 opacity-80", STATUS_CHIP_CLS[s])}
+        >
+          {STATUS_PESSOA_LABEL[s]}
+        </Badge>
+      ))}
+    </>
+  );
+}
+
+/** Status do profile — a mesma régua dos badges antigos (termo pela régua
+ *  do papel, "convite enviado" = conta sem onboarding) + o "não acessou"
+ *  novo, do último acesso real da 0192. Civis faltantes só contam quando
+ *  o termo ainda não saiu assinado (depois disso não há o que completar). */
+function statusDeProfile(
+  p: Profile,
+  mp: MentorProfile | undefined,
+  docs: DocsPessoa | undefined,
+  faltantesTermo: string[] | undefined,
+  ultimoAcessoEm: string | null | undefined
+): StatusPessoas {
+  const termoOk = termoOkProfile(p, mp, docs);
+  return statusDePessoa({
+    ativo: p.ativo,
+    contaVinculada: Boolean(p.user_id),
+    onboardedEm: p.onboarded_em,
+    ultimoAcessoEm: ultimoAcessoEm ?? null,
+    termoOk,
+    docsFaltantes: termoOk ? [] : (faltantesTermo ?? []),
+  });
+}
+
+/** Idem pro jovem — os documentos devidos viram "documentos pendentes"
+ *  (menor deve os dois: termo de participação + autorização do
+ *  responsável; um só quitado segue pendente); acesso/onboarding via a
+ *  conta vinculada (profile_id → profiles_acesso). */
+function statusDeMentorado(
+  m: Mentorado,
+  docs: DocsPessoa | undefined,
+  faltantesDoc: string[] | undefined,
+  ultimoAcessoEm: string | null | undefined
+): StatusPessoas {
+  const docOk = docsOkMentorado(m, docs);
+  return statusDePessoa({
+    ativo: !foraDoPrograma(m),
+    contaVinculada: Boolean(m.profile_id),
+    onboardedEm: m.conta?.onboarded_em ?? null,
+    ultimoAcessoEm: m.profile_id ? (ultimoAcessoEm ?? null) : null,
+    termoOk: true,
+    docsFaltantes: docOk ? [] : (faltantesDoc?.length ? faltantesDoc : ["x"]),
+  });
+}
+
+/** Um item da lista unificada no modo turma — a pessoa aparece em CADA
+ *  turma a que pertence (não é dedup global); dentro da turma, os papéis
+ *  dela naquele recorte viram chips contextuais. */
+type ItemTurma =
+  | { tipo: "profile"; p: Profile; papeis: PapelTurma[] }
+  | { tipo: "mentorado"; m: Mentorado; papeis: PapelTurma[] };
+
+const SEM_TURMA = "__sem_turma__";
+
 export function PessoasListas({
   pessoas,
   mentorados,
+  catalogo = [],
   comDupla,
   comQualquerDupla,
   duplaVivaPorMentorado,
   mentorProfiles,
   contagemPorMentor,
+  disponivelDesde,
   assinaturas,
   faltantes,
+  mapasTurma,
+  acesso,
   euNome,
   souCoord,
 }: {
   pessoas: Profile[];
   mentorados: Mentorado[];
+  /** Projeção rica do catálogo staff (especialistas_catalogo, 0239) — a
+   *  faceta "Especialistas" do diretório a consome; pra coord chega mas
+   *  não é usada (a faceta dela é o modal). */
+  catalogo?: JovemEspecialista[];
   comDupla: string[];
   /** Ids com QUALQUER dupla (até encerrada) — espelha a guarda das actions de exclusão. */
   comQualquerDupla: string[];
@@ -201,12 +367,23 @@ export function PessoasListas({
   duplaVivaPorMentorado: Record<string, string>;
   mentorProfiles: Record<string, MentorProfile>;
   contagemPorMentor: Record<string, number>;
+  /** id → quando a pessoa voltou a ficar disponível (fechamento da última
+   *  dupla) — a espera da fila mede a disponibilidade atual, não a entrada
+   *  original (REALIZA-393). Chega vazio fora da coordenação. */
+  disponivelDesde: Record<string, string>;
   /** id da pessoa → documentos assinados/pendentes (badge "assinou vs. não"). */
   assinaturas: Record<string, DocsPessoa>;
   /** id → slug → labels de faltante civil (coord-only, calculado na page) —
    *  alimenta o "civis incompletos" do Detalhes quando o doc ainda não saiu
    *  assinado. Labels, nunca valores. */
   faltantes?: Record<string, Record<string, string[]>>;
+  /** Filiação por turma (REALIZA-39) — duplas (com o rótulo vivo já
+   *  resolvido na page) + inscrições + grants escopados. Coord-only: no
+   *  diretório chega vazio e o modo turma nem liga. */
+  mapasTurma?: MapasTurma;
+  /** profile_id → último acesso (profiles_acesso, 0192) — insumo do
+   *  status "não acessou". Coord-only. */
+  acesso?: Record<string, string | null>;
   /** Nome de quem opera — assina a mensagem pronta de WhatsApp na fila. */
   euNome?: string | null;
   /** false = diretório de colegas (supervisor/mentores): mesma lista, sem
@@ -219,24 +396,85 @@ export function PessoasListas({
     return new URLSearchParams(window.location.search).get("busca") ?? "";
   });
   const [buscaDebounced, setBuscaDebounced] = useState(busca);
-  // categoria = o próprio agrupamento da lista usado como filtro
-  // (rodada out/2026 — antes: selects de papel, trilha e status)
-  const [cat, setCat] = useState<CategoriaPessoas>(() => {
+  // categoria = recorte por papel (equipe, mentores, mentorados…) — vive
+  // no modal de filtros; na URL vai crua (?cat=mentorados)
+  const [cat, setCat] = useState<string>(() => {
     if (typeof window === "undefined") return "todos";
-    const v = new URLSearchParams(window.location.search).get("cat");
-    return (GRUPO_ORDEM as string[]).includes(v ?? "") || v === "todos"
-      ? (v as CategoriaPessoas)
-      : "todos";
+    const c = new URLSearchParams(window.location.search).get("cat");
+    return c && !c.startsWith("turma:") ? c : "todos";
   });
-  // "Fora do programa" inverte o recorte: a lista passa a mostrar SÓ quem
-  // saiu (0077); desligado, eles moram no arquivo colapsável do fim
-  const [verFora, setVerFora] = useState(false);
-  // "Aguardando par": recorta a lista pros membros da fila do card —
-  // mentorados sem par + mentores DPP com vaga
-  const [verFila, setVerFila] = useState(false);
+  // turma = recorte por ciclo em pills na barra (Todos, Turma 1, Turma 2…);
+  // "sem-turma" marca o balde de quem não tem evidência nenhuma. Link
+  // antigo mandava a turma namespaced dentro de ?cat=turma:<rótulo> — lê
+  // dos dois pra não quebrar deep-link já compartilhado
+  const [turmaSel, setTurmaSel] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const sp = new URLSearchParams(window.location.search);
+    const c = sp.get("cat");
+    if (c?.startsWith("turma:")) {
+      const v = c.slice(6);
+      return v === SEM_TURMA ? SEM_TURMA : v;
+    }
+    const t = sp.get("turma");
+    if (!t) return null;
+    return t === "sem-turma" || t === SEM_TURMA ? SEM_TURMA : t;
+  });
+  // filtros do modal (REALIZA-376): status operacional no vocabulário
+  // fechado e "somente com pendências" — a trilha do mentor virou pill
+  // na barra (um tap pro catálogo de especialistas)
+  const [statusSel, setStatusSel] = useState<StatusPessoa | "todos">(() => {
+    if (typeof window === "undefined") return "todos";
+    const s = new URLSearchParams(window.location.search).get("status");
+    return s && s in STATUS_PESSOA_LABEL ? (s as StatusPessoa) : "todos";
+  });
+  const [trilhaSel, setTrilhaSel] = useState<"todas" | "dpp" | "especialista">(
+    () => {
+      if (typeof window === "undefined") return "todas";
+      const t = new URLSearchParams(window.location.search).get("trilha");
+      return t === "dpp" || t === "especialista" ? t : "todas";
+    }
+  );
+  const [soPendencias, setSoPendencias] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("pendencias") === "1"
+  );
+  // tema = chips de área/interesse do diretório (023) — single-select na
+  // barra, persiste em ?area; deep-link inválido cai no neutro (areaSelEf)
+  const [areaSel, setAreaSel] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("area");
+  });
   const [foraAberto, setForaAberto] = useState(false);
   const [inativosAberto, setInativosAberto] = useState(false);
-  const [ordem, setOrdem] = useState<OrdemPessoas>("nome");
+  const [ordem, setOrdem] = useState<OrdemPessoas>(() => {
+    if (typeof window === "undefined") return "nome";
+    return new URLSearchParams(window.location.search).get("ordem") ===
+      "pendencias"
+      ? "pendencias"
+      : "nome";
+  });
+  // agrupamento da página (REALIZA-376): "por cargo" é o padrão de novo —
+  // ?agrupar=turma liga a leitura por ciclo, que segue como alternativa
+  // dentro do modal. Só a coordenação tem os mapas de filiação; no
+  // diretório o grupo é sempre o papel.
+  const [agrupar, setAgrupar] = useState<"papel" | "turma">(() => {
+    if (typeof window === "undefined") return "papel";
+    return new URLSearchParams(window.location.search).get("agrupar") ===
+      "turma"
+      ? "turma"
+      : "papel";
+  });
+  const porTurma = souCoord && agrupar === "turma";
+  // modal de filtros — o rascunho aplica de uma vez no "Aplicar"
+  const [filtrosAberto, setFiltrosAberto] = useState(false);
+  const [draft, setDraft] = useState<DraftFiltros>({
+    agrupar: "papel",
+    cat: "todos",
+    status: "todos",
+    pendencias: false,
+    ordem: "nome",
+  });
   const emDupla = useMemo(() => new Set(comDupla), [comDupla]);
   const temQualquerDupla = useMemo(() => new Set(comQualquerDupla), [comQualquerDupla]);
 
@@ -246,51 +484,306 @@ export function PessoasListas({
     return () => clearTimeout(t);
   }, [busca]);
 
-  // persistência da busca/categoria na URL (deep-link)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const sp = new URLSearchParams(window.location.search);
-    if (busca) sp.set("busca", busca);
-    else sp.delete("busca");
-    if (cat !== "todos") sp.set("cat", cat);
-    else sp.delete("cat");
-    const qs = sp.toString();
-    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
-  }, [busca, cat]);
-
-  const q = normaliza(buscaDebounced.trim());
+  const qtBusca = buscaDebounced.trim();
+  const q = normaliza(qtBusca);
   // diretório de colegas: sem papel ainda não é colega — pré-cadastro que
   // só a coordenação precisa enxergar; cadastro inativo (saiu da equipe)
   // idem — pro diretório ele não é mais colega. A base filtrada também é o
   // denominador do contador — mostrar o total cru mentiria
-  const basePessoas = souCoord
-    ? pessoas
-    : pessoas.filter((p) => p.role != null && p.ativo);
+  const basePessoas = useMemo(
+    () =>
+      souCoord ? pessoas : pessoas.filter((p) => p.role != null && p.ativo),
+    [souCoord, pessoas]
+  );
 
-  // pra não-coord o e-mail não chega (view profiles_contato só devolve o
-  // escopo do papel) — a busca é por nome (+ nome social, que é público)
-  const qPessoa = (p: Profile) =>
-    !q ||
-    normaliza(p.nome).includes(q) ||
-    normaliza(p.nome_social ?? "").includes(q) ||
-    (souCoord && normaliza(p.email).includes(q));
-  const qMentorado = (m: Mentorado) =>
-    !q ||
-    normaliza(m.nome).includes(q) ||
-    normaliza(m.nome_social ?? "").includes(q) ||
-    normaliza(m.email ?? "").includes(q) ||
-    normaliza(m.ong_origem).includes(q);
-  const catOkPessoa = (p: Profile) => cat === "todos" || grupoDePessoa(p) === cat;
-  const catOkMentorado = cat === "todos" || cat === "mentorados";
+  // busca fuzzy (REALIZA-391): o score do item é o MELHOR match entre os
+  // campos pesquisáveis — nome (civil e social) pra todos; e-mail e ONG
+  // só pra coordenação (a view do diretório nem devolve esses dados, um
+  // match neles filtraria sem explicar por quê). O mapa pré-computado
+  // poupa o re-score por comparação no sort e dá o ranqueamento por
+  // relevância que precede as ordenações de leitura
+  const scorePessoa = (p: Profile) =>
+    Math.max(
+      ...[
+        p.nome,
+        p.nome_social,
+        souCoord ? p.email : null,
+      ].map((t) => (t ? (fuzzyMatch(qtBusca, t)?.score ?? 0) : 0))
+    );
+  const scoreMentorado = (m: Mentorado) =>
+    Math.max(
+      ...[
+        m.nome,
+        m.nome_social,
+        m.email,
+        m.ong_origem,
+      ].map((t) => (t ? (fuzzyMatch(qtBusca, t)?.score ?? 0) : 0))
+    );
+  // bloco derivado — o React Compiler memoiza sozinho (mesma regra dos
+  // filtros abaixo; useMemo manual só entraria com custo real medido)
+  const scorePorId = new Map<string, number>();
+  if (q) {
+    for (const p of basePessoas) scorePorId.set(p.id, scorePessoa(p));
+    for (const m of mentorados) scorePorId.set(m.id, scoreMentorado(m));
+  }
+  const qPessoa = (p: Profile) => !q || (scorePorId.get(p.id) ?? 0) > 0;
+  const qMentorado = (m: Mentorado) => !q || (scorePorId.get(m.id) ?? 0) > 0;
+  /** relevância da busca — 0-0 quando não há query, então o critério de
+   *  leitura (nome, pendências) segura sozinho */
+  const porRelevancia = (a: { id: string }, b: { id: string }) =>
+    (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0);
+  // ---------- filtros derivados ----------
+  // mapas de filiação (coord) — a turma da pessoa deriva das mesmas 3
+  // fontes do modo "por turma": a dupla (turmaDaDupla resolvida na page),
+  // turma_inscricoes e o escopo_turma do grant. Sem evidência → "Sem turma"
+  const mapas: MapasTurma = useMemo(
+    () =>
+      mapasTurma ?? {
+        duplas: [],
+        inscricoes: [],
+        papeisEscopo: [],
+      },
+    [mapasTurma]
+  );
+
+  // status operacional — a mesma régua dos badges da linha
+  const statusProfile = (p: Profile) =>
+    statusDeProfile(
+      p,
+      mentorProfiles[p.id],
+      assinaturas[p.id],
+      faltantes?.[p.id]?.["termo-voluntario"],
+      acesso?.[p.id]
+    );
+  const statusMentorado = (m: Mentorado) =>
+    statusDeMentorado(
+      m,
+      assinaturas[m.id],
+      // faltantes civis de TODOS os devidos — menor deve dois documentos;
+      // olhar só um slug esconderia a lacuna do outro
+      [
+        ...new Set(
+          docsDevidosMentorado(m).flatMap(
+            (slug) => faltantes?.[m.id]?.[slug] ?? []
+          )
+        ),
+      ],
+      m.profile_id ? acesso?.[m.profile_id] : null
+    );
+
+  // opções das pills de turma (coord): turmas presentes na base, mais
+  // novas primeiro e "Sem turma" por último; a contagem é de PESSOAS que
+  // têm aquela turma — quem está em duas conta nas duas
+  const turmasInfo = useMemo(() => {
+    const contagem = new Map<string, number>();
+    // o diretório não tem pills nem agrupamento por ciclo — os mapas já
+    // chegam vazios e derrotar cedo poupa a varredura
+    if (!souCoord) return { turmas: [] as string[], contagem, semTurma: 0 };
+    let sem = 0;
+    const conta = (alvo: AlvoPessoa) => {
+      const ts = turmasDePessoa(alvo, mapas);
+      if (!ts.length) {
+        sem++;
+        return;
+      }
+      for (const t of new Set(ts.map((x) => x.turma)))
+        contagem.set(t, (contagem.get(t) ?? 0) + 1);
+    };
+    for (const p of basePessoas) conta(alvoProfile(p));
+    for (const m of mentorados) conta({ tipo: "mentorado", id: m.id });
+    return {
+      turmas: [...contagem.keys()].sort((a, b) =>
+        b.localeCompare(a, "pt-BR", { numeric: true })
+      ),
+      contagem,
+      semTurma: sem,
+    };
+  }, [souCoord, basePessoas, mentorados, mapas]);
+
+  // track-pill counts share the turma denominator (whole base, not the
+  // filtered slice); a hybrid mentor counts in both pools
+  const trilhaInfo = useMemo(() => {
+    let dpp = 0;
+    let esp = 0;
+    for (const p of basePessoas) {
+      if (temPapel(p, "mentor_dpp")) dpp++;
+      if (temPapel(p, "mentor_especialista")) esp++;
+    }
+    return { dpp, esp };
+  }, [basePessoas]);
+
+  // valor efetivo dos recortes — um deep-link pode apontar pra turma que
+  // não existe mais (ou faceta que o papel não tem): cai no neutro
+  const catEf =
+    cat === "todos" ||
+    (souCoord
+      ? GRUPO_ORDEM.includes(cat as Grupo)
+      : (CATS_DIRETORIO as string[]).includes(cat))
+      ? cat
+      : "todos";
+  const turmaSelEf =
+    !souCoord || turmaSel == null
+      ? null
+      : turmaSel === SEM_TURMA
+        ? turmasInfo.semTurma > 0
+          ? SEM_TURMA
+          : null
+        : turmasInfo.turmas.includes(turmaSel)
+          ? turmaSel
+          : null;
+  // filtros de gestão são coord-only — um deep-link com ?status= ou
+  // ?pendencias= não pode recortar o diretório em cima de dados que o
+  // papel não recebe (os mapas chegam vazios da página). A trilha virou
+  // faceta do diretório (023): o papel efetivo vem do embed de papéis
+  // que staff lê — DPP × especialista filtra sem mapa de turma
+  const statusSelEf = souCoord ? statusSel : "todos";
+  const trilhaSelEf = trilhaSel;
+  const soPendEf = souCoord && soPendencias;
+  // "pendências primeiro" precisa dos mapas de gestão — no diretório
+  // cairia numa régua vazia; vale o sort por nome
+  const ordemEf: OrdemPessoas = souCoord ? ordem : "nome";
+
+  // cada dimensão é um predicado — turma pela mesma derivação do
+  // agrupamento por ciclo; categoria pelo grupo de papel; status no
+  // vocabulário fechado (primário OU pendência secundária)
+  const turmaOkPessoa = (p: Profile) => {
+    if (turmaSelEf == null) return true;
+    const ts = turmasDePessoa(alvoProfile(p), mapas);
+    return turmaSelEf === SEM_TURMA
+      ? ts.length === 0
+      : ts.some((t) => t.turma === turmaSelEf);
+  };
+  const turmaOkMentorado = (m: Mentorado) => {
+    if (turmaSelEf == null) return true;
+    const ts = turmasDePessoa({ tipo: "mentorado", id: m.id }, mapas);
+    return turmaSelEf === SEM_TURMA
+      ? ts.length === 0
+      : ts.some((t) => t.turma === turmaSelEf);
+  };
+  const catOkPessoa = (p: Profile) => {
+    if (catEf === "todos") return true;
+    if (souCoord) return grupoDePessoa(p) === catEf;
+    // "Especialistas" vive na grade do catálogo, não nas linhas;
+    // "Mentores DPP" recorta a trilha principal pelo papel efetivo (o
+    // híbrido entra aqui e no catálogo)
+    if (catEf === "especialistas") return false;
+    if (catEf === "mentores_dpp") return temPapel(p, "mentor_dpp");
+    return grupoDePessoa(p) === catEf;
+  };
+  const catOkMentorado = catEf === "todos" || catEf === "mentorados";
+  const statusOk = (s: StatusPessoas) =>
+    statusSelEf === "todos" ||
+    s.primario === statusSelEf ||
+    s.secundarios.includes(statusSelEf);
+  const statusOkPessoa = (p: Profile) => statusOk(statusProfile(p));
+  const statusOkMentorado = (m: Mentorado) => statusOk(statusMentorado(m));
+  // trilha é conceito de mentor (o papel define); o jovem entra pelo
+  // vínculo — a trilha dele é a das duplas que já teve
+  const trilhaOkPessoa = (p: Profile) =>
+    trilhaSelEf === "todas" ||
+    temPapel(
+      p,
+      trilhaSelEf === "dpp" ? "mentor_dpp" : "mentor_especialista"
+    );
+  const trilhaOkMentorado = (m: Mentorado) =>
+    trilhaSelEf === "todas" ||
+    mapas.duplas.some(
+      (d) => d.mentorado_id === m.id && d.trilha === trilhaSelEf
+    );
+  // "somente com pendências" segue a régua do dot warn do Detalhes (termo,
+  // formação do mentor, "ainda não entrou", documentos do jovem) — inativo
+  // e quem saiu do programa não têm pendência cobrável
+  const pendOkPessoa = (p: Profile) => {
+    if (!soPendEf) return true;
+    if (!p.ativo) return false;
+    const mp = mentorProfiles[p.id];
+    const termoOk = termoOkProfile(p, mp, assinaturas[p.id]);
+    return ehMentor(p)
+      ? !termoOk || !mp?.formacao_ok
+      : !termoOk || !p.user_id;
+  };
+  const pendOkMentorado = (m: Mentorado) =>
+    !soPendEf ||
+    (!foraDoPrograma(m) && !docsOkMentorado(m, assinaturas[m.id]));
+
+  // faceta "Especialistas" do diretório (023): troca as linhas pela
+  // grade do catálogo staff — consome a view inteira, não o recorte
+  const usaCatalogo = !souCoord && catEf === "especialistas";
+
+  // contagem por pill do diretório — sobre a base de papel ativo, antes
+  // da busca/tema/trilha: o número é o universo que a faceta abre
+  const catInfo: Record<CatDiretorio, number> = {
+    equipe: basePessoas.filter((p) => grupoDePessoa(p) === "equipe").length,
+    supervisores: basePessoas.filter(
+      (p) => grupoDePessoa(p) === "supervisores"
+    ).length,
+    mentores_dpp: basePessoas.filter((p) => temPapel(p, "mentor_dpp"))
+      .length,
+    especialistas: catalogo.length,
+    mentorados:
+      basePessoas.filter((p) => grupoDePessoa(p) === "mentorados").length +
+      mentorados.filter((m) => !foraDoPrograma(m)).length,
+  };
+
+  // universo dos chips de tema: o recorte da categoria (sem busca nem
+  // tema) — areas do staff, interesses dos jovens; na faceta de
+  // especialistas sai do próprio catálogo
+  const porCatPessoas = souCoord ? [] : basePessoas.filter(catOkPessoa);
+  const porCatMentorados =
+    souCoord || !catOkMentorado
+      ? []
+      : mentorados.filter((m) => !foraDoPrograma(m));
+  const temasDePessoa = (p: Profile) => p.areas ?? p.interesses ?? [];
+  const areasInfo = ((): [string, number][] => {
+    if (souCoord) return [];
+    const contagem = new Map<string, number>();
+    const soma = (listas: (string[] | null | undefined)[]) => {
+      for (const xs of listas)
+        for (const a of xs ?? [])
+          contagem.set(a, (contagem.get(a) ?? 0) + 1);
+    };
+    if (usaCatalogo) soma(catalogo.map((e) => e.areas));
+    else {
+      soma(porCatPessoas.map(temasDePessoa));
+      soma(porCatMentorados.map((m) => m.interesses));
+    }
+    return [...contagem.entries()].sort(
+      ([a, na], [b, nb]) => nb - na || a.localeCompare(b, "pt-BR")
+    );
+  })();
+  // um deep-link pode citar tema de outra faceta — cai no neutro como a turma
+  const areaSelEf =
+    !souCoord && areaSel != null && areasInfo.some(([a]) => a === areaSel)
+      ? areaSel
+      : null;
+
+  // chips de tema do diretório (023) — a linha entra se carrega o tema
+  // entre as areas/interesses que já exibe
+  const areaOkPessoa = (p: Profile) =>
+    areaSelEf == null || temasDePessoa(p).includes(areaSelEf);
+  const areaOkMentorado = (m: Mentorado) =>
+    areaSelEf == null || (m.interesses ?? []).includes(areaSelEf);
+
+  const filtrosPessoa = (p: Profile) =>
+    turmaOkPessoa(p) &&
+    catOkPessoa(p) &&
+    statusOkPessoa(p) &&
+    trilhaOkPessoa(p) &&
+    areaOkPessoa(p) &&
+    pendOkPessoa(p);
+  const filtrosMentorado = (m: Mentorado) =>
+    catOkMentorado &&
+    turmaOkMentorado(m) &&
+    statusOkMentorado(m) &&
+    trilhaOkMentorado(m) &&
+    areaOkMentorado(m) &&
+    pendOkMentorado(m);
 
   // pra coordenação, cadastro desativado sai do grupo principal e vive na
   // seção "Inativos" no fim — visível, mas sem diluir a leitura de quem segue
   const inativas = useMemo(
     () => (souCoord ? pessoas.filter((p) => !p.ativo) : []),
     [souCoord, pessoas]
-  );
-  const inativasFiltradas = inativas.filter(
-    (p) => catOkPessoa(p) && qPessoa(p)
   );
   const totalFora = useMemo(
     () => mentorados.reduce((n, m) => n + (foraDoPrograma(m) ? 1 : 0), 0),
@@ -300,12 +793,12 @@ export function PessoasListas({
   // fila "Aguardando par" (REALIZA-101): mentorados que NUNCA tiveram dupla
   // + mentores ativos com vaga livre — derivação pura em @/lib/fila
   const filaMds = useMemo(
-    () => (souCoord ? filaMentorados(mentorados, emDupla, temQualquerDupla) : []),
-    [souCoord, mentorados, emDupla, temQualquerDupla]
+    () => (souCoord ? filaMentorados(mentorados, emDupla, temQualquerDupla, disponivelDesde) : []),
+    [souCoord, mentorados, emDupla, temQualquerDupla, disponivelDesde]
   );
   const filaMts = useMemo(
-    () => (souCoord ? filaMentores(pessoas, mentorProfiles, contagemPorMentor) : []),
-    [souCoord, pessoas, mentorProfiles, contagemPorMentor]
+    () => (souCoord ? filaMentores(pessoas, mentorProfiles, contagemPorMentor, disponivelDesde) : []),
+    [souCoord, pessoas, mentorProfiles, contagemPorMentor, disponivelDesde]
   );
   // fichas completas por id — o ⋯ da fila reusa as mesmas ações das linhas
   const mentoradoPorId = useMemo(
@@ -338,24 +831,36 @@ export function PessoasListas({
     (m) => !emDupla.has(m.id) && !foraDoPrograma(m)
   );
 
-  // escopo (categoria + chips, sem a busca) — denominador honesto do
-  // "N de M" e a base dos grupos; o arquivo continua colapsável no fim
-  const filaIds = useMemo(
-    () => new Set([...filaMds, ...filaMts].map((i) => i.id)),
-    [filaMds, filaMts]
+  // espera por id pro modo Parear (REALIZA-446): o pool lá é maior que a
+  // fila (inclui remanejo e mentor cheio), então o "há N dias" chega
+  // derivado — mesma régua do carimbo que filaMentorados/filaMentores usam
+  const esperaDesdePorId = useMemo(
+    () =>
+      souCoord
+        ? Object.fromEntries(
+            [...mentoradosLivres, ...mentoresDpp].map((p) => [
+              p.id,
+              esperaDesde(p, disponivelDesde[p.id]),
+            ])
+          )
+        : {},
+    [souCoord, mentoradosLivres, mentoresDpp, disponivelDesde]
   );
-  const totalFila = filaMds.length + filaMts.length;
-  const pessoasEscopo = verFora
-    ? []
-    : basePessoas.filter(
-        (p) => p.ativo && catOkPessoa(p) && (!verFila || filaIds.has(p.id))
-      );
+
+  // escopo (todos os filtros, sem a busca) — denominador honesto do
+  // "N de M" e a base dos grupos; o arquivo continua colapsável no fim
+  const pessoasEscopo = basePessoas.filter(
+    (p) =>
+      // no modo turma o inativo aparece no grupo com o chip "inativo"
+      // (a filiação é histórica); no modo papel ele fica no arquivo
+      (porTurma || p.ativo) && filtrosPessoa(p)
+  );
   const mentoradosEscopo = !catOkMentorado
     ? []
-    : mentorados.filter((m) =>
-        verFora
-          ? foraDoPrograma(m)
-          : !foraDoPrograma(m) && (!verFila || filaIds.has(m.id))
+    : mentorados.filter(
+        // idem: quem saiu continua contando como membro histórico da
+        // turma — a situação dela vira badge própria na linha
+        (m) => (porTurma || !foraDoPrograma(m)) && filtrosMentorado(m)
       );
 
   // quem saiu se ordena pela saída mais recente — arquivo cronológico, não
@@ -364,41 +869,162 @@ export function PessoasListas({
     (b.saiu_em ?? "").localeCompare(a.saiu_em ?? "") ||
     comparaNome(a.nome, b.nome);
   const foraExibidos = mentorados
-    .filter((m) => catOkMentorado && foraDoPrograma(m) && qMentorado(m))
-    .sort(porSaidaRecente);
-  const inativasExibidas = [...inativasFiltradas].sort((a, b) =>
-    comparaNome(a.nome, b.nome)
-  );
+    .filter(
+      (m) => filtrosMentorado(m) && foraDoPrograma(m) && qMentorado(m)
+    )
+    .sort((a, b) => porRelevancia(a, b) || porSaidaRecente(a, b));
+  const inativasExibidas = [
+    ...inativas.filter((p) => filtrosPessoa(p) && qPessoa(p)),
+  ].sort((a, b) => porRelevancia(a, b) || comparaNome(a.nome, b.nome));
 
   // "pendências primeiro" usa a mesma régua dos badges da linha (termo,
-  // formação, não-entrou, sem dupla); dentro de cada grupo
-  const pessoasExibidas = pessoasEscopo.filter(qPessoa).sort((a, b) =>
-    ordem === "pendencias"
-      ? pendenciasPessoa(
-            b,
-            mentorProfiles[b.id],
-            temVaga(b),
-            assinaturas[b.id]
-          ) -
-          pendenciasPessoa(
-            a,
-            mentorProfiles[a.id],
-            temVaga(a),
-            assinaturas[a.id]
-          ) || comparaNome(a.nome, b.nome)
-      : comparaNome(a.nome, b.nome)
-  );
+  // formação, não-entrou, sem dupla); dentro de cada grupo. Com busca a
+  // relevância do match vem antes de qualquer um dos dois critérios
+  const pessoasExibidas = pessoasEscopo
+    .filter(qPessoa)
+    .sort(
+      (a, b) =>
+        porRelevancia(a, b) ||
+        (ordemEf === "pendencias"
+          ? pendenciasPessoa(
+                b,
+                mentorProfiles[b.id],
+                temVaga(b),
+                assinaturas[b.id]
+              ) -
+              pendenciasPessoa(
+                a,
+                mentorProfiles[a.id],
+                temVaga(a),
+                assinaturas[a.id]
+              ) || comparaNome(a.nome, b.nome)
+          : comparaNome(a.nome, b.nome))
+    );
   const mentoradosExibidos = mentoradosEscopo
     .filter(qMentorado)
-    .sort((a, b) =>
-      verFora
-        ? porSaidaRecente(a, b)
-        : ordem === "pendencias"
+    .sort(
+      (a, b) =>
+        porRelevancia(a, b) ||
+        (ordemEf === "pendencias"
           ? pendenciasMentorado(b, !emDupla.has(b.id), assinaturas[b.id]) -
               pendenciasMentorado(a, !emDupla.has(a.id), assinaturas[a.id]) ||
             comparaNome(a.nome, b.nome)
-          : comparaNome(a.nome, b.nome)
+          : comparaNome(a.nome, b.nome))
     );
+
+  // grade da faceta "Especialistas" (023) — mesmos recortes das linhas
+  // que valem pro catálogo: trilha via papel efetivo (a =especialista é
+  // tautológica nele, a =dpp deixa os híbridos), tema e busca fuzzy
+  const dppIds = new Set(
+    basePessoas.filter((p) => temPapel(p, "mentor_dpp")).map((p) => p.id)
+  );
+  const scoreEsp = (e: JovemEspecialista) =>
+    Math.max(
+      ...[e.nome, e.nome_social].map(
+        (t) => (t ? (fuzzyMatch(qtBusca, t)?.score ?? 0) : 0)
+      )
+    );
+  const catalogoEscopo = !usaCatalogo
+    ? []
+    : catalogo.filter(
+        (e) =>
+          (trilhaSelEf === "todas" ||
+            (trilhaSelEf === "dpp" && dppIds.has(e.id))) &&
+          (areaSelEf == null || (e.areas ?? []).includes(areaSelEf))
+      );
+  const catalogoExibidos = catalogoEscopo
+    .map((e) => ({ e, s: q ? scoreEsp(e) : 0 }))
+    .filter(({ s }) => !q || s > 0)
+    .sort(
+      (a, b) =>
+        b.s - a.s ||
+        comparaNome(a.e.nome_social || a.e.nome, b.e.nome_social || b.e.nome)
+    )
+    .map(({ e }) => e);
+
+  // ---------- agrupamento por turma ----------
+  // cada pessoa aparece em TODA turma a que pertence — os papéis dentro
+  // dela viram chips da linha. Sem evidência nenhuma → balde "Sem turma"
+  // (pré-cadastros, equipe global, quem ainda não entrou em ciclo nenhum).
+  // Sem useMemo manual: as fontes (pessoasExibidas etc.) já são derivadas
+  // a cada render — o React Compiler memoiza o bloco inteiro sozinho
+  const gruposTurma = ((): { turma: string; itens: ItemTurma[] }[] => {
+    if (!porTurma) return [];
+    const porT = new Map<string, ItemTurma[]>();
+    const distribui = (
+      item: ItemTurma,
+      ts: { turma: string; papel: PapelTurma }[]
+    ) => {
+      if (!ts.length) {
+        const arr =
+          porT.get(SEM_TURMA) ?? porT.set(SEM_TURMA, []).get(SEM_TURMA)!;
+        arr.push(item);
+        return;
+      }
+      // uma linha por turma com TODOS os papéis dela nela (dedup por turma)
+      const unica = new Map<string, PapelTurma[]>();
+      for (const t of ts)
+        unica.set(t.turma, [...(unica.get(t.turma) ?? []), t.papel]);
+      for (const [turma, papeis] of unica) {
+        const arr = porT.get(turma) ?? porT.set(turma, []).get(turma)!;
+        arr.push({ ...item, papeis });
+      }
+    };
+    for (const p of pessoasExibidas)
+      distribui(
+        { tipo: "profile", p, papeis: [] },
+        turmasDePessoa(alvoProfile(p), mapas)
+      );
+    for (const m of mentoradosExibidos)
+      distribui(
+        { tipo: "mentorado", m, papeis: [] },
+        turmasDePessoa({ tipo: "mentorado", id: m.id }, mapas)
+      );
+    // turmas mais recentes primeiro (número/período desc), "Sem turma" por último
+    const pendenciasItem = (i: ItemTurma) =>
+      i.tipo === "profile"
+        ? pendenciasPessoa(
+            i.p,
+            mentorProfiles[i.p.id],
+            temVaga(i.p),
+            assinaturas[i.p.id]
+          )
+        : pendenciasMentorado(i.m, !emDupla.has(i.m.id), assinaturas[i.m.id]);
+    return [...porT.entries()]
+      .sort(([a], [b]) =>
+        a === SEM_TURMA
+          ? 1
+          : b === SEM_TURMA
+            ? -1
+            : b.localeCompare(a, "pt-BR", { numeric: true })
+      )
+      .map(([turma, itens]) => ({
+        turma,
+        itens: itens.sort((x, y) => {
+          const nomeX = x.tipo === "profile" ? x.p.nome : x.m.nome;
+          const nomeY = y.tipo === "profile" ? y.p.nome : y.m.nome;
+          const idX = x.tipo === "profile" ? x.p.id : x.m.id;
+          const idY = y.tipo === "profile" ? y.p.id : y.m.id;
+          // dentro da turma: relevância da busca, subseção por papel
+          // contextual (mentorados → mentores → staff) e o mesmo sort
+          // nome|pendencias da lista
+          return (
+            porRelevancia({ id: idX }, { id: idY }) ||
+            rankNaTurma(x.papeis, x.tipo) - rankNaTurma(y.papeis, y.tipo) ||
+            (ordemEf === "pendencias"
+              ? pendenciasItem(y) - pendenciasItem(x)
+              : 0) ||
+            comparaNome(nomeX, nomeY)
+          );
+        }),
+      }));
+  })();
+
+  // no agrupamento por turma a pill da barra escolhe a seção exibida
+  const gruposTurmaVisiveis =
+    turmaSelEf == null
+      ? gruposTurma
+      : gruposTurma.filter((g) => g.turma === turmaSelEf);
 
   // a lista unificada em grupos — cada bloco com seu rótulo; grupo vazio
   // não renderiza (busca/filtro que zera um grupo não deixa casca). O grupo
@@ -409,145 +1035,373 @@ export function PessoasListas({
     pessoas: pessoasExibidas.filter((p) => grupoDePessoa(p) === g),
     mentorados: g === "mentorados" ? mentoradosExibidos : [],
   })).filter(({ pessoas: gp, mentorados: gm }) => gp.length + gm.length > 0);
-  const totalSecao = pessoasEscopo.length + mentoradosEscopo.length;
-  const exibidos = pessoasExibidas.length + mentoradosExibidos.length;
-  const filtrando = Boolean(q) || cat !== "todos" || verFora || verFila;
+  const totalSecao = usaCatalogo
+    ? catalogoEscopo.length
+    : pessoasEscopo.length + mentoradosEscopo.length;
+  const exibidos = usaCatalogo
+    ? catalogoExibidos.length
+    : pessoasExibidas.length + mentoradosExibidos.length;
+  const filtrando =
+    Boolean(q) ||
+    catEf !== "todos" ||
+    turmaSelEf != null ||
+    statusSelEf !== "todos" ||
+    trilhaSelEf !== "todas" ||
+    areaSelEf != null ||
+    soPendEf;
+
+  // selo do botão "Filtros": só os filtros de verdade — turma, trilha e
+  // busca já são pills/campo próprios; agrupar e ordenar são controles
+  // de visão
+  const ativosFiltro =
+    (catEf !== "todos" ? 1 : 0) +
+    (statusSelEf !== "todos" ? 1 : 0) +
+    (soPendEf ? 1 : 0);
+  const draftAtivos =
+    (draft.cat !== "todos" ? 1 : 0) +
+    (draft.status !== "todos" ? 1 : 0) +
+    (draft.pendencias ? 1 : 0);
 
   const limparFiltros = () => {
     setBusca("");
     setCat("todos");
-    setVerFora(false);
-    setVerFila(false);
+    setTurmaSel(null);
+    setStatusSel("todos");
+    setTrilhaSel("todas");
+    setAreaSel(null);
+    setSoPendencias(false);
     setOrdem("nome");
   };
 
+  const abrirFiltros = () => {
+    setDraft({
+      agrupar,
+      cat: catEf,
+      status: statusSel,
+      pendencias: soPendencias,
+      ordem,
+    });
+    setFiltrosAberto(true);
+  };
+  const aplicarDraft = () => {
+    setAgrupar(draft.agrupar);
+    setCat(draft.cat);
+    setStatusSel(draft.status);
+    setSoPendencias(draft.pendencias);
+    setOrdem(draft.ordem);
+    setFiltrosAberto(false);
+  };
+
+  // re-key por busca/filtro/ordem — a troca re-roda o animate-enter das
+  // linhas (convenção de movimento)
+  const chaveFiltros = [
+    q,
+    catEf,
+    turmaSelEf ?? "",
+    statusSelEf,
+    trilhaSelEf,
+    areaSelEf ?? "",
+    soPendEf ? "1" : "0",
+    ordemEf,
+  ].join("|");
+
+  // persistência dos recortes na URL (deep-link) — agrupar e ordenar
+  // viajam também, como preferência de leitura
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    if (busca) sp.set("busca", busca);
+    else sp.delete("busca");
+    if (catEf !== "todos") sp.set("cat", catEf);
+    else sp.delete("cat");
+    if (turmaSelEf != null)
+      sp.set("turma", turmaSelEf === SEM_TURMA ? "sem-turma" : turmaSelEf);
+    else sp.delete("turma");
+    if (statusSelEf !== "todos") sp.set("status", statusSelEf);
+    else sp.delete("status");
+    if (trilhaSelEf !== "todas") sp.set("trilha", trilhaSelEf);
+    else sp.delete("trilha");
+    if (areaSelEf != null) sp.set("area", areaSelEf);
+    else sp.delete("area");
+    if (soPendEf) sp.set("pendencias", "1");
+    else sp.delete("pendencias");
+    if (ordemEf !== "nome") sp.set("ordem", ordemEf);
+    else sp.delete("ordem");
+    if (souCoord && agrupar === "turma") sp.set("agrupar", "turma");
+    else sp.delete("agrupar");
+    const qs = sp.toString();
+    window.history.replaceState(
+      null,
+      "",
+      qs ? `?${qs}` : window.location.pathname
+    );
+  }, [
+    busca,
+    catEf,
+    turmaSelEf,
+    statusSelEf,
+    trilhaSelEf,
+    areaSelEf,
+    soPendEf,
+    ordemEf,
+    agrupar,
+    souCoord,
+  ]);
+
   return (
     <>
-      {/* barra de filtros enxuta (rodada out/2026): busca + categoria +
-          escopos. O select de papel/trilha/status morreu — o próprio
-          agrupamento da lista virou o filtro */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:max-w-sm">
-          <MagnifyingGlass
-            aria-hidden
-            size={16}
-            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-          />
-          <Input
-            type="search"
-            aria-label="Buscar pessoa"
-            placeholder={
-              souCoord ? "Buscar por nome ou e-mail" : "Buscar por nome"
-            }
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            className="pl-8"
-          />
-        </div>
-        <Select
-          value={cat}
-          onValueChange={(v) => setCat(v as CategoriaPessoas)}
-          items={{
-            todos: "Todos",
-            ...GRUPO_LABEL,
-          }}
-        >
-          <SelectTrigger
-            size="sm"
-            aria-label="Filtrar por categoria"
-            className="w-auto"
+      {/* barra de filtros (REALIZA-376 + 023): busca sempre; pro staff
+          fora da coordenação as facetas do diretório são pills próprias
+          (categoria, trilha, tema) na gramática da casa — pro coord pills
+          de turma + o modal de filtros seguem como estavam */}
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* role=search: o campo de busca fica dentro do landmark que
+              leitor de tela anuncia */}
+          <div className="relative w-full sm:max-w-sm" role="search">
+            <MagnifyingGlass
+              aria-hidden
+              size={16}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              type="search"
+              aria-label="Buscar pessoa"
+              placeholder={
+                souCoord ? "Buscar por nome ou e-mail" : "Buscar por nome"
+              }
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          {souCoord && (
+            <FiltrosButton ativos={ativosFiltro} onClick={abrirFiltros} />
+          )}
+          {/* a contagem re-anuncia quando a faceta muda — antes só mudava
+              o texto e leitor de tela não percebia */}
+          <span
+            role="status"
+            aria-live="polite"
+            className="text-xs text-muted-foreground tabular-nums"
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
-            <SelectItem value="todos">Todos</SelectItem>
-            {GRUPO_ORDEM.filter((g) => souCoord || g !== "sempapel").map(
-              (g) => (
-                <SelectItem key={g} value={g}>
-                  {GRUPO_LABEL[g]}
-                </SelectItem>
-              )
-            )}
-          </SelectContent>
-        </Select>
-        {souCoord && totalFila > 0 && (
-          <button
-            type="button"
-            aria-pressed={verFila}
-            onClick={() => {
-              setVerFila((v) => !v);
-              setVerFora(false);
-            }}
-            className={filterChipCls(verFila)}
-          >
-            Aguardando par
-            <span
-              className={cn(
-                "font-mono text-[11px] tabular-nums",
-                verFila ? "text-background/70" : "text-muted-foreground/70"
-              )}
-            >
-              {totalFila}
-            </span>
-          </button>
-        )}
-        {souCoord && (totalFora > 0 || verFora) && (
-          <button
-            type="button"
-            aria-pressed={verFora}
-            onClick={() => {
-              setVerFora((v) => !v);
-              setVerFila(false);
-            }}
-            className={filterChipCls(verFora)}
-          >
-            Fora do programa
-            <span
-              className={cn(
-                "font-mono text-[11px] tabular-nums",
-                verFora ? "text-background/70" : "text-muted-foreground/70"
-              )}
-            >
-              {totalFora}
-            </span>
-          </button>
-        )}
-        {souCoord && (
-          <Select
-            value={ordem}
-            onValueChange={(v) => setOrdem(v as OrdemPessoas)}
-            items={ORDEM_PESSOAS_LABEL}
-          >
-            <SelectTrigger
+            {exibidos} de {totalSecao}{" "}
+            {totalSecao === 1 ? "pessoa" : "pessoas"}
+          </span>
+          {filtrando && (
+            <Button
+              variant="ghost"
               size="sm"
-              aria-label="Ordenar"
-              className="ml-auto w-auto"
+              className="px-3 text-xs"
+              onClick={limparFiltros}
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false}>
-              {(
-                Object.entries(ORDEM_PESSOAS_LABEL) as [OrdemPessoas, string][]
-              ).map(([v, l]) => (
-                <SelectItem key={v} value={v}>
-                  {l}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {exibidos} de {totalSecao} {totalSecao === 1 ? "pessoa" : "pessoas"}
-        </span>
-        {filtrando && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-9 px-3 text-xs"
-            onClick={limparFiltros}
+              Limpar filtros
+            </Button>
+          )}
+        </div>
+        {/* pills de categoria do diretório (023) — a mesma gramática de
+            chip das de turma/trilha; uma linha só, rola no mobile. O
+            híbrido conta nas duas facetas de mentor e "Especialistas"
+            abre o catálogo rico em vez das linhas */}
+        {!souCoord && (
+          <FilterChipRow
+            role="group"
+            aria-label="Filtrar por categoria"
+            className="-mx-4 px-4 pb-1 sm:mx-0 sm:px-0"
           >
-            Limpar filtros
-          </Button>
+            <button
+              type="button"
+              aria-pressed={catEf === "todos"}
+              onClick={() => setCat("todos")}
+              className={filterChipCls(catEf === "todos")}
+            >
+              Todos
+            </button>
+            {CATS_DIRETORIO.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-pressed={catEf === c}
+                onClick={() => setCat(catEf === c ? "todos" : c)}
+                className={filterChipCls(catEf === c)}
+              >
+                {CAT_DIRETORIO_LABEL[c]}
+                <span
+                  className={cn(
+                    "text-[11px] tabular-nums",
+                    catEf === c
+                      ? "text-background/70"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {catInfo[c]}
+                </span>
+              </button>
+            ))}
+          </FilterChipRow>
+        )}
+        {/* pills de turma — uma linha só, rola na horizontal quando passa
+            da largura (o fade lateral do FilterChipRow marca o corte) */}
+        {souCoord &&
+          turmasInfo.turmas.length + (turmasInfo.semTurma > 0 ? 1 : 0) >
+            1 && (
+            <FilterChipRow
+              role="group"
+              aria-label="Filtrar por turma"
+              className="-mx-4 px-4 pb-1 sm:mx-0 sm:px-0"
+            >
+              <button
+                type="button"
+                aria-pressed={turmaSelEf == null}
+                onClick={() => setTurmaSel(null)}
+                className={filterChipCls(turmaSelEf == null)}
+              >
+                Todas
+              </button>
+              {turmasInfo.turmas.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  aria-pressed={turmaSelEf === t}
+                  onClick={() =>
+                    setTurmaSel(turmaSelEf === t ? null : t)
+                  }
+                  className={filterChipCls(turmaSelEf === t)}
+                  /* o chip mostra o nome longo; o rótulo cru segue no
+                     title pra desambiguar ciclos homônimos */
+                  title={t}
+                >
+                  {turmaLonga(t)}
+                  <span
+                    className={cn(
+                      "text-[11px] tabular-nums",
+                      turmaSelEf === t
+                        ? "text-background/70"
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    {turmasInfo.contagem.get(t)}
+                  </span>
+                </button>
+              ))}
+              {(turmasInfo.semTurma > 0 || turmaSelEf === SEM_TURMA) && (
+                <button
+                  type="button"
+                  aria-pressed={turmaSelEf === SEM_TURMA}
+                  onClick={() =>
+                    setTurmaSel(turmaSelEf === SEM_TURMA ? null : SEM_TURMA)
+                  }
+                  className={filterChipCls(turmaSelEf === SEM_TURMA)}
+                >
+                  Sem turma
+                  <span
+                    className={cn(
+                      "text-[11px] tabular-nums",
+                      turmaSelEf === SEM_TURMA
+                        ? "text-background/70"
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    {turmasInfo.semTurma}
+                  </span>
+                </button>
+              )}
+            </FilterChipRow>
+          )}
+        {/* mentor-track pills — one tap to the specialist catalogue (the
+            row already carries "DPP 1/2 · Esp 0/1" in the meta). Faceta
+            de todo staff (023): o papel efetivo vem do embed de papéis
+            que staff lê. Hidden when no specialist exists: an all-DPP
+            program gains nothing */}
+        {trilhaInfo.esp > 0 && (
+          <FilterChipRow
+            role="group"
+            aria-label="Filtrar por trilha de mentor"
+            className="-mx-4 px-4 pb-1 sm:mx-0 sm:px-0"
+          >
+            <button
+              type="button"
+              aria-pressed={trilhaSelEf === "todas"}
+              onClick={() => setTrilhaSel("todas")}
+              className={filterChipCls(trilhaSelEf === "todas")}
+            >
+              Todas trilhas
+            </button>
+            <button
+              type="button"
+              aria-pressed={trilhaSelEf === "dpp"}
+              onClick={() =>
+                setTrilhaSel(trilhaSelEf === "dpp" ? "todas" : "dpp")
+              }
+              className={filterChipCls(trilhaSelEf === "dpp")}
+            >
+              DPP
+              <span
+                className={cn(
+                  "text-[11px] tabular-nums",
+                  trilhaSelEf === "dpp"
+                    ? "text-background/70"
+                    : "text-muted-foreground"
+                )}
+              >
+                {trilhaInfo.dpp}
+              </span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={trilhaSelEf === "especialista"}
+              onClick={() =>
+                setTrilhaSel(
+                  trilhaSelEf === "especialista" ? "todas" : "especialista"
+                )
+              }
+              className={filterChipCls(trilhaSelEf === "especialista")}
+            >
+              Especialista
+              <span
+                className={cn(
+                  "text-[11px] tabular-nums",
+                  trilhaSelEf === "especialista"
+                    ? "text-background/70"
+                    : "text-muted-foreground"
+                )}
+              >
+                {trilhaInfo.esp}
+              </span>
+            </button>
+          </FilterChipRow>
+        )}
+        {/* chips de tema do diretório (023) — single-select, o mesmo chip
+            desmarca; o universo é o que as linhas já carregam (areas de
+            mentor, interesses dos demais e dos jovens) */}
+        {!souCoord && areasInfo.length > 0 && (
+          <FilterChipRow
+            role="group"
+            aria-label="Filtrar por área"
+            className="-mx-4 px-4 pb-1 sm:mx-0 sm:px-0"
+          >
+            {areasInfo.map(([a, n]) => (
+              <button
+                key={a}
+                type="button"
+                aria-pressed={areaSelEf === a}
+                onClick={() => setAreaSel(areaSelEf === a ? null : a)}
+                className={filterChipCls(areaSelEf === a)}
+              >
+                {a}
+                <span
+                  className={cn(
+                    "text-[11px] tabular-nums",
+                    areaSelEf === a
+                      ? "text-background/70"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {n}
+                </span>
+              </button>
+            ))}
+          </FilterChipRow>
         )}
       </div>
 
@@ -567,28 +1421,127 @@ export function PessoasListas({
           mentorProfiles={mentorProfiles}
           ocupacao={contagemPorMentor}
           assinaturas={assinaturas}
+          mapasTurma={mapas}
+          esperaDesdePorId={esperaDesdePorId}
         />
       )}
 
-      {/* lista única agrupada por categoria (rodada out/2026): um bloco
-          por grupo, linhas ricas em grade no desktop e coluna única no
-          mobile — "achar o perfil" é a tarefa, a posição do grupo já diz
-          a categoria */}
+      {/* lista única agrupada — por cargo (REALIZA-376, padrão: leitura
+          global por função) ou por turma (a pessoa aparece em cada turma
+          dela, chips de papel contextual na linha). Grade 2 colunas no
+          desktop, coluna única no mobile — "achar o perfil" é a tarefa */}
       <div className="space-y-5">
-        {grupos.map(({ g, pessoas: gp, mentorados: gm }) => (
+        {porTurma &&
+          gruposTurmaVisiveis.map(({ turma, itens }) => (
+            <section key={turma} className="space-y-2">
+              <h2 className="text-sm font-semibold tabular-nums">
+                {turma === SEM_TURMA
+                  ? "Sem turma"
+                  : turmaAno(turma)
+                    ? `${turmaLonga(turma)} · ${turmaAno(turma)}`
+                    : turmaLonga(turma)}{" "}
+                <span className="font-normal text-muted-foreground">
+                  ({itens.length})
+                </span>
+              </h2>
+              <div
+                key={`${chaveFiltros}|${turma}`}
+                className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2"
+              >
+                {itens.map((item, i) =>
+                  item.tipo === "profile" ? (
+                    <PessoaRow
+                      key={`${turma}:${item.p.id}`}
+                      p={item.p}
+                      indice={i}
+                      temHistorico={temQualquerDupla.has(item.p.id)}
+                      podeExcluir={
+                        !item.p.user_id && !temQualquerDupla.has(item.p.id)
+                      }
+                      mentorProfile={mentorProfiles[item.p.id]}
+                      usadas={{
+                        dpp: contagemPorMentor[`${item.p.id}:dpp`] ?? 0,
+                        especialista:
+                          contagemPorMentor[`${item.p.id}:especialista`] ?? 0,
+                      }}
+                      docs={assinaturas[item.p.id]}
+                      faltantesTermo={
+                        faltantes?.[item.p.id]?.["termo-voluntario"] ?? []
+                      }
+                      status={statusProfile(item.p)}
+                      papeisTurma={item.papeis}
+                      souCoord={souCoord}
+                      marca={q ? qtBusca : undefined}
+                    />
+                  ) : (
+                    <MentoradoRow
+                      key={`${turma}:${item.m.id}`}
+                      m={item.m}
+                      indice={i}
+                      emDupla={emDupla.has(item.m.id)}
+                      temDupla={temQualquerDupla.has(item.m.id)}
+                      duplaVivaId={duplaVivaPorMentorado[item.m.id] ?? null}
+                      docs={assinaturas[item.m.id]}
+                      faltantes={faltantes?.[item.m.id]}
+                      status={statusMentorado(item.m)}
+                      papeisTurma={item.papeis}
+                      souCoord={souCoord}
+                      marca={q ? qtBusca : undefined}
+                    />
+                  )
+                )}
+              </div>
+            </section>
+          ))}
+        {/* faceta "Especialistas" do diretório (023): a grade do catálogo
+            staff no lugar das linhas — card completo (foto, áreas, bio,
+            "Atende:") navegável à ficha; "Sem vagas" marca quem lotou.
+            Sem rodapé: a única ação do card é abrir a ficha, e ela já
+            mora no Link do topo */}
+        {!porTurma && usaCatalogo && catalogoExibidos.length > 0 && (
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold tabular-nums">
+              Especialistas{" "}
+              <span className="font-normal text-muted-foreground">
+                ({catalogoExibidos.length})
+              </span>
+            </h2>
+            <div
+              key={`${chaveFiltros}|especialistas`}
+              className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2"
+            >
+              {catalogoExibidos.map((e, i) => (
+                <div
+                  key={e.id}
+                  className="animate-enter"
+                  style={{ "--i": Math.min(i, 10) } as CSSProperties}
+                >
+                  <EspecialistaCatalogoCard
+                    e={e}
+                    href={`/pessoas/${e.id}`}
+                    badge={
+                      e.vagas <= 0
+                        ? { texto: "Sem vagas", cls: "text-muted-foreground" }
+                        : null
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {!porTurma &&
+          !usaCatalogo &&
+          grupos.map(({ g, pessoas: gp, mentorados: gm }) => (
           <section key={g} className="space-y-2">
             <h2 className="text-sm font-semibold tabular-nums">
-              {verFora && g === "mentorados"
-                ? "Fora do programa"
-                : GRUPO_LABEL[g]}{" "}
+              {GRUPO_LABEL[g]}{" "}
               <span className="font-normal text-muted-foreground">
                 ({gp.length + gm.length})
               </span>
             </h2>
-            {/* re-key por busca/filtro/ordem — a troca re-roda o
-                animate-enter das linhas (convenção) */}
             <div
-              key={`${q}|${cat}|${ordem}|${verFora ? 1 : 0}|${verFila ? 1 : 0}|${g}`}
+              key={`${chaveFiltros}|${g}`}
               // items-start: o Detalhes aberto cresce só o próprio card —
               // sem ele a linha do grid assume a altura do maior item e o
               // card vizinho estica vazio junto. grid-cols-1 explícito: sem
@@ -611,7 +1564,9 @@ export function PessoasListas({
                   }}
                   docs={assinaturas[p.id]}
                   faltantesTermo={faltantes?.[p.id]?.["termo-voluntario"] ?? []}
+                  status={souCoord ? statusProfile(p) : undefined}
                   souCoord={souCoord}
+                  marca={q ? qtBusca : undefined}
                 />
               ))}
               {gm.map((m, i) => (
@@ -624,14 +1579,20 @@ export function PessoasListas({
                   duplaVivaId={duplaVivaPorMentorado[m.id] ?? null}
                   docs={assinaturas[m.id]}
                   faltantes={faltantes?.[m.id]}
+                  status={souCoord ? statusMentorado(m) : undefined}
                   souCoord={souCoord}
+                  marca={q ? qtBusca : undefined}
                 />
               ))}
             </div>
           </section>
         ))}
 
-        {grupos.length === 0 && (
+        {(porTurma
+          ? gruposTurmaVisiveis.length
+          : usaCatalogo
+            ? catalogoExibidos.length
+            : grupos.length) === 0 && (
           <div className="flex flex-col items-center gap-1.5 rounded-xl bg-card py-10 text-center shadow-[var(--shadow-border)]">
             {basePessoas.length === 0 && mentorados.length === 0 ? (
               souCoord ? (
@@ -658,25 +1619,6 @@ export function PessoasListas({
                   <p className="text-sm font-medium">Nenhuma pessoa encontrada</p>
                 </>
               )
-            ) : verFora ? (
-              <>
-                <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-                  <SignOut aria-hidden size={18} />
-                </span>
-                <p className="text-sm font-medium">Ninguém fora do programa</p>
-                <p className="text-sm text-muted-foreground">
-                  Desistências e conclusões registradas no ⋮ do cadastro
-                  aparecem aqui.
-                </p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => setVerFora(false)}
-                >
-                  Ver mentorados
-                </Button>
-              </>
             ) : (
               <>
                 <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
@@ -725,9 +1667,10 @@ export function PessoasListas({
 
       {/* arquivo de quem saiu do programa (0077) — colapsável, fora do
           grupo principal pra não confundir "ativo" com "desistente"; a
-          busca força aberto pra o nome ainda ser encontrável. Com o chip
-          ligado a lista principal já é ela — não repete */}
-      {!verFora && foraExibidos.length > 0 && (
+          busca força aberto pra o nome ainda ser encontrável. No modo
+          turma quem saiu já aparece no grupo dela — o arquivo só faz
+          sentido na leitura por papel */}
+      {!porTurma && foraExibidos.length > 0 && (
         <Collapsible.Root
           open={foraAberto || Boolean(q)}
           onOpenChange={setForaAberto}
@@ -760,7 +1703,9 @@ export function PessoasListas({
                   duplaVivaId={duplaVivaPorMentorado[m.id] ?? null}
                   docs={assinaturas[m.id]}
                   faltantes={faltantes?.[m.id]}
+                  status={souCoord ? statusMentorado(m) : undefined}
                   souCoord={souCoord}
+                  marca={q ? qtBusca : undefined}
                 />
               ))}
             </div>
@@ -769,10 +1714,13 @@ export function PessoasListas({
       )}
 
       {/* idem pros cadastros desativados da equipe — mesma gramática do
-          arquivo de saídas (só coord vê; pros demais nem chegam) */}
-      {souCoord && inativasExibidas.length > 0 && (
+          arquivo de saídas (só coord vê; pros demais nem chegam). Modo
+          turma absorve os inativos nos grupos com chip próprio */}
+      {!porTurma && souCoord && inativasExibidas.length > 0 && (
         <Collapsible.Root
-          open={inativosAberto || Boolean(q)}
+          open={
+            inativosAberto || Boolean(q) || statusSelEf === "inativo"
+          }
           onOpenChange={setInativosAberto}
           className="space-y-2"
         >
@@ -809,13 +1757,183 @@ export function PessoasListas({
                   }}
                   docs={assinaturas[p.id]}
                   faltantesTermo={faltantes?.[p.id]?.["termo-voluntario"] ?? []}
+                  status={statusProfile(p)}
                   souCoord={souCoord}
+                  marca={q ? qtBusca : undefined}
                 />
               ))}
             </div>
           </Collapsible.Panel>
         </Collapsible.Root>
       )}
+
+      {/* modal de filtros (REALIZA-376) — gramática de /registros e
+          /duplas: fieldsets com rótulo OVERLINE, pílulas e checks, e um
+          rascunho que aplica tudo de uma vez. Agrupar e Ordenar são
+          controles de visão: não entram no selo de ativos e o "Limpar"
+          os preserva */}
+      <Dialog open={filtrosAberto} onOpenChange={setFiltrosAberto}>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>Filtros</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <fieldset>
+              <legend className={OVERLINE}>Agrupar</legend>
+              <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                <OpcaoPilula
+                  nome="flt-agrupar"
+                  valor="papel"
+                  atual={draft.agrupar}
+                  onSelect={(v) =>
+                    setDraft((d) => ({
+                      ...d,
+                      agrupar: v as "papel" | "turma",
+                    }))
+                  }
+                >
+                  Por cargo
+                </OpcaoPilula>
+                <OpcaoPilula
+                  nome="flt-agrupar"
+                  valor="turma"
+                  atual={draft.agrupar}
+                  onSelect={(v) =>
+                    setDraft((d) => ({
+                      ...d,
+                      agrupar: v as "papel" | "turma",
+                    }))
+                  }
+                >
+                  Por turma
+                </OpcaoPilula>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className={OVERLINE}>Categoria</legend>
+              <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                <OpcaoPilula
+                  nome="flt-cat"
+                  valor="todos"
+                  atual={draft.cat}
+                  onSelect={(v) => setDraft((d) => ({ ...d, cat: v }))}
+                >
+                  Todos
+                </OpcaoPilula>
+                {GRUPO_ORDEM.filter((g) => souCoord || g !== "sempapel").map(
+                  (g) => (
+                    <OpcaoPilula
+                      key={g}
+                      nome="flt-cat"
+                      valor={g}
+                      atual={draft.cat}
+                      onSelect={(v) => setDraft((d) => ({ ...d, cat: v }))}
+                    >
+                      {GRUPO_LABEL[g]}
+                    </OpcaoPilula>
+                  )
+                )}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className={OVERLINE}>Status</legend>
+              <div className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                <OpcaoPilula
+                  nome="flt-status"
+                  valor="todos"
+                  atual={draft.status}
+                  onSelect={(v) =>
+                    setDraft((d) => ({
+                      ...d,
+                      status: v as StatusPessoa | "todos",
+                    }))
+                  }
+                >
+                  Todos
+                </OpcaoPilula>
+                {(
+                  Object.entries(STATUS_PESSOA_LABEL) as [
+                    StatusPessoa,
+                    string,
+                  ][]
+                ).map(([v, l]) => (
+                  <OpcaoPilula
+                    key={v}
+                    nome="flt-status"
+                    valor={v}
+                    atual={draft.status}
+                    onSelect={(x) =>
+                      setDraft((d) => ({
+                        ...d,
+                        status: x as StatusPessoa | "todos",
+                      }))
+                    }
+                  >
+                    {l}
+                  </OpcaoPilula>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className={OVERLINE}>Pendências</legend>
+              <div className="mt-1.5 -mx-1 space-y-0.5">
+                <OpcaoCheck
+                  marcado={draft.pendencias}
+                  onChange={(v) =>
+                    setDraft((d) => ({ ...d, pendencias: v }))
+                  }
+                >
+                  Somente com pendências
+                </OpcaoCheck>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className={OVERLINE}>Ordenar</legend>
+              <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                {(
+                  Object.entries(ORDEM_PESSOAS_LABEL) as [
+                    OrdemPessoas,
+                    string,
+                  ][]
+                ).map(([v, l]) => (
+                  <OpcaoPilula
+                    key={v}
+                    nome="flt-ordem"
+                    valor={v}
+                    atual={draft.ordem}
+                    onSelect={(x) =>
+                      setDraft((d) => ({ ...d, ordem: x as OrdemPessoas }))
+                    }
+                  >
+                    {l}
+                  </OpcaoPilula>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+          <DialogFooter sticky>
+            <Button
+              type="button"
+              variant="ghost"
+              className="sm:me-auto"
+              disabled={draftAtivos === 0}
+              onClick={() =>
+                setDraft((d) => ({
+                  ...d,
+                  cat: "todos",
+                  status: "todos",
+                  pendencias: false,
+                }))
+              }
+            >
+              Limpar
+            </Button>
+            <Button type="button" onClick={aplicarDraft}>
+              Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -934,7 +2052,10 @@ function PessoaRow({
   usadas,
   docs: docsProp,
   faltantesTermo = [],
+  status,
+  papeisTurma,
   souCoord,
+  marca,
   emInativos = false,
 }: {
   p: Profile;
@@ -950,7 +2071,14 @@ function PessoaRow({
   docs: DocsPessoa | undefined;
   /** labels do que falta na ficha pro termo do voluntário — coord-only */
   faltantesTermo?: string[];
+  /** vocabulário de status do /pessoas (REALIZA-39) — substitui os badges
+   *  soltos de antes ("inativa", "convite enviado", "termo pendente") */
+  status?: StatusPessoas;
+  /** papéis contextuais NA turma da seção — chips no modo turma */
+  papeisTurma?: PapelTurma[];
   souCoord: boolean;
+  /** busca ativa — marca os trechos casados no nome e no meta */
+  marca?: string;
   /** Na seção "Inativos" o badge "inativa" seria redundante em cada linha —
    *  e as pendências operacionais (termo, não-entrou) não se aplicam mais. */
   emInativos?: boolean;
@@ -1061,7 +2189,14 @@ function PessoaRow({
           />
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium underline-offset-4 transition-colors group-hover:underline">
-              {p.nome_social ?? p.nome}
+              {marca ? (
+                <HighlightText
+                  texto={p.nome_social ?? p.nome}
+                  query={marca}
+                />
+              ) : (
+                (p.nome_social ?? p.nome)
+              )}
             </span>
             <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
               {/* badge de papel saiu da linha: os grupos já separam por
@@ -1070,13 +2205,25 @@ function PessoaRow({
               <span className="truncate">
                 {souCoord ? (
                   <>
-                    {metaCoord}
+                    {marca ? (
+                      <HighlightText texto={metaCoord} query={marca} />
+                    ) : (
+                      metaCoord
+                    )}
                     {semVagaDpp && (
                       <span className="text-[var(--warn-text)]">
                         {" · sem vaga"}
                       </span>
                     )}
                   </>
+                ) : marca ? (
+                  <HighlightText
+                    texto={
+                      [trilha, subtitulo].filter(Boolean).join(" · ") ||
+                      "\u00A0"
+                    }
+                    query={marca}
+                  />
                 ) : (
                   [trilha, subtitulo].filter(Boolean).join(" · ") || "\u00A0"
                 )}
@@ -1102,18 +2249,41 @@ function PessoaRow({
             )}
           </span>
         </Link>
-        {/* idem pro não-coord: sem badge de papel à direita — a seção já
-            nomeia o grupo e o subtítulo (cargo · empresa / cidade · UF)
-            vale mais que repetir o rótulo */}
-        {souCoord && !p.ativo && !emInativos && (
+        {/* papéis contextuais da turma (modo turma): o que a pessoa faz
+            NAQUELE ciclo — mentor DPP, especialista, auxiliar, aguardando */}
+        {papeisTurma?.map((pp) => (
+          <Badge
+            key={pp}
+            variant="outline"
+            className="text-xs shrink-0 bg-muted/60"
+          >
+            {PAPEL_TURMA_LABEL[pp]}
+          </Badge>
+        ))}
+        {/* status operacional (REALIZA-39): primário + pendências
+            secundárias no vocabulário fechado — substitui os badges
+            soltos de antes. "não convidado" fica como dica de ação: quem
+            nem conta tem não cabe no vocabulário (cai em "ativo" com as
+            pendências dela) mas é o alvo natural do convite em lote */}
+        {status && <StatusChips status={status} />}
+        {souCoord && status && p.ativo && !p.user_id && !p.onboarded_em && (
+          <Badge variant="outline" className="text-xs shrink-0">
+            não convidado
+          </Badge>
+        )}
+        {/* sem status (diretório não-coord): sem badge de papel à direita
+            — a seção já nomeia o grupo e o subtítulo vale mais */}
+        {!status && souCoord && !p.ativo && !emInativos && (
           <Badge variant="outline" className="text-xs shrink-0 border-[var(--danger)]/50 text-[var(--danger)]">
             inativa
           </Badge>
         )}
-        {souCoord && p.ativo && !p.user_id && (
-          <Badge variant="outline" className="text-xs shrink-0">ainda não entrou</Badge>
+        {!status && souCoord && p.ativo && !p.onboarded_em && (
+          <Badge variant="outline" className="text-xs shrink-0">
+            {p.user_id ? "convite enviado" : "não convidado"}
+          </Badge>
         )}
-        {souCoord && p.ativo && !termoOk && (
+        {!status && souCoord && p.ativo && !termoOk && (
           <Badge
             variant="outline"
             className="text-xs shrink-0 border-[var(--warn)]/60 text-[var(--warn-text)]"
@@ -1297,9 +2467,11 @@ function PessoaRow({
                 Termo de adesão pendente de assinatura
               </ItemDetalhe>
             ))}
-          {p.ativo && !p.user_id && (
+          {p.ativo && !p.onboarded_em && (
             <ItemDetalhe icone={UserPlus}>
-              Ainda não entrou na plataforma
+              {p.user_id
+                ? "Convite enviado, aguardando o primeiro acesso"
+                : "Ainda não entrou na plataforma"}
             </ItemDetalhe>
           )}
           {p.email && (
@@ -1338,7 +2510,10 @@ function MentoradoRow({
   duplaVivaId,
   docs: docsProp,
   faltantes,
+  status,
+  papeisTurma,
   souCoord,
+  marca,
 }: {
   m: Mentorado;
   indice: number;
@@ -1350,7 +2525,14 @@ function MentoradoRow({
   docs: DocsPessoa | undefined;
   /** slug → labels de faltante civil da ficha (coord-only, labels só) */
   faltantes?: Record<string, string[]>;
+  /** vocabulário de status do /pessoas (REALIZA-39) — fora do programa
+   *  segue com a badge de situação (mais informativa que "inativo") */
+  status?: StatusPessoas;
+  /** papéis contextuais NA turma da seção — chips no modo turma */
+  papeisTurma?: PapelTurma[];
   souCoord: boolean;
+  /** busca ativa — marca os trechos casados no nome e no meta */
+  marca?: string;
 }) {
   const detalhesId = `detalhes-${m.id}`;
   // quem saiu do programa (0077): fora do grupo principal — sem badges de
@@ -1360,24 +2542,28 @@ function MentoradoRow({
   // LGPD: parear menor sem a autorização do responsável é pendência jurídica.
   // Vale tanto o upload manual (documento_path) quanto a assinatura por link.
   const docs = docsProp ?? DOCS_VAZIO;
-  // 0046: quem assina o termo de participação é o próprio jovem — pra menor
-  // de idade a coordenação emite a autorização do responsável NO LUGAR dele.
-  // Exigir os dois pra todos marcava adulto como "autorização pendente".
-  const anos = idade(m.data_nascimento);
-  const menor = anos != null && anos < 18;
+  // 0046: menor de idade deve os DOIS documentos — o próprio termo de
+  // participação (assinado pelo jovem) e a autorização do responsável.
+  // Um só quitado segue pendente; adulto e sem nascimento devem só o termo.
+  const devidos = docsDevidosMentorado(m);
+  const menor = devidos.length > 1;
   const autData = docs.assinado["autorizacao-responsavel"];
   const termoData = docs.assinado["termo-mentorando"];
-  const autorizacaoOk = Boolean(m.documento_path) || autData !== undefined;
-  const termoOk = termoData !== undefined;
+  const autorizacaoOk = docOkMentorado(m, "autorizacao-responsavel", docs);
+  const termoOk = docOkMentorado(m, "termo-mentorando", docs);
   const autEnviada = docs.pendente.includes("autorizacao-responsavel");
   const termoEnviado = docs.pendente.includes("termo-mentorando");
-  const docOk = menor ? autorizacaoOk : termoOk;
-  const docEnviado = menor ? autEnviada : termoEnviado;
+  const docOk = docsOkMentorado(m, docs);
+  const faltando = devidos.filter((s) => !docOkMentorado(m, s, docs));
+  // "enviado" = ao menos um devido no ar — a linha ainda acusa a pendência,
+  // mas sem a urgência de "nada foi emitido ainda"
+  const docEnviado = faltando.some((s) => docs.pendente.includes(s));
   const temPendencia = !docOk && !fora;
-  // lacuna civil do documento que vale pra essa pessoa (autorização olha a
-  // ficha do responsável; o termo olha a do jovem)
-  const faltantesDoc =
-    faltantes?.[menor ? "autorizacao-responsavel" : "termo-mentorando"] ?? [];
+  // lacunas civis dos documentos devidos — a autorização olha a ficha do
+  // responsável, o termo a do jovem; a união dedup cobre os dois
+  const faltantesDoc = [
+    ...new Set(devidos.flatMap((s) => faltantes?.[s] ?? [])),
+  ];
   const temDocs =
     temPendencia ||
     Object.keys(docs.assinado).length > 0 ||
@@ -1417,11 +2603,18 @@ function MentoradoRow({
                   fora && "text-muted-foreground"
                 )}
               >
-                {m.nome_social ?? m.nome}
+                {marca ? (
+                  <HighlightText
+                    texto={m.nome_social ?? m.nome}
+                    query={marca}
+                  />
+                ) : (
+                  (m.nome_social ?? m.nome)
+                )}
               </span>
             </span>
             <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-              {metaLinha}
+              {marca ? <HighlightText texto={metaLinha} query={marca} /> : metaLinha}
             </span>
           </span>
         </Link>
@@ -1439,7 +2632,30 @@ function MentoradoRow({
             {SITUACAO_MENTORADO_LABEL[m.situacao ?? "ativo"]}
           </Badge>
         )}
-        {souCoord && !fora && !docOk && (
+        {/* papéis contextuais da turma — "Mentorado(a)" / "Aguardando par"
+            por evidência (dupla, inscrição), não pelo cadastro */}
+        {papeisTurma?.map((pp) => (
+          <Badge
+            key={pp}
+            variant="outline"
+            className="text-xs shrink-0 bg-muted/60"
+          >
+            {PAPEL_TURMA_LABEL[pp]}
+          </Badge>
+        ))}
+        {/* status operacional (REALIZA-39): docs/vínculo/acesso no
+            vocabulário fechado — quem saiu segue com a badge de situação
+            acima (Desistente/Concluiu informam mais que "inativo"). "não
+            convidado" fica como dica de ação junto aos chips */}
+        {status && !fora && <StatusChips status={status} />}
+        {souCoord && status && !fora && !m.profile_id && m.email && (
+          <Badge variant="outline" className="text-xs shrink-0">
+            não convidado
+          </Badge>
+        )}
+        {/* fallback sem o mapa de status (defensivo — hoje toda linha
+            coord passa status): mantém os badges antigos */}
+        {!status && souCoord && !fora && !docOk && (
           <Badge
             variant="outline"
             className={cn(
@@ -1449,12 +2665,25 @@ function MentoradoRow({
             )}
           >
             {docEnviado
-              ? menor
-                ? "autorização enviada"
-                : "termo enviado"
-              : menor
-                ? "autorização pendente"
-                : "termo pendente"}
+              ? faltando.length > 1
+                ? "documentos enviados"
+                : faltando[0] === "autorizacao-responsavel"
+                  ? "autorização enviada"
+                  : "termo enviado"
+              : faltando.length > 1
+                ? "documentos pendentes"
+                : faltando[0] === "autorizacao-responsavel"
+                  ? "autorização pendente"
+                  : "termo pendente"}
+          </Badge>
+        )}
+        {!status && souCoord && !fora && (m.email || m.profile_id) && (
+          <Badge variant="outline" className="text-xs shrink-0">
+            {m.profile_id
+              ? m.conta?.onboarded_em
+                ? "conta vinculada"
+                : "convite enviado"
+              : "não convidado"}
           </Badge>
         )}
         {/* Detalhes + ⋮ no mesmo cluster — quebram juntos pra linha 2, sem
@@ -1506,22 +2735,22 @@ function MentoradoRow({
               )}
             </ItemDetalhe>
           )}
-          {!menor && (
-            <ItemDetalhe icone={FileText} warn={!termoOk}>
-              {termoOk ? (
-                <LinkAssinatura id={termoData!.id}>
-                  {`Termo de participação assinado${termoData!.em ? ` em ${fmtDia(termoData!.em)}` : ""}`}
-                </LinkAssinatura>
-              ) : termoEnviado ? (
-                "Termo de participação enviado, aguardando assinatura"
-              ) : (
-                "Termo de participação ainda não enviado"
-              )}
-            </ItemDetalhe>
-          )}
+          {/* o termo é devido por todos — pra menor aparece AO LADO da
+              autorização, não no lugar dela */}
+          <ItemDetalhe icone={FileText} warn={!termoOk}>
+            {termoOk ? (
+              <LinkAssinatura id={termoData!.id}>
+                {`Termo de participação assinado${termoData!.em ? ` em ${fmtDia(termoData!.em)}` : ""}`}
+              </LinkAssinatura>
+            ) : termoEnviado ? (
+              "Termo de participação enviado, aguardando a assinatura do jovem"
+            ) : (
+              "Termo de participação ainda não enviado"
+            )}
+          </ItemDetalhe>
           {!docOk && faltantesDoc.length > 0 && (
             <ItemDetalhe icone={FileText} warn>
-              {`Civis incompletos pro documento (falta: ${faltantesDoc.join(" · ")}) · quem assina completa na hora`}
+              {`Civis incompletos ${devidos.length > 1 ? "pros documentos" : "pro documento"} (falta: ${faltantesDoc.join(" · ")}) · quem assina completa na hora`}
             </ItemDetalhe>
           )}
         </DetalhesRegiao>

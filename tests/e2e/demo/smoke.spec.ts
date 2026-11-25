@@ -63,13 +63,21 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
   await page.waitForURL((url) => url.pathname === "/jovem");
 
   // primeiro acesso da persona: wizard do jovem (REALIZA-114), não o de
-  // staff — boas-vindas → grade semanal → termo (a Bia tem o
-  // termo-mentorando pendente na fixture) → contato
+  // staff — boas-vindas → tour das telas → grade semanal → termo (a Bia
+  // tem o termo-mentorando pendente na fixture) → contato
   await expect(
-    page.getByRole("heading", { name: /Bem-vindo\(a\) ao Realiza, Bia/i })
+    page.getByRole("heading", { name: /Boas-vindas ao Realiza\.vc, Bia/i })
   ).toBeVisible();
 
-  // passo da grade: a ficha demo da Bia já traz ter/qui × noite pré-marcada
+  // passo do tour (REALIZA-426): os itens são botões que trocam o print da
+  // tela real — o mesmo desenho do passo de recursos do wizard de staff
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(
+    page.getByRole("heading", { name: "O que você pode fazer aqui" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Seus combinados/ })
+  ).toBeVisible();
   await page.getByRole("button", { name: "Continuar" }).click();
   await expect(
     page.getByRole("heading", { name: "Quando dá pra você?" })
@@ -94,7 +102,7 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
   await page.getByRole("button", { name: "Continuar" }).click();
 
   // passo do termo de participação — a Bia tem o termo-mentorando pendente
-  // emitido na fixture demo, então o wizard dela é 4 passos; "Assinar
+  // emitido na fixture demo, então o wizard dela é 5 passos; "Assinar
   // depois" preserva a pendência e segue pro contato
   await expect(
     page.getByRole("heading", { name: "Seu termo de participação" })
@@ -128,12 +136,12 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
     hasText: "Resolver os 10 exercícios",
   });
   await pendente.click();
+  // 526: na demo o combinado do jovem também muta em estado local
   await expect(
-    page.getByText("Modo demonstração. Nada é gravado de verdade.")
+    page.getByText("Combinado marcado como feito.")
   ).toBeVisible();
-  await expect(
-    combinados.getByRole("checkbox").first()
-  ).not.toBeChecked();
+  await page.getByRole("button", { name: /Ver \d+ feitos/ }).click();
+  await expect(pendente.getByRole("checkbox")).toBeChecked();
 
   // a DemoBar segue no shell da jovem — trocar de papel volta pra staff
   const demoTrigger = page.getByRole("button", {
@@ -147,6 +155,32 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
   await expect(
     page.getByRole("button", { name: "Controles da demonstração" })
   ).toContainText("Coordenação");
+});
+
+test("DemoBar: cinco papéis e nenhuma variante de conta órfã", async ({
+  page,
+}) => {
+  // REALIZA-381: a persona "Jovem · conta sem ficha vinculada" saiu da
+  // DemoBar — ela parecia um papel mas é um estado de produção (conta sem
+  // ficha vinculada), que segue coberto pelo fluxo real de onboarding
+  await entrarNaDemo(page, "coordenacao");
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Controles da demonstração" })
+    .click();
+
+  for (const nome of [
+    /Coordenação/,
+    /Auxiliar executivo/,
+    /Mentor DPP/,
+    /Mentor especialista/,
+    /^Mentorado/,
+  ]) {
+    await expect(page.getByRole("button", { name: nome })).toBeVisible();
+  }
+  await expect(
+    page.getByRole("button", { name: /sem ficha vinculada/ })
+  ).toHaveCount(0);
 });
 
 test("stub demo: tabelas da rodada têm dataset (sem aviso no console)", async ({

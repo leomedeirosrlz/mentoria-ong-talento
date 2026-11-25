@@ -7,19 +7,45 @@
 //     formam o grupo de uma meta; submetas_N é o desdobramento do PDM.
 
 import {
+  INSTRUMENTOS_DUPLA_SISTEMA,
   INSTRUMENTOS_SISTEMA,
   type FormularioCampo,
   type FormularioSistema,
+  type InstrumentoDuplaSistema,
   type InstrumentoSistema,
 } from "./schema";
 
 /** O sistema é um dos 4 instrumentos de jornada (0080) com experiência
  *  sob medida no /f/<token> — 360/avaliação da trilha, intakes e forms
- *  criados pela coordenação seguem no renderer genérico. */
+ *  criados pela coordenação seguem no renderer genérico. O checklist do
+ *  mentor (0190) fica fora: o preenchimento é o renderer genérico mesmo
+ *  (10 selects + 1 texto livre) — a diferença dele é só no resultado. */
 export function ehInstrumento(
   s: FormularioSistema | null | undefined
 ): s is InstrumentoSistema {
   return !!s && (INSTRUMENTOS_SISTEMA as readonly string[]).includes(s);
+}
+
+/** Os 5 instrumentos emitidos pela ficha da dupla (0080 + 0190) — a via é
+ *  sempre emitir_link_instrumento (carrega dupla_id/momento/destinatário),
+ *  nunca o link genérico; e os 5 têm resultado estruturado na leitura. */
+export function ehInstrumentoDeDupla(
+  s: FormularioSistema | null | undefined
+): s is InstrumentoDuplaSistema {
+  return !!s && (INSTRUMENTOS_DUPLA_SISTEMA as readonly string[]).includes(s);
+}
+
+/** Largura do container de /f/<token> por sistema (022/US3): os 4
+ *  instrumentos sob medida ganham a coluna de documento no desktop —
+ *  `sm:max-w-3xl` (768px) é o mínimo em que a nav de 180px do PDM sobra
+ *  com coluna de documento ≥ ~560px (o split interno dispara a 47.5rem).
+ *  Todo o resto (360, intakes, desfecho, forms genéricos, link sem
+ *  sistema) segue na coluna estreita de leitura. A base sem prefixo é
+ *  sempre `max-w-xl` — o mobile não muda nunca. */
+export function larguraPublicaForm(
+  s: FormularioSistema | null | undefined
+): string {
+  return ehInstrumento(s) ? "max-w-xl sm:max-w-3xl" : "max-w-xl";
 }
 
 // ---------- agrupamento por seções ----------
@@ -249,4 +275,19 @@ export function extraiGruposMeta(campos: FormularioCampo[]): GrupoMetaCampos[] {
       Boolean(g.meta)
     )
     .sort((a, b) => a.n - b.n);
+}
+
+/** Ids que as fichas de meta consomem do template inteiro (meta_N +
+ *  subcampos). O renderer resolve o grupo pelo N, não pelo capítulo —
+ *  um submetas_N declarado no capítulo legado "Mapa de submetas" (0080)
+ *  renderiza dentro da ficha da meta N e some do capítulo, que vira
+ *  fallback só do que sobrou órfão (submetas_M sem meta_M). */
+export function idsEmGruposMeta(grupos: GrupoMetaCampos[]): Set<string> {
+  return new Set(
+    grupos.flatMap((g) =>
+      [g.meta, g.is, g.prazo, g.porque, g.submetas]
+        .filter((c): c is FormularioCampo => c != null)
+        .map((c) => c.id)
+    )
+  );
 }

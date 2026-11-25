@@ -137,6 +137,11 @@ export function demoAtivoClient(): boolean {
 // par client do mesmo nome em mode.ts (módulo server — não importa aqui)
 const DEMO_LIDAS_COOKIE = "demo_lidas";
 
+/** Sessão de evals da demo (lib/demo/ia-evals): defs dos runs criados no
+ *  painel + células executadas + lápides do histórico. Estado do browser
+ *  como as lidas — sai junto na limpeza de sessão. */
+export const DEMO_EVAL_COOKIE = "demo_eval";
+
 /** Login real venceu: sai do modo demo apagando no browser o papel, os
  *  "já vi" das personas e o mural-lidas local. Sem isso o cookie demo_role
  *  (30 dias) seguiria desviando a navegação e todo createClient() do app
@@ -147,6 +152,7 @@ export function limparCookiesDemo() {
     DEMO_ROLE_COOKIE,
     DEMO_LIDAS_COOKIE,
     DEMO_TERMO_COOKIE,
+    DEMO_EVAL_COOKIE,
     ...DEMO_ROLES.map(demoObCookie),
   ]) {
     document.cookie = `${nome}=;path=/;max-age=0`;

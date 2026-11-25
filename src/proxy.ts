@@ -21,5 +21,7 @@ export const config = {
   // cobre raiz E rotas aninhadas (/f/<token>/opengraph-image, se existir).
   // /monitoring é o tunnel do Sentry (withSentryConfig.tunnelRoute): o POST
   // do browser precisa chegar no rewrite sem redirect pra /login.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|llms.txt|monitoring(?:/|$)|.*opengraph-image.*|.*twitter-image.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp|txt)$).*)"],
+  // /supabase é o proxy same-origin do Supabase local — o rewrite acontece
+  // depois do proxy; sem excluir aqui o login seria redirecionado pra /login.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|llms.txt|monitoring(?:/|$)|supabase(?:/|$)|.*opengraph-image.*|.*twitter-image.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp|txt)$).*)"],
 };

@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { audienciasDe } from "@/lib/materiais";
+import {
+  hrefMaterial,
+  materiaisDoNumero,
+} from "@/lib/materiais";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
@@ -8,12 +11,11 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   BookOpen,
-  CalendarBlank,
-  CalendarPlus,
   CaretDown,
   ClockCounterClockwise,
   HandHeart,
   VideoCamera,
+  Warning,
 } from "@phosphor-icons/react/dist/ssr";
 import { Collapsible } from "@base-ui/react/collapsible";
 import {
@@ -23,6 +25,7 @@ import {
   getDuplaVinculo,
   getDuplasResumo,
   getDuplasResumoTodas,
+  getEncerramentosResumo,
   getEspecialistaEventos,
   getMateriais,
   getMe,
@@ -35,7 +38,7 @@ import {
 import {
   getAvaliacaoEspDaDupla,
   getDevolutivasDupla,
-  getEspecialistas,
+  getEspecialistasCatalogo,
   getPropostas,
   getSlotsLivres,
   getSolicitacoesDaDupla,
@@ -50,7 +53,13 @@ import {
 import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getPdmDaDupla, getPdmResumo } from "@/lib/queries-pdm";
-import { dadosResumoJornada, encerramentoDecidido } from "@/lib/encerramento";
+import {
+  dadosResumoJornada,
+  encerramentoDecidido,
+  fechamentoEmFoco,
+} from "@/lib/encerramento";
+import { dadosRetrospectiva } from "@/lib/retrospectiva";
+import { resumoAvaliacaoJovem } from "@/lib/avaliacao-agregado";
 import { getAnexosPorRegistros } from "@/lib/anexos";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -60,7 +69,9 @@ import { DuplaNomes } from "@/components/dupla-nomes";
 import { VoltarLink } from "@/components/voltar-link";
 import {
   alvoAgendamento,
+  cobertosDaDupla,
   encontroDoPassoEsp,
+  encontroTemConteudo,
   eventoDaSemana,
   eventosDoCronograma,
   formatDate,
@@ -71,6 +82,8 @@ import {
   linkSeguro,
   passoEsp,
   passosDaTrilha,
+  podeEntrarAgora,
+  progressoTrilha,
   saudadeDaDupla,
   SITUACAO_MENTORADO_LABEL,
   toDateStr,
@@ -90,11 +103,25 @@ import {
   VozDoJovemEspecialista,
 } from "@/components/avaliacao-jovem";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import { PlanoEmDiaCard } from "@/components/plano-em-dia-card";
+import { AcordosCentral } from "@/components/acordos-central";
+import { RecessoDuplaCard } from "@/components/recesso-dupla-card";
+import { montarPlanoEmDia } from "@/lib/plano-em-dia";
+import {
+  carregarRoteirosDaDupla,
+  planoVigente,
+} from "@/lib/plano-roteiros-servico";
+import {
+  gradesDaDupla,
+  sugestoesEncontroDaDupla,
+} from "@/lib/sugestoes-encontro-server";
+import { disponibilidadesDaDupla } from "@/lib/actions";
+import { createClient } from "@/lib/supabase/server";
+import { demoAtivo } from "@/lib/demo/mode";
+import { getDemoData, supervisionaDuplaDemo } from "@/lib/demo/data";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
-import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
 import { RemanejoSugerido } from "@/components/remanejo-sugerido";
 import { ArquivosDupla } from "@/components/arquivos-dupla";
-import { PedirApoioDialog } from "@/components/pedir-apoio-dialog";
 import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { SolicitacaoStatusChip } from "@/components/solicitacao-status-chip";
 import { DevolutivaComposer } from "@/components/devolutivas-card";
@@ -103,6 +130,7 @@ import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
 import { TrilhaFechamento } from "@/components/trilha-fechamento";
 import { EncerramentoDupla } from "@/components/encerramento-dupla";
 import { ResumoJornadaSection } from "@/components/resumo-jornada";
+import { RetrospectivaJornada } from "@/components/retrospectiva-jornada";
 import { DesfechoDuplaCard } from "@/components/desfecho-dupla";
 import {
   SolicitacaoNegociacao,
@@ -116,20 +144,29 @@ import { MarcoNotifier } from "@/components/marco-notifier";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { temPapel } from "@/lib/types";
-import type { Dupla, Encontro, Material } from "@/lib/types";
-import { filaMentorados } from "@/lib/fila";
+import type { Dupla, Encontro } from "@/lib/types";
+import { disponivelDesdePorId, filaMentorados } from "@/lib/fila";
 import {
   ladoDeMentor,
   ladoDeMentorado,
+  motivoSugestaoRemanejo,
   ranquearMentorados,
   ranquearMentores,
+  sugereRemanejo,
 } from "@/lib/remanejo";
 import { cn } from "@/lib/utils";
 import { turmaLonga } from "@/lib/turma";
 import { parseAba } from "./ficha-abas";
 import { FichaAbas } from "./ficha-abas-tabs";
 import { AbaPorHash } from "./aba-por-hash";
+import { RemanejoFlash } from "./remanejo-flash";
 import { EncontroRow } from "./encontro-row";
+import {
+  coberturaDaSessao,
+  combinadosPendentesDaDupla,
+  filaRegistrosPendentes,
+  sessaoGrupoDaSessao,
+} from "@/lib/registro-contexto";
 import { acaoWhatsAppDupla } from "@/lib/acao-lembrete";
 
 /** Pools da sugestão de remanejo (REALIZA-115): mentores do papel da
@@ -138,13 +175,15 @@ import { acaoWhatsAppDupla } from "@/lib/acao-lembrete";
  *  "Aguardando par" pura ranqueada por afinidade com o mentor. As queries
  *  são as do board /pessoas — React.cache reusa o que a página já buscou. */
 async function montarSugestaoRemanejo(dupla: Dupla) {
-  const [pessoas, mentorados, mps, resumo, resumoTodas] = await Promise.all([
-    getPessoas(),
-    getMentorados(),
-    getMentorProfiles(),
-    getDuplasResumo(),
-    getDuplasResumoTodas(),
-  ]);
+  const [pessoas, mentorados, mps, resumo, resumoTodas, encerramentos] =
+    await Promise.all([
+      getPessoas(),
+      getMentorados(),
+      getMentorProfiles(),
+      getDuplasResumo(),
+      getDuplasResumoTodas(),
+      getEncerramentosResumo(),
+    ]);
   const mpMap: Record<string, MentorProfile> = Object.fromEntries(
     mps.map((mp) => [mp.profile_id, mp])
   );
@@ -158,7 +197,12 @@ async function montarSugestaoRemanejo(dupla: Dupla) {
     ocupados.add(d.mentorado_id);
   }
   const historico = new Set(resumoTodas.map((d) => d.mentorado_id));
-  const fila = filaMentorados(mentorados, ocupados, historico);
+  const fila = filaMentorados(
+    mentorados,
+    ocupados,
+    historico,
+    disponivelDesdePorId(resumoTodas, encerramentos)
+  );
   const papel =
     dupla.trilha === "especialista" ? "mentor_especialista" : "mentor_dpp";
   // os lados que ficam vêm do cadastro completo — o embed da dupla não
@@ -231,10 +275,10 @@ export default async function DuplaPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ aba?: string }>;
+  searchParams: Promise<{ aba?: string; remanejada?: string }>;
 }) {
   const { id } = await params;
-  const { aba: abaParam } = await searchParams;
+  const { aba: abaParam, remanejada } = await searchParams;
   const aba = parseAba(abaParam);
   const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, instrumentos, terceiros, pdm] =
     await Promise.all([
@@ -268,6 +312,20 @@ export default async function DuplaPage({
 
   const souMentor = dupla.mentor.id === me.id;
   const souCoord = me.role === "coordenacao";
+  // "staff" do plano (518): coordenação OU quem supervisiona a dupla —
+  // auxiliar de turma incluso. A régua é a RPC supervisiona_dupla, a
+  // mesma que a plano_propor aplica no banco: o supervisor_id da tela
+  // deixava a supervisão por turma de fora. O mentor nunca é staff da
+  // própria dupla.
+  const supervisionaDupla =
+    !souMentor &&
+    !souCoord &&
+    ((await demoAtivo())
+      ? supervisionaDuplaDemo(getDemoData(), me.id, dupla)
+      : (await (await createClient()).rpc("supervisiona_dupla", {
+          p_dupla: id,
+        })).data === true);
+  const souStaff = souCoord || supervisionaDupla;
   // linhagem do remanejo (0063): a ficha nova aponta a origem, a encerrada
   // aponta a sucessora. As queries voltam null quando a outra ponta está
   // fora do escopo do papel (RLS — quem saiu não enxerga a ficha nova) e a
@@ -307,6 +365,16 @@ export default async function DuplaPage({
     !ehEsp ? getPdmResumo(id) : null,
   ]);
   const solicitacao = solicitacoes[0] ?? null;
+
+  // roteiros do plano (020): a ficha é a superfície que nasce o lazy —
+  // semanas devidas viram rows publicadas na leitura (idempotente via RPC)
+  const roteirosInfo = planoVigente(dupla)
+    ? await carregarRoteirosDaDupla({
+        duplaId: id,
+        dupla,
+        lado: souMentor ? "mentor" : "staff",
+      })
+    : null;
   // o pedido que ocupa a vaga agora (0074 — "em aberto" inclui triagem e
   // negociação; o status_efetivo já desconta o slot vencido, então um
   // expirado NÃO bloqueia — bate com o dedup do criarSolicitacao).
@@ -322,6 +390,14 @@ export default async function DuplaPage({
     solicitacoes.find((s) =>
       STATUS_SOL_ABERTA.has(s.status_efetivo ?? s.status)
     ) ?? null;
+  // o estado do pedido EM ABERTO mora num lugar só: o card "Pedidos em
+  // aberto" (review 21/11, #9). O chip do cabeçalho segue valendo pros
+  // estados terminais que o card não cobre (aceita, recusada, expirada,
+  // trilha encerrada)
+  const solEstadoNoCard =
+    solicitacao != null &&
+    (solicitacao.status === "sugerida" ||
+      STATUS_SOL_ABERTA.has(solicitacao.status_efetivo ?? solicitacao.status));
   // a negociação precisa da thread e dos slots livres do especialista da
   // mesa — o contra da equipe também sai da grade dele (regra da RPC)
   const espDaMesa =
@@ -331,6 +407,11 @@ export default async function DuplaPage({
   );
   const estrelaEspPorEncontro = new Map(
     espAvaliacoes.map((a) => [a.encontro_id, a.estrelas])
+  );
+  // encontro_id → passo do guia: na trilha esp o e.numero é a tentativa
+  // física, e a linha "sessão N" mostra o passo (mesma régua do helper)
+  const passoPorEncontroEsp = new Map(
+    dupla.encontros.map((e) => [e.id, passoEsp(e, dupla.encontros)])
   );
   const realizadosCount = dupla.encontros.filter(
     (e) => e.status === "realizado"
@@ -367,10 +448,11 @@ export default async function DuplaPage({
     await Promise.all([
       solEmAberto ? getPropostas(solEmAberto.id) : Promise.resolve([]),
       espDaMesa ? getSlotsLivres(espDaMesa) : Promise.resolve([]),
-      podeSolicitar || podeSugerir ? getEspecialistas() : Promise.resolve([]),
-      souCoord &&
-      (saude.semaforo === "risco" || saude.apoio.aberto) &&
-      (dupla.status === "ativa" || dupla.status === "pausada")
+      // a escolha do especialista é por cards do catálogo rico (023)
+      podeSolicitar || podeSugerir
+        ? getEspecialistasCatalogo()
+        : Promise.resolve([]),
+      souCoord && sugereRemanejo(dupla, saude)
         ? montarSugestaoRemanejo(dupla)
         : Promise.resolve(null),
       !souMentor
@@ -389,6 +471,68 @@ export default async function DuplaPage({
   const { proximoNumero, encontroAlvo, sugeridoProximo, faltantes } =
     alvoAgendamento(dupla, eventos);
   const jornada = jornadaDaDupla(dupla, passos);
+  // catch-up plan (REALIZA-397): same journey derivation — the card only
+  // shows at 2+ due steps; a single delay stays on the usual "Agendar Nº" CTA.
+  // Everything already scheduled or done = nothing to plan. A grade
+  // combinada entra como preferência forte (518): mesma régua da
+  // simulação da superfície — os dois lados marcam períodos livres e as
+  // datas preferem os dias em comum, sem nunca bloquear.
+  const { mentor: gradeMentor, jovem: gradeJovem } =
+    await disponibilidadesDaDupla(id);
+  const planoEmDia = montarPlanoEmDia({
+    dupla,
+    eventos,
+    hoje: agora,
+    disponibilidade: gradesDaDupla(gradeMentor, gradeJovem),
+  });
+  const passosAgendaveis = planoEmDia.aplicavel
+    ? planoEmDia.passos.filter((p) => p.acao !== "travado")
+    : [];
+  const mostrarPlanoEmDia =
+    planoEmDia.aplicavel &&
+    !planoEmDia.emDia &&
+    passosAgendaveis.length >= 2 &&
+    dupla.status === "ativa";
+
+  // 482: o pacote do motor pras linhas do combinado na ficha — a mesma
+  // régua da agenda do jovem (sugestão pré-preenchida + chips do "Outra
+  // data"); a leitura da equipe não paga: só roda com plano vivo
+  const planoVivoFicha =
+    (dupla.planos ?? []).find((p) =>
+      ["proposto", "aceito", "ativo"].includes(p.status)
+    ) ?? null;
+  const sugestoesPlano = planoVivoFicha
+    ? await sugestoesEncontroDaDupla({
+        encontros: dupla.encontros,
+        plano: {
+          ritmo: planoVivoFicha.escopo?.ritmo,
+          janela: planoVivoFicha.escopo?.janela,
+          passos: planoVivoFicha.escopo?.passos,
+          passos_aplicados: planoVivoFicha.passos,
+        },
+        duplaId: dupla.id,
+        agora,
+        // staff não alcança as outras duplas do jovem — o choque aqui é só
+        // com os encontros marcados da própria ficha
+        ocupados: dupla.encontros
+          .filter(
+            (e) =>
+              (e.status === "agendado" || e.status === "remarcado") &&
+              e.data_hora != null
+          )
+          .map((e) => ({
+            inicio: e.data_hora!,
+            // na trilha esp o numero é a tentativa — o rótulo de choque
+            // também lê o passo do guia, como o resto da ficha (REALIZA-498)
+            rotulo: ehEsp
+              ? `sessão ${passoEsp(e, dupla.encontros)}`
+              : `${e.numero}º encontro`,
+            rotuloArtigo: ehEsp
+              ? `a sessão ${passoEsp(e, dupla.encontros)}`
+              : `o ${e.numero}º encontro`,
+          })),
+      }).catch(() => null)
+    : null;
 
   const primeiroNomeMentor = (
     dupla.mentor.nome_social ?? dupla.mentor.nome
@@ -398,9 +542,7 @@ export default async function DuplaPage({
   ).split(" ")[0];
 
   // combinados ainda abertos — alimentam o form de registro e a msg de WhatsApp
-  const combinadosPendentes = (dupla.encaminhamentos ?? [])
-    .filter((e) => e.status !== "feito")
-    .sort((a, b) => (a.prazo ?? "9999").localeCompare(b.prazo ?? "9999"));
+  const combinadosPendentes = combinadosPendentesDaDupla(dupla);
   // registro_id → nº de exibição do encontro, pra lista de encaminhamentos
   // dizer de onde veio cada um. Na trilha esp o nº gravado é a TENTATIVA —
   // o que as linhas mostram é o passo do guia (0074), então mapeia pro passo
@@ -423,7 +565,7 @@ export default async function DuplaPage({
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   const msgCombinados =
-    `Olá ${primeiroNomeMentorado}! Combinados do nosso último encontro: ` +
+    `Olá ${primeiroNomeMentorado}! Combinados ${ehEsp ? "da nossa última sessão" : "do nosso último encontro"}: ` +
     combinadosPendentes
       .map((t, i) => `${i + 1}) ${t.descricao}${t.prazo ? ` (até ${formatDate(t.prazo)})` : ""}`)
       .join(" ") +
@@ -472,21 +614,49 @@ export default async function DuplaPage({
 
   // material de apoio por nº de encontro (guia/template daquele encontro) —
   // a audiência segue a trilha: material DPP nunca cai na trilha especialista
-  // (pra coordenação, que enxerga tudo, o número coincidiria errado)
-  const audienciasDaTrilha = ehEsp
-    ? new Set(["todos", "mentor_especialista", "coordenacao"])
-    : new Set(["todos", "mentor_dpp", "coordenacao"]);
-  const materiaisPorNumero = new Map<number, Material[]>();
-  for (const m of materiais) {
-    if (m.encontro_num == null) continue;
-    if (!audienciasDe(m).some((a) => audienciasDaTrilha.has(a))) continue;
-    const arr = materiaisPorNumero.get(m.encontro_num) ?? [];
-    arr.push(m);
-    materiaisPorNumero.set(m.encontro_num, arr);
-  }
+  // (pra coordenação, que enxerga tudo, o número coincidiria errado). O
+  // mesmo recorte puro da rota de registro, por número.
+  const materiaisDoPasso = (numero: number) =>
+    materiaisDoNumero({
+      materiais,
+      eventosDaDupla,
+      trilha: dupla.trilha,
+      numero,
+    });
 
   const hojeStr = toDateStr(new Date());
   const podeRetroativo = souMentor && dupla.status === "ativa" && faltantes.length > 0;
+
+  // recessos vigentes/futuros do cronograma dela + a decisão declarada
+  // (462): o card vale pra dupla DPP ativa; janela já passada não rende
+  // gesto — e a decisão sobre recesso passado não teria efeito
+  const recessosDaFicha =
+    !ehEsp && dupla.status === "ativa"
+      ? eventosDaDupla
+          .filter(
+            (e) =>
+              e.tipo === "recesso" &&
+              e.data != null &&
+              (e.data_fim ?? e.data) >= hojeStr
+          )
+          .map((e) => {
+            const dec = (dupla.recessos ?? []).find(
+              (r) => r.ciclo_evento_id === e.id
+            );
+            return {
+              cicloEventoId: e.id,
+              titulo: e.titulo,
+              inicio: e.data!,
+              fim: e.data_fim ?? e.data!,
+              // tri-estado 518: sem row = a dupla ainda não decidiu —
+              // pendente vira pergunta, nunca "usa" silencioso
+              usa: dec?.usa ?? null,
+              declaradoEm: dec?.declarado_em ?? null,
+              autorNome:
+                dec?.autor?.nome_social ?? dec?.autor?.nome ?? null,
+            };
+          })
+      : [];
 
   // fechamento da trilha especialista: especialista dono ou coordenação,
   // enquanto a trilha está aberta (ativa/pausada e sem carimbo)
@@ -495,6 +665,36 @@ export default async function DuplaPage({
     (souMentor || souCoord) &&
     (dupla.status === "ativa" || dupla.status === "pausada") &&
     !dupla.encerrada_em;
+  // young-person series cut per viewer (REALIZA-71): staff/own-jovem get
+  // the RLS-visible rows aggregated; the DPP mentor only the quantized
+  // media — the embed under his policy carries just the released rows,
+  // so aggregating it would leak a wrong subset mean
+  const avaliacaoJovemResumo = souMentor
+    ? mediaJovem && mediaJovem.n > 0
+      ? {
+          // base = how many evals the released media actually covers —
+          // "média de N" must not claim the total when only k entered
+          n: mediaJovem.liberado
+            ? (mediaJovem.base ?? mediaJovem.n)
+            : mediaJovem.n,
+          media: mediaJovem.liberado ? (mediaJovem.media ?? null) : null,
+          trajetoria: null,
+          temasTop: [],
+        }
+      : null
+    : resumoAvaliacaoJovem(
+        dupla.encontros.flatMap((e) =>
+          e.avaliacao_jovem
+            ? [
+                {
+                  numero: e.numero,
+                  estrelas: e.avaliacao_jovem.estrelas,
+                  temas: e.avaliacao_jovem.temas,
+                },
+              ]
+            : []
+        )
+      );
   // resumo da jornada — gerado dos dados; o "fim" é o carimbo do fechamento
   // (decisão DPP ou encerrada_em da trilha especialista)
   const resumoJornada = dadosResumoJornada(
@@ -503,7 +703,8 @@ export default async function DuplaPage({
     eventosDaDupla,
     encerramento?.created_at ?? dupla.encerrada_em ?? null,
     new Date(),
-    pdmResumo
+    pdmResumo,
+    avaliacaoJovemResumo
   );
   // bloco só vale a pena com história — dupla zerada mostra a trilha, não um
   // relatório vazio
@@ -511,6 +712,32 @@ export default async function DuplaPage({
     resumoJornada.realizados > 0 ||
     encerramentoDecidido(encerramento) ||
     !!dupla.encerrada_em;
+
+  // REALIZA-359 — a retrospectiva derivada: destrava no 16º encontro
+  // realizado ou no fechamento da dupla. A ficha é superfície
+  // mentor/staff, então o recorte carrega as notas internas do registro
+  // e o checklist do mentor (a jovem recebe outro payload, pela RPC).
+  // A série de estrelas (378): staff/jovem vêem os pontos do embed do RLS
+  // na sparkline; pro mentor DPP o recorte segue sendo só a média
+  // quantizada — por isso a série nem chega a ser montada pra ele.
+  const starSeries = souMentor
+    ? null
+    : dupla.encontros.flatMap((e) =>
+        e.avaliacao_jovem
+          ? [{ numero: e.numero, estrelas: e.avaliacao_jovem.estrelas }]
+          : []
+      );
+  const retro = dadosRetrospectiva({
+    dupla,
+    passos,
+    eventos: eventosDaDupla,
+    fim: encerramento?.created_at ?? dupla.encerrada_em ?? null,
+    pdm: pdmResumo,
+    instrumentos,
+    avaliacaoJovem: avaliacaoJovemResumo,
+    starSeries: starSeries ?? undefined,
+    comNotasInternas: true,
+  });
 
   // concluída pelo automático (0102) com o rito ainda pendente — o mentor
   // segue podendo mexer no registro do último encontro e nos anexos dele
@@ -521,12 +748,9 @@ export default async function DuplaPage({
 
   // "reta final" e fechamento: a aba Agora carrega o encerramento só quando a
   // dupla chegou ao fim (penúltimo encontro feito ou já fechada). Fora disso
-  // o bloco mora na aba Encontros, sem sumir
-  const fechamentoEmFoco =
-    dupla.status === "concluida" ||
-    dupla.status === "encerrada" ||
-    !!dupla.encerrada_em ||
-    (!ehEsp && total > 0 && saude.feitos >= total - 1);
+  // o bloco mora na aba Encontros, sem sumir. Predicado compartilhado com a
+  // fila de ritos do hub operacional — ela linka pra mesma aba
+  const emFoco = fechamentoEmFoco(dupla, total, saude.feitos);
 
   // dupla sem cronograma (histórica, ou cadastro ainda sem vínculo): não há
   // trilha pra montar, mas os encontros registrados são fato — a lista cai
@@ -536,7 +760,7 @@ export default async function DuplaPage({
     : dupla.encontros.map((enc) => ({
         id: `leg-${enc.numero}`,
         numero: enc.numero,
-        titulo: `Encontro ${enc.numero}`,
+        titulo: ehEsp ? `Sessão ${enc.numero}` : `Encontro ${enc.numero}`,
         data: null,
         fase: null,
         instrumentos: [],
@@ -551,10 +775,13 @@ export default async function DuplaPage({
   );
   // pendência de registro (realizado sem registro ou agendado/remarcado já
   // vencido — mesma régua do `limboAberto` da agenda) — nunca entra no
-  // collapsible: o deep link #registrar-{id} precisa sempre existir
+  // collapsible: o deep link #registrar-{id} precisa sempre existir.
+  // Sessão combinada (018): o coberto já tem conteúdo via âncora — sem o
+  // mapa a ficha cobraria um registro que a sessão já entregou
+  const cobertos = cobertosDaDupla(dupla.encontros);
   const temPendencia = (enc: Encontro | undefined) =>
     !!enc &&
-    !enc.registro &&
+    !encontroTemConteudo(enc, cobertos) &&
     (enc.status === "realizado" ||
       ((enc.status === "agendado" || enc.status === "remarcado") &&
         enc.data_hora != null &&
@@ -574,11 +801,6 @@ export default async function DuplaPage({
   const encontrosColapsados = encontrosFuturos.filter(
     (ev) => !futurosComPendencia.includes(ev)
   );
-
-  // o encontro atual (próximo passo da jornada) nasce com o registro
-  // expandido; os demais viram linha-resumo sob disclosure. Pendências de
-  // registro não têm corpo salvo: o form abre pelo CTA da própria linha
-  const numeroAtual = jornada.proximoNumero;
 
   // ações do cabeçalho: UMA primária, conforme o papel e o estado. Mentor:
   // registra a pendência, senão agenda o que falta, senão entra na chamada
@@ -615,34 +837,21 @@ export default async function DuplaPage({
         .sort((a, b) => a.numero - b.numero)[0] ?? null)
     : null;
   const rotuloPendente = ehEsp ? "Registrar sessão" : `Registrar ${pendenteRegistro?.numero}º encontro`;
-  // a âncora do registro: na própria aba Encontros é âncora local (dispara
-  // hashchange); fora dela leva o ?aba= junto
+  // O registro ganhou tela própria (REALIZA-473): a primária do mentor leva
+  // pra rota dedicada em uma navegação, sem aba nem rolagem pela ficha
   const hrefRegistro = pendenteRegistro
-    ? `#registrar-${pendenteRegistro.id}`
-    : null;
-  const hrefRegistroOutraAba = pendenteRegistro
-    ? `?aba=encontros#registrar-${pendenteRegistro.id}`
+    ? `/duplas/${dupla.id}/registrar/${pendenteRegistro.id}`
     : null;
 
   // a primária do mentor (o único botão preenchido do cabeçalho)
   const primarioMentor = !souMentor || dupla.status !== "ativa"
     ? null
     : pendenteRegistro && hrefRegistro
-      ? aba === "encontros"
-        ? (
-          <a href={hrefRegistro} className={buttonVariants({ size: "sm" })}>
-            {rotuloPendente}
-          </a>
-        )
-        : (
-          <Link
-            href={hrefRegistroOutraAba!}
-            scroll={false}
-            className={buttonVariants({ size: "sm" })}
-          >
-            {rotuloPendente}
-          </Link>
-        )
+      ? (
+        <Link href={hrefRegistro} className={buttonVariants({ size: "sm" })}>
+          {rotuloPendente}
+        </Link>
+      )
       : precisaAgendar && !ehEsp
         ? (
           <AgendarEncontroDialog
@@ -663,57 +872,32 @@ export default async function DuplaPage({
               href={linkSeguro(chamadaHoje.link)!}
               target="_blank"
               rel="noopener noreferrer"
-              className={buttonVariants({ size: "sm" })}
+              className={buttonVariants({
+                // QW5: preenchida só na janela da chamada (30 min antes →
+                // 2 h depois); fora dela o link segue discreto — mesma
+                // régua do `podeEntrarAgora` usada pela linha do encontro
+                variant: podeEntrarAgora(chamadaHoje.data_hora, agora)
+                  ? "default"
+                  : "outline",
+                size: "sm",
+              })}
             >
               <VideoCamera aria-hidden />
-              Entrar na chamada
+              {podeEntrarAgora(chamadaHoje.data_hora, agora)
+                ? "Entrar na chamada"
+                : "Link da chamada"}
             </a>
           )
           : null;
 
-  // agendar nunca se esconde no "⋯": quando a pendência de registro já é a
-  // primária, ele fica ao lado em outline — ação de primeira classe em todo
-  // estado em que vale (REALIZA-97). O encontro pode ser o mesmo da
-  // pendência (agendado vencido): aí o dialog abre em modo remarcação
-  const agendarMentor =
-    souMentor && pendenteRegistro && precisaAgendar ? (
-      <AgendarEncontroDialog
-        duplaId={dupla.id}
-        numero={proximoNumero}
-        atual={encontroAlvo}
-        sugerido={sugeridoProximo}
-        piso={dupla.iniciada_em ?? undefined}
-        jovemNome={primeiroNomeMentorado}
-        trigger={
-          <Button variant="outline" size="sm">
-            <CalendarPlus aria-hidden />
-            Agendar {proximoNumero}º encontro
-          </Button>
-        }
-      />
-    ) : null;
-
-  // o próximo já marcado: o lugar do "Agendar" vira "Remarcar" com a data —
-  // as duas duplas do mentor mostram o mesmo botão, cada uma no seu estado
-  // (feedback da mentora: "a Larissa tem mais botões que a Ana")
-  const remarcarMentor =
-    souMentor && podeAgendar && proximoJaAgendado && encontroAlvo?.data_hora ? (
-      <AgendarEncontroDialog
-        duplaId={dupla.id}
-        numero={proximoNumero}
-        atual={encontroAlvo}
-        piso={dupla.iniciada_em ?? undefined}
-        jovemNome={primeiroNomeMentorado}
-        trigger={
-          <Button variant="outline" size="sm">
-            <CalendarBlank aria-hidden />
-            Remarcar {proximoNumero}º · {rotuloSlot(encontroAlvo.data_hora)}
-          </Button>
-        }
-      />
-    ) : null;
+  // "Agendar" e "Remarcar" moram no ⋯ do DuplaMaisMenu (review 21/11, #9):
+  // ação de primeira classe continua a um clique quando a primária já é o
+  // registrar — antes ficavam em outline na linha (REALIZA-97). O encontro
+  // pode ser o mesmo da pendência (agendado vencido): aí o dialog abre em
+  // modo remarcação
 
   // o encontro atual da jornada — a aba Agora mostra o que fazer nele
+  const numeroAtual = jornada.proximoNumero;
   const noAtual = numeroAtual != null
     ? (jornada.nos.find((n) => n.numero === numeroAtual) ?? null)
     : null;
@@ -726,13 +910,17 @@ export default async function DuplaPage({
         : (dupla.encontros.find((e) => e.numero === passoAtual.numero) ?? null))
     : null;
   const materialAtual = passoAtual
-    ? (materiaisPorNumero.get(passoAtual.numero) ?? []).find((m) => m.path || m.url) ?? null
+    ? (materiaisDoPasso(passoAtual.numero).find((m) => m.path || m.url) ?? null)
     : null;
+  // doc nativo carrega a ficha no ?dupla= — o "Abrir instrumento" do
+  // documento volta pra esta dupla (REALIZA-386)
   const materialAtualHref = materialAtual
-    ? materialAtual.path
-      ? `/api/material/${materialAtual.id}`
-      : linkSeguro(materialAtual.url)
+    ? hrefMaterial(materialAtual)
     : null;
+  const materialAtualHrefCtx =
+    materialAtualHref && materialAtual?.path?.startsWith("doc:")
+      ? `${materialAtualHref}?dupla=${dupla.id}`
+      : materialAtualHref;
   const notaAtual = passoAtual
     ? (dupla.notas?.find((n) => n.numero === passoAtual.numero)?.texto ?? null)
     : null;
@@ -807,18 +995,9 @@ export default async function DuplaPage({
       <RemanejoSugerido
         key="remanejo"
         dupla={dupla}
-        // semáforo aceso explica pela jornada; apoio sozinho (dupla em
-        // dia + chamado) explica pelo eixo de trabalho — "Em dia." não
-        // sustenta a frase de remanejo
-        motivo={
-          saude.semaforo !== "ok"
-            ? saude.motivo
-            : saude.apoio.origem === "mentorado"
-              ? "Pedido de apoio aberto pelo mentorado"
-              : saude.apoio.origem === "ambos"
-                ? "Pedidos de apoio abertos nos dois lados"
-                : "Pedido de apoio aberto pelo mentor"
-        }
+        // estado declarado das pessoas explica antes do semáforo; apoio
+        // sozinho (dupla em dia + chamado) explica pelo eixo de trabalho
+        motivo={motivoSugestaoRemanejo(dupla, saude)}
         mentores={sugestaoRemanejo.mentores}
         mentorados={sugestaoRemanejo.mentorados}
         agoraMs={sugestaoRemanejo.agoraMs}
@@ -826,8 +1005,8 @@ export default async function DuplaPage({
     );
   }
 
-  // botões do cabeçalho secundários: pedido de apoio do mentor; Editar
-  // (coordenação) — o resto vai pro Mais
+  // Editar dupla é da coordenação — entra como item do ⋯ junto com o
+  // resto (review 21/11, #9: uma primária + menu, nada em linha)
   const podeEditarDupla = souCoord;
 
   const renderEncontro = (passo: PassoGuia) => {
@@ -847,11 +1026,22 @@ export default async function DuplaPage({
             (enc == null || e.numero !== enc.numero)
         ).length
       : 0;
+    // sessão combinada (018): o registro, a avaliação do jovem e o link de
+    // avaliação moram na âncora — a linha do coberto mostra os da sessão,
+    // não "pendente" fantasma nem "Sem avaliação" inventado
+    const ancoraDaSessao =
+      enc != null && !ehEsp && enc.registro == null && cobertos.has(enc.numero)
+        ? (dupla.encontros.find(
+            (x) => x.numero === cobertos.get(enc.numero)
+          ) ?? null)
+        : null;
+    const regLinha = enc?.registro ?? ancoraDaSessao?.registro ?? null;
     return (
       <EncontroRow
         key={passo.id}
         passo={passo}
         encontro={enc ?? null}
+        ancora={ancoraDaSessao}
         tentativasFalhas={tentativasFalhas}
         duplaId={dupla.id}
         souMentor={souMentor}
@@ -873,8 +1063,8 @@ export default async function DuplaPage({
         // evidência é do mentor — coord só remove (moderação), sup só lê
         podeAnexar={souMentor && (dupla.status === "ativa" || ritoPendente)}
         podeRemoverAnexos={souCoord || (souMentor && (dupla.status === "ativa" || ritoPendente))}
-        anexos={(enc?.registro && anexosPorRegistro[enc.registro.id]) || []}
-        materiais={materiaisPorNumero.get(passo.numero) ?? []}
+        anexos={(regLinha && anexosPorRegistro[regLinha.id]) || []}
+        materiais={materiaisDoPasso(passo.numero)}
         combinados={dupla.encaminhamentos ?? []}
         combinadosPendentes={combinadosPendentes}
         nota={dupla.notas?.find((n) => n.numero === passo.numero)?.texto ?? null}
@@ -890,10 +1080,48 @@ export default async function DuplaPage({
             c.numero < passo.numero &&
             c.status !== "feito"
         )}
-        registroAberto={passo.numero === numeroAtual}
+        // pós-save chaining (REALIZA-397): a fila inteira devendo registro
+        // vai junto — o form pula os nºs que a sessão cobriu (007 US11) e
+        // oferece "registrar o Nº também?" pro primeiro pendente na ordem
+        // do guia
+        proximosRegistros={
+          ehEsp
+            ? null
+            : filaRegistrosPendentes(dupla, {
+                excluirEncontroId: enc?.id,
+                agora,
+              })
+        }
+        // sessão que cobriu mais de um passo (007 US11): os candidatos saem
+        // da mesma régua que o salvarRegistro revalida — passo oficial
+        // vencido sem row, compromisso vencido ou realizado sem registro;
+        // nunca o último (fechamento é gesto próprio)
+        cobertura={
+          souMentor
+            ? coberturaDaSessao({
+                dupla,
+                numero: passo.numero,
+                passos,
+                agora,
+                sessaoId: enc?.sessao_id,
+              })
+            : null
+        }
+        // sessão planejada (018): os demais membros do grupo entram
+        // travados na cobertura do form — fechados no plano
+        sessaoGrupo={
+          souMentor && enc
+            ? sessaoGrupoDaSessao({ dupla, encontroId: enc.id, passos })
+            : null
+        }
         apoioDestinos={apoioDestinos}
         linkAvaliacao={
-          enc ? (linkAvalPorEncontro.get(enc.id) ?? null) : null
+          enc
+            ? (linkAvalPorEncontro.get(enc.id) ??
+              (ancoraDaSessao
+                ? (linkAvalPorEncontro.get(ancoraDaSessao.id) ?? null)
+                : null))
+            : null
         }
         estrelaJovem={
           enc ? (estrelaEspPorEncontro.get(enc.id) ?? null) : null
@@ -920,6 +1148,7 @@ export default async function DuplaPage({
           jornada={jornada}
           statusDupla={dupla.status}
           duplaId={dupla.id}
+          sessao={ehEsp}
         />
       </section>
       {souMentor && <MarcoNotifier duplaId={dupla.id} feitos={jornada.feitos} total={jornada.total} />}
@@ -948,7 +1177,7 @@ export default async function DuplaPage({
         className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
       >
         <h2 id="proximo-encontro" className="text-base font-semibold">
-          Próximo encontro
+          {ehEsp ? "Próxima sessão" : "Próximo encontro"}
         </h2>
         {passoAtual && noAtual ? (
           <div className="mt-3 space-y-3">
@@ -982,12 +1211,12 @@ export default async function DuplaPage({
             {notaAtual && (
               <div className="rounded-lg bg-muted/50 px-3.5 py-3 text-sm shadow-[var(--shadow-inset)]">
                 <p className="text-xs font-semibold text-foreground">
-                  Plano do encontro
+                  {ehEsp ? "Plano da sessão" : "Plano do encontro"}
                 </p>
                 <p className="mt-1 whitespace-pre-line break-words">{notaAtual}</p>
               </div>
             )}
-            {(chamadaAtual && !chamadaNoCabecalho || materialAtualHref) && (
+            {(chamadaAtual && !chamadaNoCabecalho || materialAtualHrefCtx) && (
               <div className="flex flex-wrap items-center gap-2">
                 {chamadaAtual && !chamadaNoCabecalho &&
                   (souMentor ? (
@@ -995,19 +1224,27 @@ export default async function DuplaPage({
                       href={chamadaAtual}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                      className={buttonVariants({
+                        variant: podeEntrarAgora(encontroAtual?.data_hora, agora)
+                          ? "default"
+                          : "outline",
+                        size: "sm",
+                      })}
                     >
                       <VideoCamera aria-hidden />
-                      Entrar na chamada
+                      {podeEntrarAgora(encontroAtual?.data_hora, agora)
+                        ? "Entrar na chamada"
+                        : "Link da chamada"}
                     </a>
                   ) : (
                     <CopiarChamada url={chamadaAtual} />
                   ))}
-                {materialAtualHref && (
+                {materialAtualHrefCtx && (
                   <a
-                    href={materialAtualHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={materialAtualHrefCtx}
+                    {...(materialAtual?.path?.startsWith("doc:")
+                      ? {}
+                      : { target: "_blank", rel: "noopener noreferrer" })}
                     className={buttonVariants({ variant: "outline", size: "sm" })}
                   >
                     <BookOpen aria-hidden />
@@ -1020,13 +1257,56 @@ export default async function DuplaPage({
         ) : (
           <p className="mt-2 text-sm text-muted-foreground">
             {dupla.status === "ativa"
-              ? "Todos os encontros desta jornada já foram realizados."
+              ? ehEsp
+                ? "Todas as sessões desta jornada já foram realizadas."
+                : "Todos os encontros desta jornada já foram realizados."
               : dupla.status === "pausada"
-                ? "Jornada pausada. Nenhum encontro está pendente."
-                : "Jornada encerrada. Nenhum encontro está pendente."}
+                ? ehEsp
+                  ? "Jornada pausada. Nenhuma sessão está pendente."
+                  : "Jornada pausada. Nenhum encontro está pendente."
+                : ehEsp
+                  ? "Jornada encerrada. Nenhuma sessão está pendente."
+                  : "Jornada encerrada. Nenhum encontro está pendente."}
           </p>
         )}
       </section>
+
+      {mostrarPlanoEmDia && (
+        <PlanoEmDiaCard
+          plano={planoEmDia}
+          dupla={dupla}
+          souMentor={souMentor}
+          souStaff={souStaff}
+          planoVivo={planoVivoFicha != null}
+          recessos={recessosDaFicha}
+        />
+      )}
+
+      {/* central "Acordos e intervenções" (459): o combinado persistido
+          do plano, os ajustes do guia vigente e a fila de intervenções —
+          junto do próximo encontro, onde a dupla olha primeiro */}
+      <AcordosCentral
+        dupla={dupla}
+        souMentor={souMentor}
+        souStaff={souStaff}
+        numeroGuiaAtual={passoAtual?.numero ?? null}
+        recessos={recessosDaFicha}
+        sugestoesPlano={sugestoesPlano}
+        roteiros={roteirosInfo && "ok" in roteirosInfo ? roteirosInfo.roteiros : []}
+      />
+
+      {/* com plano de recuperação na tela a decisão de recesso mora dentro
+          dele — sem plano ela segue em card próprio (dupla em dia também
+          combina a janela). A decisão é da dupla (518): só o mentor
+          declara aqui; staff acompanha e cobra */}
+      {!mostrarPlanoEmDia && recessosDaFicha.length > 0 && (
+        <RecessoDuplaCard
+          duplaId={dupla.id}
+          recessos={recessosDaFicha}
+          podeDeclarar={souMentor}
+          souMentor={souMentor}
+        />
+      )}
 
       {pedidos.length > 0 && (
         <section aria-labelledby="pedidos-abertos" className="space-y-3">
@@ -1059,7 +1339,7 @@ export default async function DuplaPage({
             )}
           </div>
           <p className="mb-2 mt-1 text-xs text-muted-foreground">
-            Tarefas que a dupla combinou nos encontros
+            Tarefas que a dupla combinou {ehEsp ? "nas sessões" : "nos encontros"}
             {(souMentor || souCoord) &&
               (dupla.status === "ativa" || dupla.status === "pausada") &&
               ". Marque quando forem feitas"}.
@@ -1077,12 +1357,13 @@ export default async function DuplaPage({
             }
             hoje={hojeStr}
             encontroNumeroPorRegistroId={encontroNumeroPorRegistroId}
+            sessao={ehEsp}
           />
         </section>
       )}
 
       <Suspense fallback={<Skeleton className="h-24 w-full" />}>
-        {fechamentoEmFoco && (
+        {emFoco && (
           <>
             {ehEsp && <TrilhaFechamento dupla={dupla} avaliacao={avaliacaoEsp} />}
             {!ehEsp && (
@@ -1093,11 +1374,21 @@ export default async function DuplaPage({
                 souCoord={souCoord}
                 formularios={formulariosAtivos}
                 avaliacao360Em={avaliacao360Em}
+                avaliacaoJovem={avaliacaoJovemResumo}
                 realizadosCount={realizadosCount}
               />
             )}
+            {/* retro destravada vira o destaque; o resumo fica embaixo,
+                compacto — relatório completo sob disclosure (378) */}
+            {retro?.desbloqueada && (
+              <RetrospectivaJornada dados={retro} mostrarChecklist />
+            )}
             {mostrarResumo && (
-              <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+              <ResumoJornadaSection
+                resumo={resumoJornada}
+                encerramento={encerramento}
+                compacta={!!retro?.desbloqueada}
+              />
             )}
             {souCoord && desfechoEntregas.length > 0 && (
               <DesfechoDuplaCard entregas={desfechoEntregas} />
@@ -1115,7 +1406,7 @@ export default async function DuplaPage({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <h2 id="lista-encontros" className="text-base font-semibold">
-              Encontros
+              {ehEsp ? "Sessões" : "Encontros"}
             </h2>
             {/* as datas das linhas são as do guia do ciclo — a dupla confirma
                 ou remarca (a real aparece como "agendado {data}" na linha) */}
@@ -1131,7 +1422,12 @@ export default async function DuplaPage({
               faltantes={faltantes}
               esp={ehEsp}
               trigger={
-                <Button variant="ghost" size="sm" className="-my-1 text-muted-foreground">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="-my-1 text-muted-foreground"
+                  data-telemetry-alvo="registrar-retroativo"
+                >
                   <ClockCounterClockwise size={14} />
                   {ehEsp
                     ? "Registrar sessão já realizada"
@@ -1162,7 +1458,9 @@ export default async function DuplaPage({
         )}
       </section>
 
-      <ArquivosDupla arquivos={arquivosDaDupla} />
+      {/* pdm_da_dupla devolve doc vazio (não null) até pra trilha esp —
+          o item PDM só faz sentido na DPP, onde o documento vive */}
+      <ArquivosDupla arquivos={arquivosDaDupla} pdm={ehEsp ? null : pdm} />
 
       {ehEsp && (devolutivasFeed.length > 0 || souMentor) && (
         <section aria-labelledby="devolutivas-trilha" className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] space-y-3">
@@ -1199,7 +1497,7 @@ export default async function DuplaPage({
       {/* fechamento e resumo que não estão na Agora (dupla ainda no meio do
           ciclo): ficam aqui, no fim da lista, sem sumir */}
       <Suspense fallback={<Skeleton className="h-24 w-full" />}>
-        {!fechamentoEmFoco && !ehEsp && (
+        {!emFoco && !ehEsp && (
           <EncerramentoDupla
             dupla={dupla}
             encerramento={encerramento}
@@ -1207,11 +1505,23 @@ export default async function DuplaPage({
             souCoord={souCoord}
             formularios={formulariosAtivos}
             avaliacao360Em={avaliacao360Em}
+            avaliacaoJovem={avaliacaoJovemResumo}
             realizadosCount={realizadosCount}
           />
         )}
-        {!fechamentoEmFoco && mostrarResumo && (
-          <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+        {!emFoco && (
+          <>
+            {retro?.desbloqueada && (
+              <RetrospectivaJornada dados={retro} mostrarChecklist />
+            )}
+            {mostrarResumo && (
+              <ResumoJornadaSection
+                resumo={resumoJornada}
+                encerramento={encerramento}
+                compacta={!!retro?.desbloqueada}
+              />
+            )}
+          </>
         )}
         {souCoord && desfechoEntregas.length > 0 && (
           <DesfechoDuplaCard entregas={desfechoEntregas} />
@@ -1222,65 +1532,103 @@ export default async function DuplaPage({
 
   // ---------- aba Instrumentos ----------
   const temInstrumentosDPP = !ehEsp && (instrumentos.length > 0 || !!pdm || !!terceiros);
+  // 022/FR-008 — a aba separa a operação (a lista de instrumentos, links
+  // e envios) dos documentos vivos (PDM, terceiros, voz do jovem) com um
+  // rótulo de grupo por bloco; cada card segue com o h2 próprio. Na
+  // trilha de especialista a aba tem só a voz — um grupo de um card não
+  // agrupa nada, então ela fica sem rótulo, como antes.
+  const temDocumentos = !!pdm || !!terceiros || vozVisivel;
   const painelInstrumentos = (
     <>
-      {!ehEsp && (
-        <InstrumentosDupla
-          duplaId={dupla.id}
-          itens={instrumentos}
-          mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
-          mentoradoWhatsapp={dupla.mentorado.whatsapp}
-          podeEnviar={souCoord || souMentor}
-          jornadaViva={
-            dupla.status === "ativa" || dupla.status === "pausada"
-          }
-          remetenteMentorNome={souMentor ? (me.nome_social ?? me.nome) : undefined}
-        />
-      )}
-      <Suspense fallback={<Skeleton className="h-24 w-full" />}>
-        {!ehEsp && pdm && (
-          <PdmDupla
+      {!ehEsp && instrumentos.length > 0 && (
+        <section
+          aria-labelledby="aba-instrumentos-links"
+          className="space-y-2"
+        >
+          <p
+            id="aba-instrumentos-links"
+            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Links e envio
+          </p>
+          <InstrumentosDupla
             duplaId={dupla.id}
-            doc={pdm}
+            itens={instrumentos}
             mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
-            podeEditar={
-              souMentor &&
-              (dupla.status === "ativa" || dupla.status === "pausada")
-            }
-          />
-        )}
-        {!ehEsp && terceiros && (
-          <TerceirosDupla
-            duplaId={dupla.id}
-            contatos={terceiros.contatos}
-            consolidacao={terceiros.consolidacao}
-            mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
-            podeGerenciar={souCoord || souMentor}
-            remetenteNome={souMentor ? (me.nome_social ?? me.nome) : undefined}
+            mentoradoWhatsapp={dupla.mentorado.whatsapp}
+            mentorNome={dupla.mentor.nome_social ?? dupla.mentor.nome}
+            mentorWhatsapp={dupla.mentor.whatsapp}
+            podeEnviar={souCoord || souMentor}
             jornadaViva={
               dupla.status === "ativa" || dupla.status === "pausada"
             }
+            remetenteMentorNome={souMentor ? (me.nome_social ?? me.nome) : undefined}
+            souMentor={souMentor}
           />
-        )}
-      </Suspense>
-      {vozVisivel &&
-        (ehEsp ? (
-          <VozDoJovemEspecialista itens={espAvaliacoes} />
-        ) : (
-          <VozDoJovemCard
-            avaliacoes={dupla.encontros.flatMap((e) =>
-              e.avaliacao_jovem ? [e.avaliacao_jovem] : []
+        </section>
+      )}
+      {!ehEsp && temDocumentos && (
+        <section
+          aria-labelledby="aba-instrumentos-docs"
+          className="space-y-2"
+        >
+          <p
+            id="aba-instrumentos-docs"
+            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Documentos da jornada
+          </p>
+          <div className="space-y-4">
+            <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+              {pdm && (
+                <PdmDupla
+                  duplaId={dupla.id}
+                  doc={pdm}
+                  mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+                  podeEditar={
+                    souMentor &&
+                    (dupla.status === "ativa" || dupla.status === "pausada")
+                  }
+                />
+              )}
+              {terceiros && (
+                <TerceirosDupla
+                  duplaId={dupla.id}
+                  contatos={terceiros.contatos}
+                  consolidacao={terceiros.consolidacao}
+                  mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+                  podeGerenciar={souCoord || souMentor}
+                  remetenteNome={souMentor ? (me.nome_social ?? me.nome) : undefined}
+                  jornadaViva={
+                    dupla.status === "ativa" || dupla.status === "pausada"
+                  }
+                />
+              )}
+            </Suspense>
+            {vozVisivel && (
+              <VozDoJovemCard
+                avaliacoes={dupla.encontros.flatMap((e) =>
+                  e.avaliacao_jovem ? [e.avaliacao_jovem] : []
+                )}
+                pendentes={
+                  souCoord || me.role === "supervisor"
+                    ? saude.avaliacaoJovemPendente
+                    : 0
+                }
+                media={souMentor ? mediaJovem : null}
+                papel={souMentor ? "mentor" : (me.role as "coordenacao" | "supervisor")}
+                realizados={realizadosCount}
+              />
             )}
-            pendentes={
-              souCoord || me.role === "supervisor"
-                ? saude.avaliacaoJovemPendente
-                : 0
-            }
-            media={souMentor ? mediaJovem : null}
-            papel={souMentor ? "mentor" : (me.role as "coordenacao" | "supervisor")}
-            realizados={realizadosCount}
-          />
-        ))}
+          </div>
+        </section>
+      )}
+      {ehEsp && vozVisivel && (
+        <VozDoJovemEspecialista
+          itens={espAvaliacoes}
+          passoPorEncontro={passoPorEncontroEsp}
+        />
+      )}
       {!temInstrumentosDPP && !vozVisivel && (
         <p className="rounded-xl bg-card p-4 text-sm text-muted-foreground shadow-[var(--shadow-border)]">
           Esta trilha não tem instrumentos da jornada DPP.
@@ -1438,6 +1786,10 @@ export default async function DuplaPage({
         <VoltarLink fallback="/duplas" />
       </div>
 
+      {/* flash one-shot do remanejo (?remanejada=1): a confirmação que o
+          redirect server-side não deixa o dialog dar */}
+      {remanejada === "1" && <RemanejoFlash origemId={origem?.id ?? null} />}
+
       {/* cabeçalho: identidade da dupla, estado com o motivo e uma ação */}
       <header className="relative overflow-hidden rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5">
         <span
@@ -1464,7 +1816,11 @@ export default async function DuplaPage({
         <p className="mt-1.5 text-sm text-muted-foreground">
           {[
             turmaLonga(dupla.turma),
-            `Encontro ${jornada.proximoNumero ?? jornada.feitos} de ${total}`,
+            progressoTrilha({
+              esp: ehEsp,
+              feitos: jornada.feitos,
+              total,
+            }),
             dupla.supervisor &&
               `auxiliar executivo ${dupla.supervisor.nome_social ?? dupla.supervisor.nome}`,
           ]
@@ -1472,7 +1828,13 @@ export default async function DuplaPage({
             .join(" · ")}
         </p>
 
+        {/* linha "Situação" — texto e sinais, sem chip de botão (o estado
+            do pedido de especialista saiu daqui: mora no card "Pedidos em
+            aberto", review 21/11 #9) */}
         <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+          <span className="text-xs font-medium text-muted-foreground">
+            Situação
+          </span>
           <SemaforoBadge nivel={saude.semaforo} motivo={saude.motivo} />
           {/* pro mentor o próprio pedido de apoio é eixo separado (WP2):
               um chamado já recebido ao lado do semáforo real — o tom é
@@ -1498,7 +1860,11 @@ export default async function DuplaPage({
                   : ""}
             </span>
           )}
-          <TrajetoriaAvaliacoes encontros={dupla.encontros} total={total} />
+          <TrajetoriaAvaliacoes
+            encontros={dupla.encontros}
+            total={total}
+            sessao={ehEsp}
+          />
           {/* trilha fora do padrão DPP é fato da dupla — aparece como badge
               quieto pra ninguém ler o contador /5 como bug */}
           {ehEsp && (
@@ -1509,7 +1875,31 @@ export default async function DuplaPage({
           {/* prazo da trilha curta — 3 meses do aceite (iniciada_em), com
               urgência na quinzena final */}
           {ehEsp && <TrilhaPrazoBadge dupla={dupla} />}
-          {!ehEsp && <SolicitacaoStatusChip solicitacao={solicitacao} />}
+          {!ehEsp && (
+            <SolicitacaoStatusChip
+              solicitacao={solEstadoNoCard ? null : solicitacao}
+            />
+          )}
+          {/* papel removido com a dupla viva — residual de antes do guard
+              de setPessoaRole. Só staff vê: quem corrige é a coordenação
+              (o embed profile_papeis do mentor chega populado pela RLS) */}
+          {!souMentor &&
+            (temPapel(me, "coordenacao") || temPapel(me, "supervisor")) &&
+            !temPapel(
+              dupla.mentor,
+              ehEsp ? "mentor_especialista" : "mentor_dpp"
+            ) && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--warn-border)] bg-[var(--warn-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--warn-text)] sm:text-[11px]">
+                <Warning size={12} aria-hidden />
+                Mentor sem papel de mentor
+                <span className="font-normal">
+                  ·{" "}
+                  {temPapel(me, "coordenacao")
+                    ? "ajuste em Pessoas"
+                    : "avise a coordenação"}
+                </span>
+              </span>
+            )}
         </div>
 
         {/* linhagem do remanejo — linha discreta, quieta: é navegação de
@@ -1538,57 +1928,62 @@ export default async function DuplaPage({
                 >
                   {nomeVinculo(sucessora)}
                 </Link>
-                . Os encontros e registros desta dupla continuam aqui.
+                .{" "}
+                {ehEsp
+                  ? "As sessões e os registros desta dupla continuam aqui."
+                  : "Os encontros e registros desta dupla continuam aqui."}
               </>
             )}
           </p>
         )}
 
+        {/* UMA ação primária por papel + ⋯ com todo o resto (review 21/11,
+            #9): cada prop-grupo presente vira um item; os dialogs moram
+            dentro do componente, fora do popup (REALIZA-157). O menu some
+            sozinho quando nenhuma ação se aplica */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {souMentor && primarioMentor}
-          {souMentor && agendarMentor}
-          {remarcarMentor}
           {!souMentor && acaoWA && <DuplaWaAcao {...acaoWA} />}
 
-          {/* secundárias em outline: o pedido de apoio do mentor; a
-              coordenação edita a dupla. As de segunda ordem vêm do
-              DuplaMaisMenu: em linha no desktop, no Mais só no celular */}
-          {souMentor && (dupla.status === "ativa" || dupla.status === "pausada") && (
-            <PedirApoioDialog
-              duplaId={dupla.id}
-              trigger={
-                <Button variant="outline" size="sm">
-                  <HandHeart aria-hidden /> Pedir apoio
-                </Button>
-              }
-            />
-          )}
-          {souMentor && ehEsp && dupla.status === "ativa" && tentativaAgendada && (
-            // a sessão nasce do pedido aceito — aqui só se move a tentativa
-            // que já existe (numero = tentativa, não passo)
-            <AgendarEncontroDialog
-              duplaId={dupla.id}
-              numero={tentativaAgendada.numero}
-              atual={tentativaAgendada}
-              piso={dupla.iniciada_em ?? undefined}
-              jovemNome={primeiroNomeMentorado}
-              rotulo="sessão de especialista"
-              trigger={
-                <Button variant="outline" size="sm">
-                  <CalendarBlank aria-hidden /> Remarcar sessão
-                </Button>
-              }
-            />
-          )}
-          {podeEditarDupla && <EditarDuplaDialog dupla={dupla} />}
-
-          {/* overflow de segunda ordem — cada prop-grupo presente vira um
-              item; os dialogs moram dentro do componente, fora do popup
-              (REALIZA-157). Some sozinho quando nenhuma ação se aplica.
-              "Agendar" não mora aqui: é ação de primeira classe do mentor
-              (REALIZA-97) — fica na primária ou na outline ao lado */}
           <DuplaMaisMenu
             duplaId={dupla.id}
+            agendar={
+              souMentor && pendenteRegistro && precisaAgendar
+                ? {
+                    numero: proximoNumero,
+                    atual: encontroAlvo,
+                    sugerido: sugeridoProximo,
+                    piso: dupla.iniciada_em ?? undefined,
+                    jovemNome: primeiroNomeMentorado,
+                    item: `Agendar ${proximoNumero}º encontro`,
+                  }
+                : null
+            }
+            remarcar={
+              souMentor && podeAgendar && proximoJaAgendado && encontroAlvo?.data_hora
+                ? {
+                    numero: proximoNumero,
+                    atual: encontroAlvo,
+                    piso: dupla.iniciada_em ?? undefined,
+                    jovemNome: primeiroNomeMentorado,
+                    item: `Remarcar ${proximoNumero}º · ${rotuloSlot(encontroAlvo.data_hora)}`,
+                  }
+                : // a sessão nasce do pedido aceito — aqui só se move a
+                  // tentativa que já existe (numero = tentativa, não passo)
+                  souMentor && ehEsp && dupla.status === "ativa" && tentativaAgendada
+                  ? {
+                      numero: tentativaAgendada.numero,
+                      atual: tentativaAgendada,
+                      piso: dupla.iniciada_em ?? undefined,
+                      jovemNome: primeiroNomeMentorado,
+                      rotulo: "sessão de especialista",
+                      item: "Remarcar sessão",
+                    }
+                  : null
+            }
+            pedirApoio={
+              souMentor && (dupla.status === "ativa" || dupla.status === "pausada")
+            }
             formulario={
               souCoord &&
               (dupla.status === "ativa" || dupla.status === "pausada")
@@ -1608,19 +2003,6 @@ export default async function DuplaPage({
                 : null
             }
             solicitar={podeSolicitar ? { especialistas } : null}
-            solicitarEstado={
-              !ehEsp &&
-              dupla.status === "ativa" &&
-              (souMentor || souCoord) &&
-              solEmAberto
-                ? "Pedido de especialista em andamento"
-                : null
-            }
-            sugerirEstado={
-              !ehEsp && dupla.status === "ativa" && souMentor && sugestaoPendente
-                ? `Sugestão enviada, aguardando ${primeiroNomeMentorado}`
-                : null
-            }
             sugerir={
               podeSugerir
                 ? {
@@ -1630,6 +2012,7 @@ export default async function DuplaPage({
                   }
                 : null
             }
+            editar={podeEditarDupla ? dupla : null}
             encerrar={podeEncerrarTrilha}
             remanejar={
               souCoord && (dupla.status === "ativa" || dupla.status === "pausada")

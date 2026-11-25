@@ -15,7 +15,7 @@ import { getMentoresChamada, getPresencas } from "@/lib/queries-presenca";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { getEncerramentosPendentes } from "@/lib/queries-encerramento";
 import {
-  getEspecialistas,
+  getEspecialistasCatalogo,
   getMinhaGrade,
   getMinhasExcecoes,
   getSolicitacoesDasDuplas,
@@ -341,7 +341,10 @@ export default async function AgendaPage({
         aba === "por-mentorado"
           ? getSolicitacoesDasDuplas(idsDpp)
           : Promise.resolve({} as Record<string, SolicitacaoEspecialista[]>),
-        aba === "por-mentorado" ? getEspecialistas() : Promise.resolve([]),
+        // a sugestão escolhe por cards do catálogo rico (023)
+        aba === "por-mentorado"
+          ? getEspecialistasCatalogo()
+          : Promise.resolve([]),
         // cap de 48h do "Lembrar o jovem" — só o Por mentorado renderiza
         aba === "por-mentorado"
           ? getUltimasInteracoes(idsDpp, "nudge")
@@ -354,17 +357,26 @@ export default async function AgendaPage({
       ]);
     // o strip "Sua semana" do Por mentorado mostra os MESMOS itens da Minha
     // agenda — a derivação é pura (sem query nova), reusa o que a página já
-    // buscou pra esta aba
+    // buscou pra esta aba. `passadosSemana` entra junto: sem ele a célula
+    // de um dia já fechado dizia "livre" mesmo com encontro ocorrido.
     const itensSemana =
       aba === "por-mentorado"
-        ? deriveAgendaMinha({
-            duplas: duplasDpp,
-            trilhas,
-            eventos,
-            cronogramas,
-            hoje,
-            agora: agora.getTime(),
-          }).secoes.flatMap((s) => s.grupos.flatMap((g) => g.itens))
+        ? (() => {
+            const derivada = deriveAgendaMinha({
+              duplas: duplasDpp,
+              trilhas,
+              eventos,
+              cronogramas,
+              hoje,
+              agora: agora.getTime(),
+            });
+            return [
+              ...derivada.passadosSemana,
+              ...derivada.secoes.flatMap((s) =>
+                s.grupos.flatMap((g) => g.itens)
+              ),
+            ];
+          })()
         : [];
     return (
       <div className="space-y-6">
@@ -396,20 +408,13 @@ export default async function AgendaPage({
               cronogramas={cronogramas}
               hoje={hoje}
               agora={agora.getTime()}
-              // staff+mentor híbrido: os cards da faixa linkam pro dia no
-              // calendário — precisam carregar a visão certa (regra do
-              // hibrido do PorMentorado)
-              hibrido={duasVisoes || (papelStaff ?? false)}
             />
           ) : (
             <AgendaPorMentorado
               duplas={duplasDpp}
               trilhas={trilhas}
               solicitacoes={solicitacoes}
-              especialistas={especialistas.map((e) => ({
-                id: e.id,
-                nome: e.nome,
-              }))}
+              especialistas={especialistas}
               eventos={eventos}
               cronogramas={cronogramas}
               nudges={nudges}

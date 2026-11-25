@@ -9,7 +9,7 @@ import { formatDate } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import {
   Select,
   SelectContent,
@@ -66,10 +66,10 @@ export function FormulariosLista({
       <div className="flex flex-wrap items-center gap-2">
         {/* um toque filtra, um toque no ativo volta pra "Todos"; a contagem
             junto do chip já diz se vale o clique */}
-        <div
+        <FilterChipRow
           role="group"
           aria-label="Filtrar formulários"
-          className="flex flex-wrap items-center gap-1.5"
+          className="min-w-0 gap-1.5"
         >
           {CHIPS.map((c) => {
             const n = formularios.filter(c.bate).length;
@@ -97,7 +97,7 @@ export function FormulariosLista({
               </button>
             );
           })}
-        </div>
+        </FilterChipRow>
         <Select
           value={ordem}
           onValueChange={(v) => setOrdem(v as Ordem)}

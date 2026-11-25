@@ -3,6 +3,7 @@ import {
   atrasadasPainel,
   estacoesJornada,
   estacoesPainelDupla,
+  momentoRefazerRoda,
   resumoJornada,
   type PainelJornadaLinha,
   type Entrega360,
@@ -391,27 +392,33 @@ describe("estacoesJornada — a_fazer", () => {
     const v = por(est, "visao");
     expect(v.estado).toBe("a_fazer");
     expect(v.token).toBeNull();
-    expect(v.detalhe).toBe("o mentor envia quando chegar a hora");
+    expect(v.detalhe).toBe(
+      "o instrumento já devia estar liberado: fala com teu mentor"
+    );
   });
 
-  it("sem entrega dentro da janela → 'envia quando chegar a hora' por emissor", () => {
+  it("sem entrega dentro da janela → copy de anomalia (auto-emissão falhou)", () => {
     const est = estacoesJornada(base({ encontros: realizados(1) }));
-    expect(por(est, "visao").detalhe).toBe("o mentor envia quando chegar a hora");
-    expect(por(est, "metas").detalhe).toBe("o mentor envia quando chegar a hora");
+    expect(por(est, "visao").detalhe).toBe(
+      "o instrumento já devia estar liberado: fala com teu mentor"
+    );
+    expect(por(est, "metas").detalhe).toBe(
+      "o instrumento já devia estar liberado: fala com teu mentor"
+    );
   });
 
   it("sem entrega com a janela já passada → copy honesta, sem promessa futura", () => {
     const est = estacoesJornada(base({ encontros: realizados(16) }));
     expect(por(est, "visao").detalhe).toBe(
-      "o link ainda não chegou: fala com teu mentor"
+      "ainda não foi liberado: fala com teu mentor"
     );
     expect(por(est, "roda_formal").detalhe).toBe(
-      "o link ainda não chegou: fala com teu mentor"
+      "ainda não foi liberado: fala com teu mentor"
     );
     // a janela da 360º é o próprio enc. 16 — no teto da régua ela segue
     // "dentro da janela"; atraso dela aparece via link expirado
     expect(por(est, "avaliacao_360").detalhe).toBe(
-      "a coordenação envia quando chegar a hora"
+      "a coordenação libera quando chegar a hora"
     );
   });
 
@@ -589,6 +596,52 @@ describe("estacoesJornada — roda inicial × formal", () => {
     );
     expect(por(est, "roda_formal").estado).toBe("feito");
     expect(por(est, "roda_inicial").estado).toBe("a_fazer");
+  });
+});
+
+// ---------- momentoRefazerRoda (486): a estante só oferece "Refazer"
+// quando o link que a RPC minta é o da estação — a régua é a da 0209:
+// momento do último link usado; sem marca, o emitir deriva 'formal' ----------
+
+describe("momentoRefazerRoda", () => {
+  it("sem link usado → null (a RPC recusa: não houve emissão anterior)", () => {
+    expect(momentoRefazerRoda([entrega(), entrega()])).toBeNull();
+  });
+
+  it("último usado marcado 'inicial' → 'inicial'", () => {
+    expect(
+      momentoRefazerRoda([
+        entrega({
+          contexto: { momento: "inicial" },
+          usado_em: "2026-03-05T20:00:00-03:00",
+        }),
+        // pendente emitida não entra na conta — só usado conta
+        entrega({ contexto: { momento: "formal" }, usado_em: null }),
+      ])
+    ).toBe("inicial");
+  });
+
+  it("formal usada por último → 'formal' (refazer da inicial mintaria a formal)", () => {
+    expect(
+      momentoRefazerRoda([
+        entrega({
+          contexto: { momento: "inicial" },
+          usado_em: "2026-03-05T20:00:00-03:00",
+        }),
+        entrega({
+          contexto: { momento: "formal" },
+          usado_em: "2026-06-10T19:00:00-03:00",
+        }),
+      ])
+    ).toBe("formal");
+  });
+
+  it("usado sem marca → 'formal' (a régua automática do emitir: ≥1 usada)", () => {
+    expect(
+      momentoRefazerRoda([
+        entrega({ contexto: {}, usado_em: "2026-03-05T20:00:00-03:00" }),
+      ])
+    ).toBe("formal");
   });
 });
 
@@ -824,7 +877,12 @@ describe("regressão — re-emissão depois de respondida reabre a estação (M3
     const p = por(est, "pdm");
     expect(p.estado).toBe("a_fazer");
     expect(p.token).toBe("tok-reemissao");
-    expect(p.detalhe).toContain("nova rodada");
+    // REALIZA-515 — re-emissão decidida (link sem origem = gesto manual
+    // legado) lê "a dupla decidiu refazer", nunca "o mentor enviou"
+    expect(p.reemissao).toBe(true);
+    expect(p.detalhe).toContain("a dupla decidiu refazer");
+    expect(p.detalhe).toContain("resposta anterior segue salva");
+    expect(p.detalhe).not.toContain("o mentor enviou");
   });
 
   it("Rever sobrevive: a_fazer da re-emissão traz respostas+data da rodada anterior", () => {
@@ -852,6 +910,89 @@ describe("regressão — re-emissão depois de respondida reabre a estação (M3
     expect(p.estado).toBe("a_fazer");
     expect(p.respostas?.meta_1).toBe("Passar no vestibular");
     expect(p.respondidoEm).toBe("2026-03-15T20:00:00-03:00");
+  });
+
+  it("self-serve do jovem (origem 'jovem', 0209) é reemissão na voz dela", () => {
+    const est = estacoesJornada(
+      base({
+        encontros: realizados(9),
+        instrumentos: [
+          inst("pdm", CAMPOS_PDM, [
+            entrega({
+              status: "respondido",
+              created_at: "2026-03-10T10:00:00-03:00",
+              respondido_em: "2026-03-15T20:00:00-03:00",
+              respostas: { meta_1: "Passar no vestibular" },
+            }),
+            entrega({
+              status: "pendente",
+              created_at: `${dataEnc(9)}T10:00:00-03:00`,
+              token: "tok-refazer-jovem",
+              contexto: { origem: "jovem" },
+            }),
+          ]),
+        ],
+      })
+    );
+    const p = por(est, "pdm");
+    expect(p.estado).toBe("a_fazer");
+    expect(p.reemissao).toBe(true);
+    expect(p.detalhe).toContain("você pediu pra refazer");
+    expect(p.detalhe).not.toContain("o mentor enviou");
+  });
+
+  it("origem 'auto' depois de respondida NÃO é nova rodada (rematch 0205)", () => {
+    // remanejo: a resposta migra pra dupla nova e a auto-emissão minta o
+    // instrumento de novo — ninguém decidiu refazer, o detalhe não inventa
+    const est = estacoesJornada(
+      base({
+        encontros: realizados(9),
+        instrumentos: [
+          inst("pdm", CAMPOS_PDM, [
+            entrega({
+              status: "respondido",
+              created_at: "2026-03-10T10:00:00-03:00",
+              respondido_em: "2026-03-15T20:00:00-03:00",
+              respostas: { meta_1: "Passar no vestibular" },
+            }),
+            entrega({
+              status: "pendente",
+              created_at: `${dataEnc(9)}T10:00:00-03:00`,
+              token: "tok-auto-rematch",
+              contexto: { origem: "auto" },
+            }),
+          ]),
+        ],
+      })
+    );
+    const p = por(est, "pdm");
+    expect(p.estado).toBe("a_fazer");
+    expect(p.token).toBe("tok-auto-rematch");
+    expect(p.reemissao).toBe(false);
+    expect(p.detalhe).toBeNull();
+    // a resposta anterior segue consultável — só a narrativa some
+    expect(p.respostas?.meta_1).toBe("Passar no vestibular");
+  });
+
+  it("primeira emissão pendente nunca é reemissão — nem na Roda autoemitida", () => {
+    const est = estacoesJornada(
+      base({
+        encontros: realizados(1),
+        instrumentos: [
+          inst("roda_vida", CAMPOS_RODA, [
+            entrega({
+              status: "pendente",
+              contexto: { origem: "auto", momento: "inicial" },
+            }),
+          ]),
+        ],
+      })
+    );
+    const r = por(est, "roda_inicial");
+    expect(r.estado).toBe("a_fazer");
+    expect(r.reemissao).toBe(false);
+    expect(r.detalhe).toBeNull();
+    expect(r.detalhe ?? "").not.toContain("nova rodada");
   });
 
   it("a janela vence: re-emissão antes do enc. de abertura segue feito", () => {

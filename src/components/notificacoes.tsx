@@ -36,13 +36,14 @@ import {
   UsersThree,
   XCircle,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   listarNotificacoes,
   marcarNotificacaoLida,
   marcarTodasNotificacoesLidas,
 } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
+import { ExpandirTexto } from "@/components/expandir-texto";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { tempoRelativo } from "@/lib/ciclo";
 import { cn, pathInterno } from "@/lib/utils";
@@ -257,6 +258,14 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   // calendário marca a tarefa (agendar o encerramento/§13)
   trilha_prazo: HourglassMedium,
   trilha_prazo_coord: CalendarCheck,
+  // 0225 — plano "ficar em dia": proposta/aceite/contestação
+  plano_proposto: ArrowsClockwise,
+  plano_aceito: CalendarCheck,
+  plano_contestado: ThumbsDown,
+  // 0219/0220 — lembrete do plano segue o glifo do "Lembrar"; a intervenção
+  // é sugestão da Liza, o sparkle é o glifo dela na casa
+  plano_lembrete: ChatsCircle,
+  plano_intervencao: Sparkle,
 };
 
 export function NotificacoesBell({
@@ -354,49 +363,67 @@ export function NotificacoesBell({
               const lida = !!n.lida_em;
               return (
                 <li key={n.id} className={cn("flex items-stretch", !lida && "bg-muted/40")}>
-                  {(() => {
-                    // com href é navegação real → <a>: Cmd+click, nova aba e
-                    // preview de URL funcionam; sem href continua botão
-                    const hrefOk = pathInterno(n.href);
-                    const conteudo = (
-                      <>
-                        <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
-                          <Icone size={14} aria-hidden />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          {!lida && <span className="sr-only">Não lida · </span>}
-                          {/* título em 2 linhas + horário na linha própria —
-                              o par truncate+shrink-0 comia títulos longos */}
-                          <span className={cn("line-clamp-2 text-sm leading-snug", !lida && "font-medium")}>
-                            {n.titulo}
+                  {/* coluna: link/botão (ícone+título+tempo) em cima e o corpo
+                      fora dele embaixo — expandir é gesto próprio, nunca
+                      navega nem marca lida (027 FR-008/009) */}
+                  <div className="min-w-0 flex-1">
+                    {(() => {
+                      // com href é navegação real → <a>: Cmd+click, nova aba e
+                      // preview de URL funcionam; sem href continua botão
+                      const hrefOk = pathInterno(n.href);
+                      const conteudo = (
+                        <>
+                          <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+                            <Icone size={14} aria-hidden />
                           </span>
-                          <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                            {tempoRelativo(n.created_at, agoraMs)}
-                          </span>
-                          {n.corpo && (
-                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                              {n.corpo}
+                          <span className="min-w-0 flex-1">
+                            {!lida && <span className="sr-only">Não lida · </span>}
+                            {/* título em 2 linhas + horário na linha própria —
+                                o par truncate+shrink-0 comia títulos longos */}
+                            <span className={cn("line-clamp-2 text-sm leading-snug", !lida && "font-medium")}>
+                              {n.titulo}
                             </span>
-                          )}
-                        </span>
-                      </>
-                    );
-                    const classe =
-                      "flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60";
-                    const aoClicar = () => {
-                      if (!lida) marcar(n.id);
-                      setAberto(false);
-                    };
-                    return hrefOk ? (
-                      <Link href={hrefOk} prefetch={false} onClick={aoClicar} className={classe}>
-                        {conteudo}
-                      </Link>
-                    ) : (
-                      <button type="button" onClick={aoClicar} className={classe}>
-                        {conteudo}
-                      </button>
-                    );
-                  })()}
+                            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                              {tempoRelativo(n.created_at, agoraMs)}
+                            </span>
+                          </span>
+                        </>
+                      );
+                      const classe = cn(
+                        "flex w-full min-w-0 items-start gap-3 px-4 pt-3 text-left transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60",
+                        n.corpo ? "pb-1" : "pb-3"
+                      );
+                      const aoClicar = () => {
+                        if (!lida) marcar(n.id);
+                        setAberto(false);
+                      };
+                      return hrefOk ? (
+                        <Link href={hrefOk} prefetch={false} onClick={aoClicar} className={classe}>
+                          {conteudo}
+                        </Link>
+                      ) : (
+                        <button type="button" onClick={aoClicar} className={classe}>
+                          {conteudo}
+                        </button>
+                      );
+                    })()}
+                    {/* ps-14 alinha o corpo com a coluna do texto (px-4 +
+                        ícone 28px + gap-3); o title é o piso sem hover (010) */}
+                    {n.corpo && (
+                      <div className="pe-4 ps-14 pb-3">
+                        <ExpandirTexto
+                          linhas={2}
+                          title={n.corpo}
+                          rotuloMais="Ler mais"
+                          rotuloMenos="Ler menos"
+                          className="text-xs leading-normal text-muted-foreground"
+                          classNameBotao="min-h-11 md:min-h-6"
+                        >
+                          {n.corpo}
+                        </ExpandirTexto>
+                      </div>
+                    )}
+                  </div>
                   {!lida && (
                     <Button
                       type="button"

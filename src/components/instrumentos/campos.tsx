@@ -6,6 +6,13 @@ import {
   type FormularioCampo,
   type RespostaValor,
 } from "@/lib/forms/schema";
+import { CampoArquivo } from "@/components/forms/campo-arquivo";
+import { GridDisponibilidade } from "@/components/forms/grid-disponibilidade";
+import {
+  NumeroPergunta,
+  RotuloPergunta,
+} from "@/components/forms/pergunta";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -83,7 +90,17 @@ export function EntradaTexto({
               inputMode: "url" as const,
               placeholder: "linkedin.com/in/voce",
             }
-          : { placeholder };
+          : {
+              placeholder,
+              // autofill honesto nos nomes do intake — o civil completa
+              // como "name" e o social como o apelido de cadastro
+              autoComplete:
+                campo.id === "nome_civil" || campo.id === "nome_completo"
+                  ? "name"
+                  : campo.id === "nome_social"
+                    ? "nickname"
+                    : undefined,
+            };
   return (
     <Input
       id={campoDomId(campo)}
@@ -106,7 +123,6 @@ export function EntradaTextoLongo({
   valor,
   definir,
   erro,
-  enterKeyHint = "next",
   rows = 4,
   placeholder = "Escreva com suas palavras…",
   className,
@@ -115,26 +131,34 @@ export function EntradaTextoLongo({
   valor: RespostaValor | undefined;
   definir: (id: string, v: RespostaValor | undefined) => void;
   erro: string | undefined;
-  enterKeyHint?: "next" | "send" | "enter" | "done" | "go";
   rows?: number;
   placeholder?: string;
   className?: string;
 }) {
+  const restante = 5000 - String(valor ?? "").length;
   return (
-    <Textarea
-      id={campoDomId(campo)}
-      name={campo.id}
-      required={campo.obrigatorio}
-      rows={rows}
-      maxLength={5000}
-      enterKeyHint={enterKeyHint}
-      value={String(valor ?? "")}
-      onChange={(e) => definir(campo.id, e.target.value)}
-      placeholder={placeholder}
-      aria-invalid={erro ? true : undefined}
-      aria-describedby={erro ? campoErroId(campo) : undefined}
-      className={className}
-    />
+    <>
+      <Textarea
+        id={campoDomId(campo)}
+        name={campo.id}
+        required={campo.obrigatorio}
+        rows={rows}
+        maxLength={5000}
+        value={String(valor ?? "")}
+        onChange={(e) => definir(campo.id, e.target.value)}
+        placeholder={placeholder}
+        aria-invalid={erro ? true : undefined}
+        aria-describedby={erro ? campoErroId(campo) : undefined}
+        className={className}
+      />
+      {restante <= 500 && (
+        <p className="mt-1 text-right text-xs tabular-nums text-muted-foreground">
+          {restante === 1
+            ? "1 caractere restante"
+            : `${restante} caracteres restantes`}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -157,6 +181,7 @@ export function EntradaData({
       name={campo.id}
       type="date"
       required={campo.obrigatorio}
+      autoComplete={campo.id === "nascimento" ? "bday" : undefined}
       value={String(valor ?? "")}
       onChange={(e) => definir(campo.id, e.target.value)}
       aria-invalid={erro ? true : undefined}
@@ -178,7 +203,6 @@ export function Segmentos({
   erro,
   opcoes,
   colunas,
-  ariaLabel,
 }: {
   campo: FormularioCampo;
   valor: RespostaValor | undefined;
@@ -187,12 +211,11 @@ export function Segmentos({
   opcoes: readonly OpcaoSegmento[];
   /** grade fixa (default: uma coluna por opção) */
   colunas?: string;
-  ariaLabel?: string;
 }) {
   return (
     <div
       role="radiogroup"
-      aria-label={ariaLabel ?? campo.label}
+      aria-label={campo.label}
       aria-invalid={erro ? true : undefined}
       aria-describedby={erro ? campoErroId(campo) : undefined}
       className={cn("grid gap-1 rounded-xl bg-muted p-1", colunas)}
@@ -209,7 +232,7 @@ export function Segmentos({
       {opcoes.map((o) => (
         <label
           key={o.v}
-          className="flex h-11 cursor-pointer items-center justify-center rounded-lg px-1 text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
+          className="flex h-11 cursor-pointer items-center justify-center rounded-lg px-1 text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 @xl:h-10"
         >
           <input
             type="radio"
@@ -221,7 +244,7 @@ export function Segmentos({
             checked={String(valor ?? "") === o.v}
             onChange={() => definir(campo.id, o.v)}
             className="sr-only"
-            aria-label={`${campo.label}: ${o.l}`}
+            aria-label={o.l}
           />
           {o.l}
         </label>
@@ -281,7 +304,7 @@ export function SegmentosEscala({
       // string do radio
       definir={(id, v) => definir(id, v == null ? v : Number(v))}
       erro={erro}
-      colunas="grid-cols-5 sm:grid-cols-10"
+      colunas={teto === 5 ? "grid-cols-5" : "grid-cols-5 @xl:grid-cols-10"}
       opcoes={Array.from({ length: teto }, (_, i) => ({
         v: String(i + 1),
         l: String(i + 1),
@@ -290,67 +313,28 @@ export function SegmentosEscala({
   );
 }
 
-/** Rótulo compartilhado — pergunta + (opcional), com ou sem htmlFor. */
-export function RotuloCampo({
-  campo,
-  htmlFor,
-  className,
-}: {
-  campo: FormularioCampo;
-  htmlFor?: string;
-  className?: string;
-}) {
-  const inner = (
-    <>
-      {campo.label}
-      {!campo.obrigatorio && (
-        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-          (opcional)
-        </span>
-      )}
-    </>
-  );
-  return htmlFor ? (
-    <label
-      htmlFor={htmlFor}
-      className={cn(
-        "block text-[15px] font-medium leading-snug sm:text-base",
-        className
-      )}
-    >
-      {inner}
-    </label>
-  ) : (
-    <span
-      className={cn(
-        "block text-[15px] font-medium leading-snug sm:text-base",
-        className
-      )}
-    >
-      {inner}
-    </span>
-  );
-}
-
 /** Fallback completo por tipo — o instrumento sob medida nunca deixa um
  *  campo fora da convenção sem renderizar (form editado, campo novo).
  *  `sombra={false}` devolve a versão sem cartão — pra uso dentro de uma
- *  ficha que já tem moldura própria. */
+ *  ficha que já tem moldura própria. `n` é a posição da pergunta na
+ *  régua: com ela o rótulo ganha o número verde da gramática (442/010). */
 export function CampoGenerico({
   campo,
   api,
   sombra = true,
+  n,
 }: {
   campo: FormularioCampo;
   api: RespostaApi;
   sombra?: boolean;
+  n?: number;
 }) {
   const valor = api.valores[campo.id];
   const erro = api.erros[campo.id];
   const id = campoDomId(campo);
   const cartao = cn(
     sombra
-      ? "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5"
+      ? "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5"
       : "min-w-0",
     erro && "rounded-xl ring-2 ring-destructive/60"
   );
@@ -361,7 +345,7 @@ export function CampoGenerico({
     case "data":
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <RotuloCampo campo={campo} htmlFor={id} />
+          <RotuloPergunta campo={campo} n={n} htmlFor={id} />
           {campo.tipo === "texto" ? (
             <EntradaTexto
               campo={campo}
@@ -390,7 +374,7 @@ export function CampoGenerico({
     case "select":
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <RotuloCampo campo={campo} htmlFor={id} />
+          <RotuloPergunta campo={campo} n={n} htmlFor={id} />
           <EntradaSelect
             campo={campo}
             valor={valor}
@@ -404,9 +388,17 @@ export function CampoGenerico({
     case "escala_1_5":
     case "escala_1_10":
       return (
-        <fieldset className={cartao} data-campo={campo.id}>
+        <fieldset
+          className={cartao}
+          data-campo={campo.id}
+          // focável só por script: o submit com erro mira o grupo, e a
+          // dupla invalid+describedby faz o leitor anunciar a falha
+          tabIndex={-1}
+          aria-invalid={erro ? true : undefined}
+          aria-describedby={erro ? campoErroId(campo) : undefined}
+        >
           <legend>
-            <RotuloCampo campo={campo} />
+            <RotuloPergunta campo={campo} n={n} />
           </legend>
           <div className="mt-1.5">
             {campo.tipo === "sim_nao" ? (
@@ -430,29 +422,33 @@ export function CampoGenerico({
       );
     case "multi_select":
       return (
-        <fieldset className={cartao} data-campo={campo.id}>
+        <fieldset
+          className={cartao}
+          data-campo={campo.id}
+          tabIndex={-1}
+          aria-invalid={erro ? true : undefined}
+          aria-describedby={erro ? campoErroId(campo) : undefined}
+        >
           <legend>
-            <RotuloCampo campo={campo} />
+            <RotuloPergunta campo={campo} n={n} />
           </legend>
           <ul className="mt-1.5 space-y-1">
             {(campo.opcoes ?? []).map((o) => {
               const marcado = Array.isArray(valor) && valor.includes(o);
               return (
                 <li key={o}>
-                  <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
-                    <input
-                      type="checkbox"
+                  <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted">
+                    <Checkbox
                       checked={marcado}
-                      onChange={(e) => {
+                      onCheckedChange={(m) => {
                         const atual = Array.isArray(valor) ? valor : [];
                         api.definir(
                           campo.id,
-                          e.target.checked
+                          m
                             ? [...atual, o]
                             : atual.filter((x) => x !== o)
                         );
                       }}
-                      className="size-5 shrink-0 rounded accent-primary"
                     />
                     {o}
                   </label>
@@ -466,20 +462,20 @@ export function CampoGenerico({
     case "checkbox":
       return (
         <div className={cartao} data-campo={campo.id}>
-          <label className="-m-4 flex cursor-pointer items-start gap-3 rounded-xl p-4 text-[15px] leading-relaxed transition-colors select-none has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 sm:-m-5 sm:p-5 sm:text-base">
-            <input
-              type="checkbox"
+          <label className="-m-4 flex cursor-pointer items-start gap-3 rounded-xl p-4 text-[15px] leading-relaxed transition-colors select-none has-checked:bg-primary/5 @xl:-m-5 @xl:p-5 @xl:text-base">
+            {n != null && n > 0 && <NumeroPergunta n={n} />}
+            <Checkbox
               checked={valor === true}
-              onChange={(e) => api.definir(campo.id, e.target.checked)}
+              onCheckedChange={(v) => api.definir(campo.id, v)}
               required={campo.obrigatorio}
-              className="mt-0.5 size-4 shrink-0 accent-primary"
+              className="mt-0.5"
               aria-invalid={erro ? true : undefined}
               aria-describedby={erro ? campoErroId(campo) : undefined}
             />
-            <span>
+            <span className="min-w-0 flex-1 font-semibold text-foreground">
               {campo.label}
               {!campo.obrigatorio && (
-                <span className="ml-1.5 text-xs text-muted-foreground">
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                   (opcional)
                 </span>
               )}
@@ -487,6 +483,42 @@ export function CampoGenerico({
           </label>
           <ErroCampo campo={campo} msg={erro} />
         </div>
+      );
+    case "arquivo":
+      // form editado pode pendurar upload num instrumento — sem o
+      // componente o campo saía invisível e travava o submit
+      return (
+        <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
+          <RotuloPergunta campo={campo} n={n} />
+          <CampoArquivo
+            campo={campo}
+            token={api.token}
+            valor={valor}
+            onValor={(id, v) => api.definir(id, v ?? undefined)}
+            preview={api.preview}
+          />
+          <ErroCampo campo={campo} msg={erro} />
+        </div>
+      );
+    case "grid_disponibilidade":
+      return (
+        <fieldset
+          className={cn(cartao, "space-y-1.5")}
+          data-campo={campo.id}
+          tabIndex={-1}
+          aria-invalid={erro ? true : undefined}
+          aria-describedby={erro ? campoErroId(campo) : undefined}
+        >
+          <legend>
+            <RotuloPergunta campo={campo} n={n} />
+          </legend>
+          <GridDisponibilidade
+            name={campo.id}
+            value={valor ?? null}
+            onChange={(v) => api.definir(campo.id, v ?? undefined)}
+          />
+          <ErroCampo campo={campo} msg={erro} />
+        </fieldset>
       );
     default:
       return null;
@@ -514,7 +546,7 @@ export function EntradaSelect({
         onChange={(e) => definir(campo.id, e.target.value || undefined)}
         aria-invalid={erro ? true : undefined}
         aria-describedby={erro ? campoErroId(campo) : undefined}
-        className="h-11 w-full appearance-none rounded-lg border border-input bg-transparent px-2.5 pr-9 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:h-8 md:text-sm"
+        className="h-11 w-full appearance-none rounded-lg border border-input bg-transparent px-2.5 pr-9 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 @xl:h-8 @xl:text-sm"
       >
         <option value="" disabled>
           Escolha…

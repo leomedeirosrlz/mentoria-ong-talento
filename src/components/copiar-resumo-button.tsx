@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 const EASE = "ease-[cubic-bezier(0.2,0,0,1)]";
 
@@ -43,15 +43,15 @@ export function CopiarResumoButton({
       <span aria-hidden="true" className="relative inline-flex size-3.5 items-center justify-center">
         <Copy
           className={cn(
-            `transition-all duration-150 ${EASE}`,
-            copiado && "scale-25 opacity-0 blur-[4px]"
+            `transition-[opacity,scale] duration-150 ${EASE}`,
+            copiado && "scale-25 opacity-0"
           )}
         />
         <Check
           weight="bold"
           className={cn(
-            `absolute text-(--ok) transition-all duration-150 ${EASE}`,
-            copiado ? "scale-100 opacity-100 blur-[0px]" : "scale-25 opacity-0 blur-[4px]"
+            `absolute text-(--ok) transition-[opacity,scale] duration-150 ${EASE}`,
+            copiado ? "scale-100 opacity-100" : "scale-25 opacity-0"
           )}
         />
       </span>

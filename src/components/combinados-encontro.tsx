@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Collapsible } from "@base-ui/react/collapsible";
-import { CaretDown } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { CaretDown, Plus, X } from "@phosphor-icons/react";
+import { toast } from "@/lib/toast";
 import {
   criarCombinadoEncontro,
   editarEncaminhamento,
@@ -20,6 +20,7 @@ import {
   ExcluirCombinadoConfirm,
 } from "@/components/combinado-acoes";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { novoUuid } from "@/lib/uuid";
@@ -30,6 +31,11 @@ import { novoUuid } from "@/lib/uuid";
  *  logo após criar (bug visto no e2e). O mapa por (dupla,nº) devolve a
  *  escolha do usuário na remontagem; reload de página recomeça pelo padrão. */
 const abertoPorBloco = new Map<string, boolean>();
+/** Mesmo motivo do mapa acima: o form aberto (REALIZA-416) e o foco
+ *  pendente pro input sobrevivem à remontagem do bloco — sem eles, criar
+ *  o 1º pendente fecharia o form logo após o add. */
+const formAbertoPorBloco = new Map<string, boolean>();
+const focoPendente = new Set<string>();
 
 type Responsavel = "mentor" | "mentorado";
 
@@ -43,6 +49,7 @@ type Responsavel = "mentor" | "mentorado";
 export function CombinadosEncontro({
   duplaId,
   numero,
+  sessao = false,
   itens,
   pendentesAnteriores = [],
   jovemNome,
@@ -52,6 +59,8 @@ export function CombinadosEncontro({
   duplaId: string;
   /** nº do passo do guia — a âncora da lista (não o encontro físico). */
   numero: number;
+  /** Trilha esp: o carry-over taggeia "da sessão N", não "do Nº encontro". */
+  sessao?: boolean;
   /** Combinados deste nº (feitos e pendentes). */
   itens: Encaminhamento[];
   /** Pendentes de nºs anteriores — carry-over marcável aqui mesmo. */
@@ -79,14 +88,33 @@ export function CombinadosEncontro({
     carryOver: boolean;
   } | null>(null);
   const chaveBloco = `${duplaId}:${numero}`;
-  // abre sozinho quando há o que ver — fechado escondia o que a dupla
-  // combinou atrás de um rótulo que ninguém abria
+  // nasce recolhido em qualquer caso — o header fechado já resume
+  // ("N pendentes" / "tudo feito"); o deep link #combinados-N abre
+  // explicitamente quando o aviso aponta pra cá
   const [aberto, setAberto] = useState(
-    () =>
-      abertoPorBloco.get(chaveBloco) ??
-      itens.length + pendentesAnteriores.length > 0
+    () => abertoPorBloco.get(chaveBloco) ?? false
   );
+  // form de novo combinado nasce recolhido atrás do "+ Adicionar"
+  // (REALIZA-416): um campo visível por encontro poluía a ficha inteira
+  const [formAberto, setFormAberto] = useState(
+    () => formAbertoPorBloco.get(chaveBloco) ?? false
+  );
+  const botaoNovoRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
+
+  function abrirForm() {
+    focoPendente.add(chaveBloco); // o input ainda não existe — foca na montagem
+    setFormAberto(true);
+    formAbertoPorBloco.set(chaveBloco, true);
+  }
+
+  function fecharForm() {
+    focoPendente.delete(chaveBloco);
+    setFormAberto(false);
+    formAbertoPorBloco.set(chaveBloco, false);
+    // devolve o foco ao gatilho — ele remonta no mesmo commit
+    requestAnimationFrame(() => botaoNovoRef.current?.focus());
+  }
 
   // deep link #combinados-<nº> (aviso "Combinados em aberto" da Minha
   // agenda): a aba Encontros já está montada quando este card existe —
@@ -221,6 +249,9 @@ export function CombinadosEncontro({
     const prazoLimpo = prazo;
     setNovo("");
     setPrazo("");
+    // entrada rápida: o form segue aberto e o foco volta pro input mesmo
+    // se o refresh remontar o bloco (flag consumida na montagem dele)
+    focoPendente.add(chaveBloco);
     if (demo) {
       const agora = new Date().toISOString();
       setItensLoc((l) => [
@@ -286,7 +317,7 @@ export function CombinadosEncontro({
       >
         {carryOver && c.numero != null && (
           <span className="text-muted-foreground">
-            do {c.numero}º encontro ·{" "}
+            {sessao ? `da sessão ${c.numero}` : `do ${c.numero}º encontro`} ·{" "}
           </span>
         )}
         {c.descricao}
@@ -298,8 +329,8 @@ export function CombinadosEncontro({
     </span>
   );
 
-  // checkbox nativo + label — teclado e clique no texto de graça; o quadrado
-  // estilizado é só a representação (mesmo padrão da aba Combinados)
+  // checkbox do kit dentro da label — clique no texto e teclado de graça
+  // (mesmo padrão da aba Combinados)
   const itemMarcavel = (c: Encaminhamento, carryOver: boolean) => (
     <li key={c.id} className="flex items-start gap-1">
       <label
@@ -308,31 +339,12 @@ export function CombinadosEncontro({
           pending && pendingId === c.id && "opacity-60"
         )}
       >
-        <input
-          type="checkbox"
-          className="peer sr-only"
+        <Checkbox
           checked={feito(c)}
           disabled={pending && pendingId === c.id}
-          onChange={() => toggle(c, carryOver)}
+          onCheckedChange={() => toggle(c, carryOver)}
+          className="mt-0.5 group-hover:border-foreground"
         />
-        <span
-          aria-hidden="true"
-          className={cn(
-            "mt-0.5 grid size-4.5 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
-            feito(c)
-              ? "border-[var(--ok)] bg-[var(--ok)] text-[var(--status-foreground)]"
-              : "border-muted-foreground/40 group-hover:border-foreground"
-          )}
-        >
-          {feito(c) && (
-            <svg
-              viewBox="0 0 10 8"
-              className="size-2.5 fill-none stroke-current stroke-2"
-            >
-              <path d="M1 4l2.5 2.5L9 1" />
-            </svg>
-          )}
-        </span>
         {texto(c, carryOver)}
       </label>
       {podeEditar && (
@@ -409,20 +421,39 @@ export function CombinadosEncontro({
                 </ul>
               </div>
             )}
-            {podeEditar && (
+            {podeEditar && !formAberto && (
+              <Button
+                ref={botaoNovoRef}
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={abrirForm}
+                className="mt-1 -ml-2 text-muted-foreground hover:text-foreground"
+              >
+                <Plus aria-hidden />
+                Adicionar combinado
+              </Button>
+            )}
+            {podeEditar && formAberto && (
               <form
                 className="mt-1 flex flex-wrap items-center gap-2 sm:flex-nowrap"
                 onSubmit={(e) => {
                   e.preventDefault();
                   adicionar();
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") fecharForm();
+                }}
               >
                 <Input
+                  ref={(el: HTMLInputElement | null) => {
+                    if (el && focoPendente.delete(chaveBloco)) el.focus();
+                  }}
                   value={novo}
                   onChange={(e) => setNovo(e.target.value)}
                   maxLength={500}
                   placeholder="Adicionar combinado…"
-                  aria-label={`Novo combinado do ${numero}º encontro`}
+                  aria-label={`Novo combinado ${sessao ? `da sessão ${numero}` : `do ${numero}º encontro`}`}
                   disabled={pending}
                   className="h-9 min-w-0 flex-1 basis-48 border-0 bg-muted/40 px-3 shadow-none focus-visible:ring-1"
                 />
@@ -469,6 +500,16 @@ export function CombinadosEncontro({
                   disabled={pending || novo.trim().length < 2}
                 >
                   Adicionar
+                </Button>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="Fechar"
+                  onClick={fecharForm}
+                  className="text-muted-foreground"
+                >
+                  <X aria-hidden />
                 </Button>
               </form>
             )}

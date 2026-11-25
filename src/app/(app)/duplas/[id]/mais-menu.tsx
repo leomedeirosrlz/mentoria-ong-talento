@@ -1,32 +1,42 @@
 "use client";
 
-// Overflow "Mais" do header da ficha (REALIZA-157) — cada item é um
-// DropdownMenuItem comum com onClick que só escolhe qual dialog abrir.
-// A composição anterior (Dialog.Trigger render={Menu.Item}) era o defeito:
-// o item híbrido não preenchia a largura do popup e obrigava o Portal
-// keepMounted hand-rolled pra não desmontar o dialog junto do menu. Com os
-// dialogs fora do popup o menu volta ao DropdownMenuContent padrão — fill,
-// setas e devolução de foco vêm de graça do Menu.
+// Overflow "⋯" do header da ficha (REALIZA-157, revisto na #9 do review
+// 21/11): o cabeçalho mostra UMA ação primária e todo o resto mora aqui —
+// cada item é um DropdownMenuItem comum com onClick que só escolhe qual
+// dialog abrir. A composição anterior (Dialog.Trigger render={Menu.Item})
+// era o defeito: o item híbrido não preenchia a largura do popup e obrigava
+// o Portal keepMounted hand-rolled pra não desmontar o dialog junto do
+// menu. Com os dialogs fora do popup o menu volta ao DropdownMenuContent
+// padrão — fill, setas e devolução de foco vêm de graça do Menu.
 //
 // Cada prop-grupo presente = um item + o dialog dele, sempre montado (fecha
 // com animação e abre limpo — os dialogs resetam na borda de subida do
 // `open`, mesmo padrão do RemanejarDuplaDialog). Sem item nenhum, some.
+// Estado de pedido de especialista NÃO entra aqui como item desabilitado:
+// ele mora num lugar só, o card "Pedidos em aberto" (review #9).
 
 import { useState } from "react";
 import {
   ArrowsLeftRight,
+  CalendarBlank,
+  CalendarPlus,
   DotsThree,
   FlagCheckered,
+  HandHeart,
   PaperPlaneTilt,
+  PencilSimple,
   Sparkle,
   UserPlus,
 } from "@phosphor-icons/react";
-import type { Dupla } from "@/lib/types";
+import type { Dupla, Encontro, JovemEspecialista } from "@/lib/types";
 import {
   EnviarFormularioDialog,
   type FormularioOpcao,
   type PessoaDestino,
 } from "@/components/enviar-formulario-dialog";
+import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
+import { PedirApoioDialog } from "@/components/pedir-apoio-dialog";
 import { SolicitarEspecialistaDialog } from "@/components/solicitar-especialista-dialog";
 import { SugerirEspecialistaDialog } from "@/components/sugerir-especialista-dialog";
 import { EncerrarTrilhaDialog } from "@/components/encerrar-trilha-dialog";
@@ -39,30 +49,61 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type DialogId = "form" | "solicitar" | "sugerir" | "encerrar" | "remanejar";
+type DialogId =
+  | "agendar"
+  | "remarcar"
+  | "apoio"
+  | "form"
+  | "solicitar"
+  | "sugerir"
+  | "editar"
+  | "encerrar"
+  | "remanejar";
 
 // ícones do Mais: tamanho e cor explícitos — é o que alinha o texto do item
 // com o da linha (REALIZA-157); sem o size-4 o svg herdava o tamanho do texto
 const ICONE = "size-4 shrink-0 text-muted-foreground";
 
-type EspecialistaOpcao = {
-  id: string;
-  nome: string;
-  nome_social?: string | null;
-  areas: string[] | null;
-};
+// a seleção de especialista dos dialogs é por cards do catálogo rico (023)
+type EspecialistaOpcao = JovemEspecialista;
 
 export function DuplaMaisMenu({
   duplaId,
+  agendar,
+  remarcar,
+  pedirApoio,
   formulario,
   solicitar,
   sugerir,
-  solicitarEstado,
-  sugerirEstado,
+  editar,
   encerrar,
   remanejar,
 }: {
   duplaId: string;
+  /** "Agendar Nº encontro" — ação de primeira classe quando a primária já
+   *  é o registrar (REALIZA-97); no ⋯ ela continua a um clique. */
+  agendar?: {
+    numero: number;
+    atual: Encontro | null;
+    sugerido?: string;
+    piso?: string;
+    jovemNome?: string;
+    item: string;
+  } | null;
+  /** "Remarcar Nº · data" (DPP) ou "Remarcar sessão" (trilha esp) — mesma
+   *  dialog de agendar, já com a row atual. */
+  remarcar?: {
+    numero: number;
+    atual: Encontro;
+    piso?: string;
+    jovemNome?: string;
+    /** Como a sessão aparece no título/toasts da dialog ("sessão de
+     *  especialista"); ausente no DPP. */
+    rotulo?: string;
+    item: string;
+  } | null;
+  /** "Pedir apoio" — o chamado do mentor com a dupla já fixada. */
+  pedirApoio?: boolean;
   /** "Enviar formulário" — coordenação em dupla viva. */
   formulario?: {
     formularios: FormularioOpcao[];
@@ -78,12 +119,8 @@ export function DuplaMaisMenu({
     nomeJovem: string;
     especialistas: EspecialistaOpcao[];
   } | null;
-  /** Quando "Solicitar" não vale agora (já há pedido em andamento), o
-   *  lugar do botão diz por quê — desabilitado, no mesmo ponto: as duas
-   *  duplas do mentor mostram os mesmos botões (feedback da mentora). */
-  solicitarEstado?: string | null;
-  /** Idem pro "Sugerir" com a sugestão já enviada esperando o jovem. */
-  sugerirEstado?: string | null;
+  /** "Editar dupla" — cadastro da dupla (coordenação). */
+  editar?: Dupla | null;
   /** "Encerrar trilha" — fechamento da trilha especialista aberta. */
   encerrar?: boolean;
   /** "Remanejar" — troca um lado da dupla viva (coordenação). */
@@ -91,56 +128,29 @@ export function DuplaMaisMenu({
 }) {
   const [aberto, setAberto] = useState<DialogId | null>(null);
 
-  // uma lista só alimenta as duas apresentações: em linha a partir do sm
-  // (o cabeçalho tem espaço e a ação fica à vista, sem caçar no Mais) e o
-  // menu no celular, onde a linha de botões quebraria em três andares
   const itens = [
+    agendar && { id: "agendar", Icone: CalendarPlus, rotulo: agendar.item },
+    remarcar && { id: "remarcar", Icone: CalendarBlank, rotulo: remarcar.item },
+    pedirApoio && { id: "apoio", Icone: HandHeart, rotulo: "Pedir apoio" },
     formulario && { id: "form", Icone: PaperPlaneTilt, rotulo: "Enviar formulário" },
-    solicitar
-      ? { id: "solicitar", Icone: UserPlus, rotulo: "Solicitar mentor especialista" }
-      : solicitarEstado
-        ? { id: "solicitar", Icone: UserPlus, rotulo: solicitarEstado, desabilitado: true }
-        : null,
-    sugerir
-      ? { id: "sugerir", Icone: Sparkle, rotulo: "Sugerir especialista pro jovem" }
-      : sugerirEstado
-        ? { id: "sugerir", Icone: Sparkle, rotulo: sugerirEstado, desabilitado: true }
-        : null,
+    solicitar && { id: "solicitar", Icone: UserPlus, rotulo: "Solicitar mentor especialista" },
+    sugerir && { id: "sugerir", Icone: Sparkle, rotulo: "Sugerir especialista pro jovem" },
+    editar && { id: "editar", Icone: PencilSimple, rotulo: "Editar dupla" },
     remanejar && { id: "remanejar", Icone: ArrowsLeftRight, rotulo: "Remanejar dupla" },
     encerrar && { id: "encerrar", Icone: FlagCheckered, rotulo: "Encerrar trilha" },
   ].filter(Boolean) as {
     id: DialogId;
     Icone: typeof UserPlus;
     rotulo: string;
-    desabilitado?: boolean;
   }[];
   if (itens.length === 0) return null;
 
   return (
     <>
-      {itens.map(({ id, Icone, rotulo, desabilitado }) => (
-        <Button
-          key={id}
-          variant="outline"
-          size="sm"
-          className="hidden sm:inline-flex"
-          aria-haspopup={desabilitado ? undefined : "dialog"}
-          disabled={desabilitado}
-          onClick={() => setAberto(id)}
-        >
-          <Icone aria-hidden />
-          {rotulo}
-        </Button>
-      ))}
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <Button
-              variant="outline"
-              size="sm"
-              className="sm:hidden"
-              aria-label="Mais ações da dupla"
-            >
+            <Button variant="outline" size="sm" aria-label="Mais ações da dupla">
               <DotsThree weight="bold" aria-hidden className="size-4" />
               Mais
             </Button>
@@ -149,11 +159,10 @@ export function DuplaMaisMenu({
         {/* w-56: o popup é mais largo que o trigger — a âncora ficaria
             apertada pros labels de ação (o default é w-(--anchor-width)) */}
         <DropdownMenuContent align="end" className="w-56">
-          {itens.map(({ id, Icone, rotulo, desabilitado }) => (
+          {itens.map(({ id, Icone, rotulo }) => (
             <DropdownMenuItem
               key={id}
-              aria-haspopup={desabilitado ? undefined : "dialog"}
-              disabled={desabilitado}
+              aria-haspopup="dialog"
               onClick={() => setAberto(id)}
             >
               <Icone aria-hidden className={ICONE} />
@@ -163,17 +172,42 @@ export function DuplaMaisMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {remanejar && (
-        <RemanejarDuplaDialog
-          dupla={remanejar}
-          trigger={null}
-          open={aberto === "remanejar"}
-          onOpenChange={(o) => setAberto(o ? "remanejar" : null)}
-        />
-      )}
-
       {/* os dialogs ficam no nível do botão, controlados — fechar o menu
           não os desmonta e o foco volta pro "Mais" ao sair */}
+      {agendar && (
+        <AgendarEncontroDialog
+          duplaId={duplaId}
+          numero={agendar.numero}
+          atual={agendar.atual}
+          sugerido={agendar.sugerido}
+          piso={agendar.piso}
+          jovemNome={agendar.jovemNome}
+          trigger={null}
+          open={aberto === "agendar"}
+          onOpenChange={(o) => setAberto(o ? "agendar" : null)}
+        />
+      )}
+      {remarcar && (
+        <AgendarEncontroDialog
+          duplaId={duplaId}
+          numero={remarcar.numero}
+          atual={remarcar.atual}
+          piso={remarcar.piso}
+          jovemNome={remarcar.jovemNome}
+          rotulo={remarcar.rotulo}
+          trigger={null}
+          open={aberto === "remarcar"}
+          onOpenChange={(o) => setAberto(o ? "remarcar" : null)}
+        />
+      )}
+      {pedirApoio && (
+        <PedirApoioDialog
+          duplaId={duplaId}
+          trigger={null}
+          open={aberto === "apoio"}
+          onOpenChange={(o) => setAberto(o ? "apoio" : null)}
+        />
+      )}
       {formulario && (
         <EnviarFormularioDialog
           formularios={formulario.formularios}
@@ -203,6 +237,22 @@ export function DuplaMaisMenu({
           trigger={null}
           open={aberto === "sugerir"}
           onOpenChange={(o) => setAberto(o ? "sugerir" : null)}
+        />
+      )}
+      {editar && (
+        <EditarDuplaDialog
+          dupla={editar}
+          trigger={null}
+          open={aberto === "editar"}
+          onOpenChange={(o) => setAberto(o ? "editar" : null)}
+        />
+      )}
+      {remanejar && (
+        <RemanejarDuplaDialog
+          dupla={remanejar}
+          trigger={null}
+          open={aberto === "remanejar"}
+          onOpenChange={(o) => setAberto(o ? "remanejar" : null)}
         />
       )}
       {encerrar && (

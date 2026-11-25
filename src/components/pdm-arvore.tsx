@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -14,6 +14,7 @@ import {
   Plus,
   Prohibit,
   Target,
+  TextT,
   Trash,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
@@ -25,29 +26,49 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/ciclo";
 import type { PdmItemStatus, PdmNo } from "@/lib/pdm";
-import { PDM_STATUS_LABEL } from "@/lib/pdm";
+import { autorEdicaoItem, PDM_STATUS_LABEL } from "@/lib/pdm";
 import { cn } from "@/lib/utils";
 
 // A árvore recursiva do PDM (REALIZA-181): metas na raiz, submetas
 // aninhadas sem limite de profundidade. Acessível como role="tree" —
-// treeitem + group, caret com aria-expanded, checkbox do status com
-// rótulo falado. A partir do nível 4 o recuo para de crescer (mobile) e
-// um chip "nível N" marca a profundidade — o plano pede contexto, não
-// indentação infinita. Em lg cada meta veste uma ficha própria (mais
-// respiro entre seções do documento) e o indicador de sucesso deixa de
-// truncar — metadados do plano merecem ser lidos inteiros.
+// treeitem + group, o próprio título do nó é o controle de expandir (sem
+// coluna exclusiva de caret — no celular cada pixel conta), checkbox do
+// status com rótulo falado. A partir do nível 4 o recuo para de crescer
+// (mobile) e um chip "nível N" marca a profundidade — o plano pede
+// contexto, não indentação infinita. Em lg cada meta veste uma ficha
+// própria (mais respiro entre seções do documento) e o indicador de
+// sucesso deixa de truncar — metadados do plano merecem ser lidos
+// inteiros.
+//
+// Edição (REALIZA-487): o título de uma folha editável abre a renomeação
+// inline (Enter/blur salvam, Esc cancela); pais renomeiam pelo ⋮. O gesto
+// "nova submeta" de cada meta sai do ⋮ e vira um botão visível no fim do
+// bloco dela — o menu segue pra prioridade, descarte e exclusão.
 
 export type PdmArvoreAcoes = {
   onStatus: (item: PdmNo, status: PdmItemStatus) => void;
   onEditar: (item: PdmNo) => void;
+  /** Renomeação inline — o pai persiste o título novo com os demais
+   *  campos do item intactos. */
+  onRenomear: (item: PdmNo, titulo: string) => void;
   onNovaSubmeta: (pai: PdmNo) => void;
   onMover: (item: PdmNo, direcao: -1 | 1, irmaos: PdmNo[]) => void;
   onExcluir: (item: PdmNo) => void;
 };
 
 const NIVEL_MAX_RECUO = 3; // a partir do 4º nível: recuo fixo + chip
+
+// 526 — proveniência: o doc mistura itens projetados das respostas dos
+// instrumentos e escrita à mão; a marca "vinda do instrumento" separa os
+// dois sem tirar a editabilidade de nenhum
+const ORIGEM_INSTRUMENTO = {
+  metas: "Metas",
+  pdm: "PDM",
+  visao: "Visão",
+} as const;
 
 export function PdmArvore({
   nos,
@@ -110,12 +131,87 @@ function NoPdm({
   irmaos: PdmNo[];
 }) {
   const [aberto, setAberto] = useState(nivel === 0);
+  const [renomeando, setRenomeando] = useState(false);
+  const [novoTitulo, setNovoTitulo] = useState("");
+  const tituloBtnRef = useRef<HTMLButtonElement>(null);
+  // Esc/Enter devolvem o foco ao título ao fechar a renomeação — no blur
+  // a decisão de onde o foco vai é do ponteiro, não nossa
+  const focoVolta = useRef(false);
+  // Esc desmonta o input: o blur que vem depois não pode salvar o rascunho
+  const cancelou = useRef(false);
   const ehMeta = nivel === 0;
   const filhosVisiveis = no.filhos;
   const temFilhos = filhosVisiveis.length > 0;
   const descartada = no.status === "descartada";
   const atingida = no.status === "atingida";
   const profundo = nivel >= NIVEL_MAX_RECUO;
+  // autoria (0211): "editado por" só quando a última escrita mudou de
+  // mãos — o próprio autor ajustando não vira selo redundante
+  const editadoPor = autorEdicaoItem(no);
+  // o "+ submeta" visível é gesto de meta (nível 0) — nos níveis
+  // aninhados o ⋮ continua sendo a porta
+  const botaoSubmetaVisivel = ehMeta && podeAdicionarSub && !descartada;
+
+  useEffect(() => {
+    if (!renomeando && focoVolta.current) {
+      focoVolta.current = false;
+      tituloBtnRef.current?.focus();
+    }
+  }, [renomeando]);
+
+  function iniciarRenome() {
+    setNovoTitulo(no.titulo);
+    setRenomeando(true);
+  }
+
+  function confirmarRenome() {
+    if (cancelou.current) {
+      cancelou.current = false;
+      return;
+    }
+    const titulo = novoTitulo.trim();
+    if (titulo && titulo !== no.titulo) acoes.onRenomear(no, titulo);
+    setRenomeando(false);
+  }
+
+  // a linha do título é o controle do nó: em pai ela expande/recolhe
+  // (o caret gira dentro dela — sem coluna exclusiva), em folha editável
+  // ela abre a renomeação inline; em leitura é texto puro
+  const linhaTitulo = (
+    <span
+      className={cn(
+        "block text-sm leading-snug",
+        ehMeta ? "font-semibold sm:text-[15px]" : "font-medium",
+        (atingida || descartada) && "text-muted-foreground",
+        descartada && "line-through decoration-muted-foreground/50"
+      )}
+    >
+      {temFilhos && (
+        <CaretRight
+          size={13}
+          weight="bold"
+          aria-hidden
+          className={cn(
+            "mr-1 inline-block align-[-0.125em] text-muted-foreground transition-transform",
+            aberto && "rotate-90"
+          )}
+        />
+      )}
+      {profundo && (
+        <span className="mr-1.5 inline-block rounded bg-muted px-1 py-0.5 align-middle text-[10px] font-semibold text-muted-foreground">
+          nível {nivel + 1}
+        </span>
+      )}
+      {no.titulo}
+      {!temFilhos && podeEditar && (
+        <PencilSimple
+          size={13}
+          aria-hidden
+          className="ml-1.5 inline-block align-[-0.1em] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-70 group-focus-within:opacity-70"
+        />
+      )}
+    </span>
+  );
 
   return (
     <li
@@ -136,30 +232,6 @@ function NoPdm({
           descartada && "opacity-60"
         )}
       >
-        {/* caret do nó — 44px de alvo no mobile (32px a partir de sm),
-            gira com o estado */}
-        {temFilhos ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setAberto((v) => !v)}
-            aria-label={
-              aberto
-                ? `Recolher subitens de "${no.titulo}"`
-                : `Expandir ${filhosVisiveis.length} subitens de "${no.titulo}"`
-            }
-            className="shrink-0 text-muted-foreground"
-          >
-            <CaretRight
-              className={cn("transition-transform", aberto && "rotate-90")}
-              aria-hidden
-            />
-          </Button>
-        ) : (
-          <span aria-hidden className="size-11 shrink-0 sm:size-8" />
-        )}
-
         {/* status — o círculo é o gesto de "bati a meta": atingida ↔ ativa.
             Leitor de tela ouve o título + o que o toque faz */}
         {podeEditar ? (
@@ -207,32 +279,82 @@ function NoPdm({
         )}
 
         {/* título + metadados */}
-        <div className="min-w-0 flex-1 pt-1">
-          <p
-            className={cn(
-              "text-sm leading-snug",
-              ehMeta ? "font-semibold sm:text-[15px]" : "font-medium",
-              (atingida || descartada) && "text-muted-foreground",
-              descartada && "line-through decoration-muted-foreground/50"
-            )}
-          >
-            {profundo && (
-              <span className="mr-1.5 inline-block rounded bg-muted px-1 py-0.5 align-middle text-[10px] font-semibold text-muted-foreground">
-                nível {nivel + 1}
-              </span>
-            )}
-            {no.titulo}
-          </p>
+        <div className="min-w-0 flex-1 pt-0.5">
+          {renomeando ? (
+            <form
+              className="px-1 py-0.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                focoVolta.current = true;
+                confirmarRenome();
+              }}
+            >
+              <Input
+                value={novoTitulo}
+                onChange={(e) => setNovoTitulo(e.target.value)}
+                onBlur={confirmarRenome}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    cancelou.current = true;
+                    focoVolta.current = true;
+                    setRenomeando(false);
+                  }
+                }}
+                autoFocus
+                maxLength={500}
+                aria-label={`Renomear "${no.titulo}"`}
+                className="h-9 font-medium md:h-8"
+              />
+            </form>
+          ) : (
+            <>
+              {temFilhos ? (
+                <button
+                  ref={tituloBtnRef}
+                  type="button"
+                  onClick={() => setAberto((v) => !v)}
+                  aria-expanded={aberto}
+                  aria-label={
+                    aberto
+                      ? `Recolher subitens de "${no.titulo}"`
+                      : `Expandir ${filhosVisiveis.length} subitens de "${no.titulo}"`
+                  }
+                  className="block w-full rounded-md px-1 py-0.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {linhaTitulo}
+                </button>
+              ) : podeEditar ? (
+                <button
+                  ref={tituloBtnRef}
+                  type="button"
+                  onClick={iniciarRenome}
+                  title="Renomear"
+                  aria-label={`Renomear "${no.titulo}"`}
+                  className="block w-full rounded-md px-1 py-0.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {linhaTitulo}
+                </button>
+              ) : (
+                <div className="px-1 py-0.5">{linhaTitulo}</div>
+              )}
+            </>
+          )}
           {no.porque && (
-            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            <p className="mt-0.5 px-1 text-xs leading-relaxed text-muted-foreground">
               {no.porque}
             </p>
           )}
-          <span className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground sm:gap-x-3 sm:text-[11px]">
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 px-1 text-xs text-muted-foreground sm:gap-x-3 sm:text-[11px]">
             {no.areaVida && (
               <Badge variant="outline" className="text-[10px] font-medium">
                 {no.areaVida}
               </Badge>
+            )}
+            {no.origem !== "manual" && ORIGEM_INSTRUMENTO[no.origem] && (
+              <span className="inline-flex items-center gap-1 italic">
+                vinda do instrumento {ORIGEM_INSTRUMENTO[no.origem]}
+              </span>
             )}
             {no.indicador && (
               <span className="inline-flex min-w-0 max-w-full items-center gap-1">
@@ -267,6 +389,13 @@ function NoPdm({
             {descartada && (
               <span className="italic">{PDM_STATUS_LABEL.descartada}</span>
             )}
+            {editadoPor && (
+              <span className="inline-flex items-center gap-1 italic">
+                <PencilSimple size={12} aria-hidden className="shrink-0" />
+                editado por {editadoPor.nome}
+                {no.atualizadoEm ? ` em ${formatDate(no.atualizadoEm)}` : ""}
+              </span>
+            )}
           </span>
         </div>
 
@@ -286,6 +415,10 @@ function NoPdm({
               <DropdownMenuItem onClick={() => acoes.onEditar(no)}>
                 <PencilSimple size={16} aria-hidden data-icon="inline-start" />
                 Editar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={iniciarRenome}>
+                <TextT size={16} aria-hidden data-icon="inline-start" />
+                Renomear
               </DropdownMenuItem>
               {!descartada && (
                 <>
@@ -348,14 +481,14 @@ function NoPdm({
       </div>
 
       {/* filhos — o recuo para de crescer no nível 4 (o chip já diz a
-          profundidade); aberto por padrão nas metas */}
+          profundidade); aberto por padrão nas metas. No mobile o recuo é
+          mínimo: o caret virou parte do título e a margem carrega sozinha
+          a hierarquia */}
       {temFilhos && aberto && (
         <div
           className={cn(
             "border-l border-dashed border-border",
-            // recuo um pouco mais generoso a partir de sm — a hierarquia
-            // do mapa lê melhor com folga na borda
-            profundo ? "ml-8 sm:ml-10" : "ml-5 sm:ml-7"
+            profundo ? "ml-2 sm:ml-4" : "ml-4 sm:ml-6"
           )}
         >
           <PdmArvore
@@ -366,8 +499,42 @@ function NoPdm({
             podeAdicionarSub={podeAdicionarSub}
             acoes={acoes}
           />
+          {botaoSubmetaVisivel && (
+            <div className="px-1.5 pb-1.5 pt-0.5">
+              <BotaoNovaSubmeta pai={no} onNovaSubmeta={acoes.onNovaSubmeta} />
+            </div>
+          )}
+        </div>
+      )}
+      {/* o fim da meta é onde a submeta nasce — o gesto fica visível,
+          não depende de abrir o ⋮ (nem de a meta ter filhos ainda) */}
+      {botaoSubmetaVisivel && !(temFilhos && aberto) && (
+        <div className="ml-4 mt-0.5 sm:ml-6">
+          <BotaoNovaSubmeta pai={no} onNovaSubmeta={acoes.onNovaSubmeta} />
         </div>
       )}
     </li>
+  );
+}
+
+function BotaoNovaSubmeta({
+  pai,
+  onNovaSubmeta,
+}: {
+  pai: PdmNo;
+  onNovaSubmeta: (pai: PdmNo) => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={() => onNovaSubmeta(pai)}
+      aria-label={`Nova submeta em "${pai.titulo}"`}
+      className="w-full justify-start text-muted-foreground hover:text-foreground sm:w-auto"
+    >
+      <Plus size={14} data-icon="inline-start" aria-hidden />
+      Nova submeta
+    </Button>
   );
 }

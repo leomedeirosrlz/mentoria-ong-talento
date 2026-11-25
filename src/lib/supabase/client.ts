@@ -12,6 +12,7 @@ import { demoRoleClient } from "@/lib/demo/shared";
 // próprio entry "supabase-client-demo") e deixar este módulo livre de
 // demo/*.
 import { createDemoClient } from "@/lib/demo/client-stub";
+import { AUTH_COOKIE_NAME } from "@/lib/supabase/config";
 
 // Secure follows the real page scheme, not NODE_ENV: a prod build served
 // over http+IP/hostname (Tailscale, LAN) makes the browser drop Secure
@@ -21,13 +22,33 @@ import { createDemoClient } from "@/lib/demo/client-stub";
 const SECURE =
   typeof window !== "undefined" && window.location.protocol === "https:";
 
+// O Supabase local responde `Allow-Origin: *` junto com
+// `Allow-Credentials: true`; browsers rejeitam essa combinação. Em vez de
+// depender de CORS entre localhost/Tailscale e a porta 54321, o browser fala
+// com /supabase no mesmo host e o Next faz o proxy server-side (next.config).
+function supabaseUrl(): string {
+  if (
+    process.env.NEXT_PUBLIC_SUPABASE_PROXY === "1" &&
+    typeof window !== "undefined"
+  ) {
+    return `${window.location.origin}/supabase`;
+  }
+  return process.env.NEXT_PUBLIC_SUPABASE_URL!;
+}
+
 function realClient() {
   return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    // mesmo Secure dos cookies server-side — o client grava a sessão via
+    // mesmo Secure/nome dos cookies server-side — o client grava a sessão via
     // document.cookie no login/refresh e sem isso derrubaria a flag
-    { cookieOptions: { secure: SECURE, sameSite: "lax" } }
+    {
+      cookieOptions: {
+        name: AUTH_COOKIE_NAME,
+        secure: SECURE,
+        sameSite: "lax",
+      },
+    }
   );
 }
 
@@ -50,10 +71,14 @@ export function createClient() {
  *  handoff publicar os tokens. */
 export function createAuthClient() {
   return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookieOptions: { secure: SECURE, sameSite: "lax" },
+      cookieOptions: {
+        name: AUTH_COOKIE_NAME,
+        secure: SECURE,
+        sameSite: "lax",
+      },
       auth: { detectSessionInUrl: false },
     }
   );
@@ -70,7 +95,7 @@ export function createOtpClient(): SupabaseClient {
   // auth é sempre real — com demo_role ativo o stub retornava falha e o
   // magic link nunca era enviado
   return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: {

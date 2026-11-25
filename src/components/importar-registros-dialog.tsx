@@ -6,22 +6,26 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import {
   CaretDown,
   FileArrowUp,
+  Sparkle,
   UploadSimple,
   Warning,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
+  enriquecerPrevComIa,
   executarImportRegistros,
   previewImportRegistros,
   type EncontroInfo,
   type LinhaPrev,
 } from "@/lib/actions-importar-registros";
 import type { DuplaCandidata, LinhaReg } from "@/lib/importar-registros";
+import { MAX_CHAMADAS_IA_LOTE, novoLoteId } from "@/lib/importar/lote";
 import { formatDate } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import { Etapa, useTrocaDeEtapa } from "@/components/ui/etapa";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,9 +80,28 @@ const NIVEL_TAG: Record<string, { rotulo: string; tom: TomTag }> = {
 };
 
 /** Tag de confiança do match — "87" verde quando auto, azul quando a
- *  sugestão é provável, "manual" âmbar quando não há palpite. */
+ *  sugestão é provável, "manual" âmbar quando não há palpite. Linha
+ *  enriquecida pelo match semântico troca o número pelo selo da IA:
+ *  "sugerido por IA · <razão>" — a confiança dela não é o score
+ *  determinístico e a frase curta explica a escolha (também entra na
+ *  trilha de evidências como 'sparkle'). */
 function ConfTag({ l }: { l: LinhaPrev }) {
   if (l.status === "ignorar") return <Tag tom="muted">ignorada</Tag>;
+  if (l.sugeridoIa) {
+    return (
+      <>
+        <Tag tom="info">
+          <Sparkle size={11} aria-hidden /> sugerido por IA
+        </Tag>
+        <span
+          className="max-w-72 truncate text-xs text-muted-foreground"
+          title={l.sugeridoIa.razao}
+        >
+          · {l.sugeridoIa.razao}
+        </span>
+      </>
+    );
+  }
   const n = NIVEL_TAG[l.nivel ?? "manual"];
   return (
     <Tag tom={n.tom}>
@@ -107,10 +130,25 @@ export function ImportarRegistrosDialog() {
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [erroParse, setErroParse] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
+  // lote = uuid por sessão do dialog (REALIZA-180): toda chamada de IA
+  // da importação o carrega em ia_eventos.args->>'lote'
+  const [loteId, setLoteId] = useState(() => novoLoteId());
+  // por que a 2ª passada não rodou — estado desligado honesto (provider
+  // ausente ou 429); null = rodou ou nem tentou
+  const [iaOff, setIaOff] = useState<"sem_provider" | "limite" | null>(null);
+  // linhas 'manual' além do teto por lote — ficam na revisão de sempre
+  const [iaRestantes, setIaRestantes] = useState(0);
   const [pending, start] = useTransition();
+  const [pendingIa, startIa] = useTransition();
   const router = useRouter();
+  // fluxo por fase sem índice de etapa: assinalar marca direção + agenda o
+  // foco no MESMO tick do setState que monta a fase nova — um tick antes e
+  // um commit intermediário consome o pendente com o ref na fase velha
+  const { direcao, assinalar, reiniciar, tituloEtapaRef } =
+    useTrocaDeEtapa<HTMLDivElement>(1);
 
   function reset() {
+    reiniciar();
     setTexto("");
     setArquivo(null);
     setLinhas(null);
@@ -121,6 +159,9 @@ export function ImportarRegistrosDialog() {
     setResultado(null);
     setErroParse(null);
     setBusca("");
+    setLoteId(novoLoteId());
+    setIaOff(null);
+    setIaRestantes(0);
   }
 
   function aoMudar(o: boolean) {
@@ -165,6 +206,7 @@ export function ImportarRegistrosDialog() {
         );
         return;
       }
+      assinalar(1);
       setLinhas(res.linhas);
       setDuplas(res.duplas ?? []);
       setEncPorDupla(res.encPorDupla ?? {});
@@ -181,6 +223,77 @@ export function ImportarRegistrosDialog() {
         toast.warning(
           `${rev} ${rev === 1 ? "linha pede" : "linhas pedem"} revisão. Escolha a dupla ou ignore.`
         );
+
+      // 2ª passada (REALIZA-180): a IA sugere dupla pras linhas 'manual'
+      // — roda solta depois da prévia, que já está na tela. Falha ou
+      // provider ausente deixam tudo como o determinístico entregou
+      const paraIa = res.linhas
+        .filter((l) => l.status === "revisar")
+        .map((l) => ({
+          n: l.n,
+          mentorTxt: l.mentorTxt,
+          mentoradoTxt: l.mentoradoTxt,
+          numero: l.numero,
+          dataIso: l.dataIso,
+        }));
+      setIaOff(null);
+      setIaRestantes(0);
+      if (paraIa.length) {
+        startIa(async () => {
+          const r = await enriquecerPrevComIa(paraIa, loteId);
+          if ("error" in r) {
+            // demo/gate: não há passada — mostra o estado desligado
+            setIaOff("sem_provider");
+            return;
+          }
+          if (!r.ativa) {
+            setIaOff(r.motivo);
+            return;
+          }
+          setIaRestantes(r.restantes ?? 0);
+          const sugs = r.sugestoes ?? {};
+          const aplicadas = Object.entries(sugs);
+          if (!aplicadas.length) return;
+          setLinhas((prev) =>
+            (prev ?? []).map((l) => {
+              const s = sugs[l.n];
+              if (!s) return l;
+              // sobe a 'provavel': a sugestão pré-seleciona mas a linha
+              // segue 'revisar' — a confirmação é o clique humano
+              return {
+                ...l,
+                sugeridoIa: {
+                  duplaId: s.duplaId,
+                  confianca: s.confianca,
+                  razao: s.razao,
+                },
+                duplaId: s.duplaId,
+                nivel: "provavel" as const,
+                mentorNome: s.mentorNome,
+                mentoradoNome: s.mentoradoNome,
+                evidencias: [
+                  ...l.evidencias,
+                  {
+                    icone: "sparkle" as const,
+                    texto: s.razao,
+                    peso: 0,
+                    lado: "par" as const,
+                  },
+                ],
+              };
+            })
+          );
+          // pré-seleciona só onde a pessoa ainda não decidiu — uma
+          // escolha feita (ou IGNORAR) enquanto a IA rodava vence
+          setEscolhas((prev) => {
+            const m = new Map(prev);
+            for (const [n, s] of aplicadas) {
+              if (!m.get(Number(n))) m.set(Number(n), s.duplaId);
+            }
+            return m;
+          });
+        });
+      }
     });
   }
 
@@ -201,6 +314,7 @@ export function ImportarRegistrosDialog() {
         toast.error(res.error);
         return;
       }
+      assinalar(1);
       setResultado({
         criados: res.criados ?? 0,
         atualizados: res.atualizados ?? 0,
@@ -449,7 +563,7 @@ export function ImportarRegistrosDialog() {
         </DialogHeader>
 
         {resultado ? (
-          <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 outline-none">
+          <Etapa key="resultado" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-3 outline-none">
             <p className="text-sm">
               <span className="font-medium">{resultado.criados}</span>{" "}
               {resultado.criados === 1 ? "registro criado" : "registros criados"}
@@ -472,9 +586,9 @@ export function ImportarRegistrosDialog() {
             <DialogFooter>
               <Button variant="outline" onClick={() => aoMudar(false)}>Fechar</Button>
             </DialogFooter>
-          </div>
+          </Etapa>
         ) : linhas ? (
-          <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 min-w-0 outline-none">
+          <Etapa key="linhas" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-3 min-w-0 outline-none">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <p className="text-sm text-muted-foreground">
                 <span className="text-foreground font-medium">{importaveis}</span>{" "}
@@ -497,6 +611,25 @@ export function ImportarRegistrosDialog() {
                 />
               )}
             </div>
+
+            {/* estado da 2ª passada — honesto nos dois sentidos: IA
+                trabalhando, desligada ou com recorte pelo teto do lote */}
+            {(pendingIa || iaOff || iaRestantes > 0) && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                {pendingIa && (
+                  <>
+                    <Sparkle size={12} aria-hidden className="animate-pulse" />
+                    Consultando a IA pra sugerir as duplas manuais…
+                  </>
+                )}
+                {!pendingIa && iaOff === "sem_provider" &&
+                  "Sugestões por IA desligadas neste ambiente. A revisão segue manual."}
+                {!pendingIa && iaOff === "limite" &&
+                  "Limite de consultas à IA atingido. Tente de novo em instantes; a revisão segue manual."}
+                {!pendingIa && !iaOff && iaRestantes > 0 &&
+                  `${iaRestantes} ${iaRestantes === 1 ? "linha ficou" : "linhas ficaram"} na revisão manual (teto de ${MAX_CHAMADAS_IA_LOTE} sugestões por importação).`}
+              </p>
+            )}
 
             <div className="scroll-fina max-h-[58vh] space-y-4 overflow-y-auto pr-1">
               {grupoImport(
@@ -549,7 +682,7 @@ export function ImportarRegistrosDialog() {
             {/* sticky: a lista de revisão é alta (max-h-58vh) — Voltar e
                 Importar ficam visíveis sem rolar até o fim */}
             <DialogFooter sticky>
-              <Button variant="outline" onClick={() => { setLinhas(null); setEscolhas(new Map()); setBusca(""); }}>
+              <Button variant="outline" onClick={() => { assinalar(-1); setLinhas(null); setEscolhas(new Map()); setBusca(""); setIaOff(null); setIaRestantes(0); }}>
                 Voltar
               </Button>
               <Button disabled={pending || importaveis === 0} onClick={importar}>
@@ -559,9 +692,9 @@ export function ImportarRegistrosDialog() {
                   : `Importar ${importaveis} ${importaveis === 1 ? "resposta" : "respostas"}`}
               </Button>
             </DialogFooter>
-          </div>
+          </Etapa>
         ) : (
-          <div className="space-y-4">
+          <Etapa key="entrada" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-4 outline-none">
             {erroParse && (
               <p role="alert" className="flex items-start gap-2 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-3 py-2.5 text-sm text-[var(--warn-text)]">
                 <Warning size={16} aria-hidden className="mt-0.5 shrink-0" />
@@ -608,7 +741,7 @@ export function ImportarRegistrosDialog() {
                 {pending ? "Resolvendo duplas…" : "Pré-visualizar"}
               </Button>
             </DialogFooter>
-          </div>
+          </Etapa>
         )}
       </DialogContent>
     </Dialog>

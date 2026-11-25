@@ -8,11 +8,14 @@ import {
   demoJovemAssinaturas,
   demoJovemColegas,
   demoJovemContatos,
+  demoJovemDiretorio,
   demoJovemDuplas,
   demoJovemEncaminhamentos,
   demoJovemEncontros,
   demoJovemEspecialistas,
   demoJovemPerfil,
+  demoJovemPlano,
+  demoJovemRecessos,
 } from "./demo/queries";
 import { demoJovemJornada } from "./demo/forms-data";
 import type { JovemJornadaDados } from "./jornada";
@@ -28,6 +31,8 @@ import type {
   EncontroStatus,
   JovemAssinatura,
   JovemContato,
+  JovemDiretorioEntry,
+  JovemDiretorioTipo,
   JovemDupla,
   JovemEncaminhamento,
   JovemEspecialista,
@@ -45,6 +50,9 @@ import type {
 // exists(jovem_duplas) da 0068), materiais/comunicados audiencia='todos' e
 // notificacoes (self). O ramo demo delega às demoJovem* — que projetam as
 // mesmas colunas das views sobre o dataset em memória.
+// 0239 estende o contrato: `jovem_diretorio` (o programa inteiro sem
+// contato) e `mentorados_turma`/`jovem_contatos`/`jovem_especialistas`
+// seguem as fontes da rede — "Sua rede" é a faceta marcada do diretório.
 
 /** Ficha do próprio jovem (view jovem_perfil) — null quando o vínculo
  *  profiles↔mentorados ainda não foi feito pela coordenação. */
@@ -114,24 +122,71 @@ export const getJovemColegas = cache(async (): Promise<ColegaTurma[]> => {
   );
 });
 
-/** A pessoa por trás de um card de /jovem/pessoas — resolvida SÓ nas
- *  três fontes já seguras (contatos adultos → colegas de turma → catálogo
- *  de especialistas). id de fora desses conjuntos cai no mesmo null de
- *  quem não existe: a página 404 não vaza nem a existência do profile. */
+/** O diretório do programa pro jovem (view `jovem_diretorio`, 0239 —
+ *  definer, escopada a my_role()='mentorado'): adultos ativos com papel,
+ *  todos os jovens com conta (exceto o próprio) e o catálogo de
+ *  especialistas, dedup por id com a linha de catálogo vencendo. Sem
+ *  contato direto — whatsapp/e-mail continuam saindo da jovem_contatos.
+ *  A página repara o minha_rede pela rede resolvida (lib/jovem-diretorio). */
+export const getJovemDiretorio = cache(
+  async (): Promise<JovemDiretorioEntry[]> => {
+    const demo = await demoRole();
+    if (demo) return demoJovemDiretorio(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("jovem_diretorio")
+      .select("*");
+    if (error) {
+      console.error("getJovemDiretorio:", error);
+      return [];
+    }
+    type Row = Omit<JovemDiretorioEntry, "id" | "nome" | "tipo" | "minha_rede" | "minha_turma"> & {
+      id: string | null;
+      nome: string | null;
+      tipo: string | null;
+      minha_rede: boolean | null;
+      minha_turma: boolean | null;
+    };
+    // pt-BR no app — a collation do banco ordena acentos depois de Z
+    return ((data ?? []) as Row[])
+      .filter(
+        (e): e is Row & { id: string; nome: string } =>
+          e.id != null && e.nome != null
+      )
+      .map((e) => ({
+        ...e,
+        tipo: (e.tipo ?? "adulto") as JovemDiretorioTipo,
+        minha_rede: e.minha_rede ?? false,
+        minha_turma: e.minha_turma ?? false,
+      }))
+      .sort((a, b) =>
+        comparaNome(a.nome_social || a.nome, b.nome_social || b.nome)
+      );
+  }
+);
+
+/** A pessoa por trás de um card de /jovem/pessoas — primeiro a existência
+ *  no diretório (o recorte seguro da 0239; fora dele cai no mesmo null de
+ *  quem não existe e a página 404 não vaza nem a existência do profile),
+ *  depois o detalhe pela fonte mais rica: contato de dupla/coord → colega
+ *  de turma → catálogo de especialista → projeção pública do diretório. */
 export const getJovemPessoa = cache(
   async (id: string): Promise<JovemPessoa | null> => {
-    const [contatos, colegas, especialistas] = await Promise.all([
+    const [diretorio, contatos, colegas, especialistas] = await Promise.all([
+      getJovemDiretorio(),
       getJovemContatos(),
       getJovemColegas(),
       getJovemEspecialistas(),
     ]);
+    const entrada = diretorio.find((e) => e.id === id);
+    if (!entrada) return null;
     const contato = contatos.find((c) => c.id === id);
     if (contato) return { tipo: "contato", contato };
     const colega = colegas.find((c) => c.id === id);
     if (colega) return { tipo: "colega", colega };
     const especialista = especialistas.find((e) => e.id === id);
     if (especialista) return { tipo: "especialista", especialista };
-    return null;
+    return { tipo: "diretorio", entrada };
   }
 );
 
@@ -162,7 +217,8 @@ export const getJovemEncaminhamentos = cache(
 export const getJovemAssinaturas = cache(
   async (): Promise<JovemAssinatura[]> => {
     const demo = await demoRole();
-    if (demo) return demoJovemAssinaturas(demo, await demoTermoSimulado());
+    if (demo)
+      return demoJovemAssinaturas(demo, await demoTermoSimulado());
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("jovem_assinaturas")
@@ -190,10 +246,18 @@ export type JovemEncontro = {
   status: EncontroStatus;
   link: string | null;
   motivo_reagendamento: string | null;
+  /** Autor da row (0207) — o realizado criado pelo próprio jovem é o
+   *  retroativo editável enquanto o mentor não registra. Opcional: o
+   *  dataset demo não carrega a coluna (vem undefined → sem affordance). */
+  created_by?: string | null;
+  /** Sessão combinada (0226): uuid compartilhado por todos os encontros
+   *  que rolaram numa sessão física só — a avaliação é por grupo, não
+   *  por row. null = encontro de sessão própria. */
+  sessao_id?: string | null;
 };
 
 const JOVEM_ENCONTRO_COLS =
-  "id, dupla_id, numero, data_hora, realizado_em, duracao_min, status, link, motivo_reagendamento";
+  "id, dupla_id, numero, data_hora, realizado_em, duracao_min, status, link, motivo_reagendamento, created_by, sessao_id";
 
 /** Todos os encontros das duplas do jovem — a RLS (0068) já escopa às duplas
  *  dele via exists(jovem_duplas). Ordenação cronológica pra home e agenda. */
@@ -400,5 +464,91 @@ export const getJovemJornada = cache(
       return null;
     }
     return (data ?? null) as JovemJornadaDados | null;
+  }
+);
+
+/** Recessos vigentes/futuros do cronograma da dupla do jovem + a decisão
+ *  declarada (462 — RPC `jovem_recessos`, 0218/0225): o papel mentorado
+ *  não lê ciclo_eventos, então a janela chega por definer, no mesmo gate
+ *  da jovem_jornada. A 0225 abriu o tri-estado: `usa` null = pendente
+ *  (a dupla ainda não respondeu — left join sem row), true = os
+ *  encontros pausam no período, false = a dupla segue se encontrando. */
+export type JovemRecesso = {
+  ciclo_evento_id: string;
+  data: string;
+  data_fim: string | null;
+  usa: boolean | null;
+  declarado_em: string | null;
+};
+
+export const getJovemRecessos = cache(
+  async (): Promise<JovemRecesso[]> => {
+    const demo = await demoRole();
+    if (demo) return demoJovemRecessos(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("jovem_recessos");
+    if (error) {
+      console.error("getJovemRecessos:", error);
+      return [];
+    }
+    return (data ?? []) as JovemRecesso[];
+  }
+);
+
+/** O combinado do plano "ficar em dia" da dupla do jovem (459 — RPC
+ *  `jovem_plano`, 0219): o mentorado não lê dupla_planos, então o
+ *  recorte chega por definer no mesmo gate da jovem_jornada — sem
+ *  semáforo nem motivos internos, só status/ritmo/datas. null sem
+ *  plano. */
+export type JovemPlano = {
+  id: string;
+  status: string;
+  versao: number;
+  ritmo: string | null;
+  janela: { inicio: string; fim: string } | null;
+  passos: {
+    numero: number;
+    data: string;
+    acao: string;
+    /** Nome do encontro no guia (526) — ausente nos planos antigos. */
+    titulo?: string;
+    /** Marca de sessão combinada (018) — vem verbatim do escopo. */
+    sessao?: string;
+    duracao_min?: number;
+  }[];
+  aprovado_lado: "mentor" | "mentorado" | null;
+  /** Os dois aceites (0224) — ausentes num banco sem a migration. */
+  aceito_mentor?: boolean;
+  aceito_mentorado?: boolean;
+  /** created_at da row (o banco não guarda "proposto_em" separado). */
+  proposto_em?: string;
+  /** Carimbo de ativação (0232) — a âncora real da janela de
+   *  contestação: `aprovado_em ?? created_at`, a régua da RPC. */
+  aprovado_em?: string | null;
+  /** profile id de quem propôs — a copy "Fulano combinou" resolve ele
+   *  pelos contatos; ausente num banco sem a 0225 reemitida. */
+  proposto_por?: string | null;
+  /** "app" | "liza" — quem pediu a proposta da equipe (0225). */
+  proposto_via?: string | null;
+  expira_em: string;
+  concluido_em?: string | null;
+  passos_aplicados: {
+    numero: number;
+    data_nova: string;
+    aplicado_em: string;
+  }[];
+};
+
+export const getJovemPlano = cache(
+  async (): Promise<JovemPlano | null> => {
+    const demo = await demoRole();
+    if (demo) return demoJovemPlano(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("jovem_plano");
+    if (error) {
+      console.error("getJovemPlano:", error);
+      return null;
+    }
+    return (data ?? null) as JovemPlano | null;
   }
 );

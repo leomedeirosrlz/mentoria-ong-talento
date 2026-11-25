@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useState, useTransition } from "react";
 import {
   CheckCircle,
   CircleNotch,
@@ -17,8 +16,9 @@ import {
   TEMAS_AVALIACAO,
   estrelasTexto,
 } from "@/lib/ciclo";
-import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
+import { FadeTroca } from "@/components/ui/etapa";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +40,7 @@ export function AvaliacaoEncontroForm({
   trilha,
   primeiroNome,
   embutido = false,
+  temMedia = true,
   onEnviado,
 }: {
   /** Caminho público /avaliar/<token>. */
@@ -49,6 +50,9 @@ export function AvaliacaoEncontroForm({
   /** 'dpp' | 'especialista' — decide o toggle de visibilidade do mentor. */
   trilha: string;
   primeiroNome?: string | null;
+  /** A dupla já tem o lote da média (≥3 respostas) — sem ele a copy não
+   *  promete média que não existe (027/FR-003). */
+  temMedia?: boolean;
   /** Dentro de diálogo, o título já diz o encontro e a privacidade: o cabeçalho
    *  de contexto (saudação, título, privacidade) some e a pergunta 1 vem primeiro. */
   embutido?: boolean;
@@ -62,12 +66,6 @@ export function AvaliacaoEncontroForm({
   const [erroEstrelas, setErroEstrelas] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [pending, start] = useTransition();
-
-  const focoSucesso = useCallback((el: HTMLDivElement | null) => {
-    if (!el) return;
-    el.scrollIntoView({ block: "center" });
-    el.focus({ preventScroll: true });
-  }, []);
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -114,16 +112,12 @@ export function AvaliacaoEncontroForm({
   };
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    // troca de estado do kit: o painel entrante recebe o foco — o submit
+    // que disparou desmonta junto com o form (centralizar = página pública
+    // rolável, o envio acontece lá embaixo)
+    <FadeTroca chave={enviado ? "ok" : "form"} foco centralizar>
       {enviado ? (
-        <motion.div
-          key="ok"
-          ref={focoSucesso}
-          tabIndex={-1}
-          {...fade}
-          transition={T.enter}
-          className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] outline-none sm:p-8"
-        >
+        <div className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] outline-none sm:p-8">
           <div className="mx-auto grid size-12 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
             {pedidoAjuda ? (
               <HandHeart size={24} weight="bold" aria-hidden />
@@ -137,16 +131,11 @@ export function AvaliacaoEncontroForm({
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
             {pedidoAjuda
               ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""} por contar. A coordenação foi avisada na hora e fala com você. O combinado do programa é responder em 1 dia útil.`
-              : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. ${privacidadeAvaliacao(trilha)} Pode fechar esta página.`}
+              : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. ${privacidadeAvaliacao(trilha, temMedia)} Pode fechar esta página.`}
           </p>
-        </motion.div>
+        </div>
       ) : (
-        <motion.div
-          key="form"
-          {...fade}
-          transition={T.enter}
-          className="space-y-3"
-        >
+        <div className="space-y-3">
           {/* card de contexto — a linha de privacidade É o argumento que
               faz o jovem responder de verdade (D4). Dentro do diálogo o
               título e a privacidade já estão no cabeçalho dele */}
@@ -160,13 +149,15 @@ export function AvaliacaoEncontroForm({
                   </p>
                 )}
                 <h1 className="mt-1 text-xl font-semibold tracking-tight">
-                  Como foi o encontro?
+                  {trilha === "especialista"
+                    ? "Como foi a sessão?"
+                    : "Como foi o encontro?"}
                 </h1>
                 <p className="mt-1 text-xs text-muted-foreground">
                   1 minuto · só a nota é obrigatória
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  {privacidadeAvaliacao(trilha)}
+                  {privacidadeAvaliacao(trilha, temMedia)}
                 </p>
               </div>
             </div>
@@ -184,14 +175,14 @@ export function AvaliacaoEncontroForm({
               {...a11yEstrelas}
             >
               <legend className="block text-[15px] font-medium leading-snug sm:text-base">
-                <span className="mr-1 text-muted-foreground tabular-nums">
+                <span className="mr-1 font-bold text-[var(--ok-text)] tabular-nums">
                   1.
                 </span>
                 De 1 a 5 estrelas, como foi?
               </legend>
               <div
                 role="radiogroup"
-                aria-label="Nota do encontro de 1 a 5 estrelas"
+                aria-label={`Nota ${trilha === "especialista" ? "da sessão" : "do encontro"} de 1 a 5 estrelas`}
                 className="mt-2 flex gap-1"
               >
                 {[1, 2, 3, 4, 5].map((n) => (
@@ -242,7 +233,7 @@ export function AvaliacaoEncontroForm({
                 "bem" */}
             <fieldset className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
               <legend className="block text-[15px] font-medium leading-snug sm:text-base">
-                <span className="mr-1 text-muted-foreground tabular-nums">
+                <span className="mr-1 font-bold text-[var(--ok-text)] tabular-nums">
                   2.
                 </span>
                 Como você se sentiu?
@@ -272,7 +263,7 @@ export function AvaliacaoEncontroForm({
                 do banco */}
             <fieldset className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
               <legend className="block text-[15px] font-medium leading-snug sm:text-base">
-                <span className="mr-1 text-muted-foreground tabular-nums">
+                <span className="mr-1 font-bold text-[var(--ok-text)] tabular-nums">
                   3.
                 </span>
                 Você sente que avançou no que combinou?
@@ -302,7 +293,7 @@ export function AvaliacaoEncontroForm({
                 que a lista não prevê */}
             <fieldset className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
               <legend className="block text-[15px] font-medium leading-snug sm:text-base">
-                <span className="mr-1 text-muted-foreground tabular-nums">
+                <span className="mr-1 font-bold text-[var(--ok-text)] tabular-nums">
                   4.
                 </span>
                 Sobre o que vocês conversaram?
@@ -316,8 +307,9 @@ export function AvaliacaoEncontroForm({
                     key={o.value}
                     className="flex h-11 cursor-pointer items-center rounded-full bg-muted px-3.5 text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
                   >
-                    <input
-                      type="checkbox"
+                    {/* chip pill: a caixa fica sr-only como o input antigo —
+                        o pill inteiro é a representação (has-checked) */}
+                    <Checkbox
                       name="temas"
                       value={o.value}
                       className="sr-only"
@@ -334,7 +326,7 @@ export function AvaliacaoEncontroForm({
                 htmlFor="aval-comentario"
                 className="block text-[15px] font-medium leading-snug sm:text-base"
               >
-                <span className="mr-1 text-muted-foreground tabular-nums">
+                <span className="mr-1 font-bold text-[var(--ok-text)] tabular-nums">
                   5.
                 </span>
                 Quer contar mais alguma coisa?
@@ -356,18 +348,19 @@ export function AvaliacaoEncontroForm({
                 liberar". Na especialista nem média existe — renderizar o
                 controle seria copy desonesta */}
             {trilha === "dpp" && (
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)] transition-colors select-none has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 sm:px-5">
-                <input
-                  type="checkbox"
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)] transition-colors select-none has-checked:bg-primary/5 sm:px-5">
+                <Checkbox
                   name="visivel_mentor"
-                  className="mt-0.5 size-4 shrink-0 accent-primary"
+                  className="mt-0.5"
                 />
                 <span>
                   <span className="font-medium">
                     Quero que meu mentor leia esta avaliação
                   </span>{" "}
-                  · normalmente ele só vê a média. Marque pra mostrar esta
-                  resposta inteira a ele.
+                  ·{" "}
+                  {temMedia
+                    ? "normalmente ele só vê a média. Marque pra mostrar esta resposta inteira a ele."
+                    : "ele não lê suas avaliações; a média só aparece a partir de 3 respostas. Marque pra mostrar esta resposta inteira a ele."}
                 </span>
               </label>
             )}
@@ -375,17 +368,19 @@ export function AvaliacaoEncontroForm({
             {/* pedido de ajuda — canal de segurança distinto do "preciso
                 de apoio" do mentor: avisa coord + supervisor na hora, e
                 o sucesso já diz quem responde e quando */}
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--warn)]/40 bg-[var(--warn)]/8 px-4 py-3 text-sm transition-colors select-none has-checked:bg-[var(--warn)]/15 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 sm:px-5">
-              <input
-                type="checkbox"
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--warn)]/40 bg-[var(--warn)]/8 px-4 py-3 text-sm transition-colors select-none has-checked:bg-[var(--warn)]/15 sm:px-5">
+              <Checkbox
                 name="pedir_apoio"
-                className="mt-0.5 size-4 shrink-0 accent-[var(--warn)]"
+                tom="warn"
+                className="mt-0.5"
               />
               <span>
                 <span className="font-medium">Preciso de ajuda</span> · a
                 coordenação e o auxiliar executivo são avisados na hora e falam com
-                você. Pode ser sobre qualquer coisa, inclusive sobre o
-                encontro ou o mentor.
+                você. Pode ser sobre qualquer coisa,{" "}
+                {trilha === "especialista"
+                  ? "inclusive sobre a sessão ou a especialista."
+                  : "inclusive sobre o encontro ou o mentor."}
               </span>
             </label>
 
@@ -431,8 +426,8 @@ export function AvaliacaoEncontroForm({
               {pending ? "Enviando…" : "Enviar avaliação"}
             </Button>
           </form>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </FadeTroca>
   );
 }

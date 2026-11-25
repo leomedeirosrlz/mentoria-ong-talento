@@ -2,13 +2,17 @@ import { AppShell } from "@/components/app-shell";
 import { AssistenteBolhaLazy } from "@/components/assistente-bolha-lazy";
 import { DemoBar } from "@/components/demo-bar";
 import { OnboardingFlowLazy } from "@/components/onboarding-flow-lazy";
+import { ProdutoTelemetry } from "@/components/produto-telemetry";
 import { TelaConta } from "@/components/telas-conta";
 import { getDemoData } from "@/lib/demo/data";
+import { papeisDe } from "@/lib/demo/queries";
 import { demoRole } from "@/lib/demo/mode";
 import { getMe, getMeuMentorProfile, getMeusDadosPessoais, getNotificacoes } from "@/lib/queries";
 import { getChamadosSemDono } from "@/lib/queries-chamados";
 import { getMeusDadosCivis, getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
+import { garantirDocumentosDevidos } from "@/lib/actions-assinaturas";
 import { providerConfigurado } from "@/lib/ia/provider";
+import { pedirAcessoHref } from "@/lib/login-erros";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { gravatarUrlSeExiste } from "@/lib/gravatar";
 import type { AppRole } from "@/lib/types";
@@ -40,6 +44,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           Sua conta não está vinculada a um cadastro. Se você entrou com o
           e-mail errado, saia e entre com o e-mail cadastrado pela coordenação.
         </p>
+        <p className="mt-2">
+          Ainda não foi cadastrado?{" "}
+          <a
+            href={pedirAcessoHref()}
+            className="font-medium text-foreground underline underline-offset-2"
+          >
+            Peça acesso por e-mail
+          </a>
+          .
+        </p>
       </TelaConta>
     );
   }
@@ -64,6 +78,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           com o e-mail errado, saia e entre com o e-mail cadastrado pela
           coordenação.
         </p>
+        <p className="mt-2">
+          Dúvidas?{" "}
+          <a
+            href="mailto:mentoria@realiza.vc"
+            className="font-medium text-foreground underline underline-offset-2"
+          >
+            Fale com a coordenação
+          </a>
+          .
+        </p>
       </TelaConta>
     );
   }
@@ -73,29 +97,46 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // do (jovem): staff pedindo /jovem volta pra cá.
   if (me.role === "mentorado") redirect("/jovem");
 
+  // auto-cura do login (0206): o termo do voluntário sai emitido antes
+  // dos reads abaixo — o wizard e o banner desta renderização já veem a
+  // pendência. Idempotente, self-scoped e nunca lança; não-voluntário
+  // não deve o documento (o flag decide aqui e dentro da RPC).
+  if (me.voluntario !== false) await garantirDocumentosDevidos();
+
   // mapa papel→primeiro nome pra DemoBar — só monta o dataset quando a demo
   // está ativa (fora dela seria leitura à toa, ainda que pura/barata).
   // personas tem uma entrada por AppRole (a da mentorada existe no dataset
   // mesmo sem card na demo) — derivar dela mantém o Record completo e
   // verdadeiro, sem cast sobre DEMO_ROLES.
-  const demoPersonas = demo
+  const demoData = demo ? getDemoData() : null;
+  const demoPersonas = demoData
     ? (Object.fromEntries(
-        Object.values(getDemoData().personas).map((p) => [
+        Object.values(demoData.personas).map((p) => [
           p.role,
-          p.nome.split(" ")[0],
+          (p.nome_social ?? p.nome).split(" ")[0],
         ])
       ) as Record<AppRole, string>)
+    : null;
+  // o híbrido DPP+especialista rotula composto na DemoBar (senão a persona
+  // do Ricardo parece DPP puro vendo demanda alheia)
+  const demoPapeis = demoData
+    ? (Object.fromEntries(
+        Object.values(demoData.personas).map((p) => [
+          p.role,
+          papeisDe(demoData, p),
+        ])
+      ) as Record<AppRole, AppRole[]>)
     : null;
   // dock: pill compacta dockada no header mobile (AppShell) e no header do
   // wizard (OnboardingFlow) — badge sempre visível, zero overlay de conteúdo.
   // float: pill fixa do desktop; display:none no mobile remove trigger e
   // popover (o dock já cobre esse breakpoint).
-  const demoDock = demo && demoPersonas && (
-    <DemoBar variant="dock" papel={demo} personas={demoPersonas} />
+  const demoDock = demo && demoPersonas && demoPapeis && (
+    <DemoBar variant="dock" papel={demo} personas={demoPersonas} papeis={demoPapeis} />
   );
-  const demoFloat = demo && demoPersonas && (
+  const demoFloat = demo && demoPersonas && demoPapeis && (
     <div key="demo-float" className="hidden md:block">
-      <DemoBar variant="float" papel={demo} personas={demoPersonas} />
+      <DemoBar variant="float" papel={demo} personas={demoPersonas} papeis={demoPapeis} />
     </div>
   );
 
@@ -143,11 +184,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // que a página antiga passava
   const papeisIa =
     me.papeis && me.papeis.length ? me.papeis : me.role ? [me.role] : [];
-  // a bolha está DESLIGADA por padrão enquanto o assistente fecha a rodada
-  // de UI (gravação da demo, out/2026). IA_BOLHA=1 liga no ambiente — o e2e
-  // do app liga explicitamente; sem a flag não há entrada nenhuma pra staff
+  // a bolha está DESLIGADA por padrão fora da demo enquanto o assistente
+  // fecha a rodada de UI (gravação da demo, out/2026). IA_BOLHA=1 liga no
+  // ambiente — na demo ela sempre aparece: é a vitrine do assistente, com
+  // respostas e ajustes de exemplo (REALIZA-382)
   const acessoIa =
-    process.env.IA_BOLHA === "1" &&
+    (demo != null || process.env.IA_BOLHA === "1") &&
     ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"].some(
       (r) => papeisIa.includes(r as AppRole)
     );
@@ -174,7 +216,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       {/* toArray atribui keys — dois filhos soltos disparavam o warning
           de "each child in a list" no render do AppShell */}
-      {Children.toArray([children, demoFloat])}
+      {Children.toArray([children, demoFloat, <ProdutoTelemetry key="telemetry" />])}
     </AppShell>
   );
 }

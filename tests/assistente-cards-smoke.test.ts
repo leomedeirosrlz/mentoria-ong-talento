@@ -17,7 +17,7 @@ const em = (dias: number, h = 19) => {
 const BLOCOS: UiBloco[] = [
   {
     kind: "saude",
-    contagem: { em_andamento: 12, risco: 2, atencao: 3, em_dia: 7, apoio: 1, pausadas: 1 },
+    contagem: { em_andamento: 12, risco: 2, atencao: 3, em_dia: 7, apoio: 1, pausadas: 1, concluidas: 0, encerradas: 0 },
     pedem_acao: 6,
     destaques: [
       {
@@ -181,7 +181,7 @@ describe("UiCard: conteúdo", () => {
     const out = html(jovem);
     expect(out).not.toContain("Atenção");
     expect(out).toContain('href="/jovem"');
-    expect(out).toContain("Ver minha jornada");
+    expect(out).toContain("Ver meu início");
   });
 
   it("dupla encerrada do jovem lê 'Encerrada', nunca 'Desistente'", () => {
@@ -198,10 +198,23 @@ describe("UiCard: conteúdo", () => {
     expect(html(encerrada)).toContain("Desistente");
   });
 
+  it("encerrada formal (remanejada) lê 'Encerrada' pra equipe e pro jovem", () => {
+    const remanejada = {
+      ...(de("dupla") as Extract<UiBloco, { kind: "dupla" }>),
+      status: "encerrada" as const,
+      desfecho: "remanejada" as const,
+    };
+    const jovem = { ...remanejada };
+    delete jovem.semaforo;
+    expect(html(jovem)).toContain("Encerrada");
+    expect(html(remanejada)).toContain("Encerrada");
+    expect(html(remanejada)).not.toContain("Desistente");
+  });
+
   it("agenda agrupa por dia (Hoje) e deixa sem data no fim", () => {
     const out = html(de("agenda"));
     expect(out).toContain("Hoje");
-    expect(out.indexOf("Hoje")).toBeLessThan(out.indexOf("Sem data"));
+    expect(out.indexOf("Hoje")).toBeLessThan(out.indexOf("Sem agendamento"));
     expect(out).toContain("Realizado");
     expect(out).toContain("Ver os 14 na agenda");
   });

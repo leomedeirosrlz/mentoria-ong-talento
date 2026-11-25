@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   chipsDaAgenda,
   deriveAgendaMinha,
-  encontrosCobertos,
   filtraAgenda,
   primeiroNomeDaDupla,
   rotuloChipDupla,
+  rotuloTurmas,
   secoesDaAgenda,
   type AgendaItem,
 } from "@/lib/agenda-minha";
@@ -287,6 +287,67 @@ describe("pendências — warnrows do topo do Hoje", () => {
     expect(todosOsItens(a).some((i) => i.encontro?.id === "e4")).toBe(false);
   });
 
+  it("sessão combinada (018): o coberto não vira pendência nem pede registrar", () => {
+    // âncora 5 realizado com o registro da sessão cobrindo o 6; o 6
+    // realizado sem row própria — a régua lê o conteúdo via âncora
+    const ancora = mkEncontro({
+      id: "e5",
+      numero: 5,
+      status: "realizado",
+      data_hora: "2026-10-05T19:00:00-03:00",
+      realizado_em: "2026-10-05T19:00:00-03:00",
+      registro: {
+        id: "r5",
+        encontro_id: "e5",
+        tema: "Escuta ativa",
+        cobertura: [5, 6],
+      } as unknown as Encontro["registro"],
+    });
+    const coberto = mkEncontro({
+      id: "e6",
+      numero: 6,
+      status: "realizado",
+      data_hora: "2026-10-05T19:00:00-03:00",
+      realizado_em: "2026-10-05T19:00:00-03:00",
+    });
+    const a = deriveAgendaMinha({
+      ...BASE,
+      duplas: [mkDupla({ encontros: [ancora, coberto] })],
+    });
+    expect(a.avisos).toHaveLength(0);
+    const item = todosOsItens(a).find((i) => i.encontro?.id === "e6");
+    expect(item?.acoes ?? []).not.toContain("registrar");
+  });
+
+  it("sessão combinada: encontro realizado FORA da cobertura segue pendente", () => {
+    const ancora = mkEncontro({
+      id: "e5",
+      numero: 5,
+      status: "realizado",
+      data_hora: "2026-10-05T19:00:00-03:00",
+      realizado_em: "2026-10-05T19:00:00-03:00",
+      registro: {
+        id: "r5",
+        encontro_id: "e5",
+        tema: "Escuta ativa",
+        cobertura: [5, 6],
+      } as unknown as Encontro["registro"],
+    });
+    const fora = mkEncontro({
+      id: "e7",
+      numero: 7,
+      status: "realizado",
+      data_hora: "2026-10-05T19:00:00-03:00",
+      realizado_em: "2026-10-05T19:00:00-03:00",
+    });
+    const a = deriveAgendaMinha({
+      ...BASE,
+      duplas: [mkDupla({ encontros: [ancora, fora] })],
+    });
+    expect(a.avisos).toHaveLength(1);
+    expect(a.avisos[0].href).toBe("/duplas/d1#registrar-e7");
+  });
+
   it("realizado de hoje sem registro ainda é item, com 'Registrar como foi'", () => {
     const e = mkEncontro({
       id: "e-hj",
@@ -301,6 +362,51 @@ describe("pendências — warnrows do topo do Hoje", () => {
     expect(item!.acoes).toContain("registrar");
     // sem as 24h do semáforo ainda não é cobrança — não vira warnrow
     expect(a.avisos).toHaveLength(0);
+  });
+
+  it("registro vazio legado não fecha a pendência: aviso de >24h continua", () => {
+    const e = mkEncontro({
+      id: "e4v",
+      numero: 4,
+      status: "realizado",
+      data_hora: "2026-10-05T19:00:00-03:00",
+      realizado_em: "2026-10-05T19:00:00-03:00",
+      registro: {
+        id: "r4",
+        tema: null,
+        reflexoes: null,
+        observacoes: null,
+        atividades: [],
+      } as unknown as Encontro["registro"],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [mkDupla({ encontros: [e] })] });
+    expect(a.avisos).toHaveLength(1);
+    expect(a.avisos[0].href).toBe("/duplas/d1#registrar-e4v");
+    expect(a.avisos[0].cta).toBe("Preencher registro");
+  });
+
+  it("registro vazio legado de hoje: item pede o registro em vez de 'entregue'", () => {
+    const e = mkEncontro({
+      id: "e-hj-vazio",
+      numero: 8,
+      status: "realizado",
+      data_hora: `${HOJE}T19:00:00-03:00`,
+      realizado_em: `${HOJE}T19:00:00-03:00`,
+      registro: {
+        id: "r8",
+        tema: null,
+        reflexoes: null,
+        observacoes: null,
+        atividades: [],
+      } as unknown as Encontro["registro"],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [mkDupla({ encontros: [e] })] });
+    const item = todosOsItens(a).find((i) => i.id === "enc-e-hj-vazio");
+    expect(item).toBeDefined();
+    expect(item!.acoes).toContain("registrar");
+    expect(item!.meta).toContain("registro ainda não preenchido");
+    expect(item!.meta).not.toContain("registro entregue");
+    expect(item!.tom).toBe("warn");
   });
 
   it("agendado vencido sem registro (limbo) vira aviso com Remarcar", () => {
@@ -588,7 +694,7 @@ describe("sessões de especialista — sempre convidadas", () => {
     const item = todosOsItens(a).find((i) => i.id === "esp-s3");
     expect(item).toBeDefined();
     expect(item!.convidado).toBe(true);
-    expect(item!.notaConvidado).toBe("agenda de Ana: você não participa");
+    expect(item!.notaConvidado).toBe("agenda de Ana");
     expect(item!.rotulo).toBe(
       "Trilha de especialista · sessão 3 de 5 · 2026/2027"
     );
@@ -658,12 +764,12 @@ describe("filtro de escopo", () => {
       ],
     });
 
-    // Tudo: itens da Ana (previsto); a formação desta semana já está na
-    // faixa "Minha agenda" e não se repete na lista
+    // Tudo: itens da Ana (previsto) + a formação do mentor — a faixa
+    // saiu e o programa oficial entrou na lista como item tipado
     const tudo = filtraAgenda(agenda, "tudo");
     expect(tudo.avisos).toHaveLength(1); // registro do Caio
     const itensTudo = tudo.secoes.flatMap((s) => s.grupos.flatMap((g) => g.itens));
-    expect(itensTudo.some((i) => i.tipo === "programa")).toBe(false);
+    expect(itensTudo.filter((i) => i.tipo === "programa")).toHaveLength(1);
     const soAna = filtraAgenda(agenda, "dupla:d1");
     expect(soAna.avisos).toHaveLength(0); // a pendência é do Caio
     expect(
@@ -754,7 +860,7 @@ describe("resumo da semana e rail", () => {
     // semana de 07/10/2026 = seg 05/10 → dom 11/10
     const d = mkDupla({
       encontros: [
-        mkEncontro({ numero: 1, status: "realizado", data_hora: "2026-10-06T19:00:00-03:00", realizado_em: "2026-10-06T19:00:00-03:00", registro: { id: "r1" } as Encontro["registro"] }),
+        mkEncontro({ numero: 1, status: "realizado", data_hora: "2026-10-06T19:00:00-03:00", realizado_em: "2026-10-06T19:00:00-03:00", registro: { id: "r1", tema: "Escuta ativa" } as Encontro["registro"] }),
         mkEncontro({ numero: 2, data_hora: `${DEPOIS}T19:00:00-03:00` }),
         // semana que vem — fora da contagem
         mkEncontro({ numero: 3, data_hora: "2026-10-14T19:00:00-03:00" }),
@@ -808,6 +914,7 @@ describe("secoesDaAgenda — estrutura pura", () => {
       eventoId: null,
       link: null,
       acoes: ["agendar"],
+      oficial: null,
     };
     const secoes = secoesDaAgenda([itemSemDia], HOJE);
     const proximos = secoes.find((s) => s.id === "proximos")!;
@@ -816,75 +923,264 @@ describe("secoesDaAgenda — estrutura pura", () => {
   });
 });
 
-describe("encontrosCobertos — as chaves duplaId:numero que a faixa suprime", () => {
-  it("item 'encontro' e aviso de pendência cobrem o mesmo encontro", () => {
-    const d = mkDupla({
-      encontros: [
-        // limbo (agendado vencido): mora no aviso, não tem item na lista —
-        // se a faixa só olhasse os itens, esse card reaparecia
-        mkEncontro({
-          id: "e-limbo",
-          numero: 6,
-          data_hora: "2026-10-05T19:00:00-03:00",
-        }),
-        // agendado amanhã: item "encontro" normal da lista
-        mkEncontro({
-          id: "e8",
-          numero: 8,
-          data_hora: `${AMANHA}T19:00:00-03:00`,
-        }),
+describe("merge do evento oficial no 'tudo' (488)", () => {
+  // a agenda é por par: o MESMO evento oficial aparece um item por dupla.
+  // No chip "tudo" a chave título+data+observação funde os irmãos —
+  // "Turmas 1 e 2"; nos chips de dupla cada escopo vê o seu.
+  const CRON1: Cronograma = { ...CRONOGRAMA, turma: "T1 · 2026/2027" };
+  const CRON2: Cronograma = {
+    ...CRONOGRAMA,
+    id: "c2",
+    nome: "Turma 2",
+    turma: "T2 · 2027/2028",
+  };
+  const anaT1 = () =>
+    mkDupla({ id: "d1", turma: "T1 · 2026/2027", mentorado: mkMentorado("Ana Souza") });
+  const caioT2 = () =>
+    mkDupla({
+      id: "d2",
+      turma: "T2 · 2027/2028",
+      cronograma_id: "c2",
+      mentorado: mkMentorado("Caio Martins"),
+    });
+  const encerramento = (cron: string) =>
+    mkEvento(null, DEPOIS, "evento_encerramento", cron);
+  const programasDe = (secoes: ReturnType<typeof filtraAgenda>["secoes"]) =>
+    secoes
+      .flatMap((s) => s.grupos.flatMap((g) => g.itens))
+      .filter((i) => i.tipo === "programa");
+
+  it("mesmo título/data em turmas diferentes vira um item — 'Turmas 1 e 2'", () => {
+    const agenda = deriveAgendaMinha({
+      ...BASE,
+      duplas: [anaT1(), caioT2()],
+      cronogramas: [CRON1, CRON2],
+      eventos: [encerramento("c1"), encerramento("c2")],
+    });
+    const tudo = filtraAgenda(agenda, "tudo");
+    const programas = programasDe(tudo.secoes);
+    expect(programas).toHaveLength(1);
+    expect(programas[0].rotulo).toBe(
+      "Evento oficial do ciclo · Turmas 1 e 2"
+    );
+    expect(programas[0].notaConvidado).toBe(
+      "agenda de Ana e Caio · evento oficial"
+    );
+    // no chip da dupla o item segue sendo o da própria agenda
+    const soAna = filtraAgenda(agenda, "dupla:d1");
+    const itensAna = programasDe(soAna.secoes);
+    expect(itensAna).toHaveLength(1);
+    expect(itensAna[0].rotulo).toBe("Evento oficial do ciclo · Turma 1");
+    expect(itensAna[0].notaConvidado).toBe(
+      "agenda de Ana · evento oficial"
+    );
+  });
+
+  it("duas duplas da mesma turma também fundem — jovens somam", () => {
+    const caioT1 = mkDupla({
+      id: "d2",
+      turma: "T1 · 2026/2027",
+      mentorado: mkMentorado("Caio Martins"),
+    });
+    const agenda = deriveAgendaMinha({
+      ...BASE,
+      duplas: [anaT1(), caioT1],
+      eventos: [encerramento("c1")],
+    });
+    const programas = programasDe(filtraAgenda(agenda, "tudo").secoes);
+    expect(programas).toHaveLength(1);
+    expect(programas[0].rotulo).toBe("Evento oficial do ciclo · Turma 1");
+    expect(programas[0].notaConvidado).toBe(
+      "agenda de Ana e Caio · evento oficial"
+    );
+  });
+
+  it("eventos distintos (observação/local diferente) NÃO fundem", () => {
+    const evA: CicloEvento = {
+      ...encerramento("c1"),
+      id: "ev-enc-a",
+      observacao: "auditório, 19h",
+    };
+    const evB: CicloEvento = {
+      ...encerramento("c2"),
+      id: "ev-enc-b",
+      observacao: "quadra, 16h",
+    };
+    const agenda = deriveAgendaMinha({
+      ...BASE,
+      duplas: [anaT1(), caioT2()],
+      cronogramas: [CRON1, CRON2],
+      eventos: [evA, evB],
+    });
+    const programas = programasDe(filtraAgenda(agenda, "tudo").secoes);
+    expect(programas).toHaveLength(2);
+    expect(programas.map((i) => i.rotulo)).toEqual([
+      "Evento oficial do ciclo · Turma 1",
+      "Evento oficial do ciclo · Turma 2",
+    ]);
+  });
+
+  it("formação funde com a turma na meta, não no rótulo", () => {
+    const agenda = deriveAgendaMinha({
+      ...BASE,
+      duplas: [anaT1(), caioT2()],
+      cronogramas: [CRON1, CRON2],
+      eventos: [
+        mkEvento(null, DEPOIS, "formacao", "c1"),
+        mkEvento(null, DEPOIS, "formacao", "c2"),
       ],
     });
-    const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
-    expect([...encontrosCobertos(a)].sort()).toEqual(["d1:6", "d1:8"]);
+    const programas = programasDe(filtraAgenda(agenda, "tudo").secoes);
+    expect(programas).toHaveLength(1);
+    expect(programas[0].rotulo).toBe("Formação de mentores");
+    expect(programas[0].meta).toEqual(["Turmas 1 e 2"]);
   });
 
-  it("'a agendar' sem row cobre o passo oficial — o card não volta na faixa", () => {
-    const eventos = [mkEvento(1, "2026-10-06"), mkEvento(2, "2026-10-13")];
-    const a = deriveAgendaMinha({
+  it("recesso em duas turmas funde e junta as notas por par", () => {
+    const recesso = (cron: string) => mkEvento(null, DEPOIS, "recesso", cron);
+    const evId = recesso("c1").id; // mkEvento: ev-recesso-<data>
+    const agenda = deriveAgendaMinha({
       ...BASE,
-      duplas: [mkDupla()],
-      eventos,
+      duplas: [
+        {
+          ...anaT1(),
+          recessos: [
+            {
+              id: "dr-1",
+              dupla_id: "d1",
+              ciclo_evento_id: evId,
+              usa: false,
+              declarado_por: "p-1",
+              declarado_em: "2026-10-01T00:00:00Z",
+            },
+          ],
+        },
+        caioT2(),
+      ],
+      cronogramas: [CRON1, CRON2],
+      eventos: [recesso("c1"), recesso("c2")],
     });
-    // sem row nenhuma, o encontro 1 faltante vira o item "a agendar" —
-    // a chave sai por numero, sem depender de encontro.id
-    expect(encontrosCobertos(a).has("d1:1")).toBe(true);
+    const programas = programasDe(filtraAgenda(agenda, "tudo").secoes);
+    expect(programas).toHaveLength(1);
+    expect(programas[0].rotulo).toBe("Recesso do programa · Turmas 1 e 2");
+    expect(programas[0].meta).toEqual([
+      "Ana segue se encontrando durante o recesso",
+    ]);
   });
+});
 
-  it("sessão de especialista não é o encontro — não cobre", () => {
+describe("passadosSemana — dia fechado não é 'livre' (488)", () => {
+  // HOJE = quarta 07/10 → semana seg 05/10 a dom 11/10. A lista é
+  // só-pra-frente; o recorte seg→ontem alimenta a faixa "Sua semana".
+  it("encontro e sessão de dias fechados desta semana entram no recorte", () => {
     const d = mkDupla({
       encontros: [
         mkEncontro({
-          id: "e8",
-          numero: 8,
-          data_hora: `${AMANHA}T19:00:00-03:00`,
+          id: "e-seg",
+          numero: 5,
+          status: "realizado",
+          data_hora: "2026-10-05T19:00:00-03:00",
+          realizado_em: "2026-10-05T19:00:00-03:00",
+        }),
+        // semana passada — fora do recorte
+        mkEncontro({
+          id: "e-velha",
+          numero: 4,
+          status: "realizado",
+          data_hora: "2026-09-29T19:00:00-03:00",
+          realizado_em: "2026-09-29T19:00:00-03:00",
+        }),
+        // cancelado nunca marca o dia
+        mkEncontro({
+          id: "e-canc",
+          numero: 6,
+          status: "cancelado",
+          data_hora: "2026-10-06T19:00:00-03:00",
+        }),
+        mkEncontro({
+          id: "e-fut",
+          numero: 7,
+          data_hora: `${DEPOIS}T19:00:00-03:00`,
         }),
       ],
     });
     const a = deriveAgendaMinha({
       ...BASE,
       duplas: [d],
-      // a sessão tem duplaId+numero como os itens de encontro — só o tipo
-      // a separa; usar número diferente prova que ela não vaza pra chave
       trilhas: {
         d1: [
           mkTrilha({
             sessoes: [
               mkSessao({
-                id: "s3",
-                numero: 3,
-                data_hora: `${AMANHA}T20:00:00-03:00`,
+                id: "s-pass",
+                numero: 2,
+                status: "realizado",
+                realizado_em: "2026-10-06T16:00:00-03:00",
               }),
             ],
           }),
         ],
       },
     });
-    expect([...encontrosCobertos(a)]).toEqual(["d1:8"]);
+    const ids = a.passadosSemana.map((i) => i.id);
+    expect(ids).toEqual(["enc-e-seg", "esp-s-pass"]);
+    // passado não volta pra lista só-pra-frente — os dois papéis se separam
+    expect(todosOsItens(a).every((i) => i.id !== "enc-e-seg")).toBe(true);
+    // e o recorte nunca carrega ação — dia fechado não pede gesto
+    expect(a.passadosSemana.every((i) => i.acoes.length === 0)).toBe(true);
+    expect(a.passadosSemana.find((i) => i.id === "esp-s-pass")?.convidado)
+      .toBe(true);
   });
 
-  it("agenda vazia → conjunto vazio (a faixa mostra tudo que tiver)", () => {
-    const a = deriveAgendaMinha({ ...BASE, duplas: [] });
-    expect(encontrosCobertos(a).size).toBe(0);
+  it("evento oficial de dia fechado desta semana entra com o carimbo", () => {
+    const a = deriveAgendaMinha({
+      ...BASE,
+      duplas: [mkDupla()],
+      eventos: [
+        mkEvento(null, "2026-10-06", "evento_encerramento"), // ontem — dentro
+        mkEvento(null, "2026-10-02", "formacao"), // semana passada — fora
+        mkEvento(null, DEPOIS, "formacao"), // futuro — vai pra lista, não pro recorte
+      ],
+    });
+    const programas = a.passadosSemana.filter((i) => i.tipo === "programa");
+    expect(programas).toHaveLength(1);
+    expect(programas[0].dia).toBe("2026-10-06");
+    expect(programas[0].oficial).not.toBeNull();
+    // a formação futura segue na lista, não no recorte
+    expect(
+      todosOsItens(a).some((i) => i.dia === DEPOIS && i.tipo === "programa")
+    ).toBe(true);
+  });
+
+  it("segunda-feira cedo: semana começou hoje — recorte vazio", () => {
+    const a = deriveAgendaMinha({
+      ...BASE,
+      duplas: [
+        mkDupla({
+          encontros: [
+            mkEncontro({
+              numero: 5,
+              status: "realizado",
+              data_hora: "2026-10-05T19:00:00-03:00",
+              realizado_em: "2026-10-05T19:00:00-03:00",
+            }),
+          ],
+        }),
+      ],
+      hoje: "2026-10-05",
+      agora: Date.parse("2026-10-05T21:00:00-03:00"),
+    });
+    expect(a.passadosSemana).toEqual([]);
+  });
+});
+
+describe("rotuloTurmas — plural do merge oficial", () => {
+  it("uma turma segue no singular; duas+ viram 'Turmas N e M'", () => {
+    expect(rotuloTurmas([])).toBe("");
+    expect(rotuloTurmas(["Turma 1"])).toBe("Turma 1");
+    expect(rotuloTurmas(["Turma 1", "Turma 2"])).toBe("Turmas 1 e 2");
+    expect(rotuloTurmas(["Turma 1", "Turma 2", "Turma 3"])).toBe(
+      "Turmas 1, 2 e 3"
+    );
   });
 });

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
@@ -141,11 +142,26 @@ export async function submeterAvaliacao(input: EnvioAvaliacao) {
     // nesse caso a RPC barra o submit e a trilha não importa.
     const { data: enc } = await supabase
       .from("encontros")
-      .select("dupla_id")
+      .select("dupla_id, sessao_id")
       .eq("id", encontroId)
       .maybeSingle();
     if (enc) {
       duplaId = enc.dupla_id;
+      // sessão combinada (018): a resposta cai sempre na âncora — menor
+      // nº realizado do grupo, onde moram link e cobertura. Um submit em
+      // row coberta (link velho, rascunho) resolve pro âncora em vez de
+      // avaliar um passo que a sessão já agrupa
+      if (enc.sessao_id) {
+        const { data: grupo } = await supabase
+          .from("encontros")
+          .select("id, numero, status")
+          .eq("dupla_id", duplaId)
+          .eq("sessao_id", enc.sessao_id);
+        const ancora = (grupo ?? [])
+          .filter((g) => g.status === "realizado")
+          .sort((a, b) => a.numero - b.numero)[0];
+        if (ancora && ancora.id !== encontroId) encontroId = ancora.id;
+      }
       const { data: jd } = await supabase
         .from("jovem_duplas")
         .select("trilha")
@@ -202,10 +218,10 @@ export async function submeterAvaliacao(input: EnvioAvaliacao) {
         numero = enc?.numero ?? numero;
         const { data: prof } = await supabase
           .from("profiles")
-          .select("nome")
+          .select("nome, nome_social")
           .eq("user_id", (claims?.claims?.sub as string) ?? "")
           .maybeSingle();
-        jovemNome = prof?.nome ?? jovemNome;
+        jovemNome = prof?.nome_social ?? prof?.nome ?? jovemNome;
       }
 
       const emails = ret.destinatarios
@@ -302,7 +318,7 @@ export async function resolverApoioJovem(avaliacaoId: string, duplaId: string) {
     };
   }
   revalidatePath("/");
-  void snapshotDuplaHoje(duplaId).catch(() => {});
+  after(() => snapshotDuplaHoje(duplaId).catch(() => {}));
   revalidatePath("/duplas");
   revalidatePath("/chamados");
   revalidatePath(`/duplas/${duplaId}`);

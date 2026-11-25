@@ -8,8 +8,8 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "motion/react";
-import { toast } from "sonner";
+import { FadeTroca } from "@/components/ui/etapa";
+import { toast } from "@/lib/toast";
 import {
   CheckCircle,
   CircleNotch,
@@ -36,7 +36,7 @@ import {
   msgLinkWhatsAppRepasse,
 } from "@/components/forms/link-shared";
 import { useOrigem } from "@/components/forms/use-origem";
-import { fade, T } from "@/components/motion";
+
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
@@ -241,15 +241,12 @@ export function EnviarLinkLote({
           <DialogDescription>{descricao}</DialogDescription>
         </DialogHeader>
 
-        <AnimatePresence mode="wait" initial={false}>
+        {/* troca de estado do kit: o painel entrante recebe o foco e anuncia
+            o desfecho — o role="status" que narrava o relatório some porque
+            o foco já faz o anúncio (sem aria-live duplicado) */}
+        <FadeTroca chave={report ? "relatorio" : "selecao"} foco>
           {report ? (
-            <motion.div
-              key="relatorio"
-              {...fade}
-              transition={T.enter}
-              className="space-y-3"
-              role="status"
-            >
+            <div className="space-y-3">
               <ResumoRelatorio linhas={report} />
               <ul className="max-h-72 divide-y divide-border/60 overflow-y-auto">
                 {report.map((l) => {
@@ -332,14 +329,9 @@ export function EnviarLinkLote({
                   </Button>
                 )}
               </DialogFooter>
-            </motion.div>
+            </div>
           ) : (
-            <motion.div
-              key="selecao"
-              {...fade}
-              transition={T.enter}
-              className="space-y-4"
-            >
+            <div className="space-y-4">
               {!envioLiberado && (
                 <p className="flex items-start gap-2 rounded-lg bg-[var(--warn)]/10 px-3 py-2 text-xs leading-relaxed text-[var(--warn-text)]">
                   <Warning size={14} weight="fill" aria-hidden className="mt-0.5 shrink-0" />
@@ -462,9 +454,9 @@ export function EnviarLinkLote({
                       : "Selecione as duplas"}
                 </Button>
               </DialogFooter>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </FadeTroca>
       </DialogContent>
     </Dialog>
   );

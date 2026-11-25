@@ -41,9 +41,9 @@ export const CAMPO_FORMATO_LABEL: Record<FormularioCampoFormato, string> = {
  *  no campo só quando ele é obrigatório (opcional irreconhecível simples-
  *  mente não é gravado: a submissão só morre por vazio de obrigatório). */
 export const CAMPO_FORMATO_ERRO: Record<FormularioCampoFormato, string> = {
-  email: "Confira o e-mail — parece que faltou um pedaço (ex.: nome@dominio.com).",
-  telefone: "Confira o telefone — use DDD + número (ex.: 11 99999-8888).",
-  url: "Confira o link — escreva o endereço (ex.: linkedin.com/in/seu-nome).",
+  email: "Confira o e-mail: parece que faltou um pedaço (ex.: nome@dominio.com).",
+  telefone: "Confira o telefone: use DDD + número (ex.: 11 99999-8888).",
+  url: "Confira o link: escreva o endereço (ex.: linkedin.com/in/seu-nome).",
 };
 
 /** Condição de exibição (REALIZA-70): o campo só aparece quando a
@@ -89,6 +89,7 @@ export type FormularioSistema =
   | "metas"
   | "pdm"
   | "roda_vida"
+  | "competencias_mentor"
   | "intake_mentor"
   | "intake_mentorado"
   | "desfecho";
@@ -102,6 +103,7 @@ export const SISTEMA_LABEL: Record<FormularioSistema, string> = {
   metas: "Metas",
   pdm: "PDM",
   roda_vida: "Roda da Vida",
+  competencias_mentor: "Checklist de competências do mentor",
   intake_mentor: "Inscrição de mentores",
   intake_mentorado: "Inscrição de mentorados",
   desfecho: "Depois da mentoria",
@@ -118,6 +120,45 @@ export const INSTRUMENTOS_SISTEMA = [
 ] as const satisfies readonly FormularioSistema[];
 
 export type InstrumentoSistema = (typeof INSTRUMENTOS_SISTEMA)[number];
+
+/** Instrumentos emitidos pela ficha da dupla (emitir_link_instrumento):
+ *  os 4 respondidos pelo mentorado + o checklist de competências, que é
+ *  respondido pelo mentor (REALIZA-359) — por isso não faz parte de
+ *  INSTRUMENTOS_SISTEMA nem da experiência sob medida do /f/<token>. */
+export const INSTRUMENTOS_DUPLA_SISTEMA = [
+  "visao",
+  "metas",
+  "pdm",
+  "roda_vida",
+  "competencias_mentor",
+] as const satisfies readonly FormularioSistema[];
+
+export type InstrumentoDuplaSistema =
+  (typeof INSTRUMENTOS_DUPLA_SISTEMA)[number];
+
+/** As 10 competências do guia (documento P020, verbatim de
+ *  docs/rag/checklist-competencias.md) — a ordem é a do instrumento
+ *  oficial; o seed da 0190 e o dataset demo derivam daqui. */
+export const COMPETENCIAS_MENTOR = [
+  "Escutar sem interromper e sem antecipar conclusões",
+  "Fazer perguntas abertas em vez de dar respostas prontas",
+  "Sustentar o silêncio quando o outro está pensando",
+  "Dar feedback focado no comportamento, não na pessoa",
+  "Reconhecer e nomear progressos concretos",
+  "Admitir quando não sei algo",
+  "Manter postura não julgadora diante de escolhas diferentes das minhas",
+  "Cumprir combinados e avisar com antecedência quando preciso remarcar",
+  "Separar o meu projeto de vida do projeto do(a) jovem",
+  "Perceber quando uma questão extrapola o meu papel e acionar apoio",
+] as const;
+
+/** As duas colunas de marcação do guia ("Já faço bem" × "Preciso
+ *  desenvolver") viram um select por competência — a opção gravada é o
+ *  que torna a revisitação inicio×final comparável. */
+export const COMPETENCIA_OPCOES = [
+  "Já faço bem",
+  "Preciso desenvolver",
+] as const;
 
 /** Sistemas da régua de instrumentos do programa (REALIZA-199): os cujos
  *  cards moram na seção "Instrumentos do programa" de /materiais (194) —
@@ -157,29 +198,37 @@ export const SISTEMAS_BORDO: readonly FormularioSistema[] = [
   "intake_mentorado",
   "avaliacao_especialista",
   "desfecho",
+  "competencias_mentor",
 ];
 
 /** Resumo de uma linha da ficha da dupla — o que o instrumento é e quando
  *  entra na jornada (guias DPP). */
 export const INSTRUMENTO_INFO: Record<
-  InstrumentoSistema,
+  InstrumentoDuplaSistema,
   { titulo: string; resumo: string }
 > = {
   visao: {
     titulo: "Construindo a sua Visão",
-    resumo: "O exercício do 1º encontro — o filme da vida ideal vira a Declaração de Visão.",
+    resumo: "O exercício do 1º encontro · o filme da vida ideal vira a Declaração de Visão.",
   },
   metas: {
     titulo: "Definindo Minhas Metas",
-    resumo: "Da visão pra 3–5 metas com o porquê de cada uma — a dupla revisa com o modelo SMART.",
+    resumo: "Da visão pra 3–5 metas com o porquê de cada uma · a dupla revisa com o modelo SMART.",
   },
   pdm: {
     titulo: "PDM",
-    resumo: "O documento central: visão, metas com indicador de sucesso e prazo, mapa de submetas.",
+    // 526 — a linha é a RESPOSTA (o form por link), não o documento: o
+    // que o jovem responde aqui projeta itens no Plano de desenvolvimento
+    // da ficha. Sem essa ponte a linha lia o próprio doc.
+    resumo: "O form que o jovem responde nos encontros 1 a 4: visão, metas e desdobramentos viram itens do Plano de desenvolvimento da ficha.",
   },
   roda_vida: {
     titulo: "Roda da Vida",
-    resumo: "Satisfação 1–10 nas 16 áreas da vida, a partir do 5º mês — o desenho vira a roda.",
+    resumo: "Satisfação 1–10 nas 16 áreas da vida, a partir do 5º mês · o desenho vira a roda.",
+  },
+  competencias_mentor: {
+    titulo: "Checklist de competências do mentor",
+    resumo: "As 10 competências do guia, marcadas no início do ciclo e revisitadas no fechamento: responde o mentor.",
   },
 };
 
@@ -739,6 +788,15 @@ export function extraiRodaDaVida(
     respondidas: notas.length,
     total: areas.length,
   };
+}
+
+/** Paridade estrutural entre duas rodas: os ids de área casam um a um na
+ *  ordem. É o guard do overlay antes × depois (REALIZA-18) — estruturas
+ *  divergentes desligam a sobreposição em vez de desalinhar eixos. */
+export function mesmasAreas(a: RodaDaVida, b: RodaDaVida): boolean {
+  const aa = a.quadrantes.flatMap((q) => q.areas);
+  const bb = b.quadrantes.flatMap((q) => q.areas);
+  return aa.length === bb.length && aa.every((x, i) => x.id === bb[i].id);
 }
 
 export type MetaExtraida = {

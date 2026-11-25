@@ -1,7 +1,7 @@
 {
-  "gerado_em": "2026-11-09T13:37:11.752Z",
+  "gerado_em": "2026-11-16T20:44:24.214Z",
   "docs": 36,
-  "chunks": 464,
+  "chunks": 466,
   "fontes": [
     {
       "guia": "autorizacao-responsavel",
@@ -37,8 +37,7 @@
       "audiencia": [
         "coordenacao",
         "supervisor",
-        "mentor_dpp",
-        "mentor_especialista"
+        "mentor_dpp"
       ],
       "arquivo": "ciclo-2026-2027.md",
       "secoes": 5,
@@ -52,8 +51,7 @@
       "audiencia": [
         "coordenacao",
         "supervisor",
-        "mentor_dpp",
-        "mentor_especialista"
+        "mentor_dpp"
       ],
       "arquivo": "ciclo-turma2-2026-2027.md",
       "secoes": 6,
@@ -136,7 +134,8 @@
       "natureza": "consolidado",
       "audiencia": [
         "mentor_dpp",
-        "supervisor"
+        "supervisor",
+        "mentorado"
       ],
       "arquivo": "instrumento-construindo-visao.md",
       "secoes": 5,
@@ -149,7 +148,8 @@
       "natureza": "consolidado",
       "audiencia": [
         "mentor_dpp",
-        "supervisor"
+        "supervisor",
+        "mentorado"
       ],
       "arquivo": "instrumento-definindo-minhas-metas.md",
       "secoes": 5,
@@ -162,7 +162,8 @@
       "natureza": "consolidado",
       "audiencia": [
         "mentor_dpp",
-        "supervisor"
+        "supervisor",
+        "mentorado"
       ],
       "arquivo": "instrumento-pdm.md",
       "secoes": 6,
@@ -175,7 +176,8 @@
       "natureza": "consolidado",
       "audiencia": [
         "mentor_dpp",
-        "supervisor"
+        "supervisor",
+        "mentorado"
       ],
       "arquivo": "instrumento-roda-da-vida.md",
       "secoes": 12,
@@ -221,7 +223,7 @@
       ],
       "arquivo": "mensagem-preparacao.md",
       "secoes": 2,
-      "chunks": 3
+      "chunks": 4
     },
     {
       "guia": "perguntas-eficazes",
@@ -250,7 +252,7 @@
       ],
       "arquivo": "plataforma-e-operacao.md",
       "secoes": 13,
-      "chunks": 16
+      "chunks": 17
     },
     {
       "guia": "roteiro-encontro-01",

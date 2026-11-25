@@ -3,12 +3,15 @@ import Link from "next/link";
 import { PencilSimple, Sparkle, VideoCamera } from "@phosphor-icons/react/dist/ssr";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
+import { JovemAgendarSugestao } from "@/components/jovem-agendar-sugestao";
+import type { SugestoesEncontro } from "@/lib/sugestoes-encontro-server";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   formatDiaHora,
   formatDiaMes,
   formatDiaSemana,
   linkSeguro,
+  podeEntrarAgora,
   toDateStr,
 } from "@/lib/ciclo";
 import type { JovemEncontro } from "@/lib/queries-jovem";
@@ -21,21 +24,33 @@ import { cn } from "@/lib/utils";
 export function ProximoEncontro({
   proximo,
   rotulo,
+  sessao = false,
   hoje,
   agendar,
   linkEditavel,
   emCurso,
   concluida,
   primeiroNome,
+  plano,
 }: {
   /** Próximo encontro agendado/remarcado com data futura; null = nenhum. */
   proximo: JovemEncontro | null;
-  /** "6º encontro com Ricardo" ou "3ª sessão com Sofia", montado na página. */
+  /** "6º encontro com Ricardo" ou "Sessão 3 com Sofia", montado na página. */
   rotulo: string | null;
+  /** O próximo é sessão de especialista (ou a única trilha viva é a esp) —
+   *  o título e o vazio falam "sessão", não "encontro". */
+  sessao?: boolean;
   /** "YYYY-MM-DD" no fuso do programa. */
   hoje: string;
-  /** DPP ativa com um nº livre: o botão abre o agendamento desse número. */
-  agendar: { duplaId: string; numero: number } | null;
+  /** DPP ativa com um nº livre: o cartão sugere o dia/hora (481); sem
+   *  sugestão viável, cai no formulário antigo. */
+  agendar: {
+    duplaId: string;
+    numero: number;
+    numeros: number[];
+    comQuem: string;
+    sugestoes: SugestoesEncontro | null;
+  } | null;
   /** Mesma regra da agenda: agendado de dupla ativa e DPP pode trocar o link. */
   linkEditavel: boolean;
   /** Dupla em curso (ativa ou pausada). */
@@ -43,6 +58,10 @@ export function ProximoEncontro({
   /** Jornada DPP concluída. */
   concluida: boolean;
   primeiroNome: string;
+  /** "Sua semana" (520): o combinado como extensão do hero — a página
+   *  monta o SuaSemanaPlano e ele entra no mesmo cartão, depois das
+   *  ações. Nunca um segundo hero. */
+  plano?: React.ReactNode;
 }) {
   const link = proximo ? linkSeguro(proximo.link) : null;
   const eHoje =
@@ -55,16 +74,23 @@ export function ProximoEncontro({
     const quando = quandoCurto(proximo.data_hora!, eHoje);
     const remarcado = proximo.status === "remarcado" ? " · remarcado" : "";
     return (
-      <Casca {...cabecalho} titulo="Seu próximo encontro">
+      <Casca
+        {...cabecalho}
+        titulo={sessao ? "Sua próxima sessão" : "Seu próximo encontro"}
+        plano={plano}
+      >
         <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
-          {rotulo ?? `${proximo.numero}º encontro`}
+          {rotulo ?? (sessao ? `Sessão ${proximo.numero}` : `${proximo.numero}º encontro`)}
         </p>
         <p className="mt-1 text-sm">
           {quando}
           {remarcado}
         </p>
         <Acoes>
-          {eHoje && link ? (
+          {/* QW5: "Entrar" preenchido só na janela da chamada (30 min
+              antes → 2 h depois). Fora dela o link segue à mão, discreto;
+              sem link, a saída honesta é a agenda */}
+          {link && podeEntrarAgora(proximo.data_hora) ? (
             <a
               href={link}
               target="_blank"
@@ -73,6 +99,20 @@ export function ProximoEncontro({
             >
               <VideoCamera size={18} aria-hidden />
               Entrar na chamada
+              <span className="sr-only"> (abre em nova aba)</span>
+            </a>
+          ) : link ? (
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "w-full bg-background sm:w-auto"
+              )}
+            >
+              <VideoCamera size={18} aria-hidden />
+              Link da chamada
               <span className="sr-only"> (abre em nova aba)</span>
             </a>
           ) : (
@@ -118,8 +158,23 @@ export function ProximoEncontro({
   }
 
   if (agendar) {
+    // o cartão da 481 substitui o formulário vazio: a recomendação concreta
+    // confirma num toque e "Escolher outro dia" abre o seletor
+    if (agendar.sugestoes?.principal) {
+      return (
+        <JovemAgendarSugestao
+          duplaId={agendar.duplaId}
+          numero={agendar.numero}
+          numeros={agendar.numeros}
+          comQuem={agendar.comQuem}
+          sugestoes={agendar.sugestoes}
+          titulo="Seu próximo encontro"
+          plano={plano}
+        />
+      );
+    }
     return (
-      <Casca {...cabecalho} titulo="Seu próximo encontro">
+      <Casca {...cabecalho} titulo="Seu próximo encontro" plano={plano}>
         <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
           O {agendar.numero}º encontro ainda não tem data
         </p>
@@ -142,9 +197,13 @@ export function ProximoEncontro({
 
   if (emCurso) {
     return (
-      <Casca {...cabecalho} titulo="Seu próximo encontro">
+      <Casca
+        {...cabecalho}
+        titulo={sessao ? "Sua próxima sessão" : "Seu próximo encontro"}
+        plano={plano}
+      >
         <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
-          Nenhum encontro marcado
+          {sessao ? "Nenhuma sessão marcada" : "Nenhum encontro marcado"}
         </p>
         <p className="mt-1 text-sm">
           Combinem o próximo pelo papo ou pelo WhatsApp.
@@ -179,10 +238,13 @@ export function ProximoEncontro({
 function Casca({
   titulo,
   style,
+  plano,
   children,
 }: {
   titulo: string;
   style: CSSProperties;
+  /** o combinado como extensão do hero (520) — mesmo cartão */
+  plano?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -198,6 +260,7 @@ function Casca({
         {titulo}
       </h2>
       {children}
+      {plano}
     </section>
   );
 }

@@ -56,6 +56,15 @@ const IDS = {
   solExpirada: "e2e00000-0000-4000-8000-0000000001c3",
 } as const;
 const MENTORADOS_E2E = `${IDS.mentorado},${IDS.mentorado2}`;
+
+/** Sinos do fluxo de especialista que NÃO podem chegar à coordenação
+ *  (REALIZA-468): o pedido vive no mural e o aceite na trilha. */
+async function sinosDaCoordenacao() {
+  return buscarViaServiceRole<{ tipo: string }[]>(
+    "notificacoes",
+    `select=tipo&profile_id=eq.${IDS.coordProfile}&tipo=in.(solicitacao_registrada,especialista_aceitou,solicitacao_triagem)`
+  );
+}
 // demandas com prefixo único — o escopo dos asserts é o próprio texto
 const DEMANDA_ACEITE =
   "E2E-112: jovem precisa de reforço em inglês instrumental pra entrevista de emprego.";
@@ -114,7 +123,7 @@ async function convergirSolicitacoes() {
   // sino limpo: a assert de recusa conta exatamente a notificação do teste
   await limparViaServiceRole(
     "notificacoes",
-    `profile_id=in.(${IDS.mentorProfile},${IDS.coordProfile},${IDS.espProfile})&tipo=in.(solicitacao_recusada,solicitacao_proposta,especialista_aceitou,demanda_especialista,solicitacao_registrada)`
+    `profile_id=in.(${IDS.mentorProfile},${IDS.coordProfile},${IDS.espProfile})&tipo=in.(solicitacao_recusada,solicitacao_proposta,especialista_aceitou,demanda_especialista,solicitacao_registrada,solicitacao_triagem)`
   );
   // a dupla DPP hospedeira do pedido precisa estar ativa — um spec vizinho
   // que recriou o encontro 16 a deixou 'concluida' e a ficha vira
@@ -225,8 +234,8 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     await relogar(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.dupla}`);
     await expect(page.getByText("Horário expirado")).toBeVisible();
-    // exact: o botão "Solicitar mentor especialista" do cabeçalho fica
-    // sempre montado — a assert é sobre o rail de negociação, não o CTA
+    // exact: o item "Solicitar mentor especialista" do ⋯ contém a frase —
+    // a assert é sobre o rail de negociação, não o CTA
     await expect(
       page.getByText("Mentor especialista", { exact: true })
     ).toHaveCount(0);
@@ -245,28 +254,38 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     // ---- lado staff: o pedido nasce pela UI da ficha (a superfície real)
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.dupla}`);
-    // desktop: as ações da ficha são botões inline — o "Mais" é sm:hidden
-    const item = page.getByRole("button", {
+    // review 21/11 (#9): uma primária + ⋯ — "Solicitar" virou menuitem que
+    // abre o dialog irmão (REALIZA-157). O gesto composto é seguro de
+    // repetir: menu fechado → mais.click() abre; item ausente → catch
+    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
+    const item = page.getByRole("menuitem", {
       name: "Solicitar mentor especialista",
     });
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
-      () => item.click(),
+      async () => {
+        await mais.click();
+        await item.click();
+      },
       () => dialog.isVisible()
     );
     await dialog.locator("#demanda").fill(DEMANDA_ACEITE);
+    // a direção é por card (023): o trigger abre o pool do catálogo, o
+    // card "Selecionar" fecha e deixa o resumo completo com "Trocar"
     await agirComConfirma(
-      () => dialog.locator("#especialista-select").click(),
       () =>
-        page.getByRole("option", { name: "Esp E2E", exact: true }).isVisible()
+        dialog
+          .getByRole("button", { name: "Qualquer especialista disponível" })
+          .click(),
+      () => dialog.locator("#especialista-seletor-pool").isVisible()
     );
     await agirComConfirma(
       () =>
-        page.getByRole("option", { name: "Esp E2E", exact: true }).click(),
-      async () =>
-        (await dialog.locator("#especialista-select").textContent())?.includes(
-          "Esp E2E"
-        ) ?? false
+        dialog
+          .locator("#especialista-seletor-pool li", { hasText: "Esp E2E" })
+          .getByRole("button", { name: "Selecionar", exact: true })
+          .click(),
+      () => dialog.getByRole("button", { name: "Trocar" }).isVisible()
     );
     await agirComConfirma(
       () =>
@@ -302,6 +321,8 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     expect(sol?.especialista_desejado_id).toBe(IDS.espProfile);
     expect(sol?.created_by).toBe(IDS.mentorProfile);
     expect(sol?.mentorado_id).toBe(IDS.mentorado);
+    // criar não acorda a coordenação (468): o pedido já está no mural
+    expect(await sinosDaCoordenacao()).toHaveLength(0);
 
     // ---- lado especialista: o mural mostra o dirigido; aceitar pede slot
     await relogar(page, ESP_EMAIL, SENHA);
@@ -378,6 +399,8 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     expect(encs[0].numero).toBe(1); // 1ª tentativa da trilha
     expect(encs[0].status).toBe("agendado");
     expect(encs[0].duracao_min).toBe(60);
+    // o aceite também não gera sino de coordenação (468)
+    expect(await sinosDaCoordenacao()).toHaveLength(0);
     expect(ms(encs[0].data_hora)).toBe(ms(isoEscolhido));
   });
 
@@ -688,12 +711,13 @@ test.describe("especialista global — turma não restringe (REALIZA-158)", () =
   test.beforeEach(limpar158);
   test.afterAll(limpar158);
 
-  test("triagem libera sem turma; esp de outro escopo aceita e coord remaneja cross-turma", async () => {
-    // pedido do jovem sem DPP ativa entra na triagem (aguardando_coord)
+  test("pedido sem DPP nasce aberto; esp de outro escopo aceita e coord remaneja cross-turma", async () => {
+    // 0158: pedido do jovem sem dupla DPP nasce 'aberta', direto no mural —
+    // o insert reproduz o que pedir_especialista_jovem grava, sem triagem.
     const sol = await inserirViaServiceRole("solicitacoes_especialista", {
       mentorado_id: MENTORADO_SEM_DPP,
       origem: "jovem",
-      status: "aguardando_coord",
+      status: "aberta",
       demanda: DEMANDA_158,
       motivo: "E2E-158 motivo",
       especialista_desejado_id: ESP2_PROFILE,
@@ -701,19 +725,20 @@ test.describe("especialista global — turma não restringe (REALIZA-158)", () =
     });
     const solId = sol.id as string;
 
-    // 1) a coord libera SEM escolher turma — antes da 0101 a RPC exigia
+    // 1) a coordenação só lê (468): PATCH direto no PostgREST não muda a
+    // linha — toda escrita passa por RPC definer
     const jwtCoord = await jwtDoUsuario(COORD_EMAIL, SENHA_COORD);
-    const lib = await restComoUsuario("rpc/reconhecer_solicitacao", jwtCoord, {
-      method: "POST",
-      body: { p_id: solId },
+    await restComoUsuario(`solicitacoes_especialista?id=eq.${solId}`, jwtCoord, {
+      method: "PATCH",
+      body: { status: "cancelada" },
     });
-    const libText = await lib.text();
-    expect(lib.ok, `reconhecer sem turma → ${libText}`).toBeTruthy();
-    const [aberta] = await buscarViaServiceRole<
+    const [intacta] = await buscarViaServiceRole<
       { status: string; turma: string | null }[]
     >("solicitacoes_especialista", `select=status,turma&id=eq.${solId}`);
-    expect(aberta?.status).toBe("aberta");
-    expect(aberta?.turma).toBeNull();
+    expect(intacta?.status).toBe("aberta");
+    expect(intacta?.turma).toBeNull();
+    // e o pedido não acorda a coordenação
+    expect(await sinosDaCoordenacao()).toHaveLength(0);
 
     // 2) o pedido mira a turma do jovem quando o efetivar roda — aqui o
     // mentorado é da Turma E2E, então marcamos T1 pra forçar o cenário
@@ -785,6 +810,30 @@ test.describe("especialista global — turma não restringe (REALIZA-158)", () =
     expect(fechada?.status).toBe("encerrada");
     expect(fechada?.encerrada_em).toBeTruthy();
     expect(fechada?.devolutiva_pdm).toContain("E2E-171");
+
+    // 4) sem UPDATE direto, o cancelamento da coordenação continua pelo
+    // caminho da UI: a RPC definer (468)
+    const extra = await inserirViaServiceRole("solicitacoes_especialista", {
+      mentorado_id: MENTORADO_SEM_DPP,
+      origem: "jovem",
+      status: "aberta",
+      demanda: `${DEMANDA_158} cancelar`,
+      motivo: "E2E-158 motivo",
+      especialista_desejado_id: ESP2_PROFILE,
+      created_by: JOVEM2_PROFILE,
+    });
+    const extraId = extra.id as string;
+    const cancel = await restComoUsuario("rpc/cancelar_solicitacao", jwtCoord, {
+      method: "POST",
+      body: { p_id: extraId },
+    });
+    const cancelText = await cancel.text();
+    expect(cancel.ok, `cancelar pela RPC → ${cancelText}`).toBeTruthy();
+    const [cancelada] = await buscarViaServiceRole<{ status: string }[]>(
+      "solicitacoes_especialista",
+      `select=status&id=eq.${extraId}`
+    );
+    expect(cancelada?.status).toBe("cancelada");
   });
 });
 

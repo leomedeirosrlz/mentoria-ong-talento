@@ -254,11 +254,27 @@ async function lerIaConfig(
   return cfg;
 }
 
-/** Tier → slug concreto: config vazia cai no IA_MODEL do ambiente —
- *  o env continua sendo o piso que garante o assistente de pé. */
+/** Env default por tier (REALIZA-299) — degrau entre a config viva e o
+ *  IA_MODEL único. Lido por chamada (não por constante de módulo) pra
+ *  teste e troca de env valerem sem restart do processo. */
+const ENV_DO_TIER: Record<
+  TierIa,
+  "IA_MODEL_LEVE" | "IA_MODEL_MEDIO" | "IA_MODEL_FORTE"
+> = {
+  rapido: "IA_MODEL_LEVE",
+  balanceado: "IA_MODEL_MEDIO",
+  forte: "IA_MODEL_FORTE",
+};
+
+/** Tier → slug concreto: `cfg.modelos[tier]` (ajuste quente da coord)
+ *  → env do tier (IA_MODEL_LEVE/MEDIO/FORTE) → IA_MODEL — o env único
+ *  continua sendo o piso que garante o assistente de pé. */
 export function modeloDoTier(cfg: IaConfig, tier: TierIa): string {
   const slug = cfg.modelos[tier];
-  return slug && slug.trim() ? slug : (process.env.IA_MODEL ?? "");
+  if (slug && slug.trim()) return slug;
+  const envTier = process.env[ENV_DO_TIER[tier]];
+  if (envTier && envTier.trim()) return envTier;
+  return process.env.IA_MODEL ?? "";
 }
 
 /** Tier → nível de esforço: granular por tier, default "medio". */
@@ -266,10 +282,26 @@ export function esforcoDoTier(cfg: IaConfig, tier: TierIa): EsforcoIa {
   return cfg.esforco[tier] ?? "medio";
 }
 
-/** Tier → cadeia de fallback ordenada, sem o primário e sem repetição. */
+/** Tier → cadeia de fallback ordenada, sem o primário e sem repetição.
+ *  O `forte` sempre termina degradando pro médio (REALIZA-299): com
+ *  `modelos.fallbacks` vazio — estado da seed — o tier ficava sem cadeia
+ *  e uma falha transitória/404 do forte estourava erro pro usuário. Só o
+ *  forte ganha o degrau implícito: balanceado→rapido degradaria a
+ *  síntese sem ganho real de disponibilidade. */
 export function fallbacksDoTier(cfg: IaConfig, tier: TierIa): string[] {
   const f = cfg.modelos.fallbacks;
   const lista = Array.isArray(f) ? f : (f?.[tier] ?? []);
   const primario = cfg.modelos[tier];
-  return [...new Set(lista)].filter((s) => s && s !== primario);
+  const cadeia = [...new Set(lista)].filter((s) => s && s !== primario);
+  if (tier === "forte") {
+    const medio = modeloDoTier(cfg, "balanceado");
+    if (
+      medio &&
+      medio !== modeloDoTier(cfg, "forte") &&
+      !cadeia.includes(medio)
+    ) {
+      cadeia.push(medio);
+    }
+  }
+  return cadeia;
 }

@@ -2,7 +2,8 @@
 
 import { WhatsappLogo } from "@phosphor-icons/react";
 import { avatarPublicUrl } from "@/lib/avatar";
-import { waLink } from "@/lib/ciclo";
+import { waChatLink, waLink } from "@/lib/ciclo";
+import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
 import type { JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/avatar";
@@ -33,7 +34,9 @@ export function EquipeWaDialog({
   /** Primeiro nome do mentorado — assina a mensagem pré-preenchida. */
   nomeJovem: string;
 }) {
-  const comWa = equipe.filter((c) => waLink(c.whatsapp, ""));
+  // "tem WhatsApp" = wa.me/<dígitos> saindo — sem texto aqui (a mensagem
+  // pronta é do botão de cada linha)
+  const comWa = equipe.filter((c) => waChatLink(c.whatsapp));
   return (
     <Dialog>
       <DialogTrigger render={trigger} />
@@ -41,17 +44,14 @@ export function EquipeWaDialog({
         <DialogHeader>
           <DialogTitle>Falar com a equipe</DialogTitle>
           <DialogDescription>
-            Escolha com quem conversar no WhatsApp — a mensagem já sai com a
+            Escolha com quem conversar no WhatsApp. A mensagem já sai com a
             sua apresentação.
           </DialogDescription>
         </DialogHeader>
         <ul className="divide-y divide-border/60">
           {equipe.map((c) => {
             const nome = c.nome_social || c.nome || "Equipe";
-            const wa = waLink(
-              c.whatsapp,
-              `Olá! Sou ${nomeJovem}, mentorado(a) do programa Realiza.vc.`
-            );
+            const wa = waLink(c.whatsapp, msgApresentacaoJovem(nomeJovem));
             return (
               <li key={c.id ?? nome} className="flex items-center gap-2 py-2">
                 <Avatar
@@ -87,7 +87,7 @@ export function EquipeWaDialog({
         </ul>
         {!comWa.length && (
           <p className="text-sm text-muted-foreground">
-            A equipe ainda não tem WhatsApp cadastrado — registre sua dúvida
+            A equipe ainda não tem WhatsApp cadastrado. Registre sua dúvida
             em Precisa de ajuda e a coordenação responde pela plataforma.
           </p>
         )}

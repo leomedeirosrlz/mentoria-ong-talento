@@ -210,6 +210,29 @@ export function appEnvOk() {
   );
 }
 
+/** Fetch com retentativa curta pra 5xx E erro de rede — o PostgREST/GoTrue
+ *  do staging tem janelas de 503 e quedas do pooler (aceita a conexão e
+ *  nunca responde) que derrubavam pisos e cleanups inteiros. O timeout por
+ *  tentativa é o que defende: sem ele UMA chamada pendurada comia os 60s
+ *  do hook. 4xx volta na hora: é erro do spec, não do backend. */
+async function fetchRest(url: string, init: RequestInit): Promise<Response> {
+  let res: Response | null = null;
+  for (let i = 0; i < 3; i++) {
+    if (i) await new Promise((r) => setTimeout(r, 500 * i));
+    try {
+      res = await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (res.status < 500) return res;
+    } catch {
+      // socket morto/timeout abortado — transitório como o 503, retenta
+    }
+  }
+  if (!res) throw new Error(`fetchRest sem resposta: ${url}`);
+  return res;
+}
+
 /** DELETE via service role — limpeza do que o spec criou no backend de teste.
  *  `filtro` é a query do PostgREST (ex.: "dupla_id=eq.X&numero=eq.1"). */
 export async function limparViaServiceRole(
@@ -220,7 +243,7 @@ export async function limparViaServiceRole(
     throw new Error("E2E_SUPABASE_URL aponta pra produção — cleanup abortado");
   const url = `${supabaseUrl}/rest/v1/${tabela}?${filtro}`;
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(url, {
+  const res = await fetchRest(url, {
     method: "DELETE",
     headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
@@ -238,35 +261,46 @@ export async function limparEncontrosDaDupla(duplaId: string): Promise<void> {
   if (encs.length === 0) return;
   const lista = encs.map((e) => e.id).join(",");
   // 0084: chamados apontam pra registro/avaliação com SET NULL — saem
-  // antes dos filhos pra não sobrar chamado órfão no staging
-  const regs = await buscarViaServiceRole<{ id: string }[]>(
-    "registros",
-    `select=id&encontro_id=in.(${lista})`
-  );
-  if (regs.length) {
-    await limparViaServiceRole(
-      "chamados",
-      `registro_id=in.(${regs.map((r) => r.id).join(",")})`
-    );
-  }
-  const avals = await buscarViaServiceRole<{ id: string }[]>(
-    "avaliacoes_encontro",
-    `select=id&encontro_id=in.(${lista})`
-  );
-  if (avals.length) {
-    await limparViaServiceRole(
-      "chamados",
-      `avaliacao_id=in.(${avals.map((a) => a.id).join(",")})`
-    );
-  }
-  await limparViaServiceRole(
-    "avaliacoes_encontro",
-    `encontro_id=in.(${lista})`
-  );
-  await limparViaServiceRole(
-    "avaliacao_links",
-    `encontro_id=in.(${lista})`
-  );
+  // antes dos filhos pra não sobrar chamado órfão no staging. Os selects
+  // de filhos são independentes; os deletes seguintes também — em
+  // paralelo pra caber no hook (PostgREST de staging soma por ida).
+  const [regs, avals] = await Promise.all([
+    buscarViaServiceRole<{ id: string }[]>(
+      "registros",
+      `select=id&encontro_id=in.(${lista})`
+    ),
+    buscarViaServiceRole<{ id: string }[]>(
+      "avaliacoes_encontro",
+      `select=id&encontro_id=in.(${lista})`
+    ),
+  ]);
+  // fase 1: chamados morrem antes das origens (a FK é SET NULL — apagar
+  // a avaliação/registro primeiro deixaria a linha órfã); fase 2: as
+  // origens em si, tabelas independentes em paralelo
+  await Promise.all([
+    regs.length
+      ? limparViaServiceRole(
+          "chamados",
+          `registro_id=in.(${regs.map((r) => r.id).join(",")})`
+        )
+      : Promise.resolve(),
+    avals.length
+      ? limparViaServiceRole(
+          "chamados",
+          `avaliacao_id=in.(${avals.map((a) => a.id).join(",")})`
+        )
+      : Promise.resolve(),
+  ]);
+  await Promise.all([
+    limparViaServiceRole(
+      "avaliacoes_encontro",
+      `encontro_id=in.(${lista})`
+    ),
+    limparViaServiceRole(
+      "avaliacao_links",
+      `encontro_id=in.(${lista})`
+    ),
+  ]);
   await limparViaServiceRole("encontros", `id=in.(${lista})`);
 }
 
@@ -279,19 +313,74 @@ export async function limparEncontrosDaDupla(duplaId: string): Promise<void> {
  *  Todo piso que recria a âncora — e todo spec que depende da dupla —
  *  chama isto no final: devolve o status e desfaz o que o trigger mintou. */
 export async function convergirDuplaAtiva(duplaId: string): Promise<void> {
-  await atualizarViaServiceRole("duplas", `id=eq.${duplaId}`, {
-    status: "ativa",
-    encerrada_em: null,
-    motivo_encerramento: null,
+  // as três mexem em tabelas independentes — em paralelo corta duas
+  // latências de PostgREST (staging frio somava o teto do hook nos pisos)
+  await Promise.all([
+    atualizarViaServiceRole("duplas", `id=eq.${duplaId}`, {
+      status: "ativa",
+      encerrada_em: null,
+      motivo_encerramento: null,
+    }),
+    limparViaServiceRole(
+      "encerramentos",
+      `dupla_id=eq.${duplaId}`
+    ),
+    limparViaServiceRole(
+      "notificacoes",
+      `tipo=in.(dupla_formada,dupla_reta_final)&href=eq./duplas/${duplaId}`
+    ),
+  ]);
+}
+
+/** A ficha só mostra o card próprio do recesso (RecessoDuplaCard, onde os
+ *  botões da decisão moram) quando o plano "ficar em dia" NÃO está na
+ *  tela (518) — e ele aparece pra qualquer dupla devendo 2+ passos
+ *  agendáveis. Os fixtures de dívida cobrem quase toda a suíte; o spec
+ *  que precisa do card standalone chama isto: cada passo oficial já
+ *  vencido ganha um encontro realizado + registro, o planner lê zero
+ *  devidos e a ficha cai no caminho "em dia". Dinâmico de propósito — a
+ *  cobertura segue as datas oficiais, então o drift do calendário fixo
+ *  não quebra o piso de novo. `exceto` segura os nºs que o spec cria
+ *  por conta (dívida de propósito, sessão a cobrir) — eles ficam sem
+ *  row pra entrarem no plano/cobertura do teste. */
+export async function convergirDuplaEmDia(
+  duplaId: string,
+  criadoPor: string,
+  opts?: { exceto?: number[] }
+): Promise<void> {
+  await limparEncontrosDaDupla(duplaId);
+  const [dupla] = await buscarViaServiceRole<{ cronograma_id: string }[]>(
+    "duplas",
+    `select=cronograma_id&id=eq.${duplaId}&limit=1`
+  );
+  const hoje = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Sao_Paulo",
   });
-  await limparViaServiceRole(
-    "encerramentos",
-    `dupla_id=eq.${duplaId}`
+  const passos = await buscarViaServiceRole<
+    { numero: number; data: string }[]
+  >(
+    "ciclo_eventos",
+    `select=numero,data&cronograma_id=eq.${dupla.cronograma_id}&tipo=eq.encontro&data=lte.${hoje}&numero=not.is.null&order=numero`
   );
-  await limparViaServiceRole(
-    "notificacoes",
-    `tipo=in.(dupla_formada,dupla_reta_final)&href=eq./duplas/${duplaId}`
-  );
+  const exceto = new Set(opts?.exceto ?? []);
+  for (const p of passos) {
+    if (exceto.has(p.numero)) continue;
+    const quando = `${p.data}T19:00:00-03:00`;
+    const enc = await inserirViaServiceRole("encontros", {
+      dupla_id: duplaId,
+      numero: p.numero,
+      data_hora: quando,
+      realizado_em: quando,
+      status: "realizado",
+      created_by: criadoPor,
+    });
+    // realizado sem registro cai como pendência e segue fora do "em dia"
+    await inserirViaServiceRole("registros", {
+      encontro_id: enc.id,
+      avaliacao: "boa",
+      tema: "E2E: cobertura do passo",
+    });
+  }
 }
 
 /** DELETE de duplas com TODOS os filhos NO ACTION, não só encontros —
@@ -347,7 +436,7 @@ export async function buscarViaServiceRole<T = Record<string, unknown>[]>(
     throw new Error("E2E_SUPABASE_URL aponta pra produção — leitura abortada");
   const url = `${supabaseUrl}/rest/v1/${tabela}?${filtro}`;
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(url, {
+  const res = await fetchRest(url, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
   if (!res.ok) throw new Error(`read ${tabela} falhou: ${res.status}`);
@@ -366,7 +455,7 @@ export async function inserirViaServiceRole(
     throw new Error("E2E_SUPABASE_URL aponta pra produção — insert abortado");
   const url = `${supabaseUrl}/rest/v1/${tabela}`;
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(url, {
+  const res = await fetchRest(url, {
     method: "POST",
     headers: {
       apikey: key,
@@ -394,7 +483,7 @@ export async function atualizarViaServiceRole(
     throw new Error("E2E_SUPABASE_URL aponta pra produção — cleanup abortado");
   const url = `${supabaseUrl}/rest/v1/${tabela}?${filtro}`;
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(url, {
+  const res = await fetchRest(url, {
     method: "PATCH",
     headers: {
       apikey: key,
@@ -418,7 +507,7 @@ export async function rpcViaServiceRole<T = unknown>(
   if (supabaseUrl.includes(PROD_REF))
     throw new Error("E2E_SUPABASE_URL aponta pra produção — RPC abortada");
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(`${supabaseUrl}/rest/v1/rpc/${fn}`, {
+  const res = await fetchRest(`${supabaseUrl}/rest/v1/rpc/${fn}`, {
     method: "POST",
     headers: {
       apikey: key,
@@ -429,7 +518,10 @@ export async function rpcViaServiceRole<T = unknown>(
   });
   if (!res.ok)
     throw new Error(`rpc ${fn} falhou: ${res.status} ${await res.text()}`);
-  return (await res.json()) as T;
+  // rpcs void (registrar/falhar_login_handoff) devolvem corpo vazio —
+  // res.json() estouraria em "Unexpected end of JSON input"
+  const texto = await res.text();
+  return (texto ? JSON.parse(texto) : null) as T;
 }
 
 /** Access token de um usuário de teste (grant password do GoTrue) — pra
@@ -445,7 +537,7 @@ export async function jwtDoUsuario(
   if (supabaseUrl.includes(PROD_REF))
     throw new Error("E2E_SUPABASE_URL aponta pra produção — login abortado");
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(
+  const res = await fetchRest(
     `${supabaseUrl}/auth/v1/token?grant_type=password`,
     {
       method: "POST",
@@ -458,6 +550,36 @@ export async function jwtDoUsuario(
   const body = (await res.json()) as { access_token?: string };
   if (!body.access_token) throw new Error(`login ${email} sem access_token`);
   return body.access_token;
+}
+
+/** Par access+refresh de um usuário de teste — mesma grant do jwtDoUsuario,
+ *  mas devolve os dois: o handoff e o /auth/link precisam do refresh real
+ *  (uso único, casado com o access) pro setSession do gesto e do resgate.
+ *  Mesmo hard-stop: spec app nunca fala com prod. */
+export async function tokensDoUsuario(
+  email: string,
+  senha: string
+): Promise<{ access_token: string; refresh_token: string }> {
+  if (supabaseUrl.includes(PROD_REF))
+    throw new Error("E2E_SUPABASE_URL aponta pra produção — login abortado");
+  const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
+  const res = await fetchRest(
+    `${supabaseUrl}/auth/v1/token?grant_type=password`,
+    {
+      method: "POST",
+      headers: { apikey: key, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: senha }),
+    }
+  );
+  if (!res.ok)
+    throw new Error(`login ${email} → ${res.status}: ${await res.text()}`);
+  const body = (await res.json()) as {
+    access_token?: string;
+    refresh_token?: string;
+  };
+  if (!body.access_token || !body.refresh_token)
+    throw new Error(`login ${email} sem par de tokens`);
+  return { access_token: body.access_token, refresh_token: body.refresh_token };
 }
 
 /** REST autenticado como o usuário do JWT — apikey service + Bearer dele:
@@ -484,6 +606,50 @@ export async function restComoUsuario(
     },
     ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
   });
+}
+
+/** Deterministic e2e PATs for /api/mcp (REALIZA-297): the seed stores
+ *  only the sha256 of each in ia_mcp_tokens (MCP_PAT_FIXTURES in
+ *  scripts/seed-e2e-staging.mjs) — the plaintexts here MUST match that
+ *  map; change one side, change the other. */
+export const MCP_PAT = {
+  mentor: "rlz_mcp_e2e_mentor_1111111111111111111111111111111111",
+  coord: "rlz_mcp_e2e_coord_222222222222222222222222222222222222",
+  jovem: "rlz_mcp_e2e_jovem_333333333333333333333333333333333333",
+  semPapel: "rlz_mcp_e2e_sem_papel_4444444444444444444444444444444",
+} as const;
+
+/** Dia+hora no SeletorDiaHora (530): o #data_hora datetime-local virou dois
+ *  campos nativos — input[type=date] pro dia e input[type=time] pra hora
+ *  (step 900). Quando o motor manda sugestões os chips cobrem os campos:
+ *  "Outro dia"/"Outro horário" revelam o input nativo (o chip é role=radio
+ *  e o campo nasce preenchido). `localDT` segue no formato dos helpers
+ *  emDias/naTerca ("YYYY-MM-DDTHH:mm"): a fatia do dia vai pro primeiro, a
+ *  da hora pro segundo — a ordem importa porque escolher o dia pode
+ *  re-selecionar um chip de hora e esconder o input de novo. */
+export async function preencherDiaHora(dialog: Locator, localDT: string) {
+  const dia = dialog.locator('input[type="date"]');
+  if (!(await dia.isVisible().catch(() => false))) {
+    await dialog.getByRole("radio", { name: /Outro dia/ }).click();
+  }
+  await dia.fill(localDT.slice(0, 10));
+  const hora = dialog.locator('input[type="time"]');
+  if (!(await hora.isVisible().catch(() => false))) {
+    await dialog.getByRole("radio", { name: /Outro horário/ }).click();
+  }
+  await hora.fill(localDT.slice(11, 16));
+}
+
+/** Ações secundárias da linha do encontro moram no ⋯ "Ações do encontro"
+ *  (530): a linha guarda UM gesto primário e o resto vira menuitem — um
+ *  toque no trigger abre o popup. No-op quando já aberto: dentro do
+ *  agirComConfirma a repetição do gesto não fecha o que já abriu. */
+export async function abrirMenuEncontro(page: Page, linha: Locator) {
+  if (!(await page.getByRole("menu").isVisible().catch(() => false))) {
+    await linha
+      .getByRole("button", { name: "Ações do encontro" })
+      .click();
+  }
 }
 
 /** Confirma o AgendarEncontroDialog do mentor. Quando o horário cai fora da

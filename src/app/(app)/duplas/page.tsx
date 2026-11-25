@@ -11,7 +11,7 @@ import {
 } from "@/lib/queries";
 import { duplaSupervisionada } from "@/lib/auxiliar-escopo";
 import { getUltimasInteracoes } from "@/lib/interacoes";
-import { RECORTES_FATIA, type RecorteFatia } from "@/lib/agenda-coordenacao";
+import { resolveRecorteFatia } from "@/lib/agenda-coordenacao";
 import {
   resolveTurmaFoco,
   TURMA_FOCO_COOKIE,
@@ -102,11 +102,11 @@ export default async function DuplasPage({
   const origem = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
 
   // ?recorte=<fatia> — os atalhos do SaudePrograma (home, agenda, registros)
-  // pousam aqui já filtrados. Vocabulário único em RECORTES_FATIA; valor
-  // desconhecido cai fora (ausência de recorte), nunca 404 nem chip fantasma
+  // pousam aqui já filtrados. resolveRecorteFatia aplica o alias dos deep
+  // links antigos (?recorte=desistente → encerrada); valor desconhecido
+  // cai fora (ausência de recorte), nunca 404 nem chip fantasma
   const recorteParam = Array.isArray(sp.recorte) ? sp.recorte[0] : sp.recorte;
-  const recorteInicial: RecorteFatia | null =
-    RECORTES_FATIA.find((r) => r === recorteParam) ?? null;
+  const recorteInicial = resolveRecorteFatia(recorteParam);
 
   // ?turma= (REALIZA-73): o contexto semeia o chip de turma da coordenação
   // e recorta a lista do auxiliar — mesma regra da home (param > cookie >

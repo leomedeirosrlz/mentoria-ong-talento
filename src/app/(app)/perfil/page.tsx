@@ -44,6 +44,7 @@ export default async function PerfilPage() {
     <PerfilForm
       me={perfil}
       tema={tema}
+      demo={demo != null}
       mentorProfile={mentorProfile}
       avatarUrl={me.avatar_path ? avatarPublicUrl(me.avatar_path) : null}
       gravatarUrl={demo ? null : await gravatarUrlSeExiste(me.email)}

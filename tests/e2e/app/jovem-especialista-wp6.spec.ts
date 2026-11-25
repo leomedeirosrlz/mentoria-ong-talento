@@ -1,4 +1,5 @@
 import {
+  agirComConfirma,
   appEnvOk,
   buscarViaServiceRole,
   convergirDuplaAtiva,
@@ -126,16 +127,41 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     // --- o mentor DPP registra a sugestão na ficha da dupla ---
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.duplaDpp}`);
-    // desktop: as ações da ficha são botões inline (o "Mais" é sm:hidden)
-    await page
-      .getByRole("button", { name: /Sugerir especialista pro jovem/ })
-      .click();
+    // review 21/11 (#9): uma primária + ⋯ — "Sugerir" virou menuitem que
+    // abre o dialog irmão. O gesto composto é seguro de repetir
+    const maisSug = page.getByRole("button", { name: "Mais ações da dupla" });
+    const itemSug = page.getByRole("menuitem", {
+      name: /Sugerir especialista pro jovem/,
+    });
+    const dialogSug = page.getByRole("dialog");
+    await agirComConfirma(
+      async () => {
+        await maisSug.click();
+        await itemSug.click();
+      },
+      () => dialogSug.isVisible()
+    );
     await page.locator("#sug-mentor-demanda").fill(DEMANDA_SUG);
     await page
       .locator("#sug-mentor-objetivo")
       .fill("Destravar a entrega do projeto");
-    await page.locator("#sug-mentor-esp").click();
-    await page.getByRole("option", { name: /Esp Dois E2E/ }).click();
+    // a escolha é por card (023): o trigger abre o pool do catálogo e o
+    // card selecionado fica como resumo completo com "Trocar"
+    await agirComConfirma(
+      () =>
+        dialogSug
+          .getByRole("button", { name: "Deixar a coordenação direcionar" })
+          .click(),
+      () => dialogSug.locator("#sug-mentor-esp-pool").isVisible()
+    );
+    await agirComConfirma(
+      () =>
+        dialogSug
+          .locator("#sug-mentor-esp-pool li", { hasText: "Esp Dois E2E" })
+          .getByRole("button", { name: "Selecionar", exact: true })
+          .click(),
+      () => dialogSug.getByRole("button", { name: "Trocar" }).isVisible()
+    );
     await page
       .getByRole("button", { name: /Registrar sugestão/ })
       .click();
@@ -248,9 +274,19 @@ test.describe("WP6 — especialista do lado do jovem", () => {
   }) => {
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.duplaDpp}`);
-    await page
-      .getByRole("button", { name: /Sugerir especialista pro jovem/ })
-      .click();
+    // review #9: o gesto mora no ⋯ — o item abre o dialog irmão
+    const maisSug2 = page.getByRole("button", { name: "Mais ações da dupla" });
+    const itemSug2 = page.getByRole("menuitem", {
+      name: /Sugerir especialista pro jovem/,
+    });
+    const dialogSug2 = page.getByRole("dialog");
+    await agirComConfirma(
+      async () => {
+        await maisSug2.click();
+        await itemSug2.click();
+      },
+      () => dialogSug2.isVisible()
+    );
     await page.locator("#sug-mentor-demanda").fill(DEMANDA_DISP);
     await page
       .getByRole("button", { name: /Registrar sugestão/ })
@@ -259,11 +295,15 @@ test.describe("WP6 — especialista do lado do jovem", () => {
       page.getByText(/confirma ou ajusta na página de especialistas/i)
     ).toBeVisible({ timeout: 15_000 });
 
-    // com a sugestão pendente, o gesto some do cabeçalho (a RPC também deduplica)
+    // com a sugestão pendente, o gesto some do ⋯ (a RPC também deduplica)
     await page.reload();
+    await page
+      .getByRole("button", { name: "Mais ações da dupla" })
+      .click();
     await expect(
-      page.getByRole("button", { name: /Sugerir especialista pro jovem/ })
+      page.getByRole("menuitem", { name: /Sugerir especialista pro jovem/ })
     ).toHaveCount(0);
+    await page.keyboard.press("Escape");
 
     // o jovem dispensa — a sol vira 'cancelada' e sai de vista
     await relogar(page, JOVEM_EMAIL, SENHA);

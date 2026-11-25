@@ -217,7 +217,7 @@ Sequência sugerida: **WP0b → (WP6 ‖ WP1) → WP2 → WP3 → WP4/WP5 → WP
 
 **Reaproveitar:** `notificacoes.tsx` (ícones e tipos), `NudgeButton`, padrão de RPC `definer`, `SemaforoDot` para o chip da dupla, padrões de lista do `registros/page.tsx`.
 
-**Demo:** chamados no `data.ts` (8 casos cobrindo categorias e status), queries escopadas por papel em `demo/queries.ts`.
+**Demo:** chamados no `data.ts` (9 casos cobrindo categorias e status), queries escopadas por papel em `demo/queries.ts`.
 
 **Testes:** Vitest nas regras puras (quando é vermelho; quem pode agir em qual categoria; visibilidade de interno); e2e por papel (autor não vê interno; auxiliar não assume `plataforma`; coordenação vê tudo). **Specs e2e que fixam o fluxo velho e morrem nesta PR** (verificado): `avaliacao.spec.ts` (notificação `apoio_jovem` + "Marcar ajuda como atendida"), `jovem.spec.ts` ("Pedir ajuda" → `pedido_apoio` **pro mentor** — no modelo novo isso seria vazamento: o chamado do jovem não vai ao mentor), `operacional.spec.ts` (flag → semáforo risco + card remanejo), `remanejo-capacidade.spec.ts` ("Pedido de apoio" no card de risco).
 

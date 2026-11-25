@@ -38,7 +38,13 @@ import {
   getIaConfig,
   modeloDoTier,
 } from "@/lib/ia/config";
-import { rotearTier } from "@/lib/ia/roteador";
+import {
+  papelDecisivo,
+  perguntaDeContinuacao,
+  rotearTier,
+  tarefaDaPergunta,
+  temDominioOperacional,
+} from "@/lib/ia/roteador";
 import { contextoELimiteIa } from "@/lib/ia/rate-limit";
 import type { FonteIa } from "@/lib/ia/fontes";
 import {
@@ -63,14 +69,16 @@ const MAX_ITERACOES = 6;
 // orçamento total do stream (REALIZA-304): a plataforma encerra a função
 // aos 60s sem avisar — se o teto por rodada fosse o único limite, uma
 // rodada lenta morria no meio e nenhum evento de erro chegava ao cliente.
-// 50s a partir da abertura do stream deixa ~10s pros gates pré-stream
-const STREAM_BUDGET_MS = 50_000;
+// 55s a partir da abertura do stream deixa ~5s pros gates pré-stream e
+// pro lote de telemetria (awaited antes do close). O teto de tokens subiu
+// junto (REALIZA-397): resposta de 12000 tokens precisa de mais janela
+const STREAM_BUDGET_MS = 55_000;
 
 // espelha o teto do registrar_ia_eventos_lote (0160)
 const MAX_EVENTOS_LOTE = 50;
 
 const MSG_FALHA =
-  "Não consegui concluir essa consulta agora — tente perguntar de outra forma.";
+  "Não consegui concluir essa consulta agora. Tente perguntar de outra forma.";
 
 const MsgBody = z
   .object({
@@ -98,6 +106,11 @@ const Body = z
       .max(80)
       .regex(/^[\w.\-/:]+$/)
       .optional(),
+    // origem do gesto que enviou a mensagem (spec 026, FR-014): "pill" =
+    // chip do empty state. Viaja FORA de messages — nunca entra no
+    // histórico nem no prompt — e sai no args do evento 'resposta' pra
+    // ia_eventos distinguir sugestão clicada de texto digitado
+    origem: z.literal("pill").optional(),
   })
   .strict();
 
@@ -169,14 +182,29 @@ export async function POST(req: Request) {
   // de mexer no prompt sem versionar o texto inteiro nos eventos
   const promptV = createHash("sha256").update(system).digest("hex").slice(0, 8);
 
-  // tier da pergunta (REALIZA-329): roteador determinístico — saudação
-  // vai pro raso, pedido analítico pro forte, resto no balanceado;
-  // desligado na config = sempre balanceado. Slug ausente cai no
-  // IA_MODEL do ambiente, então config vazia não quebra nada
+  // tier da pergunta (REALIZA-329/299): roteador determinístico —
+  // tarefa derivada do formato da mensagem × papel efetivo (staff faz
+  // análise no forte; mentor/jovem capam no balanceado); desligado na
+  // config = sempre balanceado. tarefa e papelDecisivo saem daqui já
+  // calculados porque o evento 'resposta' grava os mesmos valores em
+  // args.roteador — uma derivação só, auditável sem coluna nova.
+  // Slug ausente cai no IA_MODEL do ambiente, então config vazia não
+  // quebra nada
   const ultimaPergunta =
     [...body.data.messages].reverse().find((m) => m.role === "user")
       ?.content ?? "";
-  const tier = iaCfg.roteamento ? rotearTier(ultimaPergunta) : "balanceado";
+  // follow-up depois de uma resposta: a conversa já teve turno do
+  // assistente, então "e a adesão" é continuação, não saudação solta. O
+  // piso vira síntese e a rodada nunca desce pro raso (REALIZA-465)
+  const temHistorico = body.data.messages
+    .slice(0, -1)
+    .some((m) => m.role === "assistant" && m.content.trim().length > 0);
+  const posTool = perguntaDeContinuacao(ultimaPergunta, { temHistorico });
+  const tarefa = tarefaDaPergunta(ultimaPergunta, { posTool });
+  const papelRota = papelDecisivo(papeis);
+  const tier = iaCfg.roteamento
+    ? rotearTier(ultimaPergunta, { papel: papeis, tarefa, posTool })
+    : "balanceado";
   // eval (0164): o runner do /ia manda x-ia-eval-key + modelo e mede aquele
   // slug — a cadeia de fallback sai do caminho senão a métrica mente (o
   // 'resposta' grava o modelo REAL usado, mas um fallback esconderia a
@@ -192,10 +220,12 @@ export async function POST(req: Request) {
     fallbacks: evalOverride ? [] : fallbacksDoTier(iaCfg, tier),
     // REALIZA-333: o payload de tools sai filtrado por papel — não anunciar
     // pro modelo o que ele não pode rodar (ele papagaiava a descrição das
-    // tools coord-only ao explicar a negação). Tier rapido (saudação,
-    // fora de escopo — nunca consulta dados) sai SEM tools: ~2k tokens
-    // de schema economizados por rodada
-    papeis: tier === "rapido" ? [] : papeis,
+    // tools coord-only ao explicar a negação). Tier rapido (saudação pura,
+    // nunca consulta dados) sai SEM tools: ~2k tokens de schema economizados
+    // por rodada. Pergunta com domínio operacional nunca perde os papéis,
+    // mesmo que o roteador a tenha classificado como saudação (REALIZA-465)
+    papeis:
+      tier === "rapido" && !temDominioOperacional(ultimaPergunta) ? [] : papeis,
   };
 
   // sessão estável por usuário — o provider Go exige pra rotear/cachear;
@@ -204,7 +234,7 @@ export async function POST(req: Request) {
   // teto por rodada — o orçamento do stream (STREAM_BUDGET_MS) capa
   // esse valor a cada iteração, então na prática o que manda é o que
   // ainda falta pro prazo
-  const timeoutRound = Number(process.env.IA_TIMEOUT_MS ?? 20_000) * 4;
+  const timeoutRound = Number(process.env.IA_TIMEOUT_MS ?? 45_000) * 4;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -263,10 +293,19 @@ export async function POST(req: Request) {
         if (u.opencode?.billing_source) uso.billing = u.opencode.billing_source;
       };
       let erroEmitido = false;
-      const sendErro = (e: string) => {
-        send({ type: "error", e });
+      // a resposta final saiu cortada mesmo com a continuação interna do
+      // provider — vai na telemetria do 'resposta' pra medir quanto o
+      // teto de tokens ainda aperta
+      let truncouFinal = false;
+      const sendErro = (e: string, dormindo?: boolean) => {
+        // dormindo: falha do provider (429/cota/5xx/timeout) → o cliente
+        // mostra a Liza dormindo em vez do erro genérico (REALIZA-363)
+        send({ type: "error", e, ...(dormindo ? { dormindo: true } : {}) });
         erroEmitido = true;
       };
+      // o último resultado do provider decide a cara do erro de orçamento
+      // esgotado: provider lento/atolado dorme, ferramenta nossa lenta não
+      let dormindoUltimo = false;
       let guiaChamado = false;
       const prazo = Date.now() + STREAM_BUDGET_MS;
       let iteracoes = 0;
@@ -282,6 +321,10 @@ export async function POST(req: Request) {
           AbortSignal.timeout(Math.min(timeoutRound, restante)),
         ]);
         let emitido = 0; // tokens da rodada que já saíram pro cliente
+        // o provider cortou no teto de tokens mesmo depois da continuação
+        // interna — se esta rodada vira a resposta final, o cliente ganha
+        // o chip "continuar" em vez de um texto quebrado em silêncio
+        let truncadoMsg = false;
         const r = await chamarModeloStream(historico, sessao, {
           signal,
           onToken: (t) => {
@@ -295,6 +338,7 @@ export async function POST(req: Request) {
         let msg: MsgChat;
         if (r.ok) {
           somarUso(r.usage, r.modelo);
+          truncadoMsg = Boolean(r.truncado);
           msg = {
             role: "assistant",
             content: r.content || null,
@@ -303,24 +347,33 @@ export async function POST(req: Request) {
         } else if (r.abortado) {
           break; // usuário fechou/stop — sai do loop sem erro
         } else if (r.fallback) {
+          dormindoUltimo = Boolean(r.dormindo);
           // provider recusou SSE ou o stream morreu no meio: a rodada
           // refaz em JSON — mas é uma GERAÇÃO NOVA, sem prefixo comum com
           // o que já saiu. Se algo já foi emitido, `reset` manda a bolha
           // recomeçar (emendar o rabo de outra resposta corrompia o texto)
-          if (Date.now() >= prazo) break;
-          const alt = await chamarModelo(historico, sessao, chamada);
+          const restanteJson = prazo - Date.now();
+          if (restanteJson <= 0) break;
+          const alt = await chamarModelo(historico, sessao, {
+            ...chamada,
+            // o fallback JSON não corre contra o `signal` combinado —
+            // compartilha o deadline absoluto da rodada; ~1.5s fica pra
+            // emitir token + done
+            prazoLimite: prazo - 1_500,
+          });
           if (!alt.ok) {
-            sendErro(alt.erro);
+            sendErro(alt.erro, alt.dormindo);
             break;
           }
           somarUso(alt.usage, alt.modelo);
+          truncadoMsg = Boolean(alt.truncado);
           msg = alt.mensagem;
           if (msg.content) {
             if (emitido > 0) send({ type: "reset" });
             send({ type: "token", c: msg.content });
           }
         } else {
-          sendErro(r.erro);
+          sendErro(r.erro, r.dormindo);
           break;
         }
 
@@ -329,6 +382,16 @@ export async function POST(req: Request) {
           (c) => c.type === "function"
         );
         if (!calls.length) {
+          // saiu cortada: em vez de um texto quebrado no ar, o chip
+          // ```sugestoes oferece retomar — o histórico já carrega o
+          // parcial, então a próxima rodada continua de onde parou
+          if (truncadoMsg) {
+            truncouFinal = true;
+            send({
+              type: "token",
+              c: '\n\n```sugestoes\n["Continuar de onde parei"]\n```',
+            });
+          }
           send({
             type: "done",
             tools: toolsUsadas,
@@ -399,18 +462,55 @@ export async function POST(req: Request) {
               })
               .finally(() => clearTimeout(timerPrazo));
             if (res === null) break;
-            // genUI direto: o card sai já — antes da próxima rodada do
-            // modelo, que ainda vai pensar e escrever por cima dele
             const resTool = res as ResultadoTool;
             if (resTool.ok) {
-              const bloco =
-                tc.function.name === "instrumentos_da_dupla"
-                  ? uiDosInstrumentos(
-                      String((args as { dupla_id?: unknown } | null)?.dupla_id ?? ""),
-                      resTool.dados
-                    )
-                  : uiDaTool(tc.function.name, resTool.dados);
-              if (bloco) send({ type: "ui", b: bloco });
+              // escrita em prévia (REALIZA-126): o envelope vai pro card
+              // do usuário — a única via de approve — e o tool-result que
+              // o modelo recebe é o marcador sanitizado. O confirmacao_id
+              // NUNCA entra no histórico: com ele na mão, a tool se
+              // auto-aprovaria e o portão humano viraria decorativo.
+              const pend = (
+                resTool.dados as
+                  | { pendente_confirmacao?: Record<string, unknown> }
+                  | null
+                  | undefined
+              )?.pendente_confirmacao;
+              if (pend && typeof pend === "object") {
+                send({
+                  type: "ui",
+                  b: {
+                    kind: "confirmacao",
+                    confirmacao_id: pend.confirmacao_id,
+                    tool: pend.tool,
+                    args: pend.args ?? {},
+                    resumo: pend.resumo,
+                    expira_em_minutos: pend.expira_em_minutos,
+                    // correlaciona o evento da execução com o da prévia —
+                    // o endpoint repassa no dispatch
+                    request_id: requestId,
+                  },
+                });
+                res = {
+                  ok: true,
+                  dados: {
+                    status: "aguardando_confirmacao_humana",
+                    resumo: pend.resumo,
+                  },
+                };
+              } else {
+                // genUI direto: o card sai já — antes da próxima rodada
+                // do modelo, que ainda vai pensar e escrever por cima
+                const bloco =
+                  tc.function.name === "instrumentos_da_dupla"
+                    ? uiDosInstrumentos(
+                        String(
+                          (args as { dupla_id?: unknown } | null)?.dupla_id ?? ""
+                        ),
+                        resTool.dados
+                      )
+                    : uiDaTool(tc.function.name, resTool.dados);
+                if (bloco) send({ type: "ui", b: bloco });
+              }
             }
             if (tc.function.name === "guia_consulta") {
               // envelope ResultadoTool — os dados moram em .dados; só
@@ -451,7 +551,7 @@ export async function POST(req: Request) {
       }
 
       if (!concluido && !erroEmitido && !req.signal.aborted && !fechado) {
-        send({ type: "error", e: MSG_FALHA });
+        sendErro(MSG_FALHA, dormindoUltimo);
       }
 
       // evento-resumo da request (sdd D4): um 'resposta' por mensagem com
@@ -466,6 +566,13 @@ export async function POST(req: Request) {
           tools: toolsUsadas,
           list_cost: uso.listCost || undefined,
           prompt_v: promptV,
+          // decisão do roteador auditável no jsonb já existente
+          // (REALIZA-299): por que essa mensagem caiu nesse tier
+          roteador: { tier, tarefa, papel: papelRota },
+          truncado: truncouFinal || undefined,
+          // "pill" = clique numa sugestão do empty state; ausente =
+          // digitado — entra só quando definida pra não sujar o jsonb
+          ...(body.data.origem ? { origem: body.data.origem } : {}),
         },
         ok: concluido,
         erro: erroEmitido ? "erro" : null,

@@ -20,7 +20,7 @@ import {
 import { turmaCurta } from "@/lib/turma";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import type { Cronograma } from "@/lib/types";
 
 function csvDownload(nome: string, header: string[], linhas: string[][]) {
@@ -259,13 +259,11 @@ export function RelatorioBuilder({
       {/* barra de configuração — mesma língua dos filtros de /duplas e
           /pessoas: grupos com rótulo overline + chips filterChipCls */}
       <div className="space-y-4">
-        {/* grupos de filtro: no mobile a fileira de chips rola na horizontal
-            (rótulo fica fixo à esquerda), no desktop volta a quebrar linha */}
+        {/* grupos de filtro: uma linha só, o overflow rola na horizontal
+            (REALIZA-383); o rótulo overline fica fixo à esquerda */}
         <div role="group" aria-labelledby="flt-turma" className="flex items-center gap-1.5">
           <GrupoLabel id="flt-turma">Turma</GrupoLabel>
-          {/* py-1 -my-1: overflow-x-auto vira overflow-y:auto no computado
-              e cliparia o focus-visible:ring dos chips */}
-          <div className="scroll-fina -my-1 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto py-1 sm:flex-wrap sm:overflow-visible">
+          <FilterChipRow className="flex-1 gap-1.5">
             {[...turmas, "todas"].map((t) => (
               <button
                 key={t}
@@ -278,12 +276,12 @@ export function RelatorioBuilder({
                 {t === "todas" ? "Todas" : turmaCurta(t)}
               </button>
             ))}
-          </div>
+          </FilterChipRow>
         </div>
 
         <div role="group" aria-labelledby="flt-linhas" className="flex items-center gap-1.5">
           <GrupoLabel id="flt-linhas">Linhas</GrupoLabel>
-          <div className="scroll-fina -my-1 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto py-1 sm:flex-wrap sm:overflow-visible">
+          <FilterChipRow className="flex-1 gap-1.5">
             {(["pessoas", "duplas"] as const).map((g) => (
               <button
                 key={g}
@@ -295,12 +293,12 @@ export function RelatorioBuilder({
                 {g === "pessoas" ? "Uma por pessoa" : "Uma por dupla"}
               </button>
             ))}
-          </div>
+          </FilterChipRow>
         </div>
 
         <div role="group" aria-labelledby="flt-colunas" className="flex items-center gap-1.5">
           <GrupoLabel id="flt-colunas">Colunas</GrupoLabel>
-          <div className="scroll-fina -my-1 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto py-1 sm:flex-wrap sm:overflow-visible">
+          <FilterChipRow className="flex-1 gap-1.5">
             {catalogo.map((c) => {
             // saindo já lê como desligado — a coluna desmonta quando o
             // fade termina, mas o chip vira "off" no clique
@@ -325,7 +323,7 @@ export function RelatorioBuilder({
               </button>
             );
           })}
-          </div>
+          </FilterChipRow>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

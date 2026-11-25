@@ -16,6 +16,16 @@ export function temPapel(
   if (!p) return false;
   return p.role === papel || (p.papeis?.includes(papel) ?? false);
 }
+
+/** A voz do módulo de chamados por papel (R15): o jovem "pede ajuda", o
+ *  mentor "pede apoio" e a equipe fala "chamado". Recebe o role cru (as
+ *  superfícies de chamado passam a string direta) — "mentorado" precisa
+ *  sair antes do prefixo "mentor" que ele mesmo carrega. */
+export type VozChamado = "jovem" | "mentor" | "equipe";
+export function vozChamado(papel: string | null | undefined): VozChamado {
+  if (papel === "mentorado") return "jovem";
+  return papel?.startsWith("mentor") ? "mentor" : "equipe";
+}
 /** 'concluida' (0037) = jornada percorrida até o fim; 'encerrada' = fechamento
  *  antecipado. Ambas liberam a vaga e congelam a trilha como a encerrada. */
 export type DuplaStatus = "ativa" | "pausada" | "concluida" | "encerrada";
@@ -210,6 +220,10 @@ export type Mentorado = {
   /** Vínculo com o login do jovem (0066) — `profiles.id` da conta com
    *  role='mentorado'. null = participante sem acesso à plataforma. */
   profile_id?: string | null;
+  /** Embed do profile vinculado (0180) — só `onboarded_em`: a UI distingue
+   *  "convite enviado" (conta sem onboarding) de "entrou". Só preenche
+   *  onde MENTORADO_COLS_PUBLICAS carrega o embed. */
+  conta?: { onboarded_em: string | null } | null;
   /** Opt-in colega↔colega (0076): ligado, o WhatsApp do cadastro aparece
    *  aos colegas de turma com conta (view mentorados_turma). O dono do
    *  toggle é o próprio jovem (RPC set_contato_compartilhado). */
@@ -378,6 +392,11 @@ export type Registro = {
   dificuldade_detalhe: string | null;
   proximo_passo: ProximoPasso | null;
   proximo_passo_detalhe: string | null;
+  /** Números dos outros encontros da MESMA sessão que este registro cobre
+   *  (0226): sessão combinada grava um registro só na âncora e os números
+   *  cobertos ficam aqui — a âncora em si não aparece. [] = sessão simples.
+   *  Opcional: embeds que não pedem a coluna devolvem undefined. */
+  cobertura?: number[];
   created_by: string | null;
   created_at: string;
   /** Autor do registro — só vem no embed `autor:profiles!registros_created_by_fkey(nome)` da dupla. */
@@ -410,6 +429,10 @@ export type AvaliacaoEncontro = {
   pedir_apoio: boolean;
   /** O jovem liberou o mentor DPP ler esta avaliação específica. */
   avaliacao_visivel_mentor: boolean;
+  /** Sessão combinada: números de TODOS os encontros do grupo (inclui o da
+   *  avaliação) — copiada do link pelo trigger 0228. null/[] = sessão
+   *  simples (a coluna é jsonb, pode vir null). */
+  cobertura?: number[] | null;
   /** null = resposta anônima por token (jovem sem login). */
   respondido_por_profile_id: string | null;
   created_at: string;
@@ -428,6 +451,9 @@ export type AvaliacaoLink = {
   /** Profile que respondeu por este link (null = jovem sem login — o
    *  token sozinho é a identidade). Trilha de auditoria da RPC. */
   respondido_por_profile_id: string | null;
+  /** Sessão combinada: números de TODOS os encontros que este link cobre
+   *  (inclui o âncora) — um link por sessão, mint só na âncora (0226). */
+  cobertura?: number[];
   created_at: string;
 };
 
@@ -471,6 +497,10 @@ export type Encontro = {
   link: string | null;
   /** Por que a dupla remarcou (label do preset ou texto livre) — só escrito quando a data muda. */
   motivo_reagendamento: string | null;
+  /** Sessão combinada (0226): uuid compartilhado por todos os encontros que
+   *  aconteceram numa sessão só — mesmo sessao_id = mesma sessão física.
+   *  null = encontro de sessão própria (o comum). */
+  sessao_id?: string | null;
   registro?: Registro | null;
   /** Estrela do JOVEM sobre este encontro (0071) — embed to-one no select da
    *  dupla. O RLS decide quem a vê: coord/sup sempre, mentor DPP só quando o
@@ -514,6 +544,200 @@ export type EncontroNota = {
 /** Intenção do mentor pro encontro N (REALIZA-21) — chave (dupla_id, numero)
  *  como a nota: precede o agendamento e segue o nº do guia na remarcação.
  *  Pendente = feito=false; feito_em é carimbo de trigger, nunca do caller. */
+/** Decisão declarada da dupla sobre um recesso do cronograma (REALIZA-462,
+ *  0218): usa=true = os encontros pausam no período (default implícito
+ *  quando não há linha pra esse evento); usa=false = a dupla segue se
+ *  encontrando — o planner pode sugerir datas dentro da janela. Amarrada
+ *  ao ID do evento
+ *  (não à data): se a janela anda no cronograma, a decisão segue junto. */
+export type DuplaRecesso = {
+  id: string;
+  dupla_id: string;
+  ciclo_evento_id: string;
+  usa: boolean;
+  declarado_por: string | null;
+  declarado_em: string;
+  /** Autor da última declaração — só vem no embed da ficha. */
+  autor?: { nome: string; nome_social: string | null } | null;
+};
+
+/** Plano "ficar em dia" persistido (0219): overlay sobre o calendário —
+ *  encontros/ciclo_eventos não mudam; o combinado vive aqui. `contestado`
+ *  é terminal: acordo novo = plano novo (versao+1). */
+export type DuplaPlanoStatus =
+  | "proposto"
+  | "aceito"
+  | "ativo"
+  | "concluido"
+  | "expirado"
+  | "contestado";
+
+/** Escopo gravado no plano: encontros cobertos, ritmo combinado por
+ *  semana, a janela e os passos sugeridos na proposta. */
+export type DuplaPlanoEscopo = {
+  numeros: number[];
+  ritmo?: number;
+  janela?: { inicio: string; fim: string };
+  nivel?:
+    | "ritmo_normal"
+    | "semana_dupla"
+    | "semana_tripla"
+    | "um_por_dia"
+    | "conversa_coord";
+  passos?: {
+    numero: number;
+    data: string;
+    acao: string;
+    /** Nome do encontro no guia (526) — ausente nos planos antigos. */
+    titulo?: string;
+    /** Marca da sessão combinada (018): passos com o mesmo valor foram
+     *  fundidos pela dupla numa sessão só — a plano_aplicar_sessao
+     *  carimba data_hora/duracao/sessao_id do grupo de uma vez. */
+    sessao?: string;
+    /** Duração da sessão combinada em min — 120 (2h) é o padrão. */
+    duracao_min?: number;
+  }[];
+  /** Snapshot das decisões do gesto (518: recessos e grade; 018:
+   *  fusão) — viaja no jsonb do escopo sem DDL. `fusao` registra o
+   *  aceite consciente do aviso de prática (avisa sempre, bloqueia
+   *  nunca). */
+  decisoes?: {
+    recessos?: { cicloEventoId: string; usa: boolean }[];
+    sem_grade?: boolean;
+    ajuste_no_aceite?: boolean;
+    fusao?: {
+      aceita?: boolean;
+      aviso_pratica?: boolean;
+      pares?: number[][];
+    };
+    [k: string]: unknown;
+  };
+};
+
+export type DuplaPlano = {
+  id: string;
+  dupla_id: string;
+  status: DuplaPlanoStatus;
+  escopo: DuplaPlanoEscopo;
+  versao: number;
+  proposto_por: string | null;
+  proposto_via: "app" | "liza";
+  aprovado_por: string | null;
+  aprovado_lado: "mentor" | "mentorado" | null;
+  aprovado_em: string | null;
+  /** Ciência de cada lado (0225 — aceite ÚNICO): um carimbo da dupla já
+   *  põe o plano pra valer; `aprovado_*` grava quem aceitou primeiro. */
+  aceito_mentor_em?: string | null;
+  aceito_mentorado_em?: string | null;
+  contestado_por: string | null;
+  contestado_motivo: string | null;
+  contestado_em: string | null;
+  expira_em: string;
+  concluido_em: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Passos já aplicados (embed da ficha) — data nova combinada por
+   *  encontro, com autoria e motivo. */
+  passos?: DuplaPlanoPasso[];
+  /** Linha do tempo do plano (embed da ficha) — proposto/aceito/
+   *  contestado/passo_aplicado/concluido/expirado. */
+  eventos?: DuplaPlanoEvento[];
+};
+
+export type DuplaPlanoPasso = {
+  id: string;
+  plano_id: string;
+  dupla_id: string;
+  numero: number;
+  encontro_id: string | null;
+  data_anterior: string | null;
+  data_nova: string;
+  motivo: string | null;
+  aplicado_por: string | null;
+  aplicado_via: "app" | "liza";
+  aplicado_em: string;
+};
+
+export type DuplaPlanoEvento = {
+  id: string;
+  plano_id: string;
+  dupla_id: string;
+  tipo:
+    | "proposto"
+    | "aceito"
+    | "contestado"
+    | "passo_aplicado"
+    | "concluido"
+    | "expirado";
+  de: string | null;
+  para: string | null;
+  motivo: string | null;
+  por: string | null;
+  meta: Record<string, unknown>;
+  em: string;
+};
+
+/** Intervenção estruturada sugerida pela Liza (0220) — a saída real é
+ *  humana (chamado ou mensagem); a Liza nunca executa rematch/encerrar. */
+export type DuplaIntervencao = {
+  id: string;
+  dupla_id: string;
+  plano_id: string | null;
+  tipo:
+    | "troca_mentor"
+    | "troca_mentorado"
+    | "pausa"
+    | "dpp_para_esp"
+    | "encerramento";
+  evidencias: unknown[];
+  destino: "auxiliar" | "coordenacao";
+  status: "sugerida" | "encaminhada" | "descartada";
+  saida: "chamado" | "mensagem" | null;
+  chamado_id: string | null;
+  motivo: string | null;
+  sugerida_por: string | null;
+  sugerida_via: "app" | "liza";
+  created_at: string;
+  destinada_em: string | null;
+};
+
+/** Ajuste do guia de um encontro da dupla (0220) — ancora no guia base
+ *  (cada item leva sugestão + justificativa); apagar volta ao guia. */
+export type EncontroGuiaAjuste = {
+  id: string;
+  dupla_id: string;
+  numero: number;
+  ajustes: { sugestao: string; justificativa: string }[];
+  criado_por: string | null;
+  via: "app" | "liza";
+  created_at: string;
+  updated_at: string;
+};
+
+/** Roteiro semanal persistido do plano (0231 — REALIZA-521): montagem
+ *  determinística do corpus + ajustes da dupla, um por (plano, numero,
+ *  versao); o vigente publicado é único por (plano, numero). `substituido`
+ *  segue legível pra trilha. */
+export type DuplaPlanoRoteiro = {
+  id: string;
+  dupla_id: string;
+  plano_id: string;
+  numero: number;
+  versao: number;
+  /** versao do dupla_planos quando o conteúdo foi gerado — divergência
+   *  marca "versão anterior do plano" (o UPDATE da RPC não a recarimba). */
+  plano_versao: number;
+  conteudo: unknown;
+  status: "rascunho" | "publicado" | "substituido";
+  gerado_por: string | null;
+  gerado_via: "app" | "liza" | "job";
+  gerado_em: string;
+  editado_por: string | null;
+  publicado_por: string | null;
+  publicado_em: string | null;
+  updated_at: string;
+};
+
 export type Dupla = {
   id: string;
   /** Label da turma (ex-coluna `ciclo`, renomeada na 0061) — derivada do
@@ -545,7 +769,8 @@ export type Dupla = {
   /** Motivo estruturado ligado ao desfecho (obrigatório quando não é
    *  'concluida'). */
   desfecho_motivo?: string | null;
-  /** Observação livre da coordenação (obrigatória quando 'outro'). */
+  /** Observação livre da coordenação — sempre opcional (a obrigatoriedade
+   *  de 'outro' migrou pro motivo em texto livre, REALIZA-392). */
   desfecho_obs?: string | null;
   /** Quando o desfecho foi registrado. */
   desfecho_em?: string | null;
@@ -559,15 +784,42 @@ export type Dupla = {
   encontros: Encontro[];
   encaminhamentos: Encaminhamento[];
   notas?: EncontroNota[];
+  /** Recessos com decisão declarada (0218/0225) — tri-estado da 518:
+   *  ausência da linha = pendente (a simulação conta conservador como
+   *  "pausa no período" até a dupla responder); usa=true bloqueia a
+   *  janela, usa=false libera datas dentro dela. */
+  recessos?: DuplaRecesso[];
+  /** Planos "ficar em dia" da dupla (0219) — o vivo é único por
+   *  índice parcial (proposto/aceito/ativo); o histórico convive. */
+  planos?: DuplaPlano[];
+  /** Intervenções sugeridas (0220) — visíveis pra staff + mentor. */
+  intervencoes?: DuplaIntervencao[];
+  /** Ajustes de guia por encontro (0220) — jovem fora da policy nesta
+   *  fatia, então o embed não chega a ele. */
+  guia_ajustes?: EncontroGuiaAjuste[];
 };
 
-/** Versão enxuta de Dupla — só os ids de vínculo, sem a árvore de encontros. */
+/** Versão enxuta de Dupla — só os ids de vínculo + turma (a filiação da
+ *  pessoa à turma deriva daqui, REALIZA-39), sem a árvore de encontros.
+ *  Os carimbos de fechamento vêm só no resumo "todas" (fila de espera
+ *  deriva a disponibilidade deles, REALIZA-393); o resumo das vivas não
+ *  os seleciona — por isso opcionais. */
 export type DuplaResumo = {
   id: string;
   mentor_id: string;
   mentorado_id: string;
   supervisor_id: string | null;
   trilha: Trilha;
+  /** selo gravado no pareamento — o rótulo vivo resolve por
+   *  turmaDaDupla(cronograma_id, cronogramas) (REALIZA-223) */
+  turma: string | null;
+  cronograma_id: string | null;
+  status?: string;
+  created_at?: string;
+  encerrada_em?: string | null;
+  concluida_em?: string | null;
+  desfecho_em?: string | null;
+  remanejada_de?: string | null;
 };
 
 export type Material = {
@@ -655,12 +907,23 @@ export type Notificacao = {
     // trilha_prazo → especialista (15d/7d/vencida); trilha_prazo_coord →
     // coordenação no escopo da turma (só vencida)
     | "trilha_prazo"
-    | "trilha_prazo_coord";
+    | "trilha_prazo_coord"
+    // 0225 — plano "ficar em dia": mintados dentro das RPCs definer
+    // (plano_propor/plano_responder), a leitura reescreve a copy do
+    // plano_proposto de membro (ver relerPlanoPropostoDeMembro)
+    | "plano_proposto"
+    | "plano_aceito"
+    | "plano_contestado"
+    // 0219/0220 — lembrete do plano + intervenção sugerida pela Liza
+    | "plano_lembrete"
+    | "plano_intervencao";
   titulo: string;
   corpo: string | null;
   href: string | null;
   lida_em: string | null;
   created_at: string;
+  // profile do autor — a leitura usa pra reconhecer proposta de membro
+  created_by?: string | null;
 };
 
 // ---------- chamados unificados (0084, WP1 telas finais) ----------
@@ -731,6 +994,10 @@ export type ChamadoFilaItem = ChamadoFila & {
   /** Nome do mentorado da dupla vinculada (chamados.dupla_id) — null sem
    *  dupla, quando restrito, ou quando a RLS não entrega a dupla. */
   mentorado_nome: string | null;
+  /** Só o recorte do autor preenche (504): existe atualização pública da
+   *  equipe na trilha — a prova real de "respondeu" (atribuição e status
+   *  não são resposta). Staff e a leitura avulsa deixam undefined. */
+  tem_resposta_equipe?: boolean;
 };
 
 export type ChamadoAtualizacao = {
@@ -801,7 +1068,7 @@ export type SolicitacaoEspecialista = {
   id: string;
   mentorado_id: string;
   /** Dupla DPP de origem — null no pedido que o jovem abre sem dupla DPP
-   *  (entra aguardando_coord; a triagem da coordenação define a turma). */
+   *  (nasce 'aberta' no mural desde a 0158; a turma fica null). */
   dupla_dpp_id: string | null;
   /** O porquê da trilha (gate) — null nos pedidos do jovem (que trazem
    *  `motivo`) e nos pedidos de sessão seguinte de dupla já formada. */
@@ -815,7 +1082,7 @@ export type SolicitacaoEspecialista = {
    *  ('mentor' nasce 'sugerida' e só vira pedido real na confirmação dele,
    *  0086). */
   origem: "staff" | "jovem" | "mentor";
-  /** Turma da sessão — a da dupla DPP ou a definida na triagem. */
+  /** Turma da sessão — a da dupla DPP; null no pedido sem dupla DPP. */
   turma: string | null;
   /** Por que o especialista recusou (0074) — obrigatória na recusa. */
   justificativa_recusa: string | null;
@@ -1115,13 +1382,53 @@ export type Devolutiva = {
   created_at: string;
 };
 
+/** Linha da view `jovem_diretorio` (0239) — o diretório do programa que o
+ *  jovem navega: adultos ativos com papel no programa, TODOS os jovens
+ *  com conta (inclusive menores, com foto — decisão do lead 24/11) e o
+ *  catálogo de especialistas. Contato direto não entra: whatsapp/e-mail
+ *  seguem vindo das views de rede (`jovem_contatos`). Tipo local
+ *  normalizado (o Row gerado é todo nullable). */
+export type JovemDiretorioTipo = "adulto" | "jovem" | "especialista";
+
+export type JovemDiretorioEntry = {
+  id: string;
+  tipo: JovemDiretorioTipo;
+  nome: string;
+  nome_social: string | null;
+  avatar_path: string | null;
+  /** Rótulo de papel que a view projeta — 'mentorado' pros jovens,
+   *  role/app_role pros adultos, 'mentor_especialista' no braço catálogo. */
+  papel: string | null;
+  cidade: string | null;
+  uf: string | null;
+  interesses: string[] | null;
+  areas: string[] | null;
+  bio: string | null;
+  cargo: string | null;
+  empresa: string | null;
+  experiencia_previa: string | null;
+  formacao_externa: string | null;
+  voluntariado: string | null;
+  /** Rótulos "dia + período" da grade — só no braço catálogo. */
+  grade_resumo: string[] | null;
+  vagas: number | null;
+  /** Marca da view — a página ainda repara pela rede resolvida (o
+   *  distinct on (id) prefere a linha de catálogo e perde o true do
+   *  braço adulto; ver lib/jovem-diretorio.ts). */
+  minha_rede: boolean;
+  minha_turma: boolean;
+};
+
 /** A pessoa que /jovem/pessoas/[id] resolve — sempre de uma fonte já
- *  autorizada (contato de dupla/coord, colega da turma ou catálogo de
- *  especialista); cada ramo carrega a projeção segura da view dele. */
+ *  autorizada: primeiro a existência no diretório (senão 404 sem vazar),
+ *  depois o detalhe pela fonte mais rica (contato de dupla/coord →
+ *  colega da turma → catálogo de especialista → projeção pública do
+ *  diretório). Cada ramo carrega a projeção segura da view dele. */
 export type JovemPessoa =
   | { tipo: "contato"; contato: JovemContato }
   | { tipo: "colega"; colega: ColegaTurma }
-  | { tipo: "especialista"; especialista: JovemEspecialista };
+  | { tipo: "especialista"; especialista: JovemEspecialista }
+  | { tipo: "diretorio"; entrada: JovemDiretorioEntry };
 
 /** Projeção da trilha de especialista do mentorado pro mentor DPP — saída da
  *  RPC `trilha_do_jovem` (0092). Visibilidade COMPLETA (decisão out/2026):

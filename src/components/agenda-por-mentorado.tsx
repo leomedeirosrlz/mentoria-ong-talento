@@ -27,12 +27,14 @@ import {
   formatDiaHora,
   formatDiaMes,
   formatDiaSemanaMes,
+  cobertosDaDupla,
   jornadaDaDupla,
   lembreteBloqueadoAte,
   linkSeguro,
   ORDEM_SEMAFORO,
   passoEsp,
   passosDaTrilha,
+  progressoTrilha,
   PROXIMO_PASSO_LABEL,
   rotuloSlot,
   saudadeDaDupla,
@@ -41,6 +43,10 @@ import {
   TRILHA_LEN,
   foraDoPrograma,
 } from "@/lib/ciclo";
+import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+} from "@/lib/dupla-desfecho";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import type {
   CicloEvento,
@@ -48,6 +54,7 @@ import type {
   Dificuldade,
   Dupla,
   Encontro,
+  JovemEspecialista,
   SolicitacaoEspecialista,
   SolicitacaoEspecialistaStatus,
   TrilhaJovem,
@@ -79,7 +86,7 @@ export type AgendaPorMentoradoProps = {
   duplas: Dupla[];
   trilhas: Record<string, TrilhaJovem[]>;
   solicitacoes: Record<string, SolicitacaoEspecialista[]>;
-  especialistas: { id: string; nome: string }[];
+  especialistas: JovemEspecialista[];
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
   /** Último contato por dupla — o "Lembrar o jovem" só conta tipo nudge. */
@@ -135,12 +142,6 @@ export function AgendaPorMentorado({
   agora: agoraMs,
 }: AgendaPorMentoradoProps) {
   const agora = new Date(agoraMs);
-  // o dialog pede areas:string[]|null — a página projeta só {id,nome}; o
-  // select dele já cai no ramo sem áreas quando null
-  const especialistasDialog = especialistas.map((e) => ({
-    ...e,
-    areas: null as string[] | null,
-  }));
 
   const saudePorDupla = new Map(
     duplas.map((d) => [d.id, saudadeDaDupla(d, eventos, agora)])
@@ -191,7 +192,7 @@ export function AgendaPorMentorado({
             saude={saudePorDupla.get(dupla.id)!}
             trilhas={trilhas[dupla.id] ?? []}
             solicitacoes={solicitacoes[dupla.id] ?? []}
-            especialistas={especialistasDialog}
+            especialistas={especialistas}
             eventos={eventos}
             cronogramas={cronogramas}
             nudge={
@@ -238,7 +239,7 @@ function CardMentorado({
   saude: ReturnType<typeof saudadeDaDupla>;
   trilhas: TrilhaJovem[];
   solicitacoes: SolicitacaoEspecialista[];
-  especialistas: { id: string; nome: string; areas: string[] | null }[];
+  especialistas: JovemEspecialista[];
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
   /** Último `interacoes` tipo nudge da dupla — alimenta o cap de 48h. */
@@ -292,16 +293,19 @@ function CardMentorado({
         (a, b) =>
           new Date(a.data_hora!).getTime() - new Date(b.data_hora!).getTime()
       )[0] ?? null;
+  // sessão combinada (018): o coberto já tem conteúdo via âncora — sem o
+  // mapa ele leria como limbo/pendência pra sempre
+  const cobertos = cobertosDaDupla(dupla.encontros);
   const limbo =
     dupla.encontros
-      .filter((e) => limboAberto(e, agoraMs))
+      .filter((e) => limboAberto(e, agoraMs, cobertos))
       .sort((a, b) => a.numero - b.numero)[0] ?? null;
 
   // pendências do MENTOR nesta dupla: registro por entregar — MESMO
   // predicado da Minha agenda (limbo fechado ou realizado >24h sem
   // registro, cobrindo "remarcado" legado) — e combinados com prazo vencido
   const registrosPendentes = dupla.encontros
-    .filter((e) => ehPendenciaRegistro(e, agoraMs))
+    .filter((e) => ehPendenciaRegistro(e, agoraMs, cobertos))
     .sort((a, b) => a.numero - b.numero);
   const combinadosVencidos = dupla.encaminhamentos
     .filter((t) => t.status === "pendente" && t.prazo != null && t.prazo < hoje)
@@ -348,10 +352,14 @@ function CardMentorado({
   const mentoradoFora = foraDoPrograma(dupla.mentorado);
 
   return (
-    <article className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[var(--shadow-border)]">
+    // min-w-0 no article e nos filhos diretos: eles são flex/grid items
+    // cujo min-width:auto resolve pro min-content — sem o piso explícito,
+    // qualquer conteúdo largo (chip com nome comprido, REALIZA-367)
+    // propagava a largura pra cima e esticava o documento inteiro
+    <article className="flex min-w-0 flex-col gap-4 rounded-xl bg-card p-5 shadow-[var(--shadow-border)]">
       {/* header: identidade + saúde da dupla — o texto do semáforo carrega
           o estado (cor nunca é o único canal, PV-2) */}
-      <div className="flex flex-wrap items-start gap-3">
+      <div className="flex min-w-0 flex-wrap items-start gap-3">
         <Avatar
           papel="mentorado"
           nome={nome}
@@ -365,14 +373,19 @@ function CardMentorado({
         <div className="min-w-28 flex-1">
           <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold leading-snug">
             <span className="truncate">{nome}</span>
-            <Badge variant="secondary">{turmaLonga(dupla.turma)}</Badge>
+            {/* rótulo de turma é texto livre — o Badge global é shrink-0 +
+                nowrap, então um label comprido esticaria o documento
+                (REALIZA-367): trunca com a forma íntegra no title */}
+            <Badge
+              variant="secondary"
+              title={turmaLonga(dupla.turma)}
+              className="min-w-0 max-w-full shrink"
+            >
+              <span className="truncate">{turmaLonga(dupla.turma)}</span>
+            </Badge>
             {dupla.status !== "ativa" && (
               <Badge variant="outline" className="text-muted-foreground">
-                {dupla.status === "pausada"
-                  ? "pausada"
-                  : dupla.status === "concluida"
-                    ? "concluída"
-                    : "desistente"}
+                {SITUACAO_DUPLA_LABEL[situacaoDaDupla(dupla)].toLowerCase()}
               </Badge>
             )}
             {mentoradoFora && (
@@ -391,14 +404,13 @@ function CardMentorado({
         <SemaforoBadge nivel={saude.semaforo} motivo={saude.motivo} />
       </div>
 
-      {/* progresso DPP: "encontro N de 16" é o passo corrente; a barra
-          mede o que já aconteceu de verdade (realizados) */}
-      <div>
+      {/* progresso DPP na régua única: "N de M encontros feitos" é a mesma
+          frase da home, da jornada e da ficha (REALIZA-498) — o passo
+          corrente fica no PróximoEncontro logo abaixo */}
+      <div className="min-w-0">
         <div className="flex items-baseline justify-between gap-2 text-sm">
           <p className="font-medium">
-            {jornadaFechada
-              ? `${total} de ${total} encontros`
-              : `Encontro ${alvo.proximoNumero} de ${total}`}
+            {progressoTrilha({ esp: false, feitos, total })}
             <span className="text-muted-foreground">
               {" "}
               · {turmaCurta(dupla.turma)}
@@ -411,12 +423,12 @@ function CardMentorado({
           aria-valuenow={feitos}
           aria-valuemin={0}
           aria-valuemax={total}
-          aria-label={`${feitos} de ${total} encontros realizados`}
+          aria-label={progressoTrilha({ esp: false, feitos, total })}
           className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"
         >
           <div
-            className="h-full rounded-full bg-[var(--ok)] transition-[width]"
-            style={{ width: `${pct}%` }}
+            className="h-full w-full origin-left rounded-full bg-[var(--ok)] transition-transform"
+            style={{ transform: `scaleX(${pct / 100})` }}
           />
         </div>
       </div>
@@ -471,8 +483,12 @@ function CardMentorado({
         <TrilhasAnteriores trilhas={trilhasAnteriores} />
       )}
 
-      {/* pendências acionáveis — deep link direto pro ponto da ficha */}
-      <section aria-label="Pendências da dupla" className="space-y-2">
+      {/* pendências acionáveis — deep link direto pro ponto da ficha.
+          Linhas divididas, sem caixa por item: o warn já mora no ícone */}
+      <section
+        aria-label="Pendências da dupla"
+        className="min-w-0 space-y-2 border-t border-border/60 pt-4"
+      >
         <h4 className="text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Pendências da dupla
         </h4>
@@ -481,13 +497,13 @@ function CardMentorado({
             Nada pendente. A dupla está em dia.
           </p>
         ) : (
-          <ul className="space-y-1.5">
+          <ul className="divide-y divide-border/60">
             {registrosPendentes.map((e) => {
-              const noLimbo = limboAberto(e, agoraMs);
+              const noLimbo = limboAberto(e, agoraMs, cobertos);
               return (
                 <li
                   key={e.id}
-                  className="flex flex-wrap items-center gap-3 rounded-lg bg-[var(--warn)]/8 px-3 py-2.5"
+                  className="flex flex-wrap items-center gap-3 py-2.5"
                 >
                   <Clock
                     size={18}
@@ -526,7 +542,7 @@ function CardMentorado({
             {combinadosVencidos.map((t) => (
               <li
                 key={t.id}
-                className="flex flex-wrap items-center gap-3 rounded-lg bg-[var(--warn)]/8 px-3 py-2.5"
+                className="flex flex-wrap items-center gap-3 py-2.5"
               >
                 <ClipboardText
                   size={18}
@@ -551,7 +567,7 @@ function CardMentorado({
                 mas o fechamento não — a decisão é da coordenação, na ficha
                 da dupla */}
             {encerramentoPendente && (
-              <li className="flex flex-wrap items-center gap-3 rounded-lg bg-[var(--warn)]/8 px-3 py-2.5">
+              <li className="flex flex-wrap items-center gap-3 py-2.5">
                 <FlagCheckered
                   size={18}
                   aria-hidden
@@ -581,7 +597,7 @@ function CardMentorado({
           ficha, que é onde a dupla agenda (o mentor DPP não marca sessão
           de especialista nem recebe CTA dela aqui). O "Lembrar" (D5) é o
           canal leve com o jovem — notificação + WhatsApp, nunca cobrança */}
-      <div className="mt-auto flex flex-wrap gap-2 border-t border-border/60 pt-4">
+      <div className="mt-auto flex min-w-0 flex-wrap gap-2 border-t border-border/60 pt-4">
         <Link
           href={`/duplas/${dupla.id}`}
           className={buttonVariants({ variant: "outline", size: "sm" })}
@@ -649,10 +665,10 @@ function ProximoEncontro({
     titulo = "Dupla pausada · encontros congelados por ora";
   } else if (dupla.status === "concluida") {
     titulo = "Jornada concluída";
-    detalhe = `${feitos} de ${total} encontros realizados`;
+    detalhe = progressoTrilha({ esp: false, feitos, total });
   } else if (dupla.status === "encerrada") {
     titulo = "Dupla encerrada";
-    detalhe = `${feitos} de ${total} encontros realizados`;
+    detalhe = progressoTrilha({ esp: false, feitos, total });
   } else if (limbo) {
     // limbo é honesto: a plataforma não sabe se rolou — então pergunta, e
     // cada resposta tem a sua saída: aconteceu → registra (o deep link já
@@ -707,7 +723,7 @@ function ProximoEncontro({
         .join(" · ") || null;
   } else if (jornadaCompleta || alvo.cicloCompleto) {
     titulo = "Jornada completa";
-    detalhe = `${feitos} de ${total} encontros realizados`;
+    detalhe = progressoTrilha({ esp: false, feitos, total });
   } else {
     // ninguém agendou — a sugestão é a data oficial do PDF; quem marca é a
     // dupla na ficha, nunca este card (por isso texto, não botão)
@@ -720,7 +736,7 @@ function ProximoEncontro({
   }
 
   return (
-    <div className="flex items-start gap-3 rounded-lg bg-muted/50 px-4 py-3 shadow-[var(--shadow-inset)]">
+    <div className="flex min-w-0 items-start gap-3 border-t border-border/60 pt-4">
       <CalendarDots
         size={20}
         aria-hidden
@@ -783,7 +799,7 @@ function TrilhaBlock({
   return (
     <section
       aria-label={`Trilha de especialista · ${nomeEsp}`}
-      className="space-y-3 rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 p-4"
+      className="min-w-0 space-y-3 border-t border-border/60 pt-4"
     >
       {/* flex-wrap + piso de largura no texto: a 390px o selo dividia a
           linha e espremia a explicação numa coluna de duas palavras */}
@@ -794,16 +810,14 @@ function TrilhaBlock({
           className="mt-0.5 shrink-0 text-[var(--warn-text)]"
         />
         <div className="min-w-[min(100%,12rem)] flex-1">
-          <p className="text-sm font-semibold">Você acompanha, não participa</p>
-          <p className="text-xs text-muted-foreground">
-            Trilha com {nomeEsp}
-            {trilha.demanda && (
-              <>
-                {" · "}
-                <span className="italic">{trilha.demanda}</span>
-              </>
-            )}
+          <p className="text-sm font-semibold">
+            Trilha especialista · {nomeEsp}
           </p>
+          {trilha.demanda && (
+            <p className="text-xs italic text-muted-foreground">
+              {trilha.demanda}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
           <TrilhaPrazoBadge
@@ -817,9 +831,7 @@ function TrilhaBlock({
             variant="outline"
             className="border-[var(--warn)]/60 text-[var(--warn-text)]"
           >
-            {feitos >= totalEsp
-              ? "5 de 5 sessões"
-              : `sessão ${passoAtual} de ${totalEsp}`}
+            {progressoTrilha({ esp: true, feitos, total: totalEsp })}
           </Badge>
           {trilha.status === "pausada" && (
             <Badge variant="outline" className="text-muted-foreground">
@@ -1092,7 +1104,7 @@ function RegistroSessao({ registro }: { registro: TrilhaJovemRegistro }) {
           <Paperclip size={13} aria-hidden />
           {registro.anexos.length}{" "}
           {registro.anexos.length === 1 ? "anexo" : "anexos"}
-          <span className="min-w-0">
+          <span className="min-w-0 break-words">
             · {registro.anexos.map((a) => a.nome).join(", ")}
           </span>
         </p>
@@ -1108,7 +1120,7 @@ function RegistroSessao({ registro }: { registro: TrilhaJovemRegistro }) {
 
 function TrilhasAnteriores({ trilhas }: { trilhas: TrilhaJovem[] }) {
   return (
-    <details className="group/hist rounded-lg border border-border/70 bg-muted/30 px-4 py-2.5">
+    <details className="group/hist min-w-0 rounded-lg border border-border/70 bg-muted/30 px-4 py-2.5">
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9 [&::-webkit-details-marker]:hidden">
         <CaretDown
           size={13}
@@ -1134,11 +1146,19 @@ function TrilhasAnteriores({ trilhas }: { trilhas: TrilhaJovem[] }) {
                 )}
               </p>
               <p className="text-xs text-muted-foreground">
-                {feitas} de {TRILHA_LEN.especialista} sessões
+                {progressoTrilha({
+                  esp: true,
+                  feitos: feitas,
+                  total: TRILHA_LEN.especialista,
+                })}
                 {t.iniciada_em && ` · iniciada ${formatDate(t.iniciada_em)}`}
+                {/* a RPC trilha_do_jovem não traz desfecho — sem ela a
+                    regra canônica não separa desistente × encerrada, e o
+                    fechamento da trilha esp é rito formal: "encerrada" é
+                    a palavra neutra que não acusa desistência */}
                 {t.encerrada_em &&
                   ` · ${
-                    t.status === "concluida" ? "concluída" : "desistente"
+                    t.status === "concluida" ? "concluída" : "encerrada"
                   } ${formatDate(t.encerrada_em)}`}
                 {t.motivo_encerramento && ` · ${t.motivo_encerramento}`}
               </p>
@@ -1158,6 +1178,18 @@ function TrilhasAnteriores({ trilhas }: { trilhas: TrilhaJovem[] }) {
 // ---------- pedido em voo (sem trilha ainda) ----------
 
 const PASSOS_PEDIDO = ["Pedido", "Mural", "Aceite", "Trilha"] as const;
+
+/** Título curto do pedido em voo — diz onde a bola está sem repetir a
+ *  legenda inteira do stepper (que fala por fase, não por estado). */
+const STATUS_PEDIDO_CURTO: Partial<
+  Record<SolicitacaoEspecialistaStatus, string>
+> = {
+  sugerida: "aguardando o jovem",
+  aberta: "aguardando aceite",
+  aguardando_coord: "aguardando aceite",
+  contra_proposta: "negociando horário",
+  aceita: "trilha nascendo",
+};
 
 function PedidoEspecialistaBlock({
   solicitacao,
@@ -1238,7 +1270,7 @@ function PedidoEspecialistaBlock({
   return (
     <section
       aria-label="Pedido de especialista em andamento"
-      className="space-y-3 rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 p-4"
+      className="min-w-0 space-y-3 border-t border-border/60 pt-4"
     >
       {/* flex-wrap + piso de largura no texto: a 390px o selo dividia a
           linha e espremia a explicação numa coluna de duas palavras */}
@@ -1249,7 +1281,9 @@ function PedidoEspecialistaBlock({
           className="mt-0.5 shrink-0 text-[var(--warn-text)]"
         />
         <div className="min-w-[min(100%,12rem)] flex-1">
-          <p className="text-sm font-semibold">Você acompanha, não participa</p>
+          <p className="text-sm font-semibold">
+            Pedido de especialista · {STATUS_PEDIDO_CURTO[efetivo] ?? efetivo}
+          </p>
           <p className="text-xs text-muted-foreground">
             {primeiroNome} ainda <b>não tem trilha</b>
             {tema && (
@@ -1317,14 +1351,14 @@ function SemTrilhaBlock({
   tinhaHistorico,
 }: {
   dupla: Dupla;
-  especialistas: { id: string; nome: string; areas: string[] | null }[];
+  especialistas: JovemEspecialista[];
   primeiroNome: string;
   tinhaHistorico: boolean;
 }) {
   return (
     <section
       aria-label="Trilha de especialista"
-      className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3"
+      className="flex min-w-0 flex-wrap items-center gap-3 border-t border-border/60 pt-4"
     >
       <Sparkle
         size={18}
@@ -1432,7 +1466,7 @@ function PedidosAnterioresLine({
 }) {
   const visiveis = solicitacoes.slice(0, 2);
   return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+    <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
       Pedido{solicitacoes.length > 1 ? "s" : ""} anterior
       {solicitacoes.length > 1 ? "es" : ""}:
       {visiveis.map((s) => (

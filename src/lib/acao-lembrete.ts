@@ -1,4 +1,4 @@
-import { lembreteBloqueadoAte, type DuplaSaude } from "@/lib/ciclo";
+import { cobertosDaDupla, encontroTemConteudo, lembreteBloqueadoAte, type DuplaSaude } from "@/lib/ciclo";
 import { limboFechado } from "@/lib/agenda-minha";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Dupla, Encontro } from "@/lib/types";
@@ -14,12 +14,15 @@ import type { DestinatariosWA, NudgeWA } from "@/components/dupla-wa-acao";
  *  mesma régua `limboFechado` da agenda: enquanto a chamada rola o
  *  encontro ainda não é cobrança. É o destino do "Registrar encontro N". */
 export function encontroPendente(d: Dupla, hoje: Date): Encontro | undefined {
+  // sessão combinada (018): o coberto já tem conteúdo via âncora — sem o
+  // mapa o lembrete cobraria "Registrar encontro N" de um passo entregue
+  const cobertos = cobertosDaDupla(d.encontros);
   return [...d.encontros]
     .sort((a, b) => a.numero - b.numero)
     .find(
       (e) =>
-        !e.registro &&
-        (e.status === "realizado" || limboFechado(e, hoje.getTime()))
+        !encontroTemConteudo(e, cobertos) &&
+        (e.status === "realizado" || limboFechado(e, hoje.getTime(), cobertos))
     );
 }
 
@@ -58,7 +61,8 @@ function casoLembrete(
 
 /** Props do DuplaWaAcao pra linha de dupla. "Lembrar" quando há pendência
  *  apontável em dupla ativa (notificação + wa.me, cap de 48h); "Chamar" nas
- *  demais. Pendência operacional vai pro mentor (a operação é dever dele: o
+ *  demais — o wa.me é capado igual (o clique loga nudge). Pendência
+ *  operacional vai pro mentor (a operação é dever dele: o
  *  mentorado nunca é cobrado por agendar ou registrar); o pedido de apoio do
  *  JOVEM troca a ponta inteira e fala com ele. */
 export function acaoWhatsAppDupla({
@@ -87,6 +91,10 @@ export function acaoWhatsAppDupla({
   telefone: string | null | undefined;
   mensagem: string;
   nudge: NudgeWA | undefined;
+  /** `lembreteBloqueadoAte(ultimoNudge)` — chega solto porque o "Chamar"
+   *  (contato livre, sem nudge) também loga nudge e entra no cap de 48h:
+   *  sem pendência o `nudge.bloqueadoAte` nem existiria. */
+  bloqueadoAte: Date | null;
   /** As duas pontas com texto próprio — o preview do DuplaWaAcao vira
    *  seletor "Quem recebe". A ponta default é a mesma de `mensagem`. */
   destinatarios: DestinatariosWA;
@@ -95,6 +103,7 @@ export function acaoWhatsAppDupla({
     saude.apoio.aberto &&
     (saude.apoio.origem === "mentorado" || saude.apoio.origem === "ambos");
   const nomeMentorado = dupla.mentorado.nome_social || dupla.mentorado.nome;
+  const nomeMentor = dupla.mentor.nome_social || dupla.mentor.nome;
   // apoio aberto é pendência apontável (trabalho a fazer, não falha da dupla)
   const temPendencia =
     dupla.status === "ativa" && (saude.sinais.length > 0 || saude.apoio.aberto);
@@ -111,7 +120,7 @@ export function acaoWhatsAppDupla({
   const livres = msgsContato(
     {
       eu: meuNome,
-      mentorNome: dupla.mentor.nome.split(" ")[0],
+      mentorNome: nomeMentor.split(" ")[0],
       mentoradoNome: nomeMentorado,
     },
     // sem caso: o fecho neutro "Como estão as coisas?" (contato livre)
@@ -126,6 +135,7 @@ export function acaoWhatsAppDupla({
     : (livres.mentorado ?? "");
   const mensagem = apoioJovem ? msgMentorado : msgMentor;
 
+  const capAte = lembreteBloqueadoAte(ultimoNudge, hoje);
   const nudge: NudgeWA | undefined = temPendencia
     ? {
         destino: apoioJovem ? "mentorado" : "mentor",
@@ -137,20 +147,21 @@ export function acaoWhatsAppDupla({
             : `/duplas/${dupla.id}`,
         // responder um pedido do jovem é "Chamar", nunca cobrança
         rotulo: apoioJovem ? "Chamar" : undefined,
-        bloqueadoAte: lembreteBloqueadoAte(ultimoNudge, hoje),
+        bloqueadoAte: capAte,
       }
     : undefined;
 
   return {
     duplaId: dupla.id,
-    destNome: apoioJovem ? nomeMentorado : dupla.mentor.nome,
+    destNome: apoioJovem ? nomeMentorado : nomeMentor,
     telefone: apoioJovem ? dupla.mentorado.whatsapp : dupla.mentor.whatsapp,
     mensagem,
     nudge,
+    bloqueadoAte: capAte,
     destinatarios: {
       padrao: apoioJovem ? "mentorado" : "mentor",
       mentor: {
-        nome: dupla.mentor.nome,
+        nome: nomeMentor,
         telefone: dupla.mentor.whatsapp,
         mensagem: msgMentor,
       },

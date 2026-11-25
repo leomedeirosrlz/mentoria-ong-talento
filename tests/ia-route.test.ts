@@ -66,6 +66,18 @@ function queryFake() {
   return q;
 }
 
+/** queryFake com linhas — pra servir uma ia_config específica (ex.:
+ *  roteamento desligado). */
+function queryComData(data: unknown[]) {
+  const q = {
+    select: () => q,
+    eq: () => q,
+    then: (res: (v: unknown) => unknown) =>
+      Promise.resolve({ data, error: null }).then(res),
+  };
+  return q;
+}
+
 const CTX_OK = {
   status: "ok",
   profileId: "prof-1",
@@ -122,6 +134,10 @@ const chamadasStream = () =>
     onToken: (t: string) => void;
     signal: AbortSignal;
     clienteAbortou: () => boolean;
+    modelo?: string;
+    esforco?: string;
+    fallbacks?: string[];
+    papeis?: string[];
   }][];
 
 describe("gates — JSON antes do stream abrir", () => {
@@ -401,6 +417,69 @@ describe("stream SSE", () => {
     });
   });
 
+  it("escrita em prévia emite o card de confirmação e SANITIZA o tool-result (REALIZA-126)", async () => {
+    // o envelope sai da executarTool completo (confirmacao_id incluso) —
+    // a rota é quem o divide: o id vai só pro UiBloco do card (a via de
+    // approve é POST /api/ia/confirmacao) e o histórico do modelo recebe
+    // o marcador sem id. Com o id na mão a tool se auto-aprovaria.
+    m.executarTool.mockResolvedValue({
+      ok: true,
+      dados: {
+        pendente_confirmacao: {
+          confirmacao_id: "conf-secreto-1",
+          tool: "agendar_encontro",
+          args: { dupla_id: "d-1", numero: 6 },
+          resumo: "Agendar o 6º encontro da dupla em 2099-01-05",
+          expira_em_minutos: 10,
+          instrucao: "Nada foi alterado ainda.",
+        },
+      },
+    });
+    m.chamarModeloStream
+      .mockResolvedValueOnce({
+        ok: true,
+        content: "",
+        toolCalls: [
+          {
+            id: "call_w",
+            type: "function",
+            function: { name: "agendar_encontro", arguments: "{}" },
+          },
+        ],
+      })
+      .mockImplementationOnce(
+        async (_msgs: MsgChat[], _s: string, opts: { onToken: (t: string) => void }) => {
+          opts.onToken("Confirma no card.");
+          return { ok: true, content: "Confirma no card.", toolCalls: [] };
+        }
+      );
+
+    const texto = await lerStream(await POST(req()));
+
+    // o card chega pelo evento ui ANTES da resposta do modelo — com o
+    // request_id da reserva pra correlação prévia×execução no card→endpoint
+    expect(texto).toContain(
+      'data: {"type":"ui","b":{"kind":"confirmacao","confirmacao_id":"conf-secreto-1"'
+    );
+    expect(texto).toContain('"resumo":"Agendar o 6º encontro da dupla em 2099-01-05"');
+    expect(texto).toContain('"request_id":"req-teste"');
+
+    // e o que volta ao modelo NÃO carrega o id — é a garantia de que a
+    // tool não se auto-aprova mesmo que o modelo tente re-chamar
+    const hist2 = chamadasStream()[1][0];
+    const toolMsg = hist2.find((x) => x.role === "tool");
+    expect(toolMsg).toMatchObject({ name: "agendar_encontro" });
+    expect(String(toolMsg?.content)).not.toContain("confirmacao_id");
+    expect(String(toolMsg?.content)).not.toContain("conf-secreto-1");
+    expect(JSON.parse(String(toolMsg?.content))).toEqual({
+      ok: true,
+      dados: {
+        status: "aguardando_confirmacao_humana",
+        resumo: "Agendar o 6º encontro da dupla em 2099-01-05",
+      },
+    });
+  });
+
   it("papeis vazio cai no papel do profile", async () => {
     m.contextoELimiteIa.mockResolvedValue({
       ...CTX_OK,
@@ -516,5 +595,267 @@ describe("stream SSE", () => {
     expect(res.status).toBe(200); // o stream já abriu — o erro é evento
     const texto = await lerStream(res);
     expect(texto).toContain('data: {"type":"error","e":"caiu geral"}');
+  });
+
+  it("falha marcada dormindo chega no evento error (REALIZA-363)", async () => {
+    m.chamarModeloStream.mockResolvedValue({
+      ok: false,
+      erro: "quota esgotada",
+      dormindo: true,
+    });
+    const res = await POST(req());
+    const texto = await lerStream(res);
+    expect(texto).toContain(
+      'data: {"type":"error","e":"quota esgotada","dormindo":true}'
+    );
+  });
+
+  it("dormindo viaja pelo fallback JSON também — é o resultado que falha", async () => {
+    m.chamarModeloStream.mockResolvedValue({
+      ok: false,
+      erro: "provider recusou stream",
+      fallback: true,
+      dormindo: true,
+    });
+    m.chamarModelo.mockResolvedValue({
+      ok: false,
+      erro: "quota esgotada",
+      dormindo: true,
+    });
+    const res = await POST(req());
+    const texto = await lerStream(res);
+    expect(texto).toContain(
+      'data: {"type":"error","e":"quota esgotada","dormindo":true}'
+    );
+  });
+
+  it("erro não-dormindo não leva a flag — erro real segue genérico", async () => {
+    m.chamarModeloStream.mockResolvedValue({
+      ok: false,
+      erro: "payload inválido",
+      fallback: true,
+    });
+    m.chamarModelo.mockResolvedValue({
+      ok: false,
+      erro: "payload inválido",
+    });
+    const res = await POST(req());
+    const texto = await lerStream(res);
+    expect(texto).toContain('data: {"type":"error","e":"payload inválido"}');
+    expect(texto).not.toContain("dormindo");
+  });
+});
+
+describe("roteador — papel × tarefa e auditoria (REALIZA-299)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.stubEnv("IA_BOLHA", "1");
+    vi.stubEnv("IA_MODEL", "base-env");
+    vi.stubEnv("IA_MODEL_LEVE", "leve-env");
+    vi.stubEnv("IA_MODEL_MEDIO", "medio-env");
+    vi.stubEnv("IA_MODEL_FORTE", "forte-env");
+    autenticado();
+    m.chamarModeloStream.mockResolvedValue({
+      ok: true,
+      content: "ok",
+      toolCalls: [],
+    });
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  const MSG_ANALISE = "analise as duplas em risco e me dê um diagnóstico";
+
+  it("o evento 'resposta' grava args.roteador {tier, tarefa, papel} coerente com a pergunta", async () => {
+    await lerStream(await POST(req()));
+    const evs = chamadasLote()[0][1].p_eventos;
+    const resposta = evs.find((e) => e.tool === "resposta")!;
+    expect(resposta.tier).toBe("rapido");
+    expect(resposta.args).toMatchObject({
+      roteador: { tier: "rapido", tarefa: "saudacao", papel: "coordenacao" },
+    });
+  });
+
+  it("coord com pedido analítico cai no forte — modelo vem do env do tier", async () => {
+    await lerStream(
+      await POST(req({ messages: [{ role: "user", content: MSG_ANALISE }] }))
+    );
+    expect(chamadasStream()[0][2].modelo).toBe("forte-env");
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    expect(resposta.tier).toBe("forte");
+    expect(resposta.args).toMatchObject({
+      roteador: { tier: "forte", tarefa: "analise", papel: "coordenacao" },
+    });
+    // o forte sempre carrega o médio como último degrau da cadeia
+    expect(chamadasStream()[0][2].fallbacks).toEqual(["medio-env"]);
+  });
+
+  it("mentor com o MESMO pedido analítico capa no balanceado", async () => {
+    m.contextoELimiteIa.mockResolvedValue({
+      ...CTX_OK,
+      role: "mentor_dpp",
+      papeis: ["mentor_dpp"],
+    });
+    await lerStream(
+      await POST(req({ messages: [{ role: "user", content: MSG_ANALISE }] }))
+    );
+    expect(chamadasStream()[0][2].modelo).toBe("medio-env");
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    expect(resposta.tier).toBe("balanceado");
+    expect(resposta.args).toMatchObject({
+      roteador: { tier: "balanceado", tarefa: "analise", papel: "mentor_dpp" },
+    });
+  });
+
+  it("tier rapido sai sem tools anunciadas; balanceado leva os papéis", async () => {
+    await lerStream(await POST(req())); // "oi" → rapido
+    expect(chamadasStream()[0][2].papeis).toEqual([]);
+
+    m.chamarModeloStream.mockClear();
+    await lerStream(
+      await POST(
+        req({ messages: [{ role: "user", content: "como está minha dupla?" }] })
+      )
+    );
+    expect(chamadasStream()[0][2].papeis).toEqual(["coordenacao"]);
+  });
+
+  // REALIZA-465: pergunta curta de insight não é saudação. Antes ela caía
+  // no rapido, o payload saía com papeis: [] e o modelo respondia "não
+  // tenho acesso" com os dados existindo.
+  it("insight curto cai no balanceado com os papéis e as tools", async () => {
+    const casos = [
+      "e a adesão",
+      "e a saúde",
+      "e a adoção",
+      "qual o indicador de adesão?",
+    ];
+    for (const pergunta of casos) {
+      m.chamarModeloStream.mockClear();
+      await lerStream(
+        await POST(req({ messages: [{ role: "user", content: pergunta }] }))
+      );
+      expect(chamadasStream()[0][2].papeis).toEqual(["coordenacao"]);
+      const resposta = chamadasLote().at(-1)![1].p_eventos.find(
+        (e) => e.tool === "resposta"
+      )!;
+      expect(resposta.tier).toBe("balanceado");
+      expect(resposta.args).toMatchObject({
+        roteador: { tier: "balanceado", papel: "coordenacao" },
+      });
+    }
+  });
+
+  it("follow-up curto depois de resposta mantém o tier com tools", async () => {
+    await lerStream(
+      await POST(
+        req({
+          messages: [
+            { role: "user", content: "como estão as duplas?" },
+            { role: "assistant", content: "Duas em atenção e uma em risco." },
+            { role: "user", content: "e a adesão" },
+          ],
+        })
+      )
+    );
+    expect(chamadasStream()[0][2].papeis).toEqual(["coordenacao"]);
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    expect(resposta.tier).toBe("balanceado");
+    expect(resposta.args).toMatchObject({
+      roteador: { tier: "balanceado", tarefa: "sintese", papel: "coordenacao" },
+    });
+  });
+
+  it("saudação pura no meio do papo continua rapido, sem tools", async () => {
+    await lerStream(
+      await POST(
+        req({
+          messages: [
+            { role: "user", content: "como estão as duplas?" },
+            { role: "assistant", content: "Duas em atenção e uma em risco." },
+            { role: "user", content: "obrigado!" },
+          ],
+        })
+      )
+    );
+    expect(chamadasStream()[0][2].papeis).toEqual([]);
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    expect(resposta.tier).toBe("rapido");
+  });
+
+  it("roteamento desligado na config cai no balanceado pra todos", async () => {
+    m.from.mockImplementation(() =>
+      queryComData([{ chave: "roteamento", valor: false }])
+    );
+    await lerStream(
+      await POST(req({ messages: [{ role: "user", content: MSG_ANALISE }] }))
+    );
+    expect(chamadasStream()[0][2].modelo).toBe("medio-env");
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    expect(resposta.tier).toBe("balanceado");
+  });
+});
+
+describe("origem 'pill' no Body (spec 026, FR-014)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.stubEnv("IA_BOLHA", "1");
+    autenticado();
+    m.chamarModeloStream.mockResolvedValue({
+      ok: true,
+      content: "ok",
+      toolCalls: [],
+    });
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("origem:'pill' passa no strict e sai no args do evento 'resposta'", async () => {
+    await lerStream(
+      await POST(
+        req({
+          messages: [{ role: "user", content: "Quem está em risco?" }],
+          origem: "pill",
+        })
+      )
+    );
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    expect(resposta.args).toMatchObject({ origem: "pill" });
+    // e nunca vira prompt: o histórico do modelo leva só a pergunta
+    const hist = chamadasStream()[0][0];
+    expect(JSON.stringify(hist)).not.toContain("pill");
+  });
+
+  it("outro valor de origem é rejeitado pelo strict", async () => {
+    const res = await POST(
+      req({
+        messages: [{ role: "user", content: "oi" }],
+        origem: "digitado",
+      })
+    );
+    expect(res.status).toBe(400);
+    // malformado não gasta slot nem telemetria
+    expect(m.contextoELimiteIa).not.toHaveBeenCalled();
+    expect(m.rpc).not.toHaveBeenCalled();
+  });
+
+  it("sem origem o args do 'resposta' não carrega a chave", async () => {
+    await lerStream(await POST(req()));
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    // o envio digitado não suja o jsonb com "origem": null — a chave só
+    // existe quando a pill mandou
+    expect(resposta.args).not.toHaveProperty("origem");
   });
 });

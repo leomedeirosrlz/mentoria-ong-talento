@@ -13,7 +13,8 @@ export default defineConfig({
     environment: "node",
     env: { TZ: "America/Sao_Paulo" },
     // tests/ é a casa histórica; src/**/*.test.ts cobre specs colocadas
-    // junto do domínio (ex.: src/lib/jornada.test.ts do WP7)
-    include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
+    // junto do domínio (ex.: src/lib/jornada.test.ts do WP7). .tsx pra
+    // testes de componente (jsdom por arquivo via pragma)
+    include: ["tests/**/*.test.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
   },
 });

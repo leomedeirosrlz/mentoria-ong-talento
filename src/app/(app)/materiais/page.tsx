@@ -1,15 +1,24 @@
 import type { Metadata } from "next";
-import { audienciasDe, veMaterial } from "@/lib/materiais";
+import {
+  audienciasDe,
+  enriquecerMateriaisPorEncontro,
+  veMaterial,
+} from "@/lib/materiais";
 import Link from "next/link";
 import {
   getCicloEventos,
+  getDupla,
   getDuplasInfo,
   getMateriais,
+  getMateriaisLidos,
   getMe,
   getPainelInstrumentosJornada,
 } from "@/lib/queries";
+import { getInstrumentosDaDupla } from "@/lib/forms/queries";
+import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import {
+  avaliacaoCobreNumero,
   eventoDaSemana,
   eventosDoCronograma,
   maxNumeroEncontro,
@@ -42,13 +51,14 @@ export const metadata: Metadata = { title: "Materiais de apoio" };
 export default async function MateriaisPage({
   searchParams,
 }: {
-  searchParams: Promise<{ aba?: string }>;
+  searchParams: Promise<{ aba?: string; dupla?: string }>;
 }) {
-  const { aba: abaParam } = await searchParams;
-  const [materiais, me, eventos] = await Promise.all([
+  const { aba: abaParam, dupla: duplaParam } = await searchParams;
+  const [materiais, me, eventos, lidos] = await Promise.all([
     getMateriais(),
     getMe(),
     getCicloEventos(),
+    getMateriaisLidos(),
   ]);
 
   // coordenação por papel (não só o primário): o híbrido supervisor+coord
@@ -151,8 +161,20 @@ export default async function MateriaisPage({
         .map((d) => ({
           id: d.id,
           jovemNome: d.mentorado.nome_social || d.mentorado.nome,
+          pausada: d.status === "pausada",
         }))
     : [];
+
+  // mentorado em foco (REALIZA-440 + 512): o seletor da régua escreve
+  // ?dupla=; com 2+ duplas o param ausente/inválido cai no "Todas" — os
+  // cards leem o catálogo até a pessoa escolher um nome. Com uma dupla só
+  // não há o que escolher (o seletor some) e a régua já é a dela.
+  // O fetch por dupla só roda com a aba Instrumentos aberta — na
+  // Biblioteca (o default do mentor) é desperdício
+  const duplaSelecionada =
+    fichasMentor.length > 1
+      ? fichasMentor.find((f) => f.id === duplaParam)?.id ?? null
+      : fichasMentor[0]?.id ?? null;
 
   // biblioteca do mentor/especialista (rodada dores-ux-2026-10): estrutura
   // própria, sem cobertura/filtros/selo de público — o encontro da semana
@@ -224,21 +246,65 @@ export default async function MateriaisPage({
     }
   }
 
-  // duas abas: Instrumentos (staff abre aqui — o estado da coorte e a fila
-  // de atrasados moram nos cards) e Biblioteca. A antiga aba Jornada saiu:
-  // o retrato fino por dupla é da ficha. Mentor e especialista abrem na
-  // Biblioteca (o acervo é o que eles mais usam)
+  // REALIZA-394 — o encontro da semana do mentor herda o kit do guia:
+  // roteiro, docs dos instrumentos na janela e técnicas nomeadas pelo
+  // evento — mesmo quando a linha do catálogo é transversal. Só na trilha
+  // DPP: especialista sem cronograma (turmas vazia) segue com o catálogo.
+  const porEncontroMentor =
+    ehMentor && turmasMentor.length > 0
+      ? enriquecerMateriaisPorEncontro(new Map(porEncontro), eventos)
+      : porEncontro;
+
+  // duas abas: Biblioteca (o acervo é o que mentor/especialista mais
+  // usam — primeiro item, REALIZA-440) e Instrumentos (o staff abre
+  // aqui — o estado da coorte e a fila de atrasados moram nos cards).
+  // A antiga aba Jornada saiu: o retrato fino por dupla é da ficha.
   const abas: AbaMaterialItem[] = [
+    { id: "biblioteca" as const, rotulo: "Biblioteca" },
     ...(veInstrumentos
       ? [{ id: "instrumentos" as const, rotulo: "Instrumentos" }]
       : []),
-    { id: "biblioteca" as const, rotulo: "Biblioteca" },
   ];
   const padrao: AbaMateriais =
     painel.length > 0 && veInstrumentos ? "instrumentos" : "biblioteca";
   const ativa: AbaMateriais = abas.some((a) => a.id === abaParam)
     ? (abaParam as AbaMateriais)
     : padrao;
+
+  const [instrumentosSelecionada, duplaSelecionadaFull, terceirosSelecionada] =
+    ativa === "instrumentos" && duplaSelecionada
+      ? await Promise.all([
+          getInstrumentosDaDupla(duplaSelecionada),
+          getDupla(duplaSelecionada),
+          // 449/463 — o 9º card conta respostas × indicações da dupla em
+          // foco direto dos contatos (não é entrega de formulário)
+          getTerceirosDaDupla(duplaSelecionada).then((t) => ({
+            respondidos: t.contatos.filter((c) => c.status === "respondido")
+              .length,
+            total: t.contatos.length,
+          })),
+        ])
+      : [[], null, null];
+  // a avaliação do encontro é recorrente: a contagem é avaliações feitas
+  // × encontros realizados daquela dupla (a mesma conta da linha da
+  // página por instrumento)
+  const avaliacoesSelecionada = duplaSelecionadaFull
+    ? {
+        // sessão combinada (018/0228): a avaliação do jovem é uma por
+        // sessão, na âncora — `cobertura` dela traz todos os números, e o
+        // coberto conta como avaliado
+        feitas: duplaSelecionadaFull.encontros.filter(
+          (e) =>
+            e.status === "realizado" &&
+            duplaSelecionadaFull.encontros.some((x) =>
+              avaliacaoCobreNumero(x.avaliacao_jovem, e)
+            )
+        ).length,
+        realizados: duplaSelecionadaFull.encontros.filter(
+          (e) => e.status === "realizado"
+        ).length,
+      }
+    : null;
 
   return (
     <div className="space-y-6">
@@ -267,6 +333,10 @@ export default async function MateriaisPage({
             duplasInfo={duplasInfo}
             envioLiberado={EMAIL_ENVIO_LIBERADO}
             fichasMentor={fichasMentor}
+            duplaSelecionada={duplaSelecionada}
+            instrumentosSelecionada={instrumentosSelecionada}
+            avaliacoesSelecionada={avaliacoesSelecionada}
+            terceirosSelecionada={terceirosSelecionada}
             nudges={nudges}
             meuNome={me?.nome_social || me?.nome || ""}
           />
@@ -304,12 +374,13 @@ export default async function MateriaisPage({
              (sem cronograma) lê a lista plana */
           <MateriaisMentorBiblioteca
             turmas={turmasMentor}
-            porEncontro={porEncontro}
+            porEncontro={porEncontroMentor}
             referenciais={
               turmasMentor.length > 0
                 ? transversais.flatMap((g) => g.itens)
                 : visiveis
             }
+            lidos={lidos}
           />
         ) : (
           /* staff: a biblioteca inteira agrupada por categoria
@@ -319,6 +390,7 @@ export default async function MateriaisPage({
             materiais={visiveis}
             ehCoord={ehCoord}
             maxEncontro={maxEncontro}
+            lidos={lidos}
           />
         )}
       </MateriaisAbas>

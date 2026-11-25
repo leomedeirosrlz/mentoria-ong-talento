@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import {
   appEnvOk,
   atualizarViaServiceRole,
@@ -5,8 +6,10 @@ import {
   convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
+  jwtDoUsuario,
   limparViaServiceRole,
   loginComSenha,
+  restComoUsuario,
   test,
 } from "../helpers";
 
@@ -37,12 +40,10 @@ const IDS = {
   encontroFixture: "e2e00000-0000-4000-8000-0000000000d2",
 } as const;
 const NUMERO_FIXTURE = 16;
-// números reservados aos encontros que os testes criam: os baixos (≤ a
+// números que os testes usam pros encontros que criam: os baixos (≤ a
 // semana corrente do ciclo) pra quando a linha do encontro precisa render
 // fora do <details> da ficha, os altos pra quando só a pendência importa.
 // O 8 é a fixture de encontro futuro do jovem; o 16 é a fixture daqui.
-const POOL_NUMEROS = [1, 2, 3, 4, 5, 11, 12, 13, 14, 15];
-
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
 // ids de encontro que o run criou — o afterEach devolve tudo
@@ -96,25 +97,33 @@ async function apagarEncontros(ids: Iterable<string>) {
     "avaliacoes_encontro",
     `select=id&encontro_id=in.(${lista.join(",")})`
   );
-  if (avals.length) {
-    await limparViaServiceRole(
+  // fase 1: chamados morrem antes das origens (a FK é SET NULL — apagar a
+  // avaliação primeiro deixaria a linha órfã); o fallback por autor pega
+  // chamados do jovem fixture criados por outros caminhos
+  await Promise.all([
+    avals.length
+      ? limparViaServiceRole(
+          "chamados",
+          `avaliacao_id=in.(${avals.map((a) => a.id).join(",")})`
+        )
+      : Promise.resolve(),
+    limparViaServiceRole(
       "chamados",
-      `avaliacao_id=in.(${avals.map((a) => a.id).join(",")})`
-    );
-  }
-  // fallback: chamados do jovem fixture criados por outros caminhos
-  await limparViaServiceRole(
-    "chamados",
-    `autor_id=eq.${IDS.jovemProfile}`
-  );
-  await limparViaServiceRole(
-    "avaliacoes_encontro",
-    `encontro_id=in.(${lista.join(",")})`
-  );
-  await limparViaServiceRole(
-    "avaliacao_links",
-    `encontro_id=in.(${lista.join(",")})`
-  );
+      `autor_id=eq.${IDS.jovemProfile}`
+    ),
+  ]);
+  // fase 2: as origens em si, tabelas independentes em paralelo — em
+  // staging cada ida serial ao PostgREST soma segundos no hook
+  await Promise.all([
+    limparViaServiceRole(
+      "avaliacoes_encontro",
+      `encontro_id=in.(${lista.join(",")})`
+    ),
+    limparViaServiceRole(
+      "avaliacao_links",
+      `encontro_id=in.(${lista.join(",")})`
+    ),
+  ]);
   await limparViaServiceRole("encontros", `id=in.(${lista.join(",")})`);
 }
 
@@ -123,19 +132,23 @@ async function apagarEncontros(ids: Iterable<string>) {
  *  por created_by (o trigger assina com o profile de quem respondeu —
  *  alcança qualquer coord real do staging que foi notificado). */
 async function limparRastros() {
-  await limparViaServiceRole(
-    "notificacoes",
-    `profile_id=eq.${IDS.jovemProfile}&tipo=eq.avaliacao_pendente`
-  );
-  await limparViaServiceRole(
-    "notificacoes",
-    `profile_id=eq.${IDS.jovemProfile}&tipo=eq.chamado_resolvido`
-  );
-  await limparViaServiceRole(
-    "notificacoes",
-    `created_by=eq.${IDS.jovemProfile}&tipo=like.chamado_*`
-  );
-  await limparViaServiceRole("emails_enviados", "tipo=eq.apoio_jovem");
+  // filtros disjuntos (e tabelas diferentes no emails_enviados) — o
+  // paralelo importa no PostgREST do staging, não a ordem
+  await Promise.all([
+    limparViaServiceRole(
+      "notificacoes",
+      `profile_id=eq.${IDS.jovemProfile}&tipo=eq.avaliacao_pendente`
+    ),
+    limparViaServiceRole(
+      "notificacoes",
+      `profile_id=eq.${IDS.jovemProfile}&tipo=eq.chamado_resolvido`
+    ),
+    limparViaServiceRole(
+      "notificacoes",
+      `created_by=eq.${IDS.jovemProfile}&tipo=like.chamado_*`
+    ),
+    limparViaServiceRole("emails_enviados", "tipo=eq.apoio_jovem"),
+  ]);
 }
 
 /** Piso entre testes (e retries): dupla do jovem com EXATAMENTE a pendência
@@ -143,19 +156,25 @@ async function limparRastros() {
  *  mentor.spec solto pode ter varrido os encontros da dupla inteira: se a
  *  fixture sumiu, recria (o insert dispara o trigger que minta o link). */
 async function convergirPiso() {
-  // leftovers de run morto no pool de números do spec — filhos primeiro
-  const restos = await buscarViaServiceRole<{ id: string }[]>(
-    "encontros",
-    `select=id&dupla_id=eq.${DUPLA_ID}&numero=in.(${POOL_NUMEROS.join(",")})`
-  );
+  // selects independentes em paralelo — em staging cada ida serial ao
+  // PostgREST soma segundos e o hook comia o teto de 60s do teste
+  const [restos, enc] = await Promise.all([
+    // qualquer encontro que não a fixture — o pool do spec E leftovers de
+    // outros specs (o helper convergirDuplaEmDia cobre números fora do
+    // pool e cada 'realizado' minta um link que vira pendência extra)
+    buscarViaServiceRole<{ id: string }[]>(
+      "encontros",
+      `select=id&dupla_id=eq.${DUPLA_ID}&id=neq.${IDS.encontroFixture}`
+    ),
+    buscarViaServiceRole<{ id: string }[]>(
+      "encontros",
+      `select=id&id=eq.${IDS.encontroFixture}`
+    ),
+  ]);
   await apagarEncontros(restos.map((r) => r.id));
   criados.delete(IDS.encontroFixture);
 
-  const [enc] = await buscarViaServiceRole<{ id: string }[]>(
-    "encontros",
-    `select=id&id=eq.${IDS.encontroFixture}`
-  );
-  if (!enc) {
+  if (enc.length === 0) {
     const quando = new Date(Date.now() - 2 * 86400e3).toISOString();
     await inserirViaServiceRole("encontros", {
       id: IDS.encontroFixture,
@@ -170,14 +189,17 @@ async function convergirPiso() {
   // pendência de verdade: nenhuma avaliação no encontro e o link de volta a
   // 'pendente' (o submit do spec consome os dois). Encontro 'realizado' não
   // volta de status (guard 0043) — o reconverso é nos filhos, não nele.
-  await limparViaServiceRole(
-    "avaliacoes_encontro",
-    `encontro_id=eq.${IDS.encontroFixture}`
-  );
-  const [link] = await buscarViaServiceRole<{ id: string }[]>(
-    "avaliacao_links",
-    `select=id&encontro_id=eq.${IDS.encontroFixture}`
-  );
+  const [, links] = await Promise.all([
+    limparViaServiceRole(
+      "avaliacoes_encontro",
+      `encontro_id=eq.${IDS.encontroFixture}`
+    ),
+    buscarViaServiceRole<{ id: string }[]>(
+      "avaliacao_links",
+      `select=id&encontro_id=eq.${IDS.encontroFixture}`
+    ),
+  ]);
+  const [link] = links;
   if (!link) {
     await inserirViaServiceRole("avaliacao_links", {
       token: crypto.randomUUID(),
@@ -192,11 +214,40 @@ async function convergirPiso() {
       { status: "pendente", respondido_em: null, respondido_por_profile_id: null }
     );
   }
-  await limparRastros();
   // a fixture é o ÚLTIMO encontro do cronograma — re-criá-la dispara a
-  // 0102 e a dupla acorda 'concluida' (PDM read-only, agenda sem CTA).
-  // Devolve o piso de sempre: status ativa, sem encerramento nem sinos.
-  await convergirDuplaAtiva(DUPLA_ID);
+  // 0102 e a dupla acorda 'concluida' (PDM read-only, agenda sem CTA):
+  // convergirDuplaAtiva devolve status ativa, sem encerramento nem sinos.
+  // Toca linhas diferentes das do limparRastros — vão juntas.
+  await Promise.all([limparRastros(), convergirDuplaAtiva(DUPLA_ID)]);
+}
+
+/** Lista única de pendências do /jovem (REALIZA-493): o item de avaliação
+ *  é agregado — "N encontro(s) esperando sua avaliação" — e o "Avaliar"
+ *  abre a mais recente (alvoId do motor). Pode cair no "e mais N" quando a
+ *  fila passa de 3 — expande antes de ler. */
+async function abrirAvaliarPendente(page: Page) {
+  const fazer = page.locator('section[aria-labelledby="fazer-titulo"]');
+  const item = fazer.locator("li", {
+    hasText: /esperando sua avaliação/,
+  });
+  if (!(await item.isVisible().catch(() => false))) {
+    await fazer.getByText(/e mais \d+/).click();
+  }
+  await expect(item).toBeVisible();
+  // clique pré-hidratação é no-op silencioso (o botão SSR já é visível) —
+  // o waitFor é polling porque um isVisible seco corre o mount do portal
+  const dialog = page.getByRole("dialog");
+  for (let i = 0; i < 3; i++) {
+    await item
+      .getByRole("button", { name: "Avaliar" })
+      .click({ timeout: 5_000 })
+      .catch(() => {});
+    try {
+      await dialog.waitFor({ state: "visible", timeout: 2_000 });
+      return;
+    } catch {}
+  }
+  await expect(dialog).toBeVisible();
 }
 
 test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
@@ -206,17 +257,20 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await apagarEncontros(criados);
     criados.clear();
     // devolve a fixture ao "sem avaliação, link pendente" — um teste que
-    // submeteu a dela não pode vazar estado pro próximo
-    await limparViaServiceRole(
-      "avaliacoes_encontro",
-      `encontro_id=eq.${IDS.encontroFixture}`
-    );
-    await atualizarViaServiceRole(
-      "avaliacao_links",
-      `encontro_id=eq.${IDS.encontroFixture}`,
-      { status: "pendente", respondido_em: null, respondido_por_profile_id: null }
-    );
-    await limparRastros();
+    // submeteu a dela não pode vazar estado pro próximo. As três limpezas
+    // tocam linhas/tabelas diferentes — em paralelo pra caber no hook.
+    await Promise.all([
+      limparViaServiceRole(
+        "avaliacoes_encontro",
+        `encontro_id=eq.${IDS.encontroFixture}`
+      ),
+      atualizarViaServiceRole(
+        "avaliacao_links",
+        `encontro_id=eq.${IDS.encontroFixture}`,
+        { status: "pendente", respondido_em: null, respondido_por_profile_id: null }
+      ),
+      limparRastros(),
+    ]);
   });
 
   // ---------- jovem logado (/jovem) ----------
@@ -231,21 +285,23 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await expect(
       secao.getByRole("heading", { name: "Suas avaliações" })
     ).toBeVisible();
-    // as pendências moram recolhidas na seção — o trigger "N esperando sua
-    // resposta" abre a lista (a ação primária delas vive em "Para fazer
-    // agora"; aqui fica o atalho que não repete os botões)
-    await secao.getByText(/esperando sua resposta/).click();
-    const pendente = secao.locator("li", {
-      hasText: "16º encontro",
-      has: page.getByRole("button", { name: "Avaliar" }),
+    // a pendência mora na lista única "Para fazer agora" (493): UMA linha
+    // agrupada ("1 encontro esperando sua avaliação") com o gesto Avaliar
+    // no mais recente. Passa do 3º à vista cai no "e mais N" — abre antes
+    const fazer = page.locator('section[aria-labelledby="fazer-titulo"]');
+    const itemAval = fazer.locator("li", {
+      hasText: /esperando sua avaliação/,
     });
-    await expect(pendente).toBeVisible();
-
-    await pendente.getByRole("button", { name: "Avaliar" }).click();
+    if ((await itemAval.count()) === 0)
+      await fazer.getByText(/e mais \d+/).click();
+    await itemAval.getByRole("button", { name: "Avaliar" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
+    // o título usa o rótulo da sessão ("16º encontro com Mentor") — o
+    // passe de copy trocou o "Nº encontro" seco por ele; a regex tolera
+    // as duas formas
     await expect(
-      dialog.getByText("16º encontro: como foi?")
+      dialog.getByText(/16º encontro[^:]*: como foi\?/)
     ).toBeVisible();
 
     // radios/checkbox do form moram sr-only dentro do label — o clique
@@ -272,9 +328,9 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     ).toBeVisible();
 
     // a pendência vira linha de histórico com a nota — o refresh re-renderiza
-    // (o bloco recolhido desmonta quando zera, então a marca dela some)
+    // e a linha agrupada some da lista única
     await expect(
-      secao.getByText("aguardando sua resposta")
+      fazer.getByText(/esperando sua avaliação/)
     ).toHaveCount(0);
     const feita = secao.locator("li", { hasText: "16º encontro" });
     await expect(
@@ -327,8 +383,10 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
       .getByRole("button", { name: "Ver resposta" })
       .click();
     const dialog = page.getByRole("dialog");
+    // "Sua avaliação: 15º encontro com Mentor" — o passe de copy trocou o
+    // "do Nº encontro" pelo rótulo da sessão; a regex tolera as duas formas
     await expect(
-      dialog.getByText("Sua avaliação do 15º encontro")
+      dialog.getByText(/Sua avaliação.{2,4}15º encontro/)
     ).toBeVisible();
     await expect(
       dialog.getByRole("img", { name: "5 de 5 estrelas" })
@@ -359,7 +417,11 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     expect(row.avaliacao_visivel_mentor).toBe(true);
 
     await chave.click();
-    await expect(page.getByText("Voltou a valer só na média.")).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByText(
+        /Voltou a valer só na média|Seu mentor deixa de ver esta avaliação/
+      )
+    ).toBeVisible({ timeout: 15_000 });
     await expect(chave).not.toBeChecked();
     [row] = await buscarViaServiceRole<
       { avaliacao_visivel_mentor: boolean }[]
@@ -377,17 +439,17 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     await page.waitForURL((u) => u.pathname === "/jovem", { timeout: 15_000 });
 
-    const secao = page.locator('section[aria-labelledby="avaliacoes-titulo"]');
-    // mesma pendência recolhida do spec acima — abre antes de achar a linha
-    await secao.getByText(/esperando sua resposta/).click();
-    await secao
-      .locator("li", {
-        hasText: "14º encontro",
-        has: page.getByRole("button", { name: "Avaliar" }),
-      })
-      .getByRole("button", { name: "Avaliar" })
-      .click();
+    // mesma linha agrupada do spec acima, agora com 2 pendências — o
+    // Avaliar abre a mais recente (o 14, criado depois da fixture)
+    const fazer = page.locator('section[aria-labelledby="fazer-titulo"]');
+    const itemAval = fazer.locator("li", {
+      hasText: /esperando sua avaliação/,
+    });
+    if ((await itemAval.count()) === 0)
+      await fazer.getByText(/e mais \d+/).click();
+    await itemAval.getByRole("button", { name: "Avaliar" }).click();
     const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText(/14º encontro/)).toBeVisible();
     await dialog
       .locator("label", {
         has: page.locator('input[name="estrelas"][value="2"]'),
@@ -441,6 +503,9 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
       page.getByText("Apoio aberto · do mentorado")
     ).toBeVisible();
     await expect(page.getByText("pediu ajuda", { exact: true })).toBeVisible();
+    // 473: os blocos da ficha nascem fechados — o detalhe da avaliação (com
+    // o botão de atendimento) abre pelo disclosure do próprio encontro
+    await page.getByRole("button", { name: /pediu ajuda/ }).first().click();
     await page
       .getByRole("button", { name: "Marcar ajuda como atendida" })
       .click();
@@ -607,10 +672,23 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     // a linha inteira na linha do encontro (aba Encontros) — o comentário
     // chega pra coord
     await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
-    await expect(page.getByText("Avaliação do jovem", { exact: true })).toBeVisible();
+    // escopo na lista: o tile do Resumo da jornada também diz "Avaliação
+    // do jovem" quando o bloco renderiza (mesma ficha)
+    const listaEncontros = page.locator(
+      'section[aria-labelledby="lista-encontros"]'
+    );
+    await expect(
+      listaEncontros.getByText("Avaliação do jovem", { exact: true })
+    ).toBeVisible();
     await expect(
       page.getByRole("img", { name: "5 de 5 estrelas" }).first()
     ).toBeVisible();
+    // o bloco do jovem nasce fechado (REALIZA-473): o comentário mora no
+    // corpo, então expande pelo resumo antes de ler
+    await page
+      .locator(`#registrar-${encontroId}`)
+      .getByRole("button", { name: /Avaliação do jovem/ })
+      .click();
     await expect(
       page.getByText("E2E: detalhe que só a equipe lê")
     ).toBeVisible();
@@ -669,12 +747,54 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     ).toHaveCount(0);
     await expect(page.getByText("pediu ajuda")).toHaveCount(0);
 
-    // e a linha que o jovem liberou chega com a nota que explica o porquê
+    // e a linha que o jovem liberou chega com a nota que explica o porquê —
+    // o bloco nasce fechado (REALIZA-473), então expande pelo resumo
+    await page
+      .locator(`#registrar-${encLiberada}`)
+      .getByRole("button", { name: /Avaliação do jovem/ })
+      .click();
     await expect(
       page.getByText("E2E: esta o jovem liberou pro mentor")
     ).toBeVisible();
     await expect(
       page.getByText(/O jovem ligou “meu mentor pode ler esta”/)
     ).toBeVisible();
+  });
+
+  test("o toggle recusa qualquer conta que não é a dona da avaliação", async () => {
+    // 027 (FR-004 + cenário negado da matriz): definir_visibilidade_avaliacao
+    // é escopada a my_mentorado_id() — chamada na pele de mentor ou coord
+    // bate no raise 'avaliação não encontrada' (PostgREST → 4xx) e a flag
+    // não mexe. Contraponto: a dona da avaliação liga normal.
+    const { encontroId } = await criarEncontroRealizado(15);
+    const aval = await inserirAvaliacao(encontroId, { estrelas: 4 });
+    const chamada = (jwt: string) =>
+      restComoUsuario("rpc/definir_visibilidade_avaliacao", jwt, {
+        method: "POST",
+        body: { p_id: aval.id, p_visivel: true },
+      });
+
+    const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
+    expect((await chamada(jwtMentor)).ok).toBe(false);
+    const jwtCoord = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
+    expect((await chamada(jwtCoord)).ok).toBe(false);
+
+    let [row] = await buscarViaServiceRole<
+      { avaliacao_visivel_mentor: boolean }[]
+    >(
+      "avaliacoes_encontro",
+      `select=avaliacao_visivel_mentor&id=eq.${String(aval.id)}`
+    );
+    expect(row.avaliacao_visivel_mentor).toBe(false);
+
+    const jwtJovem = await jwtDoUsuario(JOVEM_EMAIL, SENHA);
+    expect((await chamada(jwtJovem)).ok).toBe(true);
+    [row] = await buscarViaServiceRole<
+      { avaliacao_visivel_mentor: boolean }[]
+    >(
+      "avaliacoes_encontro",
+      `select=avaliacao_visivel_mentor&id=eq.${String(aval.id)}`
+    );
+    expect(row.avaliacao_visivel_mentor).toBe(true);
   });
 });

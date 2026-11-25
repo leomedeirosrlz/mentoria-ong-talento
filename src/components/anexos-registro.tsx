@@ -3,15 +3,17 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CircleNotch, Paperclip, Trash } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
 import { formatDiaMes, formatTamanho } from "@/lib/ciclo";
 import type { RegistroAnexo } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { novoUuid } from "@/lib/uuid";
+import { prepararArquivoAnexo } from "@/lib/anexo-imagem";
 
-const LIMITE_BYTES = 10 * 1024 * 1024;
+// teto do storage no plano atual — o bucket também limita (0185)
+const LIMITE_BYTES = 50 * 1024 * 1024;
 const BUCKET = "registro-anexos";
 // allowlist explícita — image/* admitiria SVG (conteúdo ativo) e HEIC (não renderiza)
 const TIPOS_ACEITOS = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
@@ -24,7 +26,7 @@ export function recusaDoAnexo(file: File): string | null {
   if (!TIPOS_ACEITOS.includes(file.type))
     return "Formato não aceito: use PDF, PNG, JPG ou WebP.";
   if (file.size > LIMITE_BYTES)
-    return "O arquivo passa de 10 MB. Envie uma versão menor.";
+    return "O arquivo passa de 50 MB. Envie uma versão menor.";
   return null;
 }
 
@@ -48,7 +50,10 @@ export async function enviarAnexo(
 ): Promise<{ row: RegistroAnexo } | { error: string }> {
   try {
     const supabase = createClient();
-    const path = `${registroId}/${novoUuid()}-${saneiaNome(file.name)}`;
+    // foto de câmera desce comprimida (WebP ~200 KB); PDF e imagem pequena
+    // passam intactos — a row guarda nome/tamanho/mime do que subiu de fato
+    const enviavel = await prepararArquivoAnexo(file);
+    const path = `${registroId}/${novoUuid()}-${saneiaNome(enviavel.name)}`;
 
     // 1) a row de metadados vem ANTES do arquivo — a policy de INSERT do
     //    storage só aceita objeto cujo path já exista em registro_anexos
@@ -57,9 +62,9 @@ export async function enviarAnexo(
       .insert({
         registro_id: registroId,
         path,
-        nome: file.name,
-        tamanho: file.size,
-        mime: file.type,
+        nome: enviavel.name,
+        tamanho: enviavel.size,
+        mime: enviavel.type,
         created_by: autorId,
       })
       .select("id, registro_id, path, nome, tamanho, mime, created_by, created_at")
@@ -71,10 +76,16 @@ export async function enviarAnexo(
     // 2) o arquivo em si
     const { error: upError } = await supabase.storage
       .from(BUCKET)
-      .upload(path, file);
+      .upload(path, enviavel);
     if (upError) {
-      // sem o arquivo a row não vale (e seguraria o path pra sempre)
-      await supabase.from("registro_anexos").delete().eq("id", row.id);
+      // sem o arquivo a row não vale (e seguraria o path pra sempre) —
+      // se nem a limpeza rodar a row órfã fica: loga no console
+      const { error: delError } = await supabase
+        .from("registro_anexos")
+        .delete()
+        .eq("id", row.id);
+      if (delError)
+        console.error("enviarAnexo: limpeza da row de metadados:", delError);
       return { error: "Falha ao enviar o arquivo. Tente de novo." };
     }
     return { row: row as RegistroAnexo };
@@ -174,7 +185,10 @@ export function AnexosRegistro({
                   target="_blank"
                   rel="noopener noreferrer"
                   title={a.nome}
-                  className="min-w-0 flex-1 truncate underline underline-offset-2 hover:text-foreground"
+                  // min-h-11: o link é o alvo de toque do anexo no celular
+                  // (o texto-xs sozinho batia ~16px); no desktop a linha
+                  // volta à densidade normal
+                  className="flex min-h-11 min-w-0 flex-1 items-center truncate underline underline-offset-2 hover:text-foreground md:min-h-0 md:inline"
                 >
                   {a.nome}
                 </a>
@@ -236,7 +250,8 @@ export function AnexosRegistro({
           </Button>
           <p className="text-xs text-muted-foreground">
             Foto ou arquivo que ajude a contar o encontro (PDF, PNG, JPG ou
-            WebP): fica salvo no registro e aparece em “Arquivos da dupla”.
+            WebP) até 50 MB: fotos são comprimidas automaticamente. Fica
+            salvo no registro e aparece em “Arquivos da dupla”.
           </p>
         </div>
       )}

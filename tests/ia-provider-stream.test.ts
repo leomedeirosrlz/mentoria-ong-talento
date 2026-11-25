@@ -234,6 +234,99 @@ describe("chamarModeloStream", () => {
     const res = await chamar({ clienteAbortou: () => true });
     expect(res).toMatchObject({ ok: false, abortado: true });
   });
+
+  it("deadline da rota no meio do texto devolve o parcial como truncado", async () => {
+    // REALIZA-397 review: stream morto pelo prazo da rota (signal que não
+    // é do cliente) com texto já emitido vira resposta truncada — chip de
+    // continuação na rota em vez de "dormiu" com texto solto na tela
+    const ctrl = new AbortController();
+    const enc = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(
+          enc.encode(
+            `data: ${JSON.stringify({ choices: [{ delta: { content: "parcial " } }] })}\n\n`
+          )
+        );
+        // o stream trava aqui — só o abort do signal da rota destrava,
+        // como um fetch real que morre no deadline
+        ctrl.signal.addEventListener("abort", () =>
+          c.error(new DOMException("aborted", "AbortError"))
+        );
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(body, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      )
+    );
+
+    const p = chamar({ signal: ctrl.signal });
+    await new Promise((r) => setTimeout(r, 30));
+    ctrl.abort();
+    const res = await p;
+
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.content).toBe("parcial ");
+      expect(res.truncado).toBe(true);
+      expect(res.finishReason).toBe("route_deadline");
+      expect(res.toolCalls).toEqual([]);
+    }
+  });
+
+  it("deadline da rota com tool_call pendente NÃO devolve parcial (fallback)", async () => {
+    // tool_call cortado no meio tem arguments inválidos — executar seria
+    // pior que o fallback, então segue o caminho antigo
+    const ctrl = new AbortController();
+    const enc = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(
+          enc.encode(
+            `data: ${JSON.stringify({
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        index: 0,
+                        id: "call_1",
+                        function: { name: "plano_em_dia", arguments: '{"dupla' },
+                      },
+                    ],
+                  },
+                },
+              ],
+            })}\n\n`
+          )
+        );
+        ctrl.signal.addEventListener("abort", () =>
+          c.error(new DOMException("aborted", "AbortError"))
+        );
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(body, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      )
+    );
+
+    const p = chamar({ signal: ctrl.signal });
+    await new Promise((r) => setTimeout(r, 30));
+    ctrl.abort();
+    const res = await p;
+
+    expect(res).toMatchObject({ ok: false, fallback: true });
+  });
 });
 
 describe("chamarModeloStream — retry (REALIZA-307)", () => {
@@ -312,6 +405,30 @@ describe("chamarModeloStream — retry (REALIZA-307)", () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  it("marca dormindo nas falhas do provider; 400 genérico não (REALIZA-363)", async () => {
+    const dormindo = (r: unknown) =>
+      (r as { dormindo?: boolean }).dormindo === true;
+
+    // exhausted quota and provider 5xx put Liza to sleep
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("quota", { status: 429 }))
+    );
+    expect(dormindo(await chamar())).toBe(true);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("pau", { status: 500 }))
+    );
+    expect(dormindo(await chamar())).toBe(true);
+
+    // our own 400 payload stays a generic error, not sleep
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("invalid payload", { status: 400 }))
+    );
+    expect(dormindo(await chamar())).toBe(false);
+  });
+
   it("quebra depois de token emitido NÃO retenta — vira fallback", async () => {
     const enc = new TextEncoder();
     // pull no 1º read entrega o evento do token; no 2º quebra — c.error
@@ -374,6 +491,106 @@ describe("chamarModeloStream — retry (REALIZA-307)", () => {
     const res = await p;
     // abort veio do timeout da rota, não do cliente → fallback, não "abortado"
     expect(res).toMatchObject({ ok: false, fallback: true });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("chamarModeloStream — truncamento por max_tokens (REALIZA-397)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("finish_reason=length continua anexando — tokens seguem no mesmo onToken", async () => {
+    const tokens: string[] = [];
+    let n = 0;
+    const spy = vi.fn<(url: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(() =>
+      Promise.resolve(
+        n++ === 0
+          ? sseResposta([
+              sse(
+                { choices: [{ delta: { content: "Primeira " } }] },
+                {
+                  choices: [{ delta: { content: "parte" }, finish_reason: "length" }],
+                  usage: { prompt_tokens: 10, completion_tokens: 5 },
+                }
+              ),
+            ])
+          : sseResposta([
+              sse(
+                { choices: [{ delta: { content: " e fim." }, finish_reason: "stop" }] },
+                { choices: [], usage: { prompt_tokens: 8, completion_tokens: 4 } }
+              ),
+            ])
+      )
+    );
+    vi.stubGlobal("fetch", spy);
+
+    const res = await chamar({ tokens });
+    // a continuação emite pro mesmo onToken — o cliente vê um texto só
+    expect(tokens).toEqual(["Primeira ", "parte", " e fim."]);
+    expect(res).toMatchObject({
+      ok: true,
+      content: "Primeira parte e fim.",
+      finishReason: "stop",
+      usage: { prompt_tokens: 18, completion_tokens: 9 },
+    });
+    expect(spy).toHaveBeenCalledTimes(2);
+    // a 2ª request carrega o parcial como assistant + o "continue"
+    const msgs = JSON.parse(String(spy.mock.calls[1]?.[1]?.body)).messages;
+    expect(msgs.at(-2)).toEqual({ role: "assistant", content: "Primeira parte" });
+    expect(msgs.at(-1).role).toBe("user");
+  });
+
+  it("continuação também cortada devolve truncado (cap: sem loop)", async () => {
+    const spy = vi.fn(() =>
+      Promise.resolve(
+        sseResposta([
+          sse({
+            choices: [{ delta: { content: "x" }, finish_reason: "length" }],
+          }),
+        ])
+      )
+    );
+    vi.stubGlobal("fetch", spy);
+
+    const res = await chamar();
+    expect(res).toMatchObject({ ok: true, content: "xx", truncado: true });
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("tool_call cortada NÃO continua — arguments quebrado não tem remendo", async () => {
+    const spy = vi.fn(() =>
+      Promise.resolve(
+        sseResposta([
+          sse({
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "c1",
+                      function: { name: "ficha_dupla", arguments: '{"du' },
+                    },
+                  ],
+                },
+                finish_reason: "length",
+              },
+            ],
+          }),
+        ])
+      )
+    );
+    vi.stubGlobal("fetch", spy);
+
+    const res = await chamar();
+    expect(res).toMatchObject({ ok: true, truncado: true });
     expect(spy).toHaveBeenCalledTimes(1);
   });
 });

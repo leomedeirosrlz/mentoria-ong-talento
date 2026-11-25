@@ -6,7 +6,18 @@ import {
   TRILHA_LABEL,
 } from "@/lib/ciclo";
 import { turmaDaDupla, turmaLonga } from "@/lib/turma";
-import type { Cronograma, EncontroStatus, Trilha } from "@/lib/types";
+import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+  type DuplaDesfecho,
+} from "@/lib/dupla-desfecho";
+import { PAPEL_TURMA_LABEL, soEspecialista } from "@/lib/pessoas-status";
+import type {
+  AppRole,
+  Cronograma,
+  EncontroStatus,
+  Trilha,
+} from "@/lib/types";
 
 // ---------- config ----------
 
@@ -111,13 +122,21 @@ export type PessoaFonte = {
    *  é editável na grade (a 0060 reserva a escrita ao sync do auth) */
   user_id?: string | null;
   nome: string | null;
+  /** nome de exibição preferido — opcional: a RPC pública pode não
+   *  projetá-lo, e nesse caso vale o civil (regra `nome_social || nome`). */
+  nome_social?: string | null;
   email?: string | null;
   whatsapp?: string | null;
   cidade: string | null;
   uf: string | null;
   /** papel primário — só o recorte 'assinaturas' carrega (rótulo "tipo" da
-   *  linha); grade/ciclo nem pedem ao banco */
-  role?: string | null;
+   *  linha) e a grade interna (régua da fila, REALIZA-383); ciclo e a RPC
+   *  pública nem pedem ao banco */
+  role?: AppRole | null;
+  /** papéis efetivos (role ∪ profile_papeis) — junto do role na grade
+   *  interna; o snapshot público não carrega e a fila cai no rótulo de
+   *  sempre */
+  papeis?: AppRole[] | null;
 };
 
 export type DuplaFonte = {
@@ -127,6 +146,11 @@ export type DuplaFonte = {
   mentorado_id: string;
   supervisor_id: string | null;
   status: string;
+  /** Por que fechou — separa "Encerrada" (remanejada/outro) de
+   *  "Desistente" (desistencia_*). Opcional: o snapshot público
+   *  (abrir_relatorio RPC) ainda não carrega a coluna — lá a encerrada
+   *  sem desfecho segue a regra legada e lê "Desistente". */
+  desfecho?: DuplaDesfecho | null;
   iniciada_em: string | null;
   demanda: string | null;
   /** só o recorte público 'ciclo' carrega (desambigua trilha/esp e o nº do
@@ -224,20 +248,27 @@ function alvosDe(
   return out;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  ativa: "Ativa",
-  encerrada: "Desistente",
-  pausada: "Pausada",
-  concluida: "Concluída",
-};
-
-export function labelStatus(s: string): string {
-  return STATUS_LABEL[s] ?? s;
+/** Rótulo da situação da dupla no CSV/print — mesma fonte das telas
+ *  (dupla-desfecho). Status fora do enum conhecido vaza cru em vez de
+ *  ler "Em andamento" por engano. */
+export function labelStatus(d: {
+  status: string;
+  desfecho?: DuplaDesfecho | null;
+}): string {
+  return ["ativa", "pausada", "concluida", "encerrada"].includes(d.status)
+    ? SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)]
+    : d.status;
 }
 
 function cidadeUf(p: Pick<PessoaFonte, "cidade" | "uf">): string {
   if (!p.cidade && !p.uf) return "";
   return [p.cidade, p.uf].filter(Boolean).join(" · ");
+}
+
+/** Nome exibido da pessoa na grade — regra da casa `nome_social || nome`;
+ *  "" só quando não há pessoa nem nome. */
+function nomeFonte(p: Pick<PessoaFonte, "nome" | "nome_social"> | null | undefined): string {
+  return p?.nome_social || p?.nome || "";
 }
 
 function contato(p: Pick<PessoaFonte, "email" | "whatsapp">): string {
@@ -282,14 +313,14 @@ export function montarLinhas(
         const mentorado = mentorados.get(d.mentorado_id);
         const sup = d.supervisor_id ? profs.get(d.supervisor_id) : null;
         const linha: LinhaRelatorio = {
-          mentor: mentor?.nome ?? "",
-          mentorado: mentorado?.nome ?? "",
+          mentor: nomeFonte(mentor),
+          mentorado: nomeFonte(mentorado),
           contato_mentor: mentor ? contato(mentor) : "",
           contato_mentorado: mentorado ? contato(mentorado) : "",
-          status_dupla: labelStatus(d.status),
+          status_dupla: labelStatus(d),
           iniciada_em: formatDate(d.iniciada_em),
           demanda: d.demanda ?? "",
-          auxiliar: sup?.nome ?? "",
+          auxiliar: nomeFonte(sup),
           __status: d.status,
         };
         if (paraApp) {
@@ -318,15 +349,15 @@ export function montarLinhas(
     if (mentor) {
       const linha: LinhaRelatorio = {
         papel: "Mentor(a)",
-        nome: mentor.nome ?? "",
+        nome: nomeFonte(mentor),
         email: mentor.email ?? "",
         whatsapp: mentor.whatsapp ?? "",
         cidade_uf: cidadeUf(mentor),
-        par: mentorado?.nome ?? "",
-        status_dupla: labelStatus(d.status),
+        par: nomeFonte(mentorado),
+        status_dupla: labelStatus(d),
         iniciada_em: formatDate(d.iniciada_em),
         demanda: d.demanda ?? "",
-        auxiliar: sup?.nome ?? "",
+        auxiliar: nomeFonte(sup),
         __status: d.status,
         __papel: "mentor",
       };
@@ -339,15 +370,15 @@ export function montarLinhas(
     if (mentorado) {
       const linha: LinhaRelatorio = {
         papel: "Mentorado(a)",
-        nome: mentorado.nome ?? "",
+        nome: nomeFonte(mentorado),
         email: mentorado.email ?? "",
         whatsapp: mentorado.whatsapp ?? "",
         cidade_uf: cidadeUf(mentorado),
-        par: mentor?.nome ?? "",
-        status_dupla: labelStatus(d.status),
+        par: nomeFonte(mentor),
+        status_dupla: labelStatus(d),
         iniciada_em: formatDate(d.iniciada_em),
         demanda: d.demanda ?? "",
-        auxiliar: sup?.nome ?? "",
+        auxiliar: nomeFonte(sup),
         __status: d.status,
         __papel: "mentorado",
       };
@@ -361,16 +392,22 @@ export function montarLinhas(
 
   // fila de espera: inscrito `aguardando` sem dupla ativa vira linha
   // "Sem dupla" — regra idêntica pra qualquer turma (a lista já chega
-  // escopada do chamador; quem tem dupla ativa sai pelos sets `ativos*`)
+  // escopada do chamador; quem tem dupla ativa sai pelos sets `ativos*`).
+  // A fila é do pareamento DPP: quem só é especialista não espera par e a
+  // linha dele sai pelo papel real, sem pendência de dupla (REALIZA-383;
+  // a 0208 projeta role+papeis no grade da abrir_relatorio, então o
+  // /resumo público resolve pela pessoa igual ao app)
   for (const i of fila) {
     if (i.papel_esperado === "mentor") {
       const p = profs.get(i.profile_id);
       if (p && !ativosMentor.has(i.profile_id)) {
+        const esp = soEspecialista(p);
         const linha: LinhaRelatorio = {
-          papel: "Mentor(a)", nome: p.nome ?? "", email: p.email ?? "",
+          papel: esp ? PAPEL_TURMA_LABEL.mentor_especialista : "Mentor(a)",
+          nome: nomeFonte(p), email: p.email ?? "",
           whatsapp: p.whatsapp ?? "", cidade_uf: cidadeUf(p), par: "",
-          status_dupla: "Sem dupla", iniciada_em: "", demanda: "", auxiliar: "",
-          __status: "sem_dupla",
+          status_dupla: esp ? "" : "Sem dupla", iniciada_em: "", demanda: "", auxiliar: "",
+          __status: esp ? undefined : "sem_dupla",
           __papel: "mentor",
         };
         if (paraApp) {
@@ -382,7 +419,7 @@ export function montarLinhas(
       const m = mentorados.get(i.mentorado_id);
       if (m && !ativosJovem.has(i.mentorado_id)) {
         const linha: LinhaRelatorio = {
-          papel: "Mentorado(a)", nome: m.nome ?? "", email: m.email ?? "",
+          papel: "Mentorado(a)", nome: nomeFonte(m), email: m.email ?? "",
           whatsapp: m.whatsapp ?? "", cidade_uf: cidadeUf(m), par: "",
           status_dupla: "Sem dupla", iniciada_em: "", demanda: "", auxiliar: "",
           __status: "sem_dupla",
@@ -698,10 +735,10 @@ export function montarLinhasCiclo(dados: RelatorioDadosCiclo): LinhaRelatorio[] 
     for (const e of encs) {
       const r = regs.get(e.id);
       linhas.push({
-        mentor: profs.get(d.mentor_id)?.nome ?? "",
-        mentorado: ments.get(d.mentorado_id)?.nome ?? "",
+        mentor: nomeFonte(profs.get(d.mentor_id)),
+        mentorado: nomeFonte(ments.get(d.mentorado_id)),
         auxiliar: d.supervisor_id
-          ? (profs.get(d.supervisor_id)?.nome ?? "")
+          ? nomeFonte(profs.get(d.supervisor_id))
           : "",
         trilha: d.trilha ? (TRILHA_LABEL[d.trilha as Trilha] ?? d.trilha) : "",
         turma: d.turma,
@@ -747,7 +784,7 @@ export function montarLinhasAssinaturas(
         : null;
     const tpl = a.template;
     return {
-      nome: pessoa?.nome ?? "",
+      nome: nomeFonte(pessoa),
       tipo: a.profile_id
         ? papelLabel(profs.get(a.profile_id)?.role ?? null)
         : "Mentorado",
@@ -757,7 +794,7 @@ export function montarLinhasAssinaturas(
         STATUS_ASSINATURA_LABEL[a.status] ?? a.status,
       emitido_em: dataHoraCurta(a.created_at),
       emitido_por: a.created_by
-        ? (profs.get(a.created_by)?.nome ?? "")
+        ? nomeFonte(profs.get(a.created_by))
         : "A própria pessoa",
       expira_em: dataCurta(a.token_expira_em),
       assinado_em: dataHoraCurta(a.assinado_em),

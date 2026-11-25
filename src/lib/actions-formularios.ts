@@ -6,13 +6,17 @@ import { DEMO_MSG } from "./demo/shared";
 import { gerarLinksFormulario, type DestinoLink } from "./forms/actions";
 import { getInstrumentosDaDupla } from "./forms/queries";
 import {
-  INSTRUMENTOS_SISTEMA,
+  INSTRUMENTOS_DUPLA_SISTEMA,
   type FormularioCampo,
   type FormularioSistema,
   type InstrumentoSistema,
   type RespostaValor,
 } from "./forms/schema";
-import { entregasDoMomento, SISTEMA_DA_ESTACAO, type EstacaoChave } from "./jornada";
+import { entregasDoMomento, parRoda, SISTEMA_DA_ESTACAO, type EstacaoChave } from "./jornada";
+import {
+  emitirProdutoEvento,
+  superficieDaOrigem,
+} from "./produto-eventos-server";
 import { erroAmigavel } from "./utils";
 
 // "Enviar formulário" a partir da ficha da dupla — a action do motor
@@ -87,7 +91,7 @@ export async function gerarLinksParaDupla(input: {
   if (eForm) return { error: erroAmigavel(eForm) };
   if (!form) return { error: "Formulário não encontrado." };
   if (
-    (INSTRUMENTOS_SISTEMA as readonly string[]).includes(
+    (INSTRUMENTOS_DUPLA_SISTEMA as readonly string[]).includes(
       (form.sistema as FormularioSistema | null) ?? ""
     )
   )
@@ -199,6 +203,9 @@ type DetalheInstrumento =
       campos: FormularioCampo[];
       respostas: Record<string, RespostaValor>;
       respondidoEm: string | null;
+      /** a leitura inicial da roda quando a página pede a formal — o
+       *  antes×depois que a ficha já mostra (REALIZA-441) */
+      anterior: Record<string, RespostaValor> | null;
     }
   | { ok: false };
 
@@ -214,10 +221,13 @@ export async function detalheInstrumentoDaDupla(
   const inst = itens.find((i) => i.sistema === sistema);
   if (!inst) return { ok: false };
 
-  let entregas = inst.entregas.filter((e) => e.destino === "mentorado");
+  const mentoradoEntregas = inst.entregas.filter(
+    (e) => e.destino === "mentorado"
+  );
+  let entregas = mentoradoEntregas;
   if (sistema === "roda_vida") {
     const alvo = chave === "roda_inicial" ? "inicial" : "formal";
-    entregas = entregasDoMomento(entregas, alvo);
+    entregas = entregasDoMomento(mentoradoEntregas, alvo);
   }
 
   const respondida = entregas
@@ -230,6 +240,10 @@ export async function detalheInstrumentoDaDupla(
     campos: inst.campos,
     respostas: respondida.respostas,
     respondidoEm: respondida.respondido_em,
+    anterior:
+      sistema === "roda_vida" && chave === "roda_formal"
+        ? (parRoda(mentoradoEntregas).inicial?.respostas ?? null)
+        : null,
   };
 }
 
@@ -241,26 +255,66 @@ export async function detalheInstrumentoDaDupla(
  *  é dele. */
 export async function enviarInstrumentoMentorado(
   duplaId: string,
-  sistema: string
+  sistema: string,
+  momento?: string
 ): Promise<
   { error: string } | { ok: true; token: string; reutilizado: boolean }
 > {
   if (await demoAtivo()) return { error: DEMO_MSG };
   if (!UUID_RE.test(duplaId)) return { error: "Dupla inválida." };
-  if (!(INSTRUMENTOS_SISTEMA as readonly string[]).includes(sistema))
+  if (!(INSTRUMENTOS_DUPLA_SISTEMA as readonly string[]).includes(sistema))
     return { error: "Instrumento inválido." };
+  // vocabulário por sistema — a RPC também filtra; aqui falha rápido
+  const MOMENTOS: Record<string, readonly string[]> = {
+    roda_vida: ["inicial", "formal"],
+    competencias_mentor: ["inicio", "final"],
+  };
+  if (momento != null && !(MOMENTOS[sistema] ?? []).includes(momento))
+    return { error: "Momento inválido." };
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("emitir_link_instrumento", {
     p_dupla_id: duplaId,
     p_sistema: sistema,
+    p_momento: momento ?? null,
   });
   if (error) return { error: erroAmigavel(error) };
   const token = (data as { token?: string } | null)?.token;
   if (!token) return { error: "Link emitido, mas o token não voltou." };
-  return {
-    ok: true,
-    token,
-    reutilizado: (data as { reutilizado?: boolean }).reutilizado === true,
-  };
+  const reutilizado =
+    (data as { reutilizado?: boolean }).reutilizado === true;
+  // telemetria (417): o gesto "emitir instrumento" conta mesmo com link
+  // reutilizado — a intenção de entrega aconteceu; meta sinaliza o reuso
+  await emitirProdutoEvento(supabase, {
+    superficie: await superficieDaOrigem(),
+    acao: "form_emitido",
+    meta: { dupla_id: duplaId, sistema, momento: momento ?? null, reutilizado },
+  });
+  return { ok: true, token, reutilizado };
+}
+
+/** "Refazer" self-serve do jovem (0209) — a RPC resolve a própria dupla
+ *  DPP viva, exige uma emissão anterior (respondida ou expirada) e
+ *  devolve link vivo do mesmo momento ou minta um novo com origem
+ *  'jovem'. A resposta anterior segue guardada como evidência; a ficha
+ *  da dupla mostra pro mentor que o pedido partiu dele. */
+export async function refazerInstrumentoJovem(
+  sistema: string
+): Promise<{ error: string } | { ok: true; token: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  if (!["visao", "metas", "pdm", "roda_vida"].includes(sistema))
+    return { error: "Instrumento inválido." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("refazer_instrumento_jovem", {
+    p_sistema: sistema,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  const token = (data as { token?: string } | null)?.token;
+  if (!token) return { error: "Link emitido, mas o token não voltou." };
+  await emitirProdutoEvento(supabase, {
+    superficie: await superficieDaOrigem(),
+    acao: "form_emitido",
+    meta: { sistema, origem: "jovem" },
+  });
+  return { ok: true, token };
 }

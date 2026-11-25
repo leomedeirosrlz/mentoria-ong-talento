@@ -1,8 +1,21 @@
-import { getDemoData, type DemoData } from "./data";
+import {
+  getDemoData,
+  supervisionaDuplaDemo,
+  type DemoData,
+} from "./data";
 import type { TermoSimulado } from "./shared";
-import { audienciasDe, veMaterial } from "../materiais";
-import { comparaNome, registroTardio, semanaBounds } from "../ciclo";
+import { audienciasDe, veMaterial, veMaterialDaTurma } from "../materiais";
+import { turmaDaDupla, turmaNumero } from "../turma";
+import { comparaNome, registroTardio, saudadeDaDupla, semanaBounds, toDateStr } from "../ciclo";
+import type { DiaSaude } from "../relatorios/dados";
+import type { RecorteCsv } from "../relatorios/csv-core";
 import { slotsLivresEspecialista } from "./agenda";
+import { relerTitulosNotificacao } from "../notificacao-releitura";
+import {
+  numerosMarcadosDe,
+  numerosRealizadosDe,
+  roteirosDevidos,
+} from "../plano-roteiros";
 import { normaliza } from "../utils";
 import type {
   AppRole,
@@ -20,6 +33,7 @@ import type {
   DocumentoPessoa,
   Devolutiva,
   Dupla,
+  DuplaPlanoRoteiro,
   DuplaResumo,
   Encontro,
   EspecialistaAvaliacao,
@@ -28,6 +42,7 @@ import type {
   GradeJanela,
   JovemAssinatura,
   JovemContato,
+  JovemDiretorioEntry,
   JovemDupla,
   JovemEncaminhamento,
   JovemEspecialista,
@@ -55,19 +70,23 @@ import type {
   DadosPessoais,
   DuplaOpcao,
   DuplaPerfil,
+  FichaJovemPerfil,
   FiltrosRegistro,
   MentorProfile,
   PessoaPerfil,
   RegistroResumo,
 } from "../queries";
 import type { ResumoFormacao } from "../queries-presenca";
-import type { JovemEncontro } from "../queries-jovem";
+import type { JovemEncontro, JovemPlano, JovemRecesso } from "../queries-jovem";
 import type {
   AvaliacaoMediaDpp,
   AvaliacaoTokenInfo,
   JovemAvaliacao,
 } from "../queries-avaliacao";
-import type { FormularioPublico } from "../forms/queries";
+import type { ContextoAvaliacao, FormularioPublico } from "../forms/queries";
+import type { FormularioLink } from "../forms/schema";
+import { mediaQuantizadaDpp } from "../avaliacao-agregado";
+import type { InscricaoTurma, PapelEscopo } from "../pessoas-status";
 import { getDemoFormularios } from "./forms-data";
 import type { Interacao } from "../interacoes";
 import type {
@@ -106,7 +125,7 @@ const criadoEm = (d: Dupla) =>
  *  profile_papeis dela — o backfill garante uma por role e o híbrido
  *  carrega duas. Sem linha na tabela, cai no profiles.role (estado
  *  pré-migration); é o que o has_papel real fará quando a tabela sair. */
-function papeisDe(data: DemoData, profile: Profile): AppRole[] {
+export function papeisDe(data: DemoData, profile: Profile): AppRole[] {
   const linhas = data.profilePapeis.filter((r) => r.profile_id === profile.id);
   if (linhas.length === 0) return profile.role ? [profile.role] : [];
   return [...new Set(linhas.map((r) => r.papel))];
@@ -115,12 +134,16 @@ const temPapel = (data: DemoData, p: Profile, papel: AppRole) =>
   papeisDe(data, p).includes(papel);
 
 /** Escopo de vínculo do papel — o mesmo das policies duplas_select: coord
- *  tudo; supervisor as supervisionadas; mentor/especialista as mentoradas. */
+ *  tudo; supervisor as supervisionadas + as da turma do escopo dele (0125)
+ *  + as que ele mentora (mentor_id=me é ramo próprio da policy); demais
+ *  papéis as mentoradas. */
 function duplasDoPapel(data: DemoData, role: AppRole): Dupla[] {
   const eu = data.personas[role];
   if (role === "coordenacao") return data.duplas;
   if (role === "supervisor")
-    return data.duplas.filter((d) => d.supervisor?.id === eu.id);
+    return data.duplas.filter(
+      (d) => d.mentor?.id === eu.id || supervisionaDuplaDemo(data, eu.id, d)
+    );
   return data.duplas.filter((d) => d.mentor?.id === eu.id);
 }
 
@@ -141,7 +164,7 @@ function jovemProfileVisivel(
   return data.duplas.some(
     (d) =>
       d.mentorado?.id === ficha.id &&
-      (d.mentor?.id === eu.id || d.supervisor?.id === eu.id)
+      (d.mentor?.id === eu.id || supervisionaDuplaDemo(data, eu.id, d))
   );
 }
 
@@ -160,7 +183,7 @@ export function demoContatosMap(role: AppRole): Map<string, Contato> {
       // idem à view profiles_contato: só dupla ativa/pausada expõe o
       // contato do mentor — concluída/encerrada é capítulo fechado
       if (
-        d.supervisor?.id === eu.id &&
+        supervisionaDuplaDemo(data, eu.id, d) &&
         (d.status === "ativa" || d.status === "pausada") &&
         d.mentor
       ) {
@@ -239,6 +262,9 @@ const COLS_MENTORADO_PAR: (keyof MentoradoPar)[] = [
   "uf",
   "interesses",
   "disponibilidade",
+  // MENTORADO_COLS_PAR da query real inclui situacao — sem ele a demo
+  // escondia um jovem desistente do gatilho de remanejo (460)
+  "situacao",
 ];
 
 function mentoradoPar(m: MentoradoPar): MentoradoPar {
@@ -251,14 +277,23 @@ function mentoradoPar(m: MentoradoPar): MentoradoPar {
 /** Contato em mentor/supervisor de cada dupla — idem mergeContatoDuplas.
  *  O embed real lista só colunas públicas: o strip dos sensíveis vale pra
  *  TODO papel, inclusive coordenação (a ficha dela vem pelas views). O
- *  mentorado desce pro recorte PAR desde a 0076. */
+ *  mentorado desce pro recorte PAR desde a 0076. `papeis` do mentor vem do
+ *  embed profile_papeis — a policy select exclui o mentorado, então a
+ *  linha alheia desce vazia pra ele como no banco. */
 function comContatoDuplas(
   duplas: Dupla[],
-  contatos: Map<string, Contato>
+  contatos: Map<string, Contato>,
+  role: AppRole
 ): Dupla[] {
+  const data = getDemoData();
   return duplas.map((d) => ({
     ...d,
-    mentor: d.mentor ? semPessoal(comContato(d.mentor, contatos)) : d.mentor,
+    mentor: d.mentor
+      ? semPessoal({
+          ...comContato(d.mentor, contatos),
+          papeis: role === "mentorado" ? [] : papeisDe(data, d.mentor),
+        })
+      : d.mentor,
     mentorado: d.mentorado ? mentoradoPar(d.mentorado) : d.mentorado,
     supervisor: d.supervisor ? semPessoal(comContato(d.supervisor, contatos)) : null,
   }));
@@ -410,19 +445,47 @@ export function demoSlotsLivres(profileId: string, dias = 21): string[] {
 }
 
 /** Policy materiais_select (0065): 'todos' alcança qualquer papel — inclusive
- *  o mentorado; 'dpp'/'especialista' só o papel homônimo; coordenação vê tudo. */
+ *  o mentorado; 'dpp'/'especialista' só o papel homônimo; coordenação vê tudo.
+ *  O recorte de turma do getMateriais vale igual: material "— Turma N" só
+ *  aparece pra quem tem dupla nela. */
 export function demoMateriais(role: AppRole): Material[] {
   const data = getDemoData();
   const eu = data.personas[role];
   // papéis efetivos da persona (profile_papeis do dataset) — é o que faz o
   // híbrido ver os dois lados; o `role` sozinho perderia o secundário
   const papeis = papeisDe(data, eu);
+  const turmas = papeis.includes("coordenacao")
+    ? null
+    : new Set(
+        duplasDoPapel(data, role).map((d) =>
+          turmaNumero(turmaDaDupla(d, data.cronogramas) ?? "")
+        )
+      );
   return data.materiais
     .filter((m) =>
       // mesma régua do app/RLS (0139): audiencias cumulativas por papel
       veMaterial(audienciasDe(m), { role: eu.role, papeis })
     )
+    .filter((m) => veMaterialDaTurma(m, turmas))
     .sort((a, b) => a.ordem - b.ordem);
+}
+
+/** Leituras prévias da persona (0196) — baseline narrativo; as da sessão
+ *  ficam no cookie demo_materiais_lidos e a query real mescla (este módulo
+ *  também entra no grafo client via client-stub — nada de next/headers). */
+export function demoBaseMateriaisLidos(role: AppRole): string[] {
+  return role === "mentor_dpp"
+    ? [
+        "doc:guia-mentor-dpp",
+        // roteiros dos encontros já realizados (a demo ancora a semana no
+        // 5º) — o da semana corrente segue por ler, que é o gesto visível
+        ...[1, 2, 3, 4].map(
+          (n) => `doc:roteiro-encontro-${String(n).padStart(2, "0")}`
+        ),
+      ]
+    : role === "mentor_especialista"
+      ? ["doc:guia-mentor-especialista"]
+      : [];
 }
 
 // ---------- duplas ----------
@@ -437,7 +500,8 @@ export function demoDuplas(role: AppRole): Dupla[] {
       role,
       data
     ),
-    demoContatosMap(role)
+    demoContatosMap(role),
+    role
   );
 }
 
@@ -446,14 +510,34 @@ export function demoDupla(role: AppRole, id: string): Dupla | null {
   return demoDuplas(role).find((d) => d.id === id) ?? null;
 }
 
-/** mentor_id = eu OR supervisor_id = eu — getMinhasDuplas não ramifica por
- *  papel, então pra coordenação devolve as duplas em que ela é parte (nenhuma
- *  no dataset típico — a home dela usa getDuplas). */
+/** A dupla DO jovem — `duplasDoPapel` é por mentor/supervisão, então a
+ *  persona mentorado resolve a dela pelo vínculo mentorado (mesmo escopo
+ *  da RLS: jovem_relacionado). Reaplica a mesma pipeline de mascaramento. */
+export function demoDuplaJovem(role: AppRole, id: string): Dupla | null {
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  const d = data.duplas.find(
+    (x) => x.id === id && m != null && x.mentorado?.id === m.id
+  );
+  if (!d) return null;
+  return (
+    comContatoDuplas(
+      comAvaliacaoJovem([d], role, data),
+      demoContatosMap(role),
+      role
+    )[0] ?? null
+  );
+}
+
+/** mentor_id = eu OR supervisiona_dupla — a real não filtra em TS: a RLS
+ *  devolve as mentoradas + as supervisionadas + as da turma do escopo
+ *  (0125). Pra coordenação devolve as em que ela é parte (nenhuma no
+ *  dataset típico — a home dela usa getDuplas). */
 export function demoMinhasDuplas(role: AppRole): Dupla[] {
   const data = getDemoData();
   const eu = data.personas[role];
   const minhas = data.duplas.filter(
-    (d) => d.mentor?.id === eu.id || d.supervisor?.id === eu.id
+    (d) => d.mentor?.id === eu.id || supervisionaDuplaDemo(data, eu.id, d)
   );
   return comContatoDuplas(
     comAvaliacaoJovem(
@@ -461,7 +545,8 @@ export function demoMinhasDuplas(role: AppRole): Dupla[] {
       role,
       data
     ),
-    demoContatosMap(role)
+    demoContatosMap(role),
+    role
   );
 }
 
@@ -476,6 +561,12 @@ export function demoDuplasResumo(role: AppRole, todas: boolean): DuplaResumo[] {
       mentorado_id: d.mentorado.id,
       supervisor_id: d.supervisor?.id ?? null,
       trilha: d.trilha,
+      turma: d.turma,
+      cronograma_id: d.cronograma_id,
+      status: d.status,
+      encerrada_em: d.encerrada_em ?? null,
+      desfecho_em: d.desfecho_em ?? null,
+      remanejada_de: d.remanejada_de ?? null,
     }));
 }
 
@@ -520,6 +611,15 @@ export function demoPessoas(role: AppRole): Profile[] {
     .sort(porNome);
 }
 
+/** Réplica do embed `conta` de MENTORADO_COLS_PUBLICAS (0180) — o
+ *  onboarded_em do profile vinculado resolve as 3 fases do convite.
+ *  Left join como o PostgREST: profile fora do dataset vira null. */
+function comConta(data: DemoData, m: Mentorado): Mentorado {
+  if (!m.profile_id) return m;
+  const conta = data.profiles.find((p) => p.id === m.profile_id);
+  return { ...m, conta: conta ? { onboarded_em: conta.onboarded_em } : null };
+}
+
 export function demoMentorados(role: AppRole): Mentorado[] {
   const data = getDemoData();
   // mentorados_select (0023): coordenação lê todos; mentor e supervisor só
@@ -533,7 +633,7 @@ export function demoMentorados(role: AppRole): Mentorado[] {
   // pra qualquer papel ≠ coordenação (a real lê pela view mentorados_pessoal)
   return data.mentorados
     .filter((m) => !vinculados || vinculados.has(m.id))
-    .map((m) => (role === "coordenacao" ? m : semPessoal(m)))
+    .map((m) => comConta(data, role === "coordenacao" ? m : semPessoal(m)))
     .sort(porNome);
 }
 
@@ -633,7 +733,13 @@ function duplaPerfil(
 export function demoPessoaPerfil(
   role: AppRole,
   id: string
-): (PessoaPerfil & { duplas: DuplaPerfil[]; notas: PessoaNota[] }) | null {
+):
+  | (PessoaPerfil & {
+      duplas: DuplaPerfil[];
+      notas: PessoaNota[];
+      fichaJovem: FichaJovemPerfil;
+    })
+  | null {
   const data = getDemoData();
   const eu = data.personas[role];
   const contatos = demoContatosMap(role);
@@ -653,6 +759,20 @@ export function demoPessoaPerfil(
     // lados — DPP de uma dupla E especialista com trilha (ou grade aberta)
     const ehMentor =
       temPapel(data, p, "mentor_dpp") || temPapel(data, p, "mentor_especialista");
+    // conta de jovem → ficha canônica, escopada como mentorados_select:
+    // coord sempre; os demais só se a ficha é de um mentorado de dupla dele
+    const ficha = data.mentorados.find((x) => x.profile_id === id);
+    const fichaJovem =
+      ficha &&
+      (role === "coordenacao" ||
+        escopo.some((d) => d.mentorado?.id === ficha.id))
+        ? {
+            id: ficha.id,
+            nome: ficha.nome,
+            nome_social: ficha.nome_social ?? null,
+            whatsapp: ficha.whatsapp ?? null,
+          }
+        : null;
     return {
       tipo: "profile",
       pessoa: role === "coordenacao" ? comContato(p, contatos) : semPessoal(comContato(p, contatos)),
@@ -664,6 +784,7 @@ export function demoPessoaPerfil(
         .sort(desc)
         .map((d) => duplaPerfil(d, contatos)),
       notas: notasDe("profile_id"),
+      fichaJovem,
     };
   }
   const m = data.mentorados.find((x) => x.id === id);
@@ -681,12 +802,13 @@ export function demoPessoaPerfil(
     return {
       tipo: "mentorado",
       pessoa: {
-        ...(role === "coordenacao" ? m : semPessoal(m)),
+        ...comConta(data, role === "coordenacao" ? m : semPessoal(m)),
         curriculo_path: cv?.curriculo_path ?? null,
         curriculo_url: cv?.curriculo_url ?? null,
       },
       duplas,
       notas: notasDe("mentorado_id"),
+      fichaJovem: null,
     };
   }
   return null;
@@ -718,11 +840,13 @@ export function demoNotificacoes(
   naoLidas: number;
 } {
   const agora = new Date().toISOString();
-  const lista = [...(getDemoData().notificacoes[role] ?? [])]
-    .map((n) =>
-      n.lida_em == null && lidas.has(n.id) ? { ...n, lida_em: agora } : n
-    )
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const lista = relerTitulosNotificacao(
+    [...(getDemoData().notificacoes[role] ?? [])]
+      .map((n) =>
+        n.lida_em == null && lidas.has(n.id) ? { ...n, lida_em: agora } : n
+      )
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+  );
   return {
     itens: lista.slice(0, 15),
     naoLidas: lista.filter((n) => n.lida_em == null).length,
@@ -1009,12 +1133,106 @@ export function demoJovemEncontros(role: AppRole): JovemEncontro[] {
       status: e.status,
       link: e.link,
       motivo_reagendamento: e.motivo_reagendamento,
+      sessao_id: e.sessao_id ?? null,
     }))
     .sort(
       (a, b) =>
         Number(a.data_hora == null) - Number(b.data_hora == null) ||
         (a.data_hora ?? "").localeCompare(b.data_hora ?? "")
     );
+}
+
+/** jovem_plano (0219): o combinado da DPP mais recente dela — o recorte
+ *  definer espelhado sobre o dataset (plano vivo primeiro, senão o mais
+ *  recente; sem semáforo nem motivos internos). Ler a árvore em vez de
+ *  repetir números fixos é o que mantém os passos coerentes com os
+ *  encontros reais da dupla (482). */
+export function demoJovemPlano(role: AppRole): JovemPlano | null {
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return null;
+  const dupla = data.duplas
+    .filter((d) => d.mentorado?.id === m.id && d.trilha !== "especialista")
+    .sort(
+      (a, b) =>
+        Number(b.status === "ativa" || b.status === "pausada") -
+          Number(a.status === "ativa" || a.status === "pausada") ||
+        criadoEm(b).localeCompare(criadoEm(a))
+    )[0];
+  if (!dupla) return null;
+  const p = (dupla.planos ?? [])
+    .slice()
+    .sort(
+      (a, b) =>
+        Number(["proposto", "aceito", "ativo"].includes(b.status)) -
+          Number(["proposto", "aceito", "ativo"].includes(a.status)) ||
+        b.created_at.localeCompare(a.created_at)
+    )[0];
+  if (!p) return null;
+  return {
+    id: p.id,
+    status: p.status,
+    versao: p.versao,
+    ritmo: p.escopo?.ritmo != null ? String(p.escopo.ritmo) : null,
+    janela: p.escopo?.janela ?? null,
+    passos: p.escopo?.passos ?? [],
+    aprovado_lado: p.aprovado_lado ?? null,
+    aceito_mentor: p.aceito_mentor_em != null || p.aprovado_lado === "mentor",
+    aceito_mentorado:
+      p.aceito_mentorado_em != null || p.aprovado_lado === "mentorado",
+    proposto_em: p.created_at,
+    aprovado_em: p.aprovado_em,
+    proposto_por: p.proposto_por,
+    proposto_via: p.proposto_via,
+    expira_em: p.expira_em,
+    passos_aplicados: (p.passos ?? []).map((s) => ({
+      numero: s.numero,
+      data_nova: s.data_nova,
+      aplicado_em: s.aplicado_em,
+    })),
+  };
+}
+
+/** jovem_recessos (0218/0225): os recessos vigentes do cronograma da DPP
+ *  dela com a decisão da dupla — left join do banco espelhado aqui:
+ *  evento sem row em dupla_recessos volta `usa: null` (pendente), nunca
+ *  o default silencioso que a 0225 aposentou. */
+export function demoJovemRecessos(role: AppRole): JovemRecesso[] {
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return [];
+  const dupla = data.duplas
+    .filter((d) => d.mentorado?.id === m.id && d.trilha !== "especialista")
+    .sort(
+      (a, b) =>
+        Number(b.status === "ativa" || b.status === "pausada") -
+          Number(a.status === "ativa" || a.status === "pausada") ||
+        criadoEm(b).localeCompare(criadoEm(a))
+    )[0];
+  if (!dupla?.cronograma_id) return [];
+  const hoje = toDateStr(new Date());
+  const porEvento = new Map(
+    (dupla.recessos ?? []).map((r) => [r.ciclo_evento_id, r])
+  );
+  return data.cicloEventos
+    .filter(
+      (e) =>
+        e.cronograma_id === dupla.cronograma_id &&
+        e.tipo === "recesso" &&
+        e.data != null &&
+        (e.data_fim ?? e.data) >= hoje
+    )
+    .sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""))
+    .map((e) => {
+      const r = porEvento.get(e.id);
+      return {
+        ciclo_evento_id: e.id,
+        data: e.data!,
+        data_fim: e.data_fim,
+        usa: r?.usa ?? null,
+        declarado_em: r?.declarado_em ?? null,
+      };
+    });
 }
 
 // ---------- /registros — conteúdo do form semanal (coord/sup) ----------
@@ -1184,7 +1402,7 @@ function efetivo(s: SolicitacaoEspecialista): SolicitacaoEspecialistaStatus {
 
 /** Devolve a solicitação como a view solicitacoes_mural — com status_efetivo
  *  computado na leitura (a coluna só existe na view, não no dataset). */
-function comEfetivo(s: SolicitacaoEspecialista): SolicitacaoEspecialista {
+export function comEfetivo(s: SolicitacaoEspecialista): SolicitacaoEspecialista {
   return { ...s, status_efetivo: efetivo(s) };
 }
 
@@ -1341,24 +1559,22 @@ export function demoEspecialistas(): {
     .sort(porNome);
 }
 
-/** O catálogo da view jovem_especialistas (0075) — os especialistas ativos,
- *  projetados no que o jovem pode ver (nome/social/avatar/áreas, sem contato).
- *  Só faz sentido pro papel mentorado. Filtra por profile_papeis (o híbrido
- *  aparece); a decisão D9 do guia tira o próprio DPP do jovem do catálogo. */
-export function demoJovemEspecialistas(role: AppRole): JovemEspecialista[] {
-  if (role !== "mentorado") return [];
-  const data = getDemoData();
-  const m = mentoradoDaPersona(data, role);
-  const meuDppId = data.duplas.find(
-    (d) =>
-      d.mentorado?.id === m?.id && d.trilha === "dpp" && d.status === "ativa"
-  )?.mentor?.id;
+/** A projeção rica de especialista compartilhada pelas três views de
+ *  catálogo (jovem_especialistas 0075/0086 e especialistas_catalogo 0239):
+ *  os ativos com papel mentor_especialista, projetados no que a pessoa
+ *  pode ver (nome/social/avatar/áreas/currículo/janela por período,
+ *  sem contato). `excludeId` é o recorte específico do jovem — a decisão
+ *  D9 do guia tira o próprio DPP dele do catálogo. */
+function catalogoEspRows(
+  data: DemoData,
+  excludeId?: string | null
+): JovemEspecialista[] {
   return data.profiles
     .filter(
       (p) =>
         temPapel(data, p, "mentor_especialista") &&
         p.ativo &&
-        p.id !== meuDppId
+        p.id !== excludeId
     )
     .map((p) => {
       const mp = data.mentorProfiles.find((x) => x.profile_id === p.id);
@@ -1403,6 +1619,159 @@ export function demoJovemEspecialistas(role: AppRole): JovemEspecialista[] {
       };
     })
     .sort(porNome);
+}
+
+/** O catálogo da view jovem_especialistas (0075) — os especialistas ativos,
+ *  projetados no que o jovem pode ver (nome/social/avatar/áreas, sem contato).
+ *  Só faz sentido pro papel mentorado. Filtra por profile_papeis (o híbrido
+ *  aparece); a decisão D9 do guia tira o próprio DPP do jovem do catálogo. */
+export function demoJovemEspecialistas(role: AppRole): JovemEspecialista[] {
+  if (role !== "mentorado") return [];
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  const meuDppId = data.duplas.find(
+    (d) =>
+      d.mentorado?.id === m?.id && d.trilha === "dpp" && d.status === "ativa"
+  )?.mentor?.id;
+  return catalogoEspRows(data, meuDppId);
+}
+
+/** O catálogo staff `especialistas_catalogo` (0239) — a MESMA projeção da
+ *  jovem_especialistas trocando só o predicado de papel: todo staff lê
+ *  (coordenacao/mentor_dpp/mentor_especialista/supervisor), o mentorado
+ *  não. Sem o recorte D9 — pro staff o DPP do jovem é um especialista
+ *  listável como qualquer outro. */
+export function demoEspecialistasCatalogo(
+  role: AppRole
+): JovemEspecialista[] {
+  if (
+    role !== "coordenacao" &&
+    role !== "mentor_dpp" &&
+    role !== "mentor_especialista" &&
+    role !== "supervisor"
+  )
+    return [];
+  return catalogoEspRows(getDemoData());
+}
+
+/** jovem_diretorio (0239): os três braços deduplicados por id com a
+ *  prioridade da view (catálogo vence adulto, adulto vence jovem) —
+ *  adultos ativos com papel no programa, TODOS os jovens com conta
+ *  (exceto o próprio, inclusive menores com foto — decisão do lead) e o
+ *  catálogo. minha_rede/minha_turma saem dos mesmos conjuntos que as
+ *  views de rede usam — inclusive o quirk fiel: o braço catálogo traz
+ *  minha_rede=false mesmo pro especialista da própria trilha (a página
+ *  repara pela rede resolvida, como o app real faz). */
+export function demoJovemDiretorio(role: AppRole): JovemDiretorioEntry[] {
+  if (role !== "mentorado") return [];
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return [];
+  const redeAdultos = new Set(
+    demoJovemContatos(role)
+      .map((c) => c.id)
+      .filter((id): id is string => id != null)
+  );
+  const redeJovens = new Set(
+    demoJovemColegas(role)
+      .map((c) => c.id)
+      .filter((id): id is string => id != null)
+  );
+  const linhas: (JovemDiretorioEntry & { prioridade: number })[] = [
+    // catálogo primeiro (prioridade 0 vence o distinct on (id))
+    ...demoJovemEspecialistas(role).map((e) => ({
+      id: e.id,
+      tipo: "especialista" as const,
+      nome: e.nome,
+      nome_social: e.nome_social,
+      avatar_path: e.avatar_path,
+      papel: "mentor_especialista",
+      cidade: e.cidade,
+      uf: e.uf,
+      interesses: null,
+      areas: e.areas,
+      bio: e.bio,
+      cargo: e.cargo,
+      empresa: e.empresa,
+      experiencia_previa: e.experiencia_previa,
+      formacao_externa: e.formacao_externa,
+      voluntariado: e.voluntariado,
+      grade_resumo: e.grade_resumo,
+      vagas: e.vagas,
+      minha_rede: false,
+      minha_turma: false,
+      prioridade: 0,
+    })),
+    ...data.profiles
+      .filter(
+        (p) =>
+          p.ativo &&
+          (temPapel(data, p, "mentor_dpp") ||
+            temPapel(data, p, "mentor_especialista") ||
+            temPapel(data, p, "supervisor") ||
+            temPapel(data, p, "coordenacao"))
+      )
+      .map((p) => ({
+        id: p.id,
+        tipo: "adulto" as const,
+        nome: p.nome,
+        nome_social: p.nome_social ?? null,
+        avatar_path: p.avatar_path ?? null,
+        papel: p.role,
+        cidade: p.cidade ?? null,
+        uf: p.uf ?? null,
+        interesses: p.interesses ?? null,
+        areas: p.areas ?? null,
+        bio: p.bio ?? null,
+        cargo: p.cargo ?? null,
+        empresa: p.empresa ?? null,
+        experiencia_previa: null,
+        formacao_externa: null,
+        voluntariado: p.voluntariado ?? null,
+        grade_resumo: null,
+        vagas: null,
+        minha_rede: redeAdultos.has(p.id),
+        minha_turma: false,
+        prioridade: 1,
+      })),
+    ...data.mentorados
+      .filter((c) => c.id !== m.id && c.profile_id != null)
+      .map((c) => ({
+        id: c.id,
+        tipo: "jovem" as const,
+        nome: c.nome,
+        nome_social: c.nome_social ?? null,
+        avatar_path: c.avatar_path ?? null,
+        papel: "mentorado",
+        cidade: c.cidade ?? null,
+        uf: c.uf ?? null,
+        interesses: c.interesses ?? null,
+        areas: null,
+        bio: null,
+        cargo: null,
+        empresa: null,
+        experiencia_previa: null,
+        formacao_externa: null,
+        voluntariado: null,
+        grade_resumo: null,
+        vagas: null,
+        minha_rede: redeJovens.has(c.id),
+        minha_turma: redeJovens.has(c.id),
+        prioridade: 2,
+      })),
+  ];
+  const dedup = new Map<string, JovemDiretorioEntry>();
+  for (const { prioridade: _p, ...linha } of linhas.sort(
+    (a, b) => a.prioridade - b.prioridade
+  )) {
+    if (!dedup.has(linha.id)) dedup.set(linha.id, linha);
+  }
+  return [...dedup.values()].sort((a, b) =>
+    (a.nome_social || a.nome).localeCompare(
+      b.nome_social || b.nome,
+      "pt-BR"
+    )
+  );
 }
 
 /** Feed datado por trilha (0086) — o jovem lê as das duplas dele; o
@@ -1465,7 +1834,7 @@ export function demoTrilhasDosJovens(
       dpp != null &&
       dpp.trilha === "dpp" &&
       (dpp.mentor?.id === eu.id ||
-        dpp.supervisor?.id === eu.id ||
+        supervisionaDuplaDemo(data, eu.id, dpp) ||
         temPapel(data, eu, "coordenacao"));
     if (!autorizado || !dpp.mentorado?.id) return [id, []];
 
@@ -1917,7 +2286,7 @@ function presencaVisivel(data: DemoData, role: AppRole, p: Presenca): boolean {
   if (role !== "supervisor") return false;
   return data.duplas.some(
     (d) =>
-      d.supervisor?.id === eu.id &&
+      supervisionaDuplaDemo(data, eu.id, d) &&
       d.mentor?.id === p.profile_id &&
       (d.status === "ativa" || d.status === "pausada")
   );
@@ -2024,7 +2393,52 @@ export function demoFormularioPorToken(
       versao: f.versao,
       sistema: f.sistema ?? null,
     },
+    contexto_avaliacao: demoContextoAvaliacao(l, f.sistema ?? null),
   };
+}
+
+/** Espelho do contexto_avaliacao da 0191: nos links dos 360º com dupla,
+ *  mentor recebe a série 1–4 dele + a média do jovem pela MESMA régua
+ *  quantizada (mediaQuantizadaDpp, módulo puro); mentorado, as estrelas
+ *  dele. Os fixtures demo avaliações por dupla_id/encontro_id como o join
+ *  real — a série sai idêntica. */
+function demoContextoAvaliacao(
+  l: FormularioLink,
+  sistema: string | null
+): ContextoAvaliacao | null {
+  if (!l.dupla_id) return null;
+  const data = getDemoData();
+  const dupla = data.duplas.find((d) => d.id === l.dupla_id);
+  if (sistema === "avaliacao_final_mentor") {
+    const registros = (dupla?.encontros ?? [])
+      .map((e) => ({
+        numero: e.numero,
+        avaliacao: e.registro?.avaliacao ?? null,
+      }))
+      .filter((r) => r.avaliacao != null)
+      .sort((a, b) => a.numero - b.numero);
+    const porData = data.avaliacoes
+      .filter((a) => a.dupla_id === l.dupla_id)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const q = mediaQuantizadaDpp(porData.map((a) => a.estrelas));
+    return { registros, media_jovem: q.liberado ? (q.media ?? null) : null };
+  }
+  if (sistema === "avaliacao_final_mentorado") {
+    const numeroPorEncontro = new Map(
+      (dupla?.encontros ?? []).map((e) => [e.id, e.numero])
+    );
+    const estrelas = data.avaliacoes
+      .filter((a) => a.dupla_id === l.dupla_id)
+      .map((a) => ({
+        numero: numeroPorEncontro.get(a.encontro_id) ?? 0,
+        estrelas: a.estrelas,
+        avancei: a.avancei,
+      }))
+      .filter((a) => a.numero > 0)
+      .sort((a, b) => a.numero - b.numero);
+    return { estrelas };
+  }
+  return null;
 }
 
 // ---------- avaliação estrela do jovem (0071) ----------
@@ -2119,6 +2533,15 @@ export function demoAvaliacaoLinkMeta(
     dupla_id: l.dupla_id,
     trilha: d?.trilha ?? "dpp",
   };
+}
+
+/** Lote da média da dupla (≥3 respostas) — mesmo critério da RPC
+ *  avaliacao_media_dpp; a copy de privacidade do form público usa pra não
+ *  prometer média que não existe (027/FR-003). */
+export function demoTemMediaDpp(duplaId: string): boolean {
+  return (
+    getDemoData().avaliacoes.filter((a) => a.dupla_id === duplaId).length >= 3
+  );
 }
 
 /** As avaliações que a persona mentorada enviou — branch exists(jovem_duplas)
@@ -2289,6 +2712,19 @@ export function demoChamadosFila(role: AppRole): ChamadoFilaItem[] {
         atribuido_nome: restrito ? null : nome(c.atribuido_a),
         contexto,
         mentorado_nome: restrito ? null : mNome,
+        // mesma régua do ramo autor do getChamados: pública de alguém que
+        // não é o autor conta como resposta da equipe (a própria fala do
+        // autor não responde o pedido dele). O recorte da equipe não
+        // deriva a flag — a fila real também não preenche
+        tem_resposta_equipe: staff
+          ? undefined
+          : data.chamadoAtualizacoes.some(
+              (u) =>
+                u.chamado_id === c.id &&
+                u.tipo === "publica" &&
+                u.autor_id != null &&
+                u.autor_id !== eu.id
+            ),
       } as ChamadoFilaItem;
     })
     .sort((a, b) => {
@@ -2387,6 +2823,44 @@ export function demoTurmaInscricoesAguardando(
         ];
       return [];
     });
+}
+
+// ---------- /pessoas por turma (REALIZA-39) — mesmos gates coord-only das
+// queries reais; o status deriva em pessoas-status.ts sobre estes mapas
+
+/** Todas as inscrições (o /pessoas precisa das três: aguardando marca o
+ *  papel; formada/desistiu seguem valendo como filiação à turma). */
+export function demoTurmaInscricoesPessoas(role: AppRole): InscricaoTurma[] {
+  if (role !== "coordenacao") return [];
+  return getDemoData().turmaInscricoes.map((i) => ({
+    turma: i.turma,
+    profile_id: i.profile_id,
+    mentorado_id: i.mentorado_id,
+    papel_esperado: i.papel_esperado,
+    status: i.status,
+  }));
+}
+
+/** Grants escopados — o Paulo supervisiona a T2 inteira pelo escopo; é a
+ *  única linha não-global do dataset e cobre o papel "Auxiliar executivo". */
+export function demoPapeisEscopo(role: AppRole): PapelEscopo[] {
+  if (role !== "coordenacao") return [];
+  return getDemoData()
+    .profilePapeis.filter((pp) => pp.escopo_turma != null)
+    .map((pp) => ({
+      profile_id: pp.profile_id,
+      papel: pp.papel,
+      escopo_turma: pp.escopo_turma!,
+    }));
+}
+
+/** Último acesso por profile (espelho da view profiles_acesso, 0192) — o
+ *  mapa vem do dataset; quem não tem user_id não tem linha, como no real. */
+export function demoMapaAcesso(
+  role: AppRole
+): Record<string, string | null> {
+  if (role !== "coordenacao") return {};
+  return getDemoData().acessoMap;
 }
 
 /** Painel de links públicos da coordenação (REALIZA-170/201) — fixture
@@ -2490,4 +2964,99 @@ export function demoResumoAcessos(): ResumoAcessoItem[] {
       origem: "a1b2c3d4e5",
     },
   ];
+}
+
+/** Tendência da aba Saúde na demo — o job de snapshots não existe no
+ *  dataset em memória, mas as datas são evergreen: recalcular o semáforo
+ *  de cada dupla viva a cada dia reproduz o histórico que a RPC gravaria
+ *  (mesma regra do backfill do job — dados atuais, não replay). O filtro
+ *  espelha duplaNoRecorte sem importar csv-core (que puxa next/server). */
+export function demoTendenciaSaude(
+  data: DemoData,
+  recorte: RecorteCsv,
+  dias = 30,
+  hoje = new Date()
+): DiaSaude[] {
+  const vivas = data.duplas.filter(
+    (d) =>
+      (d.status === "ativa" || d.status === "pausada") &&
+      (!recorte.turma ||
+        turmaDaDupla(d, data.cronogramas) === recorte.turma) &&
+      (!recorte.cronogramaId || d.cronograma_id === recorte.cronogramaId)
+  );
+  const porDia = new Map<string, DiaSaude>();
+  for (let i = dias - 1; i >= 0; i--) {
+    const d = new Date(hoje.getTime() - i * 86400000);
+    const cur = porDia.get(d.toISOString().slice(0, 10)) ?? {
+      dia: d.toISOString().slice(0, 10),
+      risco: 0,
+      atencao: 0,
+      ok: 0,
+    };
+    for (const dupla of vivas) {
+      const s = saudadeDaDupla(dupla, data.cicloEventos, d).semaforo;
+      if (s === "risco") cur.risco++;
+      else if (s === "atencao") cur.atencao++;
+      else cur.ok++;
+    }
+    porDia.set(cur.dia, cur);
+  }
+  return [...porDia.values()];
+}
+
+/** Metas dos roteiros do plano na demo (020): as semanas devidas nascem
+ *  publicadas e a seguinte fica rascunho — o conteúdo fica vazio aqui
+ *  (a home só troca o link; a rota da semana monta de verdade). */
+export function demoRoteirosResumo(
+  role: AppRole,
+  planoIds?: string[]
+): DuplaPlanoRoteiro[] {
+  const agora = new Date().toISOString();
+  const rows: DuplaPlanoRoteiro[] = [];
+  const data = getDemoData();
+  const meuMentorado = mentoradoDaPersona(data, role);
+  const duplas =
+    role === "mentorado"
+      ? data.duplas.filter((d) => d.mentorado?.id === meuMentorado?.id)
+      : demoDuplas(role);
+  for (const dupla of duplas) {
+    const plano =
+      (dupla.planos ?? [])
+        .filter((p) => p.status === "aceito" || p.status === "ativo")
+        .sort((a, b) => b.versao - a.versao)[0] ?? null;
+    if (!plano || (planoIds && !planoIds.includes(plano.id))) continue;
+    const realizados = numerosRealizadosDe(dupla.encontros ?? []);
+    const devidos = roteirosDevidos({
+      numeros: plano.escopo?.numeros ?? [],
+      marcados: numerosMarcadosDe(dupla.encontros ?? []),
+      realizados,
+    });
+    // rascunho = próxima semana futura do combinado; nunca uma realizada
+    const rascunho = (plano.escopo?.numeros ?? []).find(
+      (n) => !devidos.includes(n) && !realizados.includes(n)
+    );
+    for (const [status, numero] of [
+      ...devidos.map((n) => ["publicado", n] as const),
+      ...(rascunho != null ? [["rascunho", rascunho] as const] : []),
+    ]) {
+      rows.push({
+        id: `roteiro-demo-${plano.id}-${numero}`,
+        dupla_id: dupla.id,
+        plano_id: plano.id,
+        numero,
+        versao: 1,
+        plano_versao: plano.versao,
+        conteudo: null,
+        status,
+        gerado_por: null,
+        gerado_via: "app",
+        gerado_em: agora,
+        editado_por: null,
+        publicado_por: null,
+        publicado_em: status === "publicado" ? agora : null,
+        updated_at: agora,
+      });
+    }
+  }
+  return rows;
 }

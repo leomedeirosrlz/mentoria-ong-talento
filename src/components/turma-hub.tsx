@@ -132,7 +132,8 @@ export function TurmaHubCard({
   duplas: Dupla[];
   eventos: CicloEvento[];
   hoje: Date;
-  /** card do contexto ativo — ring + aria-current. */
+  /** card do contexto ativo — ring + aria-current; o re-clique limpa o
+   *  recorte (link vira `?turma=todas`). */
   ativa?: boolean;
   /** índice do stagger de entrada (--i). */
   i?: number;
@@ -147,13 +148,18 @@ export function TurmaHubCard({
   const nome = turmaLonga(turma);
 
   return (
+    // re-clicar no card do foco ativo limpa o recorte (REALIZA-365) —
+    // `?turma=todas` é o mesmo destino do "ver todas": a page resolve
+    // origem "todas" e o sync apaga o cookie
     <Link
-      href={`/?turma=${encodeURIComponent(turma)}`}
+      href={
+        ativa ? "/?turma=todas" : `/?turma=${encodeURIComponent(turma)}`
+      }
       prefetch={false}
       aria-current={ativa ? "page" : undefined}
       aria-label={`${nome}${ano ? ` · ${ano}` : ""}, ${saude.emAndamento} ${
         saude.emAndamento === 1 ? "dupla ativa" : "duplas ativas"
-      }`}
+      }${ativa ? " · remover o recorte" : ""}`}
       style={{ "--i": Math.min(i, 10) } as CSSProperties}
       className={cn(
         "animate-enter group flex h-full flex-col rounded-xl bg-card px-4 py-3.5 shadow-[var(--shadow-border)] transition-[box-shadow,translate] duration-200 ease-snappy hover:-translate-y-px hover:shadow-[var(--shadow-border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5",
@@ -182,8 +188,9 @@ export function TurmaHubCard({
           {saude.emAndamento}
         </b>{" "}
         {saude.emAndamento === 1 ? "dupla ativa" : "duplas ativas"}
-        {saude.pausadas + saude.concluidas + saude.desistentes > 0 &&
-          ` · ${saude.pausadas + saude.concluidas + saude.desistentes} pausadas, concluídas ou desistentes`}
+        {saude.pausadas + saude.concluidas + saude.encerradas >
+          0 &&
+          ` · ${saude.pausadas + saude.concluidas + saude.encerradas} pausadas, concluídas ou encerradas`}
         {saude.risco > 0 && (
           <span className="font-semibold text-[var(--danger-text)]">
             {" "}

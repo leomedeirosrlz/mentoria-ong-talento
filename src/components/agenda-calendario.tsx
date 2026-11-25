@@ -90,6 +90,8 @@ import {
   JANELA_PERIODO,
   linkSeguro,
   coberturaEncontro,
+  cobertosDaDupla,
+  encontroTemConteudo,
   periodosNoDia,
   passosDaTrilha,
   resumoSemanaDe,
@@ -102,6 +104,7 @@ import {
   type PassoGuia,
 } from "@/lib/ciclo";
 import { limboAberto } from "@/lib/agenda-minha";
+import { hrefMaterial } from "@/lib/materiais";
 import { painelDuplasDoDia, type LinhaPainelDia } from "@/lib/painel-dia";
 import { useFadeX } from "@/lib/use-fade-x";
 import {
@@ -286,9 +289,20 @@ const DOT_ESTADO: Record<EstadoEncontro, string> = {
   nao_aconteceu: "bg-muted-foreground",
 };
 
-function corDotEncontro(e: Encontro, agoraMs: number): string {
-  return DOT_ESTADO[estadoDoEncontro(e, agoraMs)];
+function corDotEncontro(
+  e: Encontro,
+  agoraMs: number,
+  cobertos?: Map<number, number>
+): string {
+  return DOT_ESTADO[estadoDoEncontro(e, agoraMs, cobertos)];
 }
+
+// Sessão combinada (018): o mapa coberto→âncora é por dupla e deriva da
+// lista de encontros — custo trivial (≤ o nº de passos da trilha), sem
+// memo pra não virar side-effect no meio do render (o React Compiler
+// bloqueia mutação de cache global dentro de componente).
+const cobertosDe = (dupla: Dupla): Map<number, number> =>
+  cobertosDaDupla(dupla.encontros);
 
 /** Disco numerado do encontro de dupla na célula do mês — mesma gramática do
  *  dot, agora com o nº dentro (antes era preciso abrir o dia pra saber qual
@@ -461,11 +475,14 @@ function MarcadorTipo({ tipo, nome }: { tipo: CicloEvento["tipo"]; nome: string 
  *  legenda nomear exatamente os números que a barra pinta. */
 function contagemEncontros(itens: ItemDupla[], agora: number) {
   const cont = { ok: 0, warn: 0, agendado: 0, apagado: 0 };
-  for (const { encontro } of itens) {
+  for (const { encontro, dupla } of itens) {
+    const cobertos = cobertosDe(dupla);
     if (encontro.status === "realizado")
-      cont[encontro.registro ? "ok" : "warn"]++;
+      // sessão combinada: o coberto conta "ok" — o registro da âncora vale
+      // por ele (018); sem o mapa o segmento pintava warn pra sempre
+      cont[encontroTemConteudo(encontro, cobertos) ? "ok" : "warn"]++;
     else if (encontro.status === "agendado" || encontro.status === "remarcado")
-      cont[limboAberto(encontro, agora) ? "warn" : "agendado"]++;
+      cont[limboAberto(encontro, agora, cobertos) ? "warn" : "agendado"]++;
     else cont.apagado++;
   }
   return cont;
@@ -642,7 +659,10 @@ function IndicadorSemanaMes({
           ? estadoDaSemana(
               duplas.map((d) => d.encontros.find((x) => x.numero === e.numero) ?? null),
               semanaComecou,
-              agoraMs
+              agoraMs,
+              // sessão combinada (018): mapa paralelo, um por dupla —
+              // encontro coberto lê "registrado" quando a âncora entrega
+              duplas.map((d) => cobertosDe(d))
             )
           : null;
         // neutro = gramática do rail: lime passada, lime com anel na semana
@@ -1043,6 +1063,24 @@ export function AgendaCalendario({
     dupla.trilha === "especialista"
       ? (passosEspPorNumero.get(numero) ?? null)
       : (passosDppPorCron.get(dupla.cronograma_id ?? "")?.get(numero) ?? null);
+
+  /** Demais membros do grupo sessao_id deste encontro (sessão planejada,
+   *  018) com o título do guia — o form de registro do detalhe do dia os
+   *  trava na cobertura (mesma régua da `sessaoGrupoDaSessao`, só que sem
+   *  a lista de passos da ficha na mão). */
+  const sessaoGrupoDe = (dupla: Dupla, encontro: Encontro) => {
+    if (dupla.trilha === "especialista" || !encontro.sessao_id) return null;
+    const grupo = dupla.encontros
+      .filter(
+        (e) => e.sessao_id === encontro.sessao_id && e.id !== encontro.id
+      )
+      .sort((a, b) => a.numero - b.numero)
+      .map((e) => ({
+        numero: e.numero,
+        titulo: passoDe(dupla, e.numero)?.titulo ?? "",
+      }));
+    return grupo.length ? grupo : null;
+  };
 
   // nºs oficiais por cronograma — o selo "fora do dia oficial" de um encontro
   // compara contra o calendário DA DUPLA dele, não o da tela (mentor com
@@ -1866,6 +1904,7 @@ export function AgendaCalendario({
       souCoord={ehCoord}
       indice={i}
       evento={passoDe(item.dupla, item.encontro.numero)}
+      sessaoGrupo={sessaoGrupoDe(item.dupla, item.encontro)}
       aberto={registroAberto === item.encontro.id}
       onAlternarRegistro={(abrir) =>
         setRegistroAberto(abrir ? item.encontro.id : null)
@@ -1929,7 +1968,7 @@ export function AgendaCalendario({
                   atual={null}
                   sugerido={hoje}
                   piso={d.iniciada_em ?? undefined}
-                  jovemNome={d.mentorado.nome.split(" ")[0]}
+                  jovemNome={primeiroNomeMentorado(d.mentorado)}
                   onCreated={(id, dia) => encontroCriado(d.id, id, dia)}
                   trigger={
                     <Button variant="outline" size="sm">
@@ -1946,7 +1985,7 @@ export function AgendaCalendario({
                 atual={null}
                 sugerido={selecionado}
                 piso={d.iniciada_em ?? undefined}
-                jovemNome={d.mentorado.nome.split(" ")[0]}
+                jovemNome={primeiroNomeMentorado(d.mentorado)}
                 onCreated={(id, dia) => encontroCriado(d.id, id, dia)}
                 trigger={
                   <Button size="sm">
@@ -1967,14 +2006,15 @@ export function AgendaCalendario({
         <ul>
           {rowDupla({ encontro: linha.encontro, dupla: d }, indice, selecionado)}
         </ul>
-        {linha.tipo === "remarcar" && !limboAberto(linha.encontro, agoraMs) && (
+        {linha.tipo === "remarcar" &&
+          !limboAberto(linha.encontro, agoraMs, cobertosDe(d)) && (
           <div className="flex flex-wrap items-center gap-2 pb-1.5 pl-[1.625rem] pr-2">
             <AgendarEncontroDialog
               duplaId={d.id}
               numero={linha.encontro.numero}
               atual={linha.encontro}
               piso={d.iniciada_em ?? undefined}
-              jovemNome={d.mentorado.nome.split(" ")[0]}
+              jovemNome={primeiroNomeMentorado(d.mentorado)}
               rotulo={
                 d.trilha === "especialista" ? "sessão de especialista" : undefined
               }
@@ -2063,7 +2103,7 @@ export function AgendaCalendario({
                       const remarcavel =
                         item.dupla.status === "ativa" &&
                         (((e.status === "agendado" || e.status === "remarcado") &&
-                          !limboAberto(e, agoraMs)) ||
+                          !limboAberto(e, agoraMs, cobertosDe(item.dupla))) ||
                           e.status === "nao_aconteceu");
                       return (
                         <div key={e.id}>
@@ -2075,7 +2115,7 @@ export function AgendaCalendario({
                                 numero={e.numero}
                                 atual={e}
                                 piso={item.dupla.iniciada_em ?? undefined}
-                                jovemNome={item.dupla.mentorado.nome.split(" ")[0]}
+                                jovemNome={primeiroNomeMentorado(item.dupla.mentorado)}
                                 rotulo={
                                   item.dupla.trilha === "especialista"
                                     ? "sessão de especialista"
@@ -2219,8 +2259,8 @@ export function AgendaCalendario({
                   <span className="block">
                     {encontro.numero}º encontro
                     {ehMentorUi
-                      ? ` com ${dupla.mentorado.nome}`
-                      : ` de ${dupla.mentor.nome} e ${dupla.mentorado.nome}`}
+                      ? ` com ${dupla.mentorado.nome_social || dupla.mentorado.nome}`
+                      : ` de ${dupla.mentor.nome_social || dupla.mentor.nome} e ${dupla.mentorado.nome_social || dupla.mentorado.nome}`}
                   </span>
                   <span className="block text-xs text-muted-foreground">
                     Remarcado para {formatDateTime(rem.data_nova)}
@@ -2428,7 +2468,9 @@ export function AgendaCalendario({
                       d.notas?.find((n) => n.numero === e.numero)?.texto ?? null
                     }
                     rotulo={
-                      duplasAtivasDpp.length > 1 ? d.mentorado.nome : undefined
+                      duplasAtivasDpp.length > 1
+                        ? d.mentorado.nome_social || d.mentorado.nome
+                        : undefined
                     }
                   />
                 ))}
@@ -2607,7 +2649,7 @@ export function AgendaCalendario({
                   Turma
                 </Label>
                 <Select
-                  value={cronogramaSel ?? undefined}
+                  value={cronogramaSel}
                   onValueChange={(v) => setCronogramaSel(v)}
                   items={Object.fromEntries(
                     opcoesCron.map((c) => [
@@ -3115,12 +3157,12 @@ export function AgendaCalendario({
                               realizado sem registro OU limbo; o detalhe vive
                               no painel e no board) */}
                           {duplasDoDia.length <= 2 ? (
-                            duplasDoDia.map(({ encontro }) => (
+                            duplasDoDia.map(({ encontro, dupla }) => (
                               <span
                                 key={encontro.id}
                                 className={cn(
                                   "grid size-4 shrink-0 place-items-center rounded-full text-[10px] font-semibold leading-none tabular-nums",
-                                  DISCO_ESTADO[estadoDoEncontro(encontro, agoraMs)]
+                                  DISCO_ESTADO[estadoDoEncontro(encontro, agoraMs, cobertosDe(dupla))]
                                 )}
                               >
                                 {encontro.numero}
@@ -3148,10 +3190,17 @@ export function AgendaCalendario({
                               className={cn(
                                 "ms-auto text-[11px] font-medium leading-none tabular-nums",
                                 duplasDoDia.some(
-                                  ({ encontro }) =>
+                                  ({ encontro, dupla }) =>
                                     (encontro.status === "realizado" &&
-                                      !encontro.registro) ||
-                                    limboAberto(encontro, agoraMs)
+                                      !encontroTemConteudo(
+                                        encontro,
+                                        cobertosDe(dupla)
+                                      )) ||
+                                    limboAberto(
+                                      encontro,
+                                      agoraMs,
+                                      cobertosDe(dupla)
+                                    )
                                 )
                                   ? "text-[var(--warn-text)]"
                                   : "text-muted-foreground"
@@ -3485,9 +3534,13 @@ export function AgendaCalendario({
                           )}
                         >
                           {passouN && (
+                            // fill ancorado na base: scaleY a partir do
+                            // bottom é o equivalente em transform do
+                            // height% (spec 028 — nada de transition
+                            // de layout)
                             <span
-                              className="absolute inset-x-0 bottom-0 bg-[var(--brand-lime)] transition-[height] duration-500 ease-snappy"
-                              style={{ height: `${pct}%` }}
+                              className="absolute inset-x-0 bottom-0 h-full origin-bottom bg-[var(--brand-lime)] transition-transform duration-500 ease-snappy"
+                              style={{ transform: `scaleY(${pct / 100})` }}
                             />
                           )}
                           {passouN && total > 0 && feitos < total && (
@@ -3885,7 +3938,7 @@ export function AgendaCalendario({
               })}
               {itensDaSemana.map(({ encontro, dupla }) => {
                 const iso = diaDoEncontro(encontro)!;
-                const estado = estadoDoEncontro(encontro, agoraMs);
+                const estado = estadoDoEncontro(encontro, agoraMs, cobertosDe(dupla));
                 const tema = passoDe(dupla, encontro.numero)?.titulo;
                 return (
                   <button
@@ -3907,7 +3960,7 @@ export function AgendaCalendario({
                         {tema ? ` · ${tema}` : ""}
                       </span>
                       <span className="mt-0.5 block break-words text-xs text-muted-foreground">
-                        {multiDuplaLista ? dupla.mentorado.nome : "Seu encontro"} ·{" "}
+                        {multiDuplaLista ? dupla.mentorado.nome_social || dupla.mentorado.nome : "Seu encontro"} ·{" "}
                         {ROTULO_ESTADO_ENCONTRO[estado]}
                       </span>
                     </span>
@@ -3972,7 +4025,7 @@ function DuplaSemEncontroLinha({
       />
       <span className="min-w-0 flex-1">
         <span className="block break-words text-sm font-medium">
-          {dupla.mentorado.nome}
+          {dupla.mentorado.nome_social || dupla.mentorado.nome}
         </span>
         <span className="block break-words text-xs text-muted-foreground">
           {previsto != null
@@ -4000,6 +4053,7 @@ function EncontroDuplaRow({
   souCoord,
   indice,
   evento,
+  sessaoGrupo,
   aberto,
   onAlternarRegistro,
   onRegistroSalvo,
@@ -4016,6 +4070,9 @@ function EncontroDuplaRow({
   indice: number;
   /** Passo do guia do nº na trilha da dupla — sugestão de tema/foco do form. */
   evento: PassoGuia | null;
+  /** Demais membros do grupo sessao_id (sessão planejada, 018) — o form
+   *  os trava na cobertura; null fora de sessão combinada. */
+  sessaoGrupo?: { numero: number; titulo: string }[] | null;
   /** O form de registro desta linha está aberto (um por vez no painel). */
   aberto: boolean;
   onAlternarRegistro: (abrir: boolean) => void;
@@ -4032,19 +4089,26 @@ function EncontroDuplaRow({
   const iso = isoDoEncontro(encontro);
   // numero-match do mentor pode trazer encontro de outro dia — aí a data aparece completa
   const mesmoDia = diaDoEncontro(encontro) === selecionado;
+  // sessão combinada (018): o coberto tem conteúdo via âncora — sem o mapa
+  // a linha cobraria registro de um passo que a sessão já entregou
+  const cobertos = cobertosDe(dupla);
+  const temConteudo = encontroTemConteudo(encontro, cobertos);
   // agendado cuja hora já passou sem virar realizado nem não-aconteceu — a
   // mesma leitura de "limbo" da trilha (jornadaDaDupla) e da ficha
-  const limbo = limboAberto(encontro, agora);
+  const limbo = limboAberto(encontro, agora, cobertos);
   const registroPendente =
-    !encontro.registro && (encontro.status === "realizado" || limbo);
+    !temConteudo && (encontro.status === "realizado" || limbo);
   // nudge da coord/sup sobre a pendência — os dois lados da dupla; limbo
   // pergunta "rolou?", realizado cobra o registro (tipos nudge/contato
-  // coexistem no dedupe de 60s do /api/nudge)
-  const waPendentes = useMemo<DestinoWA[]>(() => {
+  // coexistem no dedupe de 60s do /api/nudge). Sem useMemo manual: o
+  // compilador não preservava a memo com o Map de cobertos na vizinhança
+  // ("dependency may be modified later") e a conta é barata pra rodar a
+  // cada render — memoização automática cobre
+  const waPendentes: DestinoWA[] = (() => {
     if (!registroPendente) return [];
     const msgs = msgsContato(limbo ? "limbo" : "registro_pendente", {
-      mentorNome: dupla.mentor.nome,
-      mentoradoNome: dupla.mentorado.nome,
+      mentorNome: dupla.mentor.nome_social || dupla.mentor.nome,
+      mentoradoNome: dupla.mentorado.nome_social || dupla.mentorado.nome,
       autorNome,
       extra: `${encontro.numero}º`,
     });
@@ -4062,7 +4126,7 @@ function EncontroDuplaRow({
         t: "contato",
       },
     ];
-  }, [registroPendente, limbo, dupla, encontro.numero, autorNome]);
+  })();
   // mentor com registro pendente cai direto no card do encontro na página da
   // dupla — lá a âncora abre o RegistroInline; aqui o caminho curto é o CTA.
   // (só usado no ramo ehMentor — coord/sup abrem o detalhe em modal)
@@ -4084,7 +4148,7 @@ function EncontroDuplaRow({
   // o "já passou?" no tempo enquanto a hora não chega)
   const podeTerRegistro =
     ehMentor &&
-    !encontro.registro &&
+    !temConteudo &&
     (encontro.status === "realizado" ||
       encontro.data_hora != null);
 
@@ -4149,7 +4213,7 @@ function EncontroDuplaRow({
           numero={encontro.numero}
           atual={encontro}
           piso={dupla.iniciada_em ?? undefined}
-          jovemNome={dupla.mentorado.nome.split(" ")[0]}
+          jovemNome={primeiroNomeMentorado(dupla.mentorado)}
           rotulo={
             dupla.trilha === "especialista"
               ? "sessão de especialista"
@@ -4179,12 +4243,12 @@ function EncontroDuplaRow({
         >
           <span
             aria-hidden
-            className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro, agora))}
+            className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro, agora, cobertos))}
           />
           <span className="min-w-0 flex-1">
             {/* o mentor já sabe que é ele — a linha nomeia o outro lado */}
             <span className="block break-words text-sm font-medium">
-              {dupla.mentorado.nome}
+              {dupla.mentorado.nome_social || dupla.mentorado.nome}
             </span>
             <span className="block break-words text-xs text-muted-foreground">
               {encontro.numero}º encontro · {STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}
@@ -4192,7 +4256,7 @@ function EncontroDuplaRow({
                 ? `, ${mesmoDia ? `às ${fmtHora.format(new Date(iso))}` : formatDateTime(iso)}`
                 : ", data a definir"}
               {encontro.status === "realizado" &&
-                (encontro.registro ? (
+                (temConteudo ? (
                   <span className="text-[var(--ok-text)]">, registro entregue</span>
                 ) : (
                   <span className="text-[var(--warn-text)]">, registro pendente</span>
@@ -4219,11 +4283,14 @@ function EncontroDuplaRow({
           >
             <span
               aria-hidden
-              className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro, agora))}
+              className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro, agora, cobertos))}
             />
             <span className="min-w-0 flex-1">
               <span className="block break-words text-sm font-medium">
-                <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
+                <DuplaNomes
+                  mentor={dupla.mentor.nome_social || dupla.mentor.nome}
+                  mentorado={dupla.mentorado.nome_social || dupla.mentorado.nome}
+                />
               </span>
               <span className="block break-words text-xs text-muted-foreground">
                 {encontro.numero}º encontro · {STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}
@@ -4231,7 +4298,7 @@ function EncontroDuplaRow({
                   ? `, ${mesmoDia ? `às ${fmtHora.format(new Date(iso))}` : formatDateTime(iso)}`
                   : ", data a definir"}
                 {encontro.status === "realizado" &&
-                  (encontro.registro ? (
+                  (temConteudo ? (
                     <span className="text-[var(--ok-text)]">, registro entregue</span>
                   ) : (
                     <span className="text-[var(--warn-text)]">, registro pendente</span>
@@ -4289,6 +4356,9 @@ function EncontroDuplaRow({
               evento={evento}
               trilha={dupla.trilha}
               combinadosPendentes={combinadosPendentes}
+              // sessão planejada (018): o grupo sessao_id entra travado na
+              // cobertura — o registro é da sessão, não só desta row
+              sessaoGrupo={sessaoGrupo}
               onSaved={onRegistroSalvo}
               // telemetria (REALIZA-217): encontro "externo" é o catch-up
               // retroativo (criado já realizado), não um follow-up novo
@@ -4337,11 +4407,13 @@ const MATERIAL_TIPO_LABEL = {
  *  carrega badge de audiência e ações de coordenação que não pertencem aqui. */
 function MaterialDoEncontro({ m }: { m: Material }) {
   const Icone = MATERIAL_ICONE[m.tipo];
-  // arquivo oficial ganha da url externa; sem os dois, o material ainda não
-  // chegou. linkSeguro: o CHECK do banco exige http(s), este guard cobre
-  // escrita fora do app — url insegura cai no estado "sem destino"
+  // arquivo oficial ganha da url externa; "doc:<slug>" é documento nativo;
+  // sem os três, o material ainda não chegou. linkSeguro: o CHECK do banco
+  // exige http(s), este guard cobre escrita fora do app — url insegura cai
+  // no estado "sem destino"
   const urlOk = linkSeguro(m.url);
-  const href = m.path ? `/api/material/${m.id}` : urlOk;
+  const ehDoc = m.path?.startsWith("doc:") ?? false;
+  const href = hrefMaterial(m);
   const inner = (
     <>
       <Icone size={16} className="shrink-0 text-muted-foreground" aria-hidden />
@@ -4354,12 +4426,18 @@ function MaterialDoEncontro({ m }: { m: Material }) {
         )}
         <span className="sr-only">
           {MATERIAL_TIPO_LABEL[m.tipo]}
-          {m.path ? " · arquivo" : urlOk && m.tipo !== "link" ? " · link externo" : ""}
+          {ehDoc
+            ? " · documento"
+            : m.path
+              ? " · arquivo"
+              : urlOk && m.tipo !== "link"
+                ? " · link externo"
+                : ""}
           {href ? " (abre em nova aba)" : ""}
         </span>
       </span>
       {m.path ? (
-        // path aceita imagem além de PDF — ícone genérico de arquivo
+        // path aceita doc nativo e imagem além de PDF — ícone genérico de arquivo
         <File size={14} className="shrink-0 text-muted-foreground" aria-hidden />
       ) : urlOk ? (
         <ArrowSquareOut size={14} className="shrink-0 text-muted-foreground" aria-hidden />
@@ -4498,8 +4576,8 @@ function LinhaSemEncontro({
   autorNome?: string;
 }) {
   const msgs = msgsContato("sem_encontro", {
-    mentorNome: dupla.mentor.nome,
-    mentoradoNome: dupla.mentorado.nome,
+    mentorNome: dupla.mentor.nome_social || dupla.mentor.nome,
+    mentoradoNome: dupla.mentorado.nome_social || dupla.mentorado.nome,
     autorNome,
     extra: `${numero}º`,
   });
@@ -4527,8 +4605,8 @@ function LinhaSemEncontro({
         className="flex min-h-11 min-w-0 flex-1 items-center rounded-sm text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <DuplaNomes
-          mentor={dupla.mentor.nome}
-          mentorado={dupla.mentorado.nome}
+          mentor={dupla.mentor.nome_social || dupla.mentor.nome}
+          mentorado={dupla.mentorado.nome_social || dupla.mentorado.nome}
           truncar
         />
       </Link>
@@ -4713,9 +4791,10 @@ function minutosDoDia(d: Date): number {
  *  detalhe do dia. */
 function hrefEncontroMentor(item: ItemDupla, agora: number): string {
   const { encontro, dupla } = item;
+  const cobertos = cobertosDe(dupla);
   const pendente =
-    !encontro.registro &&
-    (encontro.status === "realizado" || limboAberto(encontro, agora));
+    !encontroTemConteudo(encontro, cobertos) &&
+    (encontro.status === "realizado" || limboAberto(encontro, agora, cobertos));
   return pendente
     ? `/duplas/${dupla.id}#registrar-${encontro.id}`
     : `/duplas/${dupla.id}`;
@@ -4828,7 +4907,7 @@ function BlocoEncontro({
     >
       <span
         aria-hidden
-        className={cn("mt-[0.3em] size-1.5 shrink-0 rounded-full", corDotEncontro(encontro, agora))}
+        className={cn("mt-[0.3em] size-1.5 shrink-0 rounded-full", corDotEncontro(encontro, agora, cobertosDe(dupla)))}
       />
       {/* quebra em vez de cortar: no celular não tem hover pro title
           (feedback da mentora) — o nome do mentorado desce pra 2ª linha */}
@@ -5345,7 +5424,7 @@ function HorariosMentor({
           atual={alvoSlot.encontroAlvo}
           sugerido={slotAgendar.sugerido}
           piso={duplaSlot.iniciada_em ?? undefined}
-          jovemNome={duplaSlot.mentorado.nome.split(" ")[0]}
+          jovemNome={primeiroNomeMentorado(duplaSlot.mentorado)}
           rotulo={
             duplaSlot.trilha === "especialista"
               ? "sessão de especialista"

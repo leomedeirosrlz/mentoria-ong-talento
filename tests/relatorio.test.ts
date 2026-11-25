@@ -59,7 +59,30 @@ describe("montarLinhas · metadados de exibição", () => {
     expect(mentor.__status).toBe("ativa");
     expect(mentor.__papel).toBe("mentor");
     expect(jovem.__papel).toBe("mentorado");
-    expect(textoCelula(mentor, "status_dupla")).toBe("Ativa");
+    expect(textoCelula(mentor, "status_dupla")).toBe("Em andamento");
+  });
+
+  it("status_dupla lê a situação canônica — desfecho separa Desistente × Encerrada", () => {
+    const casos = [
+      ["ativa", null, "Em andamento"],
+      ["pausada", null, "Pausada"],
+      ["concluida", null, "Concluída"],
+      ["encerrada", "desistencia_jovem", "Desistente"],
+      ["encerrada", "desistencia_mentor", "Desistente"],
+      ["encerrada", null, "Desistente"], // legado sem desfecho
+      ["encerrada", "remanejada", "Encerrada"],
+      ["encerrada", "outro", "Encerrada"],
+    ] as const;
+    for (const [status, desfecho, esperado] of casos) {
+      const linhas = montarLinhas(
+        CFG_PESSOAS,
+        [{ ...DUPLA, status, desfecho }],
+        mapa(MENTOR),
+        mapa(JOVEM)
+      );
+      const mentor = linhas.find((l) => textoCelula(l, "papel") === "Mentor(a)")!;
+      expect(textoCelula(mentor, "status_dupla")).toBe(esperado);
+    }
   });
 
   it("sem paraApp não emite __alvos nem __links (resumo público)", () => {
@@ -191,6 +214,29 @@ describe("montarLinhas · fila de espera (turma_inscricoes, 0111)", () => {
   };
   const JOVEM_DESISTENTE: PessoaFonte = { ...JOVEM_FILA, id: "j-desist", nome: "Eva Saiu" };
   const JOVEM_FORMADA: PessoaFonte = { ...JOVEM_FILA, id: "j-formada", nome: "Fê Formada" };
+  // a fila não conhece trilha: o papel efetivo resolve quem espera par —
+  // só-especialista (role ou grant) sai da régua "Sem dupla" (REALIZA-383)
+  const MENTOR_ESP: PessoaFonte = {
+    ...MENTOR_FILA,
+    id: "m-esp",
+    nome: "Elisa Prado",
+    role: "mentor_especialista",
+    papeis: ["mentor_especialista"],
+  };
+  const MENTOR_ESP_GRANT: PessoaFonte = {
+    ...MENTOR_FILA,
+    id: "m-esp-grant",
+    nome: "Gabi Nunes",
+    role: null,
+    papeis: ["mentor_especialista"],
+  };
+  const MENTOR_HIBRIDO: PessoaFonte = {
+    ...MENTOR_FILA,
+    id: "m-hib",
+    nome: "Hugo Híbrido",
+    role: "mentor_dpp",
+    papeis: ["mentor_dpp", "mentor_especialista"],
+  };
 
   const ROWS: InscricaoRow[] = [
     { turma: "T2 · 2026/2027", status: "aguardando", papel_esperado: "mentor", profile_id: "m-fila", mentorado_id: null },
@@ -222,6 +268,36 @@ describe("montarLinhas · fila de espera (turma_inscricoes, 0111)", () => {
     expect(textoCelula(mentor, "par")).toBe("");
     const jovem = semDupla.find((l) => l.__papel === "mentorado")!;
     expect(textoCelula(jovem, "nome")).toBe("Bruno Reis");
+  });
+
+  it("só-especialista inscrito sai pelo papel real, sem 'Sem dupla' (REALIZA-383)", () => {
+    const rows = [
+      ...ROWS,
+      { turma: "T2 · 2026/2027", status: "aguardando" as const, papel_esperado: "mentor" as const, profile_id: "m-esp", mentorado_id: null },
+      { turma: "T2 · 2026/2027", status: "aguardando" as const, papel_esperado: "mentor" as const, profile_id: "m-esp-grant", mentorado_id: null },
+      { turma: "T2 · 2026/2027", status: "aguardando" as const, papel_esperado: "mentor" as const, profile_id: "m-hib", mentorado_id: null },
+    ];
+    const linhas = montarLinhas(
+      CFG_PESSOAS,
+      [DUPLA],
+      mapa(MENTOR, MENTOR_FILA, MENTOR_ESP, MENTOR_ESP_GRANT, MENTOR_HIBRIDO),
+      mentsTodas,
+      { fila: escopoFila(rows, "T2 · 2026/2027") }
+    );
+    // a inscrição segue filiando à turma — a linha existe, mas pelo papel
+    // real e sem a pendência de par (status vazio, sem chip sem_dupla)
+    for (const nome of ["Elisa Prado", "Gabi Nunes"]) {
+      const l = linhas.find((x) => textoCelula(x, "nome") === nome)!;
+      expect(textoCelula(l, "papel"), nome).toBe("Especialista");
+      expect(textoCelula(l, "status_dupla"), nome).toBe("");
+      expect(l.__status, nome).toBeUndefined();
+      expect(textoCelula(l, "par"), nome).toBe("");
+    }
+    // híbrido mantém a semântica DPP — continua "Sem dupla" de sempre
+    const hib = linhas.find((x) => textoCelula(x, "nome") === "Hugo Híbrido")!;
+    expect(textoCelula(hib, "papel")).toBe("Mentor(a)");
+    expect(textoCelula(hib, "status_dupla")).toBe("Sem dupla");
+    expect(hib.__status).toBe("sem_dupla");
   });
 
   it("inscrito com dupla ativa não repete na fila (m-1 já tem a dele)", () => {

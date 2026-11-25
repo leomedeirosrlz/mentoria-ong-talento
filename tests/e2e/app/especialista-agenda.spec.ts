@@ -1,5 +1,6 @@
 import type { Locator } from "@playwright/test";
 import {
+  abrirMenuEncontro,
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
@@ -359,14 +360,18 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     await expect(
       esp.getByText(/Sessões de 1h · escolhe um horário/)
     ).toBeVisible();
+    // desde a 507 os chips agrupam por dia ("terça 24/11" + hora solta); o
+    // rótulo completo "terça 24/11 às 20:00" vive no title do botão
     await expect(
-      esp.getByText(/terça \d{2}\/\d{2} às 20:00/).first()
+      esp.getByTitle(/Pedir sessão terça \d{2}\/\d{2} às 20:00/).first()
     ).toBeVisible();
 
     // o agendado da trilha subtrai o horário da oferta — 19:00/19:30 daquela
     // terça não aparecem pro jovem; 20:00 (fora do encontro de 1h) continua
     await expect(
-      esp.getByText(new RegExp(`terça ${ddmm(dataEnc)} às (19:00|19:30)`))
+      esp.getByTitle(
+        new RegExp(`Pedir sessão terça ${ddmm(dataEnc)} às (19:00|19:30)`)
+      )
     ).toHaveCount(0);
 
     // combinar é fora do app — o botão abre o wa.me do especialista
@@ -374,7 +379,8 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     await expect(wa).toHaveAttribute("href", /wa\.me\/5511999000070/);
 
     // o agendado da trilha esp aparece em Próximos SEM "Remarcar" — a RPC de
-    // agenda do jovem é DPP-only; desmarcar segue valendo em qualquer trilha.
+    // agenda do jovem é DPP-only; desmarcar segue valendo em qualquer trilha
+    // (530: o gesto mora no ⋯ da linha, não num botão solto).
     // Ancora pela data (única por construção), não pelo nº — encontros DPP
     // paralelos podem dividir o mesmo número.
     const proximos = page.locator(
@@ -387,11 +393,20 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     await expect(
       linhaEsp.getByRole("button", { name: "Remarcar" })
     ).toHaveCount(0);
+    // Desmarcar é a única ação da linha esp — gesto único fica solto à
+    // vista (530: "uma só, ela fica à vista sem ⋯"). Remarcar não aparece
+    // em forma nenhuma: nem à vista nem em menu
     await expect(
       linhaEsp.getByRole("button", { name: "Desmarcar" })
     ).toBeVisible();
+    await expect(
+      linhaEsp.getByRole("button", { name: "Ações do encontro" })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("menuitem", { name: "Remarcar" })
+    ).toHaveCount(0);
 
-    // contraste: a linha DPP na mesma lista segue com o gesto
+    // contraste: a linha DPP na mesma lista segue com o gesto — primário
     const linhaDpp = proximos
       .getByText("8º encontro", { exact: true })
       .locator("xpath=../..");

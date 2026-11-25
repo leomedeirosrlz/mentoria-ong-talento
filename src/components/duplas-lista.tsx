@@ -12,6 +12,7 @@ import {
   Funnel,
   Lifebuoy,
   MagnifyingGlass,
+  UsersThree,
 } from "@phosphor-icons/react";
 import {
   comparaNome,
@@ -22,15 +23,25 @@ import {
   formatDiaMes,
   formatDiaSemanaMes,
   ORDEM_SEMAFORO,
+  passosRealizadosDe,
+  progressoTrilha,
   saudadeDaDupla,
   toDateStr,
   totalDaTrilha,
   ultimoRegistro,
 } from "@/lib/ciclo";
 import { prazoTrilhaEspecialista } from "@/lib/encerramento";
-import { saudeDoRecorte, type RecorteFatia } from "@/lib/agenda-coordenacao";
-import { ehConcluida, ehDesistente } from "@/lib/dupla-desfecho";
+import {
+  resolveRecorteFatia,
+  saudeDoRecorte,
+  type RecorteFatia,
+} from "@/lib/agenda-coordenacao";
+import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+} from "@/lib/dupla-desfecho";
 import { gravarTurmaFocoClient } from "@/lib/turma-contexto";
+import { trackProduto } from "@/components/produto-telemetry";
 import { turmaDaDupla, turmaLonga } from "@/lib/turma";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { acaoWhatsAppDupla, encontroPendente } from "@/lib/acao-lembrete";
@@ -41,8 +52,17 @@ import type {
   Dupla,
   EspecialistaEvento,
 } from "@/lib/types";
-import { cn, normaliza } from "@/lib/utils";
-import { useFadeX } from "@/lib/use-fade-x";
+import { cn } from "@/lib/utils";
+import { fuzzyMatch } from "@/lib/fuzzy";
+import {
+  comparadorDe,
+  escreveOrdem,
+  ORDEM_ROTULO,
+  parseOrdemDupla,
+  pesoFila,
+  type OrdemCol,
+  type OrdemDupla,
+} from "@/lib/duplas-ordem";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { DuplaLinha, GRID_DUPLA_LG, type TomSituacao } from "@/components/dupla-linha";
@@ -51,15 +71,10 @@ import { SaudePrograma } from "@/components/saude-programa";
 import { AvaliacaoBadge } from "@/components/semaforo";
 import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormSurface } from "@/components/form-surface";
 import { FiltrosButton } from "@/components/ui/filtros-button";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { OVERLINE } from "@/components/ui/filtro-opcoes";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -68,9 +83,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const OVERLINE =
-  "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]";
 
 // dialogs da coordenação — atrás de clique, viram chunk sob demanda
 const NovaDuplaDialog = dynamic(() =>
@@ -122,23 +134,22 @@ function Pill({ tom, children }: { tom: TomPill; children: React.ReactNode }) {
   );
 }
 
-const STATUS_LABEL: Record<string, { label: string; tom: TomPill }> = {
+const SEMAFORO_LABEL: Record<string, { label: string; tom: TomPill }> = {
   risco: { label: "Em risco", tom: "risco" },
   atencao: { label: "Atenção", tom: "atencao" },
   ok: { label: "Em dia", tom: "ok" },
-  pausada: { label: "Pausada", tom: "pausa" },
-  concluida: { label: "Concluída", tom: "pausa" },
-  encerrada: { label: "Desistente", tom: "pausa" },
 };
 
-/** O pill de estado da linha: status da dupla fora da régua, senão o
- *  semáforo da jornada. Apoio NÃO vira estado — é pill própria ao lado. */
+/** O pill de estado da linha: situação canônica (dupla-desfecho) fora da
+ *  régua, senão o semáforo da jornada. Apoio NÃO vira estado — é pill
+ *  própria ao lado. */
 function estadoDaDupla(
   d: Dupla,
   saude: Saude
 ): { label: string; tom: TomPill } {
-  if (d.status !== "ativa") return STATUS_LABEL[d.status] ?? STATUS_LABEL.pausada;
-  return STATUS_LABEL[saude.semaforo];
+  if (d.status !== "ativa")
+    return { label: SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)], tom: "pausa" };
+  return SEMAFORO_LABEL[saude.semaforo];
 }
 
 /** Tom do pill de estado na linha canônica — mesma régua, cor da linha. */
@@ -206,6 +217,24 @@ const APOIO_ORIGEM_LABEL = {
   ambos: "pedido pelo mentor e pelo mentorado",
 } as const;
 
+// ---------- ordenação e relevância da lista ----------
+// as regras moram em @/lib/duplas-ordem (REALIZA-445): a coluna Situação
+// lê a saúde calculada — comparador puro com saudePorId injetado é
+// testável fora do React
+
+/** Relevância fuzzy da dupla: o melhor match entre os 4 nomes possíveis
+ *  (social e civil de cada ponta — quem lembra do nome de batismo acha a
+ *  dupla mesmo com a lista mostrando o social). */
+const scoreDaDupla = (q: string, d: Dupla): number =>
+  Math.max(
+    ...[
+      d.mentor.nome,
+      d.mentor.nome_social,
+      d.mentorado.nome,
+      d.mentorado.nome_social,
+    ].map((n) => (n ? (fuzzyMatch(q, n)?.score ?? 0) : 0))
+  );
+
 // ---------- a linha densa (v1 → v5) ----------
 
 /** A linha da dupla em /duplas: monta os dados e entrega à linha canônica.
@@ -217,7 +246,8 @@ function LinhaDupla({
   mostrarSupervisor,
   wa,
   menu,
-  dimDesistentes,
+  dimEncerradas,
+  marca,
   i,
 }: {
   d: Dupla;
@@ -229,17 +259,18 @@ function LinhaDupla({
   wa: React.ReactNode;
   /** o ⋯ real — o caller decide o conteúdo por papel */
   menu?: React.ReactNode;
-  /** na visão "todas" a desistente esmaece — está fora da régua, não é
-   *  prioridade do radar (a ficha continua a um clique) */
-  dimDesistentes?: boolean;
+  /** na visão "todas" a encerrada cedo esmaece (desistente e fechamento
+   *  formal juntos) — está fora da régua, não é prioridade do radar (a
+   *  ficha continua a um clique) */
+  dimEncerradas?: boolean;
+  /** busca ativa — marca os trechos casados nos nomes */
+  marca?: string;
   i: number;
 }) {
   const estado = estadoDaDupla(d, saude);
   const ehEsp = d.trilha === "especialista";
   const total = totalDaTrilha(d.trilha, eventosDoCronograma(eventos, d.cronograma_id));
-  const realizados = d.encontros
-    .filter((e) => e.status === "realizado")
-    .map((e) => e.numero);
+  const realizados = passosRealizadosDe(d);
   const ultimoReg = ultimoRegistro(d);
   const encontroDoReg = ultimoReg
     ? d.encontros.find((e) => e.registro?.id === ultimoReg.id)
@@ -258,13 +289,11 @@ function LinhaDupla({
   const legenda =
     d.status === "pausada"
       ? "em pausa"
-      : d.status === "concluida"
-        ? "concluída"
-        : d.status === "encerrada"
-          ? "desistente"
-          : ehEsp
-            ? "sessões"
-            : `esperado ${saude.esperado}`;
+      : d.status === "ativa"
+        ? ehEsp
+          ? "sessões"
+          : `esperado ${saude.esperado}`
+        : SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)].toLowerCase();
 
   return (
     <DuplaLinha
@@ -282,6 +311,7 @@ function LinhaDupla({
       progresso={{
         total,
         realizados,
+        sessao: ehEsp,
         esperado: !ehEsp && d.status === "ativa" ? saude.esperado : null,
         legenda,
       }}
@@ -310,7 +340,8 @@ function LinhaDupla({
       menu={menu}
       fichaHref={`/duplas/${d.id}`}
       fichaNome={(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}
-      className={dimDesistentes && desistenteDa(d) ? "opacity-60" : undefined}
+      marca={marca}
+      className={dimEncerradas && ehEncerradaCedo(d) ? "opacity-60" : undefined}
     />
   );
 }
@@ -325,6 +356,7 @@ function LinhaMini({
   hojeStr,
   wa,
   menu,
+  marca,
   i,
 }: {
   d: Dupla;
@@ -334,6 +366,7 @@ function LinhaMini({
   wa: React.ReactNode;
   /** o ⋯ real — colapsada não significa sem ações */
   menu?: React.ReactNode;
+  marca?: string;
   i: number;
 }) {
   const feitos = d.encontros.filter((e) => e.status === "realizado").length;
@@ -360,6 +393,7 @@ function LinhaMini({
         <DuplaNomes
           mentor={d.mentor.nome_social ?? d.mentor.nome}
           mentorado={d.mentorado.nome_social ?? d.mentorado.nome}
+          marca={marca}
         />
         {d.turma && (
           <span
@@ -375,7 +409,7 @@ function LinhaMini({
             solto (mock: .m-prog); o número fica no texto ao lado */}
         <span
           role="img"
-          aria-label={`${feitos} de ${total} encontros realizados`}
+          aria-label={progressoTrilha({ esp: ehEsp, feitos, total })}
           className="relative h-1.5 w-14 rounded-full bg-muted"
         >
           <span
@@ -398,7 +432,7 @@ function LinhaMini({
           )}
         </span>
         <span className="whitespace-nowrap text-xs font-semibold text-foreground">
-          {feitos}/{total}
+          {progressoTrilha({ esp: ehEsp, feitos, total, curta: true })}
           {/* sem cronograma não há esperado pra comparar — "esp. 0"
               mentia a mesma coisa que o tick escondido acima */}
           {saude.esperado > 0 && ` · esp. ${saude.esperado}`}
@@ -432,24 +466,86 @@ function LinhaMini({
 }
 
 /** O cabeçalho da tabela densa — usa a mesma grade da linha canônica, pra
- *  cada rótulo cair em cima da sua coluna. */
-function CabecalhoColunas() {
+ *  cada rótulo cair em cima da sua coluna. As colunas com ordenação são
+ *  clicáveis (REALIZA-405): cada uma cicla asc → desc → default no padrão
+ *  do header de /relatorios, e só uma fica ativa por vez. Os spans
+ *  restantes ficam presentacionais (o dado já carrega o significado). */
+function ColunaOrdenavel({
+  col,
+  rotulo,
+  dica,
+  ordem,
+  onCiclar,
+}: {
+  col: OrdemCol;
+  rotulo: string;
+  dica: string;
+  ordem: OrdemDupla | null;
+  onCiclar: (col: OrdemCol) => void;
+}) {
+  const ativa = ordem?.col === col;
+  return (
+    <button
+      type="button"
+      onClick={() => onCiclar(col)}
+      // aria-sort só é válido em columnheader/rowheader — num <button> o
+      // leitor ignora. O estado vai no nome acessível (a seta é aria-hidden)
+      aria-label={`Ordenar por ${dica}: ${ativa ? ORDEM_ROTULO[col][String(ordem!.dir) as "1" | "-1"] : "por prioridade"}`}
+      title={`Ordenar por ${dica}`}
+      className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-sm text-left uppercase tracking-[0.08em] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {rotulo}
+      <span aria-hidden className="w-3 text-[10px]">
+        {ativa ? (ordem!.dir === 1 ? "↑" : "↓") : "↕"}
+      </span>
+    </button>
+  );
+}
+
+function CabecalhoColunas({
+  ordem,
+  onCiclar,
+}: {
+  ordem: OrdemDupla | null;
+  onCiclar: (col: OrdemCol) => void;
+}) {
   return (
     <div
-      aria-hidden
       className={cn(
         "hidden border-b border-border px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground @4xl:grid @4xl:gap-x-3",
         GRID_DUPLA_LG
       )}
     >
-      <span>Situação</span>
-      <span>Dupla</span>
-      <span>Motivo</span>
-      <span title="Cada quadrado é um encontro da trilha; o traço marca quantos o calendário já esperava até hoje">
-        Encontros
-      </span>
-      <span>Nota</span>
-      <span />
+      <ColunaOrdenavel
+        col="situacao"
+        rotulo="Situação"
+        dica="situação"
+        ordem={ordem}
+        onCiclar={onCiclar}
+      />
+      <ColunaOrdenavel
+        col="nome"
+        rotulo="Dupla"
+        dica="nome da dupla"
+        ordem={ordem}
+        onCiclar={onCiclar}
+      />
+      <span aria-hidden>Motivo</span>
+      <ColunaOrdenavel
+        col="encontros"
+        rotulo="Encontros"
+        dica="quantidade de encontros"
+        ordem={ordem}
+        onCiclar={onCiclar}
+      />
+      <ColunaOrdenavel
+        col="nota"
+        rotulo="Nota"
+        dica="nota do mentor"
+        ordem={ordem}
+        onCiclar={onCiclar}
+      />
+      <span aria-hidden />
     </div>
   );
 }
@@ -467,23 +563,23 @@ const CATS: { id: FiltroCat; nome: string; dot: string | null }[] = [
   { id: "andamento", nome: "Em andamento", dot: null },
   { id: "pausada", nome: "Pausadas", dot: null },
   { id: "concluida", nome: "Concluídas", dot: null },
-  { id: "desistente", nome: "Desistentes", dot: null },
+  { id: "encerrada", nome: "Encerradas", dot: null },
   { id: "apoio", nome: "Apoio", dot: null },
 ];
 
-/** O critério único de desistente — o chip, a contagem do cabeçalho e o
- *  esmaecer da linha leem a mesma regra: encerrada OU desfecho que não é
- *  conclusão (concluída com sucesso nunca conta). */
-function desistenteDa(d: Dupla): boolean {
-  return (
-    d.status === "encerrada" ||
-    ehDesistente({ desfecho: d.desfecho, status: d.status })
-  );
+/** Saiu da régua sem concluir (desistente ou encerrada-formal) — o que
+ *  esmaece na visão "todas" e o que o chip "Encerradas" cobre: no modelo
+ *  canônico desistente é encerrada com desfecho, então a fatia é uma só
+ *  e a linha distingue pelo rótulo. */
+function ehEncerradaCedo(d: Dupla): boolean {
+  const sit = situacaoDaDupla(d);
+  return sit === "desistente" || sit === "encerrada";
 }
 
 /** Cada chip é uma parte da mesma régua do resumo: "Em andamento" são as
- *  ativas (risco e atenção incluídas); "Concluídas" são as que fecharam com
- *  êxito; "Desistentes" são as encerradas/interrompidas. */
+ *  ativas (risco e atenção incluídas); as fechadas se separam pela
+ *  situação canônica (dupla-desfecho) — "Encerradas" cobre desistência e
+ *  fechamento formal num balde só. */
 function chipBate(f: FiltroCat, d: Dupla, s: Saude): boolean {
   switch (f) {
     case "todas":
@@ -497,9 +593,9 @@ function chipBate(f: FiltroCat, d: Dupla, s: Saude): boolean {
     case "pausada":
       return d.status === "pausada";
     case "concluida":
-      return d.status === "concluida" || ehConcluida({ desfecho: d.desfecho });
-    case "desistente":
-      return desistenteDa(d);
+      return situacaoDaDupla(d) === "concluida";
+    case "encerrada":
+      return ehEncerradaCedo(d);
     case "apoio":
       return s.apoio.aberto;
   }
@@ -551,7 +647,11 @@ function resumoDaLista(
   lista: Dupla[],
   saudePorId: Map<string, Saude>,
   visao: VisaoDuplas
-): { n: string; desistentes: number; itens: { texto: string; forte?: boolean }[] } {
+): {
+  n: string;
+  encerradas: number;
+  itens: { texto: string; forte?: boolean }[];
+} {
   const cont = { risco: 0, atencao: 0, andamento: 0, pausada: 0, apoio: 0 };
   for (const d of lista) {
     const s = saudePorId.get(d.id)!;
@@ -560,9 +660,11 @@ function resumoDaLista(
       cont[s.semaforo === "ok" ? "andamento" : s.semaforo]++;
     else if (d.status === "pausada") cont.pausada++;
   }
-  // desistentes não contam no sujeito — a mancha vai no sufixo discreto
-  const desistentes = lista.filter(desistenteDa).length;
-  const nVivas = lista.length - desistentes;
+  // fechadas cedo não contam no sujeito — a mancha vai no sufixo discreto.
+  // desistência e fechamento formal são o mesmo balde ("encerradas"):
+  // o desfecho distingue na linha, não na contagem
+  const encerradas = lista.filter(ehEncerradaCedo).length;
+  const nVivas = lista.length - encerradas;
   const sujeito =
     visao === "especialista"
       ? `${nVivas} ${nVivas === 1 ? "trilha" : "trilhas"}`
@@ -574,18 +676,18 @@ function resumoDaLista(
     cont.pausada > 0 && { texto: `${cont.pausada} pausada${cont.pausada > 1 ? "s" : ""}` },
     cont.andamento > 0 && { texto: `${cont.andamento} em dia` },
   ].filter(Boolean) as { texto: string; forte?: boolean }[];
-  return { n: sujeito, desistentes, itens };
+  return { n: sujeito, encerradas, itens };
 }
 
 function ResumoLinha({ resumo }: { resumo: ReturnType<typeof resumoDaLista> }) {
   return (
     <p className="mt-1 text-sm text-muted-foreground">
       {resumo.n}
-      {resumo.desistentes > 0 && (
+      {resumo.encerradas > 0 && (
         <span className="text-xs">
           {" · "}
-          {resumo.desistentes}{" "}
-          {resumo.desistentes === 1 ? "desistente" : "desistentes"}
+          {resumo.encerradas}{" "}
+          {resumo.encerradas === 1 ? "encerrada" : "encerradas"}
         </span>
       )}
       {resumo.itens.map((it, i) => (
@@ -894,12 +996,15 @@ function VisaoCoordenacao({
   const [mentorSel, setMentorSel] = useState<string | null>(() =>
     sp.get("mentor")
   );
+  // a coluna "Dupla" ciclável — prioridade → az → za → prioridade (?ordem=)
+  const [ordem, setOrdem] = useState<OrdemDupla | null>(() =>
+    parseOrdemDupla(sp.get("ordem"))
+  );
   // supervisão/mentor são secundários — moram no painel "Filtros (n)",
   // não na barra (o modal aplica de uma vez, como em /registros)
   const [painelAberto, setPainelAberto] = useState(false);
   const [draftSup, setDraftSup] = useState("todas");
   const [draftMentor, setDraftMentor] = useState("todos");
-  const { ref: chipsRef, maskStyle: chipsMask } = useFadeX<HTMLDivElement>();
 
   // link da home pousa aqui sem remontar a rota — realinha o chip quando
   // o contexto resolvido muda. Ajuste durante o render (padrão react.dev),
@@ -999,10 +1104,11 @@ function VisaoCoordenacao({
     setSpStrVisto(spStr);
     const params = new URLSearchParams(spStr);
     const r = params.get("recorte");
-    setFiltro(CATS.some((c) => c.id === r) ? (r as FiltroCat) : "todas");
+    setFiltro(resolveRecorteFatia(r) ?? "todas");
     setBusca(params.get("q") ?? "");
     setSupSel(params.get("sup") ?? "todas");
     setMentorSel(params.get("mentor"));
+    setOrdem(parseOrdemDupla(params.get("ordem")));
   }
 
   // estado → URL: replaceState NATIVO, nunca router.replace — a navegação
@@ -1016,17 +1122,22 @@ function VisaoCoordenacao({
     else params.set("recorte", filtro);
     const qt = busca.trim();
     if (!qt) params.delete("q");
-    else params.set("q", qt);
+    // a query crua, não o trim — o eco URL→estado abaixo devolve o param ao
+    // input; um espaço digitado no meio da busca (token novo começando) não
+    // pode sumir ao clicar noutro controle
+    else params.set("q", busca);
     if (supSelEf === "todas") params.delete("sup");
     else params.set("sup", supSelEf);
     if (!mentorSelEf) params.delete("mentor");
     else params.set("mentor", mentorSelEf);
+    if (!ordem) params.delete("ordem");
+    else params.set("ordem", escreveOrdem(ordem));
     const qs = params.toString();
     const url = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
     if (url !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, "", url);
     }
-  }, [filtro, busca, supSelEf, mentorSelEf]);
+  }, [filtro, busca, supSelEf, mentorSelEf, ordem]);
 
   // critério secundário só existe com ≥2 opções úteis (regra de silêncio
   // dos filtros); se um deles está ativo o controle fica — ninguém fica
@@ -1054,33 +1165,75 @@ function VisaoCoordenacao({
   const saude = saudeDoRecorte(recorte, eventos, hoje);
 
   // a ordem default é o radar: apoio (trabalho) → risco → atenção → em
-  // andamento → fora da régua (pausada/concluída/encerrada)
-  const pesoFila = (d: Dupla) => {
-    const s = saudePorId.get(d.id)!;
-    if (s.apoio.aberto) return 0;
-    if (d.status !== "ativa") return 5;
-    return ORDEM_SEMAFORO[s.semaforo] + 1;
-  };
+  // andamento → fora da régua (pausada/concluída/encerrada) — o pesoFila
+  // compartilhado de @/lib/duplas-ordem, o mesmo da coluna "Situação"
   const porPrioridade = (a: Dupla, b: Dupla) =>
-    pesoFila(a) - pesoFila(b) ||
+    pesoFila(a, saudePorId.get(a.id)!) - pesoFila(b, saudePorId.get(b.id)!) ||
     comparaNome(a.mentor.nome, b.mentor.nome) ||
     comparaNome(a.mentorado.nome, b.mentorado.nome);
 
-  const q = normaliza(busca.trim());
-  const base = [...recorte].sort(porPrioridade).filter(
-    (d) =>
-      !q ||
-      normaliza(d.mentor.nome).includes(q) ||
-      normaliza(d.mentorado.nome).includes(q)
-  );
-  const exibidas = base.filter((d) =>
-    chipBate(filtro, d, saudePorId.get(d.id)!)
-  );
+  // cada coluna cicla asc → desc → default e só uma fica ativa — mesmo
+  // ciclo dos headers de /relatorios
+  const clicarColuna = (col: OrdemCol) => {
+    trackProduto("sort", { col });
+    setOrdem((o) =>
+      !o || o.col !== col ? { col, dir: 1 } : o.dir === 1 ? { col, dir: -1 } : null
+    );
+  };
+
+  // o controle móvel não tem colunas — um botão só percorre os 9 estados
+  // na sequência (prioridade é a ausência de ordem); situação abre porque
+  // é a coluna que a linha mostra primeiro
+  const ciclarTodas = () => {
+    trackProduto("sort", { col: "ciclo" });
+    const ciclo: OrdemDupla[] = [
+      { col: "situacao", dir: 1 },
+      { col: "situacao", dir: -1 },
+      { col: "nome", dir: 1 },
+      { col: "nome", dir: -1 },
+      { col: "encontros", dir: 1 },
+      { col: "encontros", dir: -1 },
+      { col: "nota", dir: 1 },
+      { col: "nota", dir: -1 },
+    ];
+    setOrdem((o) => {
+      if (!o) return ciclo[0];
+      const i = ciclo.findIndex((c) => c.col === o.col && c.dir === o.dir);
+      return i === ciclo.length - 1 ? null : ciclo[i + 1];
+    });
+  };
+
+  // busca fuzzy (REALIZA-391): todo token bate em algum nome da dupla, a
+  // ordem das palavras é livre e erro leve entra — o score decide a
+  // relevância quando não há ordenação explícita. Score pré-computado por
+  // id (mesma régua do scorePorId de /pessoas): dentro do comparador do
+  // sort seriam O(n log n) chamadas de matcher por tecla
+  const qt = busca.trim();
+  const scorePorId = new Map<string, number>();
+  if (qt) {
+    for (const d of recorte) scorePorId.set(d.id, scoreDaDupla(qt, d));
+  }
+  const base = qt
+    ? recorte.filter((d) => (scorePorId.get(d.id) ?? 0) > 0)
+    : [...recorte];
+  const exibidas = base
+    .filter((d) => chipBate(filtro, d, saudePorId.get(d.id)!))
+    .sort(
+      ordem
+        ? comparadorDe(ordem, saudePorId)
+        : qt
+          ? (a, b) =>
+              (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0) ||
+              porPrioridade(a, b)
+          : porPrioridade
+    );
 
   // na visão "todas" sem recortes a massa saudável colapsa — destaques são
-  // quem tem encontro batendo nos próximos 3 dias (v5)
+  // quem tem encontro batendo nos próximos 3 dias (v5). Ordem alfabética
+  // explícita pede a lista chapa — esconder duplas sob "mostrar as outras"
+  // quebraria o A→Z que a pessoa acabou de pedir
   const semRecorte =
-    !q && !turmaSel && supSelEf === "todas" && !mentorSelEf;
+    !qt && !ordem && !turmaSel && supSelEf === "todas" && !mentorSelEf;
   const mostrarMassa =
     filtro === "todas" && semRecorte && exibidas.length > 0;
   const LIMITE_MASSA = 5;
@@ -1115,7 +1268,7 @@ function VisaoCoordenacao({
   const menuDa = (d: Dupla) => (
     <DuplaLinhaMenu
       dupla={d}
-      fichaHref={`/duplas/${d.id}`}
+      editar
       formulario
       remanejar
       encerrar={
@@ -1134,8 +1287,8 @@ function VisaoCoordenacao({
         dupla: d,
         saude: s,
         hoje,
-        // o cap de 48h conta só interações tipo nudge — um "contato" manual
-        // (Chamar) nunca bloqueia o Lembrar
+        // o cap de 48h conta interações tipo nudge — Lembrar e Chamar da
+        // linha alimentam a mesma régua (o wa.me loga nudge também)
         ultimoNudge: nudges[d.id]?.tipo === "nudge" ? nudges[d.id] : null,
         meuNome,
         tituloNudge: "Lembrete da coordenação",
@@ -1155,7 +1308,8 @@ function VisaoCoordenacao({
         mostrarSupervisor
         wa={waDa(d, s)}
         menu={menuDa(d)}
-        dimDesistentes={filtro === "todas"}
+        dimEncerradas={filtro === "todas"}
+        marca={qt || undefined}
         i={i}
       />
     );
@@ -1202,6 +1356,31 @@ function VisaoCoordenacao({
         </div>
       </header>
 
+      {/* entrada da fila de pareamento (REALIZA-446): quem espera par não
+          é dupla ainda, então não aparece na lista — a fila mora em
+          /pessoas e daqui a coord salta direto pro card, que abre com
+          gente esperando */}
+      <Link
+        href="/pessoas#aguardando-par"
+        className="group mt-4 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)]/15 text-foreground">
+          <UsersThree aria-hidden size={16} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium">Aguardando par</span>
+          <span className="block text-xs text-muted-foreground">
+            Jovens e mentores esperando pareamento. A fila e o Parear
+            ficam em Pessoas.
+          </span>
+        </span>
+        <CaretRight
+          aria-hidden
+          size={15}
+          className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+        />
+      </Link>
+
       {/* situação do programa (ou do recorte): o mesmo resumo da agenda —
           aqui a fatia não navega, ativa o chip equivalente da própria página */}
       {lista.length > 0 && (
@@ -1213,10 +1392,8 @@ function VisaoCoordenacao({
       {/* chips por situação com contador; a régua de cada uma está no
           "Como calculamos" do resumo. Clicar de novo desfaz o filtro. */}
       {lista.length > 0 && (
-        <div
-          ref={chipsRef}
-          style={chipsMask}
-          className="-mx-4 mt-5 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:px-0"
+        <FilterChipRow
+          className="-mx-4 mt-5 px-4 sm:mx-0 sm:px-0"
           role="group"
           aria-label="Filtrar por situação"
         >
@@ -1237,7 +1414,7 @@ function VisaoCoordenacao({
               />
             );
           })}
-        </div>
+        </FilterChipRow>
       )}
 
       {/* filtros: turma é primária e fica em chips; supervisão/mentor são
@@ -1246,14 +1423,15 @@ function VisaoCoordenacao({
       {(turmas.length > 1 || temSecundarios) && (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           {turmas.length > 1 && (
-            <span
-              className="flex flex-wrap items-center gap-1.5"
-              role="group"
-              aria-label="Filtrar por turma"
-            >
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
+            <span className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto">
+              <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
                 Turma
               </span>
+              <FilterChipRow
+                className="flex-1 gap-1.5"
+                role="group"
+                aria-label="Filtrar por turma"
+              >
               <button
                 type="button"
                 aria-pressed={turmaSel === null}
@@ -1289,6 +1467,7 @@ function VisaoCoordenacao({
                   </span>
                 </button>
               ))}
+              </FilterChipRow>
             </span>
           )}
           {temSecundarios && (
@@ -1304,11 +1483,39 @@ function VisaoCoordenacao({
         </div>
       )}
 
-      <Dialog open={painelAberto} onOpenChange={setPainelAberto}>
-        <DialogContent size="md">
-          <DialogHeader>
-            <DialogTitle>Filtros</DialogTitle>
-          </DialogHeader>
+      {/* superfície única por viewport (spec 022, US6): Sheet de rodapé
+          no celular, Dialog lg no desktop */}
+      <FormSurface
+        open={painelAberto}
+        onOpenChange={setPainelAberto}
+        titulo="Filtros"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              className="sm:me-auto"
+              disabled={draftAtivos === 0}
+              onClick={() => {
+                setDraftSup("todas");
+                setDraftMentor("todos");
+              }}
+            >
+              Limpar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setSupSel(draftSup);
+                setMentorSel(draftMentor === "todos" ? null : draftMentor);
+                setPainelAberto(false);
+              }}
+            >
+              Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
+            </Button>
+          </>
+        }
+      >
           <div className="space-y-4">
             {supShow && (
               <fieldset>
@@ -1373,60 +1580,48 @@ function VisaoCoordenacao({
               </fieldset>
             )}
           </div>
-          <DialogFooter sticky>
-            <Button
-              type="button"
-              variant="ghost"
-              className="sm:me-auto"
-              disabled={draftAtivos === 0}
-              onClick={() => {
-                setDraftSup("todas");
-                setDraftMentor("todos");
-              }}
-            >
-              Limpar
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                setSupSel(draftSup);
-                setMentorSel(draftMentor === "todos" ? null : draftMentor);
-                setPainelAberto(false);
-              }}
-            >
-              Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </FormSurface>
 
-      {/* barra da lista: contagem viva + legenda dos dots. Desistentes não
-          inflam o número principal — a mancha vai no sufixo discreto (no
-          chip Desistentes a contagem é delas mesmas) */}
+      {/* barra da lista: contagem viva + legenda dos dots. Fechadas cedo
+          não inflam o número principal — a mancha vai no sufixo discreto
+          como "encerradas" (desistência e fechamento formal no mesmo
+          balde; o desfecho distingue na linha) */}
       <div className="mb-2 mt-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-[13px] text-muted-foreground">
           {(() => {
-            const nDes = exibidas.filter(desistenteDa).length;
-            const nPrincipais = exibidas.length - nDes;
-            return filtro === "desistente" ? (
+            const nEnc = exibidas.filter(ehEncerradaCedo).length;
+            const nPrincipais = exibidas.length - nEnc;
+            return filtro === "encerrada" ? (
               <b className="font-semibold text-foreground">
-                {nDes} {nDes === 1 ? "desistente" : "desistentes"}
+                {nEnc} {nEnc === 1 ? "encerrada" : "encerradas"}
               </b>
             ) : (
               <>
                 <b className="font-semibold text-foreground">
                   {nPrincipais} {nPrincipais === 1 ? "dupla" : "duplas"}
                 </b>
-                {nDes > 0 && (
+                {nEnc > 0 && (
                   <span className="text-xs">
-                    {" "}
-                    · {nDes} {nDes === 1 ? "desistente" : "desistentes"}
+                    {` · ${nEnc} ${nEnc === 1 ? "encerrada" : "encerradas"}`}
                   </span>
                 )}
               </>
             );
           })()}{" "}
-          · ordenadas por prioridade
+          {/* a ordenação corrente é afordância — clicar cicla (o header da
+              coluna só existe na grade @4xl; aqui o controle serve também
+              no mobile). Subtil: pontilhado, não botão */}
+          ·{" "}
+          <button
+            type="button"
+            onClick={ciclarTodas}
+            title="Ordenar a lista"
+            className="cursor-pointer underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+          >
+            {ordem
+              ? `por ${ORDEM_ROTULO[ordem.col][String(ordem.dir) as "1" | "-1"]}`
+              : "por prioridade"}
+          </button>
         </p>
         <p className="text-xs text-muted-foreground">
           <span aria-hidden className="mx-1 inline-block size-2 rounded-full bg-[var(--role-mentorado)] align-[-1px] ring-1 ring-foreground/15" />
@@ -1462,12 +1657,13 @@ function VisaoCoordenacao({
             className="@container"
           >
             <div className="@4xl:overflow-hidden @4xl:rounded-xl @4xl:bg-card @4xl:shadow-[var(--shadow-border)]">
-              <CabecalhoColunas />
-              {/* filtro, turma, supervisão e busca sempre animam (convenção do
-                  AGENTS.md): a re-key remonta as linhas e o animate-enter re-roda
-                  com o stagger do --i. A busca entra na key de propósito. */}
+              <CabecalhoColunas ordem={ordem} onCiclar={clicarColuna} />
+              {/* filtro, turma, supervisão, ordenação e busca sempre animam
+                  (convenção do AGENTS.md): a re-key remonta as linhas e o
+                  animate-enter re-roda com o stagger do --i. A busca entra
+                  na key de propósito. */}
               <div
-                key={`${filtro}|${turmaSel ?? ""}|${supSelEf}|${mentorSelEf ?? ""}|${q}`}
+                key={`${filtro}|${turmaSel ?? ""}|${supSelEf}|${mentorSelEf ?? ""}|${ordem ? escreveOrdem(ordem) : ""}|${qt}`}
                 className="space-y-3 @4xl:space-y-0 @4xl:divide-y @4xl:divide-border/60"
               >
                 {antes.map((d) => linha(d, i++))}
@@ -1495,6 +1691,7 @@ function VisaoCoordenacao({
                             hojeStr={hojeStr}
                             wa={waDa(d, s)}
                             menu={menuDa(d)}
+                            marca={qt || undefined}
                             i={i++}
                           />
                         );
@@ -1551,7 +1748,10 @@ function VisaoSupervisor({
   // ficha preserva e o voltar aterrissa de volta neles)
   const [busca, setBusca] = useState(() => sp.get("q") ?? "");
   const [filtro, setFiltro] = useState<FiltroCat>(recorteInicial ?? "todas");
-  const { ref: chipsRef, maskStyle: chipsMask } = useFadeX<HTMLDivElement>();
+  // a coluna "Dupla" ciclável — mesmo ?ordem= da visão de coordenação
+  const [ordem, setOrdem] = useState<OrdemDupla | null>(() =>
+    parseOrdemDupla(sp.get("ordem"))
+  );
 
   // um ?recorte= resolvido novo realinha a fatia — ajuste no render, o
   // mesmo padrão da visão de coordenação
@@ -1570,8 +1770,9 @@ function VisaoSupervisor({
     setSpStrVisto(spStr);
     const params = new URLSearchParams(spStr);
     const r = params.get("recorte");
-    setFiltro(CATS.some((c) => c.id === r) ? (r as FiltroCat) : "todas");
+    setFiltro(resolveRecorteFatia(r) ?? "todas");
     setBusca(params.get("q") ?? "");
+    setOrdem(parseOrdemDupla(params.get("ordem")));
   }
 
   useEffect(() => {
@@ -1580,37 +1781,75 @@ function VisaoSupervisor({
     else params.set("recorte", filtro);
     const qt = busca.trim();
     if (!qt) params.delete("q");
-    else params.set("q", qt);
+    // query crua — o eco URL→estado não pode mastigar o espaço mid-typing
+    else params.set("q", busca);
+    if (!ordem) params.delete("ordem");
+    else params.set("ordem", escreveOrdem(ordem));
     const qs = params.toString();
     const url = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
     if (url !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, "", url);
     }
-  }, [filtro, busca]);
+  }, [filtro, busca, ordem]);
 
-  const pesoFila = (d: Dupla) => {
-    const s = saudePorId.get(d.id)!;
-    if (s.apoio.aberto) return 0;
-    if (d.status !== "ativa") return 5;
-    return ORDEM_SEMAFORO[s.semaforo] + 1;
-  };
+  // o pesoFila compartilhado de @/lib/duplas-ordem — a ordem do radar é
+  // a mesma da visão de coordenação e da coluna "Situação"
   const porPrioridade = (a: Dupla, b: Dupla) =>
-    pesoFila(a) - pesoFila(b) ||
+    pesoFila(a, saudePorId.get(a.id)!) - pesoFila(b, saudePorId.get(b.id)!) ||
     comparaNome(a.mentor.nome, b.mentor.nome) ||
     comparaNome(a.mentorado.nome, b.mentorado.nome);
 
-  const q = normaliza(busca.trim());
-  const base = [...lista].sort(porPrioridade).filter(
-    (d) =>
-      !q ||
-      normaliza(d.mentor.nome).includes(q) ||
-      normaliza(d.mentorado.nome).includes(q)
-  );
+  // cada coluna cicla asc → desc → default — mesmo modelo da coordenação
+  const clicarColuna = (col: OrdemCol) => {
+    trackProduto("sort", { col });
+    setOrdem((o) =>
+      !o || o.col !== col ? { col, dir: 1 } : o.dir === 1 ? { col, dir: -1 } : null
+    );
+  };
+  const ciclarTodas = () => {
+    trackProduto("sort", { col: "ciclo" });
+    const ciclo: OrdemDupla[] = [
+      { col: "situacao", dir: 1 },
+      { col: "situacao", dir: -1 },
+      { col: "nome", dir: 1 },
+      { col: "nome", dir: -1 },
+      { col: "encontros", dir: 1 },
+      { col: "encontros", dir: -1 },
+      { col: "nota", dir: 1 },
+      { col: "nota", dir: -1 },
+    ];
+    setOrdem((o) => {
+      if (!o) return ciclo[0];
+      const i = ciclo.findIndex((c) => c.col === o.col && c.dir === o.dir);
+      return i === ciclo.length - 1 ? null : ciclo[i + 1];
+    });
+  };
+
+  // busca fuzzy (REALIZA-391) — a mesma da visão de coordenação: qualquer
+  // nome da dupla (social ou civil) vale, score ordena na busca livre.
+  // Score por id pré-computado — comparador do sort não roda matcher
+  const qt = busca.trim();
+  const scorePorId = new Map<string, number>();
+  if (qt) {
+    for (const d of lista) scorePorId.set(d.id, scoreDaDupla(qt, d));
+  }
+  const base = qt
+    ? lista.filter((d) => (scorePorId.get(d.id) ?? 0) > 0)
+    : [...lista];
   // o mesmo chipBate da coordenação — fatia chega pela URL ou pelo atalho
-  // do resumo; "todas" é a ausência de recorte
-  const exibidas = base.filter((d) =>
-    chipBate(filtro, d, saudePorId.get(d.id)!)
-  );
+  // do resumo; "todas" é a ausência de recorte. A ordenação pedida vale
+  // dentro de cada grupo de turma (a ordem dos grupos continua a da turma)
+  const exibidas = base
+    .filter((d) => chipBate(filtro, d, saudePorId.get(d.id)!))
+    .sort(
+      ordem
+        ? comparadorDe(ordem, saudePorId)
+        : qt
+          ? (a, b) =>
+              (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0) ||
+              porPrioridade(a, b)
+          : porPrioridade
+    );
 
   // sub-headers por turma dentro da mesma tabela — supervisionadas podem
   // misturar estados dentro da turma, a régua de critérios não se repete
@@ -1669,10 +1908,8 @@ function VisaoSupervisor({
           supervisor não tem linha de filtro; "Todas" (ou clicar de novo
           no chip ativo) devolve a lista inteira e esconde a linha */}
       {filtro !== "todas" && (
-        <div
-          ref={chipsRef}
-          style={chipsMask}
-          className="-mx-4 mt-5 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:px-0"
+        <FilterChipRow
+          className="-mx-4 mt-5 px-4 sm:mx-0 sm:px-0"
           role="group"
           aria-label="Filtrar por situação"
         >
@@ -1693,35 +1930,47 @@ function VisaoSupervisor({
               />
             );
           })}
-        </div>
+        </FilterChipRow>
       )}
 
-      {/* desistentes fora do número principal (mesma régua da
-          coordenação) */}
+      {/* fechadas cedo fora do número principal (mesma régua da
+          coordenação — "encerradas" cobre desistência e fechamento) */}
       <div className="mb-2 mt-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-[13px] text-muted-foreground">
           {(() => {
-            const nDes = exibidas.filter(desistenteDa).length;
-            const nPrincipais = exibidas.length - nDes;
-            return filtro === "desistente" ? (
+            const nEnc = exibidas.filter(ehEncerradaCedo).length;
+            const nPrincipais = exibidas.length - nEnc;
+            return filtro === "encerrada" ? (
               <b className="font-semibold text-foreground">
-                {nDes} {nDes === 1 ? "desistente" : "desistentes"}
+                {nEnc} {nEnc === 1 ? "encerrada" : "encerradas"}
               </b>
             ) : (
               <>
                 <b className="font-semibold text-foreground">
                   {nPrincipais} {nPrincipais === 1 ? "dupla" : "duplas"}
                 </b>
-                {nDes > 0 && (
+                {nEnc > 0 && (
                   <span className="text-xs">
-                    {" "}
-                    · {nDes} {nDes === 1 ? "desistente" : "desistentes"}
+                    {` · ${nEnc} ${nEnc === 1 ? "encerrada" : "encerradas"}`}
                   </span>
                 )}
               </>
             );
           })()}{" "}
-          · agrupadas por turma
+          · agrupadas por turma{" "}
+          {/* dentro de cada turma, a ordenação corrente — clicar cicla
+              (mesmo controle do header da coluna; serve no mobile) */}
+          <button
+            type="button"
+            onClick={ciclarTodas}
+            title="Ordenar a lista"
+            className="cursor-pointer underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+          >
+            <span aria-hidden>· </span>
+            {ordem
+              ? `por ${ORDEM_ROTULO[ordem.col][String(ordem.dir) as "1" | "-1"]}`
+              : "por prioridade"}
+          </button>
         </p>
         <p className="text-xs text-muted-foreground">
           <span aria-hidden className="mx-1 inline-block size-2 rounded-full bg-[var(--role-mentorado)] align-[-1px] ring-1 ring-foreground/15" />
@@ -1747,11 +1996,11 @@ function VisaoSupervisor({
           className="@container"
         >
           <div className="@4xl:overflow-hidden @4xl:rounded-xl @4xl:bg-card @4xl:shadow-[var(--shadow-border)]">
-            <CabecalhoColunas />
-            {/* re-key só no recorte (nunca na busca) — remontar a cada
-                  tecla recolhia os grupos e matava um dialog
-                  aberto; a troca de chip re-roda o animate-enter das linhas */}
-            <div key={filtro}>
+            <CabecalhoColunas ordem={ordem} onCiclar={clicarColuna} />
+            {/* re-key só no recorte e na ordenação (nunca na busca) —
+                  remontar a cada tecla recolhia os grupos e matava um
+                  dialog aberto; chip e ordem re-rodam o animate-enter */}
+            <div key={`${filtro}|${ordem ? escreveOrdem(ordem) : ""}`}>
               {gruposOrdenados.map(([turma, duplas], gi) => {
                 // o próximo encontro oficial do calendário da turma — o "esta
                 // semana é o N" do sub-header (duplas da turma correm o mesmo
@@ -1788,15 +2037,9 @@ function VisaoSupervisor({
                             saude={s}
                             eventos={eventos}
                             mostrarSupervisor={false}
-                            menu={
-                              // supervisor não tem ação de coordenação —
-                              // o ⋯ leva o "Ver ficha" explícito
-                              <DuplaLinhaMenu
-                                dupla={d}
-                                fichaHref={`/duplas/${d.id}`}
-                              />
-                            }
-                            dimDesistentes={filtro === "todas"}
+                            // supervisor não tem ação de coordenação —
+                            // sem menu o ⋯ decorativo mantém o visual
+                            dimEncerradas={filtro === "todas"}
                             wa={
                               <DuplaWaAcao
                                 {...acaoWhatsAppDupla({
@@ -1813,6 +2056,7 @@ function VisaoSupervisor({
                                 })}
                               />
                             }
+                            marca={qt || undefined}
                             i={i++}
                           />
                         );
@@ -1891,6 +2135,7 @@ function VisaoMentor({
               d.trilha,
               eventosDoCronograma(eventos, d.cronograma_id)
             );
+            const ehEsp = d.trilha === "especialista";
             const feitos = d.encontros.filter(
               (e) => e.status === "realizado"
             ).length;
@@ -1971,9 +2216,9 @@ function VisaoMentor({
                 <div
                   role="img"
                   aria-label={
-                    s.esperado > 0
+                    s.esperado > 0 && !ehEsp
                       ? `${feitos} encontros feitos de ${s.esperado} esperados até hoje, de ${total}`
-                      : `${feitos} encontros feitos de ${total}`
+                      : progressoTrilha({ esp: ehEsp, feitos, total })
                   }
                 >
                   <div className="relative h-2 rounded-full border border-border bg-muted">
@@ -2137,11 +2382,9 @@ function VisaoEspecialista({
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           {ordenadas.map((d, idx) => {
             const s = saudePorId.get(d.id)!;
-            const realizados = new Set(
-              d.encontros
-                .filter((e) => e.status === "realizado")
-                .map((e) => e.numero)
-            );
+            // passos do guia cobertos — o numero da row é a tentativa, a
+            // régua é o rank entre realizados (passoEsp via helper)
+            const realizados = new Set(passosRealizadosDe(d));
             const total = espEventos.length || 5;
             const atual = Array.from(
               { length: total },
@@ -2179,7 +2422,7 @@ function VisaoEspecialista({
                       <span aria-hidden className="size-1.5 rounded-full bg-current" />
                       {d.status === "ativa"
                         ? "Trilha ativa"
-                        : (STATUS_LABEL[d.status]?.label ?? d.status)}
+                        : SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)]}
                     </Pill>
                     <Link
                       href={`/duplas/${d.id}`}
@@ -2229,10 +2472,12 @@ function VisaoEspecialista({
                   </ol>
                   <p className="text-xs text-muted-foreground">
                     <b className="text-foreground">
-                      Sessão {atual ?? total} de {total}
-                    </b>{" "}
-                    · {realizados.size} concluída
-                    {realizados.size === 1 ? "" : "s"}
+                      {progressoTrilha({
+                        esp: true,
+                        feitos: realizados.size,
+                        total,
+                      })}
+                    </b>
                     {atual ? ` · a ${atual}ª ${s.proximo ? "agendada" : "a marcar"}` : ""}
                   </p>
                 </div>

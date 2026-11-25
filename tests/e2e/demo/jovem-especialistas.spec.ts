@@ -9,7 +9,7 @@ import { entrarNaDemo, expect, test } from "../helpers";
 //   · negociação viva (contra-proposta da Helena na mesa, com radios da
 //     grade real — os slots de ter/qui à noite "encaixam" na grade dela)
 //   · cardápio com todos os estados de card (vagas, agenda fechada,
-//     preferência) + rodapé "Falar com a coordenação (abre um chamado)"
+//     preferência) + rodapé "Falar com a coordenação"
 // A persona mentor_especialista (Sofia) cobre o mural: busca acento-
 // insensível, chips de filtro, "Direcionada a você". A persona coordenacao
 // cobre o painel somente-leitura de trilhas + "Pedidos parados" (o pedido
@@ -67,6 +67,63 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
     await expect(
       sugestoes.getByRole("button", { name: "Agora não" })
     ).toBeVisible();
+
+    // REALIZA-515 — a prévia do indicado: foto, cargo, áreas e
+    // experiência. O bloco inteiro leva ao perfil público — decidir sem
+    // ver quem é era apostar às cegas
+    const preview = sugestoes.getByRole("link", {
+      name: "Ver perfil de Marcos Vinícius",
+    });
+    await expect(preview).toBeVisible();
+    await expect(
+      sugestoes.getByText("Engenheiro de dados · Consultoria")
+    ).toBeVisible();
+    await expect(
+      sugestoes.getByText("tecnologia", { exact: true })
+    ).toBeVisible();
+    await expect(
+      sugestoes.getByText(/Professor de curso técnico aos sábados/)
+    ).toBeVisible();
+    // o recorte público nunca vaza documento nem contato
+    await expect(sugestoes.getByText(/marcos\.vinicius@/)).toHaveCount(0);
+    await expect(sugestoes.getByText(/5511987654012/)).toHaveCount(0);
+
+    // a prévia abre o perfil completo e dá pra voltar ao aceite
+    await preview.click();
+    await page.waitForURL("**/jovem/pessoas/*");
+    await expect(
+      page.getByRole("heading", { name: "Marcos Vinícius" })
+    ).toBeVisible();
+    await page
+      .getByRole("link", { name: /catálogo de especialistas/ })
+      .click();
+    await page.waitForURL("**/jovem/especialistas");
+
+    // o mesmo catálogo dentro do dialog de confirmação (023: a escolha é
+    // por card, não Select) — o sugerido vem selecionado e o resumo é o
+    // card completo, com link à ficha
+    await sugestoes.getByRole("button", { name: "Quero seguir" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByRole("link", { name: "Abrir perfil de Marcos Vinícius" })
+    ).toBeVisible();
+    await dialog.getByText("Experiência e formação").click();
+    await expect(
+      dialog.getByText(/Professor de curso técnico aos sábados/)
+    ).toBeVisible();
+    // "qualquer" não inventa perfil: troca pelo primeiro card do pool (o
+    // card do mural é clicável inteiro, 526) e a nota explica que a
+    // coordenação conecta
+    await dialog.getByRole("button", { name: "Trocar" }).click();
+    await dialog
+      .locator("#sug-esp-pool li")
+      .first()
+      .getByRole("button")
+      .click();
+    await expect(
+      dialog.getByText(/a coordenação conecta você/)
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
   });
 
   test("a página abre direto no trabalho — sem bloco explicativo", async ({
@@ -188,7 +245,16 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
     const encaixados = grupo.getByRole("radio", {
       name: /· encaixa com você/,
     });
-    expect(await encaixados.count()).toBe(await radios.count());
+    // 507: slot na grade mas em choque com a agenda da Bia deixa de dizer
+    // "encaixa" e passa a dizer "você já tem algo nesse horário" — a soma
+    // dos dois estados cobre todos os slots oferecidos.
+    const ocupados = grupo.getByRole("radio", {
+      name: /· você já tem algo nesse horário/,
+    });
+    expect(await encaixados.count()).toBeGreaterThan(0);
+    expect(
+      (await encaixados.count()) + (await ocupados.count())
+    ).toBe(await radios.count());
     // selecionar um ativa o botão Propor — estado da escolha fica no radio
     await radios.first().locator("xpath=..").click();
     await expect(radios.first()).toBeChecked();
@@ -224,8 +290,9 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
         "Ainda não liberou horários. Seu pedido vai pro mural."
       )
     ).toBeVisible();
-    // Sofia — a especialista da Bia: variante "sua" com os dois gestos
-    await expect(catalogo.getByText("Sua especialista")).toBeVisible();
+    // Sofia — a especialista da Bia: a variante "seu/seu especialista"
+    // (neutra) vem com os dois gestos
+    await expect(catalogo.getByText("Seu especialista")).toBeVisible();
     await expect(
       catalogo.getByRole("button", { name: "Pedir próxima sessão" })
     ).toBeVisible();
@@ -238,44 +305,49 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
       catalogo.getByRole("button", { name: "Pedir pro mural" }).first()
     ).toBeVisible();
 
-    // o gesto da Sofia abre o dialog compartilhado de pedido — a escolha de
-    // alvo é o primeiro passo
-    await catalogo.getByRole("button", { name: "Pedir trilha" }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(
-      dialog.getByRole("heading", { name: "Pedir apoio de um especialista" })
-    ).toBeVisible();
-    await expect(
-      dialog.getByRole("button", { name: /Um especialista específico/ })
-    ).toBeVisible();
-    await expect(
-      dialog.getByRole("button", { name: /Qualquer especialista/ })
-    ).toBeVisible();
-    // caminho dirigido: escolhe a Sofia — o passo de horário oferece
-    // "Deixar Sofia propor" + chips dos slots reais da grade dela
-    await dialog
-      .getByRole("button", { name: /Um especialista específico/ })
+    // o gesto da Sofia seleciona o card dela na grade (023: o pedido saiu
+    // do modal) — o painel de horário+texto monta embaixo, com âncora
+    // #pedir, e o card fica marcado com selo + aria-pressed
+    await catalogo
+      .getByRole("button", { name: "Pedir próxima sessão" })
       .click();
-    await dialog
-      .getByRole("button", { name: /Sofia Nogueira/ })
-      .click();
+    const painel = page.locator("section#pedir");
     await expect(
-      dialog.getByRole("button", { name: "Deixar Sofia propor" })
+      painel.getByText("Pedido para Sofia Nogueira")
     ).toBeVisible();
+    const cardSofia = catalogo
+      .locator("[data-slot='card']")
+      .filter({ hasText: "Sofia Nogueira" });
+    await expect(cardSofia.getByText("Selecionado")).toBeVisible();
     await expect(
-      dialog
-        .getByRole("button", { name: /(terça|quinta|sábado|domingo) \d{2}\/\d{2} às \d{2}:\d{2}/ })
+      catalogo.getByRole("button", { name: "Pedir próxima sessão" })
+    ).toHaveAttribute("aria-pressed", "true");
+    // os chips são os horários livres reais da grade dela; sem escolha o
+    // pedido sai igual e quem aceita propõe — o "deixar propor" virou
+    // legenda, não opção
+    await expect(
+      painel
+        .getByRole("button", {
+          name: /(terça|quinta|sábado|domingo) \d{2}\/\d{2} às \d{2}:\d{2}/,
+        })
         .first()
     ).toBeVisible();
     await expect(
-      dialog.getByRole("button", { name: "Enviar pedido" })
+      painel.getByText(/manda o pedido e Sofia propõe um com você/)
     ).toBeVisible();
+    await expect(
+      painel.getByRole("button", { name: "Enviar pedido" })
+    ).toBeVisible();
+    // o mural também é um card da grade — "Qualquer especialista" no fim
+    await expect(page.locator("#cta-pedir-mural")).toBeVisible();
     await page.keyboard.press("Escape");
+    await expect(painel).toHaveCount(0);
 
     // rodapé do catálogo — trava de agenda/método vira CHAMADO, outro
-    // sistema: o botão abre o dialog "Pedir ajuda" do jovem
+    // sistema: o botão abre o dialog "Pedir ajuda" do jovem (o passe de
+    // copy tirou o "(abre um chamado)" do rótulo)
     await page
-      .getByRole("button", { name: "Falar com a coordenação (abre um chamado)" })
+      .getByRole("button", { name: "Falar com a coordenação" })
       .click();
     const chamado = page.getByRole("dialog");
     await expect(

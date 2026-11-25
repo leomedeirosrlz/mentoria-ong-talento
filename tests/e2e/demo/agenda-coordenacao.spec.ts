@@ -1,4 +1,5 @@
-import { entrarNaDemo, expect, test } from "../helpers";
+import type { Page } from "@playwright/test";
+import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
 
 // WP5 → REALIZA-161 → REALIZA-195 (v8b) → REALIZA-176 (aceite) — a agenda
 // da coordenação no modo "Monitoramento": faixa de síntese no topo (a
@@ -49,10 +50,46 @@ const DUPLA_PEND = "de000000-0000-4000-8000-000000001538";
 // uid(0x060e) — a concluída do Ricardo com o rito de encerramento aberto
 const DUPLA_RITO = "de000000-0000-4000-8000-000000001550";
 
-const TZ = "America/Sao_Paulo";
-/** "YYYY-MM-DD" de hoje em São Paulo — mesma régua do `hoje` da page. */
-const hojeSP = () =>
-  new Date().toLocaleDateString("en-CA", { timeZone: TZ });
+const MESES: Record<string, string> = {
+  janeiro: "01",
+  fevereiro: "02",
+  março: "03",
+  abril: "04",
+  maio: "05",
+  junho: "06",
+  julho: "07",
+  agosto: "08",
+  setembro: "09",
+  outubro: "10",
+  novembro: "11",
+  dezembro: "12",
+};
+const DOWS: Record<string, number> = {
+  domingo: 0,
+  "segunda-feira": 1,
+  "terça-feira": 2,
+  "quarta-feira": 3,
+  "quinta-feira": 4,
+  "sexta-feira": 5,
+  sábado: 6,
+};
+
+/** "hoje" do DATASET, lido do DOM — o servidor demo ancora as datas na
+ *  subida dele (rebuild re-ancora), não no relógio do teste: um runner
+ *  dias depois do boot lia o weekday errado. O cabeçalho da agenda diz
+ *  "Semana N · D a D de mês · hoje, quinta-feira, 19 de novembro" —
+ *  weekday + dia/mês do hoje do servidor. */
+async function hojeDoCabecalho(page: Page) {
+  const txt = await page
+    .getByText(/Semana \d+ · \d+ a \d+ de \S+ · hoje,/)
+    .innerText();
+  const m = txt.match(/hoje, ([^,]+), (\d{1,2}) de (\S+)/);
+  if (!m) throw new Error(`cabeçalho sem o "hoje, …" esperado: ${txt}`);
+  return {
+    dow: DOWS[m[1]!] ?? -1,
+    diaMes: `${MESES[m[3]!]}-${m[2]!.padStart(2, "0")}`,
+  };
+}
 
 test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
   test.use({ timezoneId: "America/Sao_Paulo" });
@@ -72,7 +109,7 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // síntese, e o contrato "a dupla agenda, a coordenação faz nudge" é
     // coberto pelo teste "coordenação não agenda" abaixo
     await expect(
-      page.getByText(/Semana \d+ · \d+ a \d+ de \w+ · hoje,/)
+      page.getByText(/Semana \d+ · \d+ a \d+ de \S+ · hoje,/)
     ).toBeVisible();
     await expect(
       page.getByRole("note", { name: "Síntese do monitoramento" })
@@ -94,7 +131,9 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // as seções do modo na ordem do aceite (REALIZA-176): a fila
     // operacional é a 1ª — "Para acompanhar" (a resposta dos 5s), depois
     // os blocos de monitoramento "Semana do programa" e "Números da
-    // semana". O primeiro h2 da página é o da fila
+    // semana". O primeiro h2 da página é o da fila.
+    // .first: várias sections levam aria-label — a checagem é da ordem,
+    // então ancora na primeira da página
     await expect(page.locator("section[aria-label]").first()).toHaveAttribute(
       "aria-label",
       "Para acompanhar"
@@ -107,6 +146,8 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       await expect(
         page.locator(`section[aria-label="${label}"]`)
       ).toBeVisible();
+    // .first: o h1 é "Agenda do programa" — o h2 de abertura (o da fila)
+    // é o assert, não qualquer h2 da página
     await expect(page.locator("h2").first()).toContainText("Para acompanhar");
   });
 
@@ -180,6 +221,8 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // pro dia oficial, "N de M com registro" e a barra única lime
     // (role=img — o desenho é um fill só, mas o aria-label segue lendo o
     // denominador literal com "sem data" nomeado, nunca omissão)
+    // .first: o nome da turma repete em conteúdo dentro da linha (pill e
+    // motivo); a li da row é o primeiro li casador
     const linhaT1 = sec.locator("li", { hasText: "Turma 1" }).first();
     const linhaT2 = sec.locator("li", { hasText: "Turma 2" }).first();
     await expect(linhaT1).toBeVisible();
@@ -291,9 +334,10 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // lembretes nas últimas 48h (o do Dandara foi há ~20h — é ele que
     // trava o botão dela; a métrica conta enviados na janela, não "presos")
     await expect(sec.getByText(/registros entregues/)).toBeVisible();
-    // o contador do pulso — "N aguardando" (o aria-label da barra de
-    // cobertura também diz "aguardando registro"; o dígito desambigua)
-    await expect(sec.getByText(/\d+ aguardando$/)).toBeVisible();
+    // o contador do pulso — "N aguardando". O texto pode aparecer mais de
+    // uma vez (total + linha por turma e/ou par mobile/desktop), então
+    // escopamos no primeiro: o contrato é "existe um contador visível".
+    await expect(sec.getByText(/\d+ aguardando$/).first()).toBeVisible();
     await expect(
       sec.getByText(/média das avaliações dos jovens/)
     ).toBeVisible();
@@ -399,6 +443,8 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // 2 atrasados na maior parte da semana — na terça o vigente já conta:
     // 3 antes das 19h (agendado por vir) e 2 depois (o agendado cai em
     // limbo e cobre o esperado)
+    // .first: o motivo pode sair em resumo e detalhe dentro da mesma li —
+    // basta a primeira ocorrência visível
     await expect(
       risco.getByText(/[23] encontros atrasados/).first()
     ).toBeVisible();
@@ -430,7 +476,7 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // é o vigente (seg/ter). Na linha canônica as dimensões viraram motivo
     // em texto — o que era badge segue dito, sem chip por dimensão
     const pend = fila.locator("li", { hasText: "Caio Henrique Oliveira" });
-    const dowHoje = new Date(`${hojeSP()}T12:00:00Z`).getUTCDay();
+    const { dow: dowHoje } = await hojeDoCabecalho(page);
     if ((await pend.count()) > 0) {
       // a pendência encabeça o motivo — a forma é a do estado da row
       // ("Registro do Nº ... pendente" quando realizado; "...agendado já
@@ -452,14 +498,14 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       ).toBeVisible();
       if (dowHoje === 1) {
         await expect(
-          pend.getByText(/Encontro \d+ da Turma 1 ainda sem data/)
+          pend.getByText(/Encontro \d+ da Turma 1 ainda sem agendamento/)
         ).toBeVisible();
       }
       if (dowHoje === 2) {
         await expect(
           pend.getByText(/1 encontro atrasado/)
         ).toBeVisible();
-        await expect(pend).toContainText(/ainda sem data/);
+        await expect(pend).toContainText(/ainda sem agendamento/);
       }
       // "Ver ficha" aponta pra ficha da dupla — o nome acessível leva o
       // primeiro nome do mentorado; id estável do dataset
@@ -620,13 +666,20 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // coordenação (o mentor lê "Como conduzir" na dele). O gatilho é alvo
     // de toque de verdade (min-h-11 no mobile) e o texto do guia abre fora
     // do card, que não muda de altura
+    // .first: cada card da seção tem o gatilho — medir o popover de
+    // qualquer um prova o comportamento
     const guia = sec.getByRole("button", { name: /O que cobre/ }).first();
     await expect(guia).toBeVisible();
     const card = guia.locator("xpath=ancestor::li[1]");
     const altura = (await card.boundingBox())!.height;
-    await guia.click();
     const pop = page.getByRole("dialog", { name: "O que cobre" });
+    await agirComConfirma(
+      () => guia.click(),
+      () => pop.isVisible()
+    );
     await expect(pop).toBeVisible();
+    // .last: o popover leva título/meta + parágrafos — o corpo do guia é
+    // o último parágrafo com texto
     await expect(pop.locator("p", { hasText: /[a-zá-ú]{4}/ }).last()).toBeVisible();
     expect((await card.boundingBox())!.height).toBe(altura);
     await page.keyboard.press("Escape");
@@ -647,17 +700,21 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // (de quarta em diante), os dois encontros de formação da T2 — a
     // inicial na quinta e a final na sexta da semana corrente. Nos outros
     // dias os cards levam só a tag do tipo (Formação/Encontro/…)
-    const dow = new Date(`${hojeSP()}T12:00:00Z`).getUTCDay();
+    const { dow, diaMes } = await hojeDoCabecalho(page);
     const chamadaHoje =
       dow === 0 || (!ancoraNaSemana && (dow === 4 || dow === 5));
     const chamada = sec.getByRole("link", { name: "Abrir chamada" });
     if (chamadaHoje) {
+      // o dia do link é o "hoje" do servidor — dia/mês do cabeçalho
+      // (o ano vem do relógio dele, não do runner)
       await expect(chamada).toHaveAttribute(
         "href",
-        `/agenda?aba=calendario&dia=${hojeSP()}`
+        new RegExp(`/agenda\\?aba=calendario&dia=\\d{4}-${diaMes}$`)
       );
     } else {
       await expect(chamada).toHaveCount(0);
+      // .first: "Formação" é a tag do tipo em vários cards da seção —
+      // basta a primeira visível como prova de que a tag está lá
       await expect(
         sec.getByText("Formação", { exact: true }).first()
       ).toBeVisible();

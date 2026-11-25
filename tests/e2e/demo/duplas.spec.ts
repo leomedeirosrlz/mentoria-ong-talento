@@ -41,7 +41,7 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     ).toBeVisible();
     await expect(
       resumo.getByRole("img", {
-        name: /\d+ em andamento: \d+ em risco, \d+ em atenção, \d+ em dia\. \d+ pausadas, \d+ concluídas, \d+ desistentes\. \d+ com apoio aberto\./,
+        name: /\d+ em andamento: \d+ em risco, \d+ em atenção, \d+ em dia\. \d+ pausadas, \d+ concluídas, \d+ encerradas\. \d+ com apoio aberto\./,
       })
     ).toBeVisible();
     const legenda = resumo.getByRole("listitem");
@@ -51,7 +51,9 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await expect(legenda.nth(2)).toContainText("em dia");
     await expect(legenda.nth(3)).toContainText("pausadas");
     await expect(legenda.nth(4)).toContainText("concluídas");
-    await expect(legenda.nth(5)).toContainText("desistentes");
+    // "encerradas" é um balde só — desistência e fechamento formal somam
+    // na mesma fatia (REALIZA-377); a linha distingue pelo desfecho
+    await expect(legenda.nth(5)).toContainText("encerradas");
     await expect(resumo.getByText(/com apoio aberto/)).toBeVisible();
     // a definição da régua não fica na tela — mora no popover "Como
     // calculamos" (convenção: a interface não explica a si mesma)
@@ -84,6 +86,14 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await expect(
       chips.getByRole("button", { name: /Concluídas \d+/ })
     ).toBeVisible();
+    // desistente não tem chip próprio — entra no balde "Encerradas"
+    // (REALIZA-377): o chip único cobre desistência + fechamento formal
+    await expect(
+      chips.getByRole("button", { name: /Desistentes/ })
+    ).toHaveCount(0);
+    await expect(
+      chips.getByRole("button", { name: /Encerradas \d+/ })
+    ).toBeVisible();
     await expect(
       chips.getByRole("button", { name: /Apoio \d+/ })
     ).toBeVisible();
@@ -99,13 +109,19 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     const n = await linhas.count();
     expect(n).toBeGreaterThan(3);
 
-    // o chip filtra de verdade: "Em risco N" reduz a lista às duplas em
-    // risco do recorte (o dataset tem 1 — a Fernanda × Dandara)
-    await chips.getByRole("button", { name: /Em risco \d+/ }).click();
-    await expect(page.locator(LINHAS_COORD)).toHaveCount(1);
+    // o chip filtra de verdade: "Em risco N" reduz a lista às N duplas em
+    // risco do recorte (o dataset pode ganhar novas duplas em risco; o
+    // número do chip é a fonte da verdade, não um 1 fixo)
+    const chipRisco = chips.getByRole("button", { name: /Em risco \d+/ });
+    const riscoN = Number((await chipRisco.innerText()).match(/\d+/)?.[0]);
+    await chipRisco.click();
+    await expect(page.locator(LINHAS_COORD)).toHaveCount(riscoN);
     await expect(
-      page.locator(LINHAS_COORD).first()
-    ).toContainText("Dandara");
+      page
+        .locator(LINHAS_COORD)
+        .filter({ hasText: "Fernanda" })
+        .filter({ hasText: "Dandara" })
+    ).toHaveCount(1);
     await chips.getByRole("button", { name: /Todas \d+/ }).click();
     await expect(linhas).toHaveCount(n);
 
@@ -140,15 +156,18 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       await expect(
         linha.getByRole("link", { name: /Ver ficha/ })
       ).toHaveCount(1);
-      // progresso em segmentos, com aria-label "N de M encontros"
+      // progresso em segmentos, aria na régua única: "N de M encontros
+      // feitos" (DPP) ou "N de M sessões feitas" (esp) — REALIZA-498
       await expect(
-        linha.locator('[role="img"][aria-label*="encontros realizados"]')
+        linha.locator(
+          '[role="img"][aria-label*="encontros feitos"], [role="img"][aria-label*="sessões feitas"]'
+        )
       ).toHaveCount(1);
     }
 
     // o botão muda com o estado: "Lembrar" nas ativas com pendência,
-    // "Chamar" (contato livre, sem cap) nas fora da régua. O "Lembrada
-    // dd/mm" do cap de 48h mora no dialog da dupla bloqueada (abaixo).
+    // "Chamar" (contato livre) nas fora da régua. O "Lembrada dd/mm" do
+    // cap de 48h mora no dialog da dupla bloqueada (abaixo).
     await expect(
       page.locator(LINHAS_COORD).getByText(/^Lembrar/).first()
     ).toBeVisible();
@@ -156,12 +175,13 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       page.locator(LINHAS_COORD).getByText(/^Chamar/).first()
     ).toBeVisible();
 
-    // o "Chamar" abre o preview — o wa.me com `t=contato` (fora do cap de
-    // 48h) está no "Abrir WhatsApp" lá dentro. O rótulo cobre DOIS estados
-    // (ele diz a intenção, não a presença de pendência): contato livre de
-    // dupla em dia, sem nudge → sem lembrete in-app; e a resposta ao pedido
-    // de apoio do jovem, que TEM nudge (destino mentorado) e mostra o
-    // Lembrar in-app no preview. Aqui interessa o contato livre.
+    // o "Chamar" abre o preview — o wa.me com `t=nudge` está no "Abrir
+    // WhatsApp" lá dentro: o cap de 48h cobre o contato manual também.
+    // O rótulo cobre DOIS estados (ele diz a intenção, não a presença de
+    // pendência): contato livre de dupla em dia, sem nudge → sem lembrete
+    // in-app; e a resposta ao pedido de apoio do jovem, que TEM nudge
+    // (destino mentorado) e mostra o Lembrar in-app no preview. Aqui
+    // interessa o contato livre.
     const linhaChamar = page
       .locator(LINHAS_COORD)
       .filter({ has: page.getByRole("button", { name: /Chamar .+ ver a mensagem/ }) })
@@ -173,7 +193,7 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     const dlgChamar = page.getByRole("dialog");
     await expect(
       dlgChamar.getByRole("link", { name: "Abrir WhatsApp" })
-    ).toHaveAttribute("href", /t=contato/);
+    ).toHaveAttribute("href", /t=nudge/);
     // sem pendência apontável não há lembrete in-app no preview
     await expect(
       dlgChamar.getByRole("button", { name: /Lembrar pelo app/ })
@@ -195,9 +215,17 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await expect(
       dlgBloq.getByRole("button", { name: /Lembrada \d{2}\/\d{2}/ })
     ).toBeDisabled();
+    // o cap cobre o wa.me também: "Abrir WhatsApp" vira botão
+    // desabilitado com a data, nunca a página de bloqueio do redirect
+    await expect(
+      dlgBloq.getByRole("link", { name: "Abrir WhatsApp" })
+    ).toHaveCount(0);
+    await expect(
+      dlgBloq.getByRole("button", { name: /Destrava \d{2}\/\d{2}/ })
+    ).toBeDisabled();
     await page.keyboard.press("Escape");
 
-    // fora da régua nunca vira nudge: pausada e concluída só têm "Chamar"
+    // fora da régua nunca tem Lembrar: pausada e concluída só têm "Chamar"
     // — nem "Lembrar" nem "Lembrada" — e a pill repete o rótulo do status
     // ("Pausada"), nunca um "em dia" que mentisse
     const pausada = page.locator(LINHAS_COORD).filter({ hasText: "Pausada" });
@@ -354,6 +382,11 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       () => document.documentElement.scrollWidth
     );
     expect(scrollW).toBeLessThanOrEqual(390);
+
+    // a página ainda assenta quando a lista aparece (entrada escalonada,
+    // stagger até ~530ms) — o boundingBox já leu 43.99px contra o piso
+    // de 44 numa medição no meio do gesto; espera terminar antes de medir
+    await page.waitForTimeout(600);
 
     for (let i = 0; i < n; i++) {
       const card = cards.nth(i);
@@ -555,6 +588,27 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     for (let i = 0; i < nApoio; i++)
       await expect(linhas.nth(i).getByText("Apoio pedido")).toBeVisible();
 
+    // deep link antigo: ?recorte=desistente (época do chip próprio)
+    // aterrissa no chip "Encerradas" — o balde que cobre desistência
+    // + fechamento formal (REALIZA-377)
+    await page.goto("/duplas?recorte=desistente");
+    await expect(
+      chips.getByRole("button", { name: /Encerradas \d+/ })
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(linhas).toHaveCount(await nDoChip(/Encerradas \d+/));
+    // a linha continua distinguindo o desfecho: a desistente do fixture
+    // (Carlos × Laura) lê "Desistente" e a remanejada lê "Encerrada"
+    await expect(
+      linhas
+        .filter({ hasText: "Laura" })
+        .getByText("Desistente", { exact: true })
+    ).toBeVisible();
+    await expect(
+      linhas
+        .filter({ hasText: "Eduardo" })
+        .getByText("Encerrada", { exact: true })
+    ).toBeVisible();
+
     // recorte desconhecido não vira chip fantasma — cai em "Todas"
     await page.goto("/duplas?recorte=bogus");
     await expect(
@@ -671,5 +725,255 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       ).toHaveCount(1);
       await expect(card.locator("div.border-dashed")).toHaveCount(0);
     }
+  });
+
+  // REALIZA-390/405/445 — as colunas ordenáveis (Situação/Dupla/Encontros/
+  // Nota) ciclam asc → desc → default, uma ativa por vez, persistidas em
+  // ?ordem= (<col> / <col>-desc). A asserção de ordem compara o lockup
+  // inteiro ("Mentor e Mentorado") na mesma collation pt-BR do
+  // porNomeDupla.
+  test("coordenação: coluna Dupla cicla prioridade → A a Z → Z a A", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/duplas");
+    const linhas = page.locator(LINHAS_COORD);
+    const nomesDuplas = async () =>
+      (await linhas.locator("p.text-sm.font-semibold").allInnerTexts()).map(
+        (t) => t.replace(/\s+/g, " ").trim()
+      );
+    const cmp = (a: string, b: string) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+    // a lista chega por stream — espera a primeira linha pintar antes de
+    // medir (allInnerTexts não tem retry e a máquina de CI pode estar lenta)
+    await expect(linhas.first()).toBeVisible();
+    const padrao = await nomesDuplas();
+    expect(padrao.length).toBeGreaterThan(3);
+
+    // o header clicável da coluna — o nome acessível anuncia a ordenação
+    // corrente (aria-sort não vale em <button>), e a legenda
+    // "por prioridade/A a Z" repete o gesto no mobile
+    const btnOrdem = page.getByRole("button", {
+      name: /^Ordenar por nome da dupla/,
+    });
+    await expect(btnOrdem).toBeVisible();
+
+    await btnOrdem.click();
+    await expect(btnOrdem).toHaveAttribute("aria-label", /de A a Z/);
+    await expect(page).toHaveURL(/[?&]ordem=nome(&|$)/);
+    await expect(linhas.first()).toBeVisible();
+    const az = await nomesDuplas();
+    expect(az).toEqual([...az].sort(cmp));
+    // a massa saudável não colapsa em ordem alfabética — todas as duplas
+    // do recorte estão na lista chapa
+    expect(az.length).toBeGreaterThanOrEqual(padrao.length);
+
+    await btnOrdem.click();
+    await expect(btnOrdem).toHaveAttribute("aria-label", /de Z a A/);
+    await expect(page).toHaveURL(/[?&]ordem=nome-desc/);
+    await expect(linhas.first()).toBeVisible();
+    expect(await nomesDuplas()).toEqual([...az].reverse());
+
+    // terceiro clique devolve o radar — o param sai da URL e a ordem de
+    // prioridade (com a massa colapsada, se havia) volta intacta
+    await btnOrdem.click();
+    await expect(page).not.toHaveURL(/[?&]ordem=/);
+    await expect(linhas.first()).toBeVisible();
+    expect(await nomesDuplas()).toEqual(padrao);
+  });
+
+  // REALIZA-405 — Encontros e Nota seguem o mesmo ciclo: asc → desc →
+  // default, e uma coluna ativa substitui a outra no header e no param.
+  test("coordenação: Encontros e Nota ciclam e alternam a coluna ativa", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/duplas");
+    const linhas = page.locator(LINHAS_COORD);
+    await expect(linhas.first()).toBeVisible();
+
+    // a contagem de passos feitos de cada linha, lida do aria-label dos
+    // quadrados ("N de M encontros feitos" / "N de M sessões feitas…")
+    const encontrosFeitos = async () =>
+      (
+        await linhas
+          .locator(
+            "[aria-label*='encontros feitos'], [aria-label*='sessões feitas']"
+          )
+          .evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))
+      ).map((s) => {
+        const m = /(\d+) de \d+/.exec(s ?? "");
+        return m ? Number(m[1]) : -1;
+      });
+
+    const btnEnc = page.getByRole("button", {
+      name: /^Ordenar por quantidade de encontros/,
+    });
+    const btnNota = page.getByRole("button", {
+      name: /^Ordenar por nota do mentor/,
+    });
+    const btnNome = page.getByRole("button", {
+      name: /^Ordenar por nome da dupla/,
+    });
+
+    // Encontros asc → as contagens sobem (ou empatam) na leitura
+    await btnEnc.click();
+    await expect(page).toHaveURL(/[?&]ordem=encontros(&|$)/);
+    await expect(btnEnc).toHaveAttribute("aria-label", /menos encontros/);
+    await expect(linhas.first()).toBeVisible();
+    const asc = await encontrosFeitos();
+    expect(asc).toEqual([...asc].sort((a, b) => a - b));
+
+    // Encontros desc — mesmas contagens na ordem inversa
+    await btnEnc.click();
+    await expect(page).toHaveURL(/[?&]ordem=encontros-desc/);
+    await expect(btnEnc).toHaveAttribute("aria-label", /mais encontros/);
+    expect(await encontrosFeitos()).toEqual([...asc].reverse());
+
+    // Nota substitui Encontros como coluna ativa — uma por vez
+    await btnNota.click();
+    await expect(page).toHaveURL(/[?&]ordem=nota(&|$)/);
+    await expect(btnNota).toHaveAttribute("aria-label", /menor nota/);
+    await expect(btnEnc).toHaveAttribute("aria-label", /por prioridade/);
+
+    // ciclo da Nota: desc e volta ao radar
+    await btnNota.click();
+    await expect(page).toHaveURL(/[?&]ordem=nota-desc/);
+    await btnNota.click();
+    await expect(page).not.toHaveURL(/[?&]ordem=/);
+
+    // Nome continua ciclando igual — a interação entre colunas não
+    // quebrou o gesto original
+    await btnNome.click();
+    await expect(page).toHaveURL(/[?&]ordem=nome(&|$)/);
+    await btnNome.click();
+    await expect(page).toHaveURL(/[?&]ordem=nome-desc/);
+    await btnNome.click();
+    await expect(page).not.toHaveURL(/[?&]ordem=/);
+  });
+
+  // REALIZA-445 — a coluna "Situação" entra no mesmo ciclo das outras:
+  // asc segue a leitura do radar (apoio → risco → atenção → em dia, fora
+  // da régua no fim), desc é "em dia primeiro" com a mesma âncora de fim,
+  // e o estado persiste em ?ordem=situacao / situacao-desc.
+  test("coordenação: coluna Situação ordena pelo radar e persiste em ?ordem=", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/duplas");
+    const linhas = page.locator(LINHAS_COORD);
+    await expect(linhas.first()).toBeVisible();
+
+    // pill de situação = 1º span da célula order-1; a 2ª (quando existe)
+    // é o "Apoio pedido" — eixo próprio que toma a frente da fila
+    const pesos = async () =>
+      Promise.all(
+        (await linhas.all()).map(async (l) => {
+          const spans = l.locator("div.order-1 > span");
+          const rotulo = (await spans.first().innerText()).trim();
+          const apoio =
+            (await spans.count()) > 1 &&
+            (await spans.nth(1).innerText()).includes("Apoio pedido");
+          if (apoio) return 0;
+          return (
+            {
+              "Em risco": 1,
+              "Atenção": 2,
+              "Em dia": 3,
+            } as Record<string, number>
+          )[rotulo] ?? 9;
+        })
+      );
+
+    const btn = page.getByRole("button", {
+      name: /^Ordenar por situação/,
+    });
+    await expect(btn).toBeVisible();
+
+    // asc = a fila do radar: apoio primeiro (o do Caio no fixture),
+    // risco → atenção → em dia; fora da régua no fim
+    await btn.click();
+    await expect(page).toHaveURL(/[?&]ordem=situacao(&|$)/);
+    await expect(btn).toHaveAttribute("aria-label", /mais graves primeiro/);
+    await expect(linhas.first()).toBeVisible();
+    const asc = await pesos();
+    expect(asc).toEqual([...asc].sort((a, b) => a - b));
+    expect(asc[0]).toBe(0);
+    expect(asc[asc.length - 1]).toBe(9);
+
+    // desc = "em dia primeiro" — fora da régua continua no fim
+    await btn.click();
+    await expect(page).toHaveURL(/[?&]ordem=situacao-desc/);
+    await expect(btn).toHaveAttribute("aria-label", /em dia primeiro/);
+    await expect(linhas.first()).toBeVisible();
+    const desc = await pesos();
+    expect(desc).toEqual(
+      [...desc.filter((p) => p !== 9)]
+        .sort((a, b) => b - a)
+        .concat(desc.filter((p) => p === 9))
+    );
+    expect(desc[desc.length - 1]).toBe(9);
+
+    // 3º clique devolve o radar e o param sai da URL
+    await btn.click();
+    await expect(page).not.toHaveURL(/[?&]ordem=/);
+
+    // o param persiste na URL: reload com ?ordem=situacao aterrissa na
+    // mesma ordenação asc. toPass cobre a remontagem do stream — entre o
+    // primeiro paint e a hidratação a lista troca de nó uma vez
+    await page.goto("/duplas?ordem=situacao");
+    await expect(async () => {
+      expect(await pesos()).toEqual(asc);
+    }).toPass();
+  });
+
+  test("supervisor: coluna Situação também ordena pelo radar", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "supervisor");
+    await page.goto("/duplas");
+
+    // a ordenação vale dentro de cada grupo de turma — cada container
+    // divide-y é um grupo; o peso da pill é o da visão de coordenação
+    const grupos = page.locator(
+      'section[aria-label="Duplas supervisionadas"] [class*="@4xl:divide-y"]'
+    );
+    const pesosDe = async (grupo: ReturnType<typeof grupos.nth>) =>
+      Promise.all(
+        (await grupo.locator(":scope > div").all()).map(async (l) => {
+          const spans = l.locator("div.order-1 > span");
+          const rotulo = (await spans.first().innerText()).trim();
+          const apoio =
+            (await spans.count()) > 1 &&
+            (await spans.nth(1).innerText()).includes("Apoio pedido");
+          if (apoio) return 0;
+          return (
+            {
+              "Em risco": 1,
+              "Atenção": 2,
+              "Em dia": 3,
+            } as Record<string, number>
+          )[rotulo] ?? 9;
+        })
+      );
+
+    await expect(grupos.first()).toBeVisible();
+    const btn = page.getByRole("button", {
+      name: /^Ordenar por situação/,
+    });
+    await expect(btn).toBeVisible();
+    await btn.click();
+    await expect(page).toHaveURL(/[?&]ordem=situacao(&|$)/);
+    await expect(btn).toHaveAttribute("aria-label", /mais graves primeiro/);
+    const nG = await grupos.count();
+    expect(nG).toBeGreaterThan(0);
+    for (let gi = 0; gi < nG; gi++) {
+      const p = await pesosDe(grupos.nth(gi));
+      expect(p).toEqual([...p].sort((a, b) => a - b));
+    }
+    await btn.click();
+    await expect(page).toHaveURL(/[?&]ordem=situacao-desc/);
+    await btn.click();
+    await expect(page).not.toHaveURL(/[?&]ordem=/);
   });
 });

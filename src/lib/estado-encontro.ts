@@ -1,4 +1,5 @@
 import type { Encontro } from "@/lib/types";
+import { encontroTemConteudo } from "@/lib/ciclo";
 import { limboAberto } from "@/lib/agenda-minha";
 
 /** Estado visual de um encontro de dupla no calendário (REALIZA-342) — um
@@ -11,9 +12,16 @@ import { limboAberto } from "@/lib/agenda-minha";
  *  O limbo entra como pendente pra cor bater com a contagem dos buckets. */
 export type EstadoEncontro = "agendado" | "pendente" | "registrado" | "nao_aconteceu";
 
-export function estadoDoEncontro(e: Encontro, agoraMs: number): EstadoEncontro {
-  if (e.status === "realizado") return e.registro ? "registrado" : "pendente";
-  if (limboAberto(e, agoraMs)) return "pendente";
+export function estadoDoEncontro(
+  e: Encontro,
+  agoraMs: number,
+  /** Sessão combinada (018): mapa nº coberto → âncora da dupla. O coberto
+   *  tem conteúdo via âncora — sem o mapa ele pinta "falta o registro". */
+  cobertos?: Map<number, number>
+): EstadoEncontro {
+  if (e.status === "realizado")
+    return encontroTemConteudo(e, cobertos) ? "registrado" : "pendente";
+  if (limboAberto(e, agoraMs, cobertos)) return "pendente";
   if (e.status === "agendado" || e.status === "remarcado") return "agendado";
   return "nao_aconteceu";
 }
@@ -35,11 +43,16 @@ export type EstadoSemana = "pendente" | "por_vir" | "agendado" | "registrado";
 export function estadoDaSemana(
   encontrosPorDupla: (Encontro | null)[],
   semanaComecou: boolean,
-  agoraMs: number
+  agoraMs: number,
+  /** Mesma posição de `encontrosPorDupla`: o mapa de cobertos daquela dupla
+   *  (018) — a lista mistura duplas, então o mapa não pode ser único. */
+  cobertosPorDupla?: (Map<number, number> | undefined)[]
 ): EstadoSemana | null {
   if (encontrosPorDupla.length === 0) return null;
-  const porDupla = encontrosPorDupla.map((e): EstadoSemana => {
-    const estado = e ? estadoDoEncontro(e, agoraMs) : null;
+  const porDupla = encontrosPorDupla.map((e, i): EstadoSemana => {
+    const estado = e
+      ? estadoDoEncontro(e, agoraMs, cobertosPorDupla?.[i])
+      : null;
     if (estado === "registrado") return "registrado";
     if (estado === "agendado") return "agendado";
     if (estado === "pendente") return "pendente";

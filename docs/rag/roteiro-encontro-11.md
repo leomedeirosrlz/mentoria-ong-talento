@@ -4,7 +4,7 @@ material: roteiro-encontro-11
 titulo: "Roteiro do 11º encontro: Rede de Apoio & Novos Espaços"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp, supervisor]
+audiencia: [mentor_dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-11 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

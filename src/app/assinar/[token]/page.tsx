@@ -14,22 +14,13 @@ import {
 import type { Icon } from "@phosphor-icons/react";
 import { assinarComToken, assinaturaPorToken } from "@/lib/actions-assinaturas";
 import { demoRole } from "@/lib/demo/mode";
-import { AssinaturaForm } from "@/components/assinatura-form";
 import { SiteFooter } from "@/components/site-footer";
-import { TermoMentorandoDoc, TermoVoluntarioDoc } from "@/components/termo-doc";
+import { TermoVivo } from "@/components/termo-vivo";
 import { buttonVariants } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/ciclo";
 import { sharedOg } from "@/lib/og";
 import { SITE_URL } from "@/lib/email";
-import {
-  AUTORIZACAO_TITULO,
-  civisPreview,
-  CLAUSULAS_AUTORIZACAO,
-  dataPorExtenso,
-  FECHO_AUTORIZACAO,
-  preambuloAutorizacao,
-} from "@/lib/documentos/texto";
-import type { DadosAutorizacao, DadosCivis, ResponsavelCivis } from "@/lib/types";
+import type { DadosCivis } from "@/lib/types";
 import { Logo } from "@/components/logo";
 
 const DESCRICAO_ASSINATURA =
@@ -239,15 +230,12 @@ export default async function AssinarTokenPage({
 
   // pendente: preview do documento já com o que está na ficha (0046 — a
   // RPC devolve `civis` como sugestão; o que faltar fica em branco e o form
-  // abaixo completa/corrige — o snapshot registra o que foi assinado)
+  // abaixo completa/corrige — o snapshot registra o que foi assinado).
+  // O documento interpola cada campo conforme a pessoa digita (497)
   const slug = info.template.slug;
   const ehAutorizacao = slug === "autorizacao-responsavel";
   const ehVoluntario = slug === "termo-voluntario";
   const civis = info.civis as (DadosCivis & { parentesco?: string }) | null;
-  const dadosPreview: DadosAutorizacao = {
-    mentorado_nome: info.alvo.nome,
-    responsavel: { ...civisPreview(civis), parentesco: civis?.parentesco ?? "______" },
-  };
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
@@ -323,97 +311,44 @@ export default async function AssinarTokenPage({
           </ol>
         </nav>
 
-        {/* o documento como será emitido — o texto é o mesmo que entra no PDF
-            (src/lib/documentos/texto.ts é a fonte única dos dois). O termo do
-            voluntário renderiza pelo mesmo TermoVoluntarioDoc da página
+        {/* o documento como será emitido — o texto é o mesmo que entra no
+            PDF (src/lib/documentos/texto.ts é a fonte única dos dois) e o
+            preview interpola o que a pessoa digita no form (497). O termo
+            do voluntário renderiza pelo mesmo TermoVoluntarioDoc da página
             logada — um doc só, duas portas de entrada */}
-        {ehVoluntario ? (
-          <div className="mt-8">
-            <TermoVoluntarioDoc
-              civis={civis}
-              id="termo"
-              continuar={{
-                href: "#dados",
-                rotulo: "Continuar para seus dados ↓",
-              }}
-            />
-          </div>
-        ) : ehAutorizacao ? (
-          <section
-            id="termo"
-            className="mt-8 scroll-mt-4 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8"
-          >
-            <h2 className="text-center text-sm font-semibold uppercase tracking-[0.06em]">
-              {AUTORIZACAO_TITULO}
-            </h2>
-            <div className="mt-5 space-y-3 text-sm leading-relaxed">
-              {preambuloAutorizacao(dadosPreview).map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
-              {CLAUSULAS_AUTORIZACAO.map(([titulo, paragrafos]) => (
-                <div key={titulo} className="pt-1">
-                  <h3 className="font-semibold">{titulo}</h3>
-                  {paragrafos.map((p) => (
-                    <p key={p} className="mt-1.5">
-                      {p}
-                    </p>
-                  ))}
-                </div>
-              ))}
-              <p>{FECHO_AUTORIZACAO}</p>
-              <p>{dataPorExtenso(new Date())}</p>
-            </div>
-            <p className="mt-6 border-t border-border pt-5 text-center">
-              <a
-                href="#dados"
-                className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
-              >
-                Continuar para seus dados ↓
-              </a>
-            </p>
-          </section>
-        ) : (
-          <div className="mt-8">
-            <TermoMentorandoDoc
-              civis={civis}
-              id="termo"
-              continuar={{
-                href: "#dados",
-                rotulo: "Continuar para seus dados ↓",
-              }}
-            />
-          </div>
-        )}
-
-        <section
-          id="dados"
-          className="mt-6 scroll-mt-4 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8"
-        >
-          <h2 className="text-base font-semibold">
-            {ehAutorizacao
-              ? "2 · Seus dados para assinar"
+        <TermoVivo
+          doc={
+            ehAutorizacao
+              ? "autorizacao"
               : ehVoluntario
-                ? "2 · Confira seus dados e assine"
-                : "2 · Dados do(a) jovem e assinatura"}
-          </h2>
-          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            {civis
-              ? "Os dados já vêm do cadastro. Confira, corrija se preciso e assine. A assinatura registra data, hora e endereço de rede."
-              : "Preencha como consta no documento oficial. As informações entram no documento e a assinatura registra data, hora e endereço de rede."}
-          </p>
-          <div className="mt-6">
-            <AssinaturaForm
-              modo={ehAutorizacao ? "autorizacao" : "termo"}
-              alvoNome={info.alvo.nome}
-              acao={assinarComToken.bind(null, token)}
-              dados={civis}
-              parentesco={
-                ehAutorizacao ? ((civis as ResponsavelCivis | null)?.parentesco ?? undefined) : undefined
-              }
-              etapas
-            />
-          </div>
-        </section>
+                ? "voluntario"
+                : "mentorando"
+          }
+          civis={civis}
+          alvoNome={info.alvo.nome}
+          acao={assinarComToken.bind(null, token)}
+          etapas
+          docId="termo"
+          secaoId="dados"
+          className="mt-8 space-y-6"
+          secaoClasse="scroll-mt-4 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8"
+          cabecalho={
+            <>
+              <h2 className="text-base font-semibold">
+                {ehAutorizacao
+                  ? "2 · Seus dados para assinar"
+                  : ehVoluntario
+                    ? "2 · Confira seus dados e assine"
+                    : "2 · Dados do(a) jovem e assinatura"}
+              </h2>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                {civis
+                  ? "Os dados já vêm do cadastro. Confira, corrija se preciso e assine. A assinatura registra data, hora e endereço de rede."
+                  : "Preencha como consta no documento oficial. As informações entram no documento e a assinatura registra data, hora e endereço de rede."}
+              </p>
+            </>
+          }
+        />
       </main>
 
       <div className="border-t border-border py-6 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">

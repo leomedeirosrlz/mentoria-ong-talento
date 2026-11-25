@@ -4,6 +4,7 @@ import {
   diaMesEvento,
   elegiveisLote,
   liberaCopia,
+  painelTurmaCtx,
   resolveLinhasPainel,
   type CicloEventoMinimo,
   type PainelJornadaLinha,
@@ -55,6 +56,23 @@ describe("diaMesEvento", () => {
     expect(diaMesEvento(null)).toBeNull();
     expect(diaMesEvento("")).toBeNull();
     expect(diaMesEvento("04/11/2026")).toBeNull();
+  });
+});
+
+describe("painelTurmaCtx", () => {
+  it("'hoje' é o dia civil de São Paulo, não o dia UTC", () => {
+    // 01:30Z do dia 06 = 22:30 BRT do dia 05 — o slice UTC de toISOString
+    // trataria como dia 06 e contaria o encontro do dia seguinte um dia
+    // antes (liberação precoce da janela no painel)
+    const ctx = painelTurmaCtx(
+      [
+        { cronograma_id: "c-t1", tipo: "encontro", numero: 5, data: "2025-09-05" },
+        { cronograma_id: "c-t1", tipo: "encontro", numero: 6, data: "2025-09-06" },
+      ],
+      "c-t1",
+      new Date("2025-09-06T01:30:00Z")
+    );
+    expect(ctx.encVigente).toBe(5);
   });
 });
 

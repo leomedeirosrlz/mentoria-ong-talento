@@ -80,6 +80,7 @@ export function Sparkline({
   atencaoAbaixoDe,
   area = false,
   eixo = true,
+  compacto = false,
   altura = 120,
   formatarValor = (v) =>
     v.toLocaleString("pt-BR", { maximumFractionDigits: 1 }),
@@ -101,6 +102,11 @@ export function Sparkline({
   area?: boolean;
   /** gridlines tracejadas + rótulos de escala na gutter esquerda */
   eixo?: boolean;
+  /** modo denso (ex.: coluna de tabela): some o label de valor do último
+   *  ponto e o dot inflado de destaque — os dois colidiam com cabeçalho
+   *  e célula vizinha. Linha, área, dots normais e pontos de atenção
+   *  seguem (o alerta é nomeado, não decoração). */
+  compacto?: boolean;
   /** altura do plot em px */
   altura?: number;
   /** formatador dos valores (default pt-BR, ≤1 casa — "4,2") */
@@ -218,7 +224,9 @@ export function Sparkline({
             })}
           </svg>
           {/* dots HTML — circulo nítido + label onde o SVG distorceria;
-              transition-[left,top] interpola mudanças de dado */}
+              transition-[left,top] interpola mudanças de dado — exceção
+              registrada da spec 028: posição de marcador não vira
+              transform sem medir o container */}
           {series.map((s, si) => {
             const cor = s.cor ?? CORES_SERIE[si % CORES_SERIE.length];
             let ultimo = -1;
@@ -230,7 +238,9 @@ export function Sparkline({
             return s.valores.map((v, i) => {
               if (v == null) return null;
               const baixo = atencaoAbaixoDe != null && v < atencaoAbaixoDe;
-              const chave = i === ultimo;
+              // no modo denso o último ponto não infla nem ganha label —
+              // pontos de atenção continuam marcados (são dado, não enfeite)
+              const chave = !compacto && i === ultimo;
               const marcado = baixo || chave;
               const corDot = baixo ? "var(--warn)" : cor;
               return (

@@ -4,7 +4,7 @@ material: roteiro-encontro-05
 titulo: "Roteiro do 5º encontro: Primeiros Resultados"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp, supervisor]
+audiencia: [mentor_dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-5 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

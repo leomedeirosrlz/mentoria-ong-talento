@@ -7,8 +7,10 @@ import { useRouter } from "next/navigation";
  *  não enxerga o fragmento, então a ficha abre na aba Agora e este
  *  componente troca pra aba onde o alvo está montado —
  *  `#registrar-<encontro>` e `#combinados-<nº>` (aviso "Combinados em
- *  aberto" da agenda; `#intencoes-<nº>` é o link antigo) → Encontros; `#instrumentos` → Instrumentos (o hash acompanha
- *  a navegação e o browser rola pra seção quando ela monta). */
+ *  aberto" da agenda; `#intencoes-<nº>` é o link antigo) → Encontros;
+ *  `#instrumentos` e `#pdm` (o doc vivo linkado em "Documentos da dupla")
+ *  → Instrumentos (o hash acompanha a navegação e o browser rola pra
+ *  seção quando ela monta). */
 export function AbaPorHash() {
   const router = useRouter();
 
@@ -21,7 +23,7 @@ export function AbaPorHash() {
       url.hash.startsWith("#intencoes") ||
       url.hash.startsWith("#encontro-")
         ? "encontros"
-        : url.hash === "#instrumentos"
+        : url.hash === "#instrumentos" || url.hash === "#pdm"
           ? "instrumentos"
           : null;
     if (!aba) return;

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Switch } from "@/components/ui/switch";
 import { setContatoCompartilhado } from "@/lib/actions-jovem";
 import { cn } from "@/lib/utils";
@@ -55,9 +55,6 @@ export function PrivacidadeCard({
       <h2 className="text-base font-semibold">
         Privacidade
       </h2>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Você escolhe se os colegas veem seu contato.
-      </p>
       <div className="mt-4 space-y-4">
         <label
           className={cn(
@@ -78,15 +75,11 @@ export function PrivacidadeCard({
             </span>{" "}
             <span className="text-muted-foreground">
               {temWhatsapp
-                ? "Ligado, os colegas da sua turma que têm conta na plataforma veem o número do seu cadastro em Pessoas; desligado, ninguém vê."
-                : "Seu cadastro no programa ainda não tem WhatsApp (a coordenação mantém a ficha). Quando ele estiver lá, ligar aqui compartilha com os colegas."}
+                ? "Colegas da sua turma com conta veem seu número em Pessoas."
+                : "Seu cadastro ainda não tem WhatsApp. Quando tiver, essa opção passa a valer."}
             </span>
           </span>
         </label>
-        <p className="text-xs text-muted-foreground">
-          Do outro lado é igual: um colega só mostra o WhatsApp dele se
-          escolher compartilhar no próprio perfil.
-        </p>
       </div>
     </section>
   );

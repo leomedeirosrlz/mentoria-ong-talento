@@ -32,6 +32,11 @@ export function AvaliacoesHistoricoDialog({
   feitas: AvaliacaoFeita[];
 }) {
   const [open, setOpen] = useState(false);
+  // a média é por dupla e só existe no lote de ≥3 (027/FR-003)
+  const dppPorDupla = new Map<string, number>();
+  for (const a of feitas)
+    if (a.trilha !== "especialista")
+      dppPorDupla.set(a.dupla_id, (dppPorDupla.get(a.dupla_id) ?? 0) + 1);
   const ordenadas = [...feitas].sort(
     (a, b) =>
       instante(b.encontro?.realizado_em ?? b.created_at) -
@@ -71,7 +76,10 @@ export function AvaliacoesHistoricoDialog({
                     {formatDiaMes(a.encontro?.realizado_em ?? a.created_at)}
                   </p>
                 </div>
-                <VerAvaliacaoButton avaliacao={a} />
+                <VerAvaliacaoButton
+                  avaliacao={a}
+                  temMedia={(dppPorDupla.get(a.dupla_id) ?? 0) >= 3}
+                />
               </li>
             ))}
           </ul>

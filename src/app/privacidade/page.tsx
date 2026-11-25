@@ -45,6 +45,13 @@ const SECOES: { titulo: string; corpo: React.ReactNode }[] = [
             avaliações, combinados, anexos de evidência, notas de acompanhamento
             e histórico de agendamentos.
           </li>
+          <li>
+            <strong>Uso da plataforma:</strong> páginas visitadas e ações de
+            interface (buscas, filtros, abertura de materiais), ligadas à sua
+            conta, para entender como a plataforma é usada e melhorar a
+            experiência. Guardado por 90 dias; depois disso permanece apenas
+            como contagem diária agrupada, sem identificar ninguém.
+          </li>
         </ul>
       </>
     ),
@@ -58,6 +65,7 @@ const SECOES: { titulo: string; corpo: React.ReactNode }[] = [
           <li>Operar o programa de mentoria: formação de duplas, agenda de encontros e acompanhamento</li>
           <li>Permitir a comunicação entre mentor, mentorado e coordenação (inclusive por WhatsApp)</li>
           <li>Registrar evidências e produzir relatórios e prestações de contas do programa</li>
+          <li>Melhorar a plataforma a partir de como ela é usada de verdade</li>
           <li>Cumprir obrigações legais e regulatórias</li>
         </ul>
       </>

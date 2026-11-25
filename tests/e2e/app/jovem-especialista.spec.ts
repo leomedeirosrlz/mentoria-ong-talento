@@ -295,9 +295,9 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     await expect(
       page.getByRole("heading", { name: "Especialistas" })
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Pedir trilha" })
-    ).toBeVisible();
+    // o gesto mora na grade (023): o card "Qualquer especialista" fecha a
+    // linha do catálogo e é sempre clicável pra quem não estourou o teto
+    await expect(page.locator("#cta-pedir-mural")).toBeVisible();
   });
 
   test("pedido dirigido com slot da grade grava de verdade", async ({
@@ -306,54 +306,51 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem/especialistas");
     const secao = secaoPedidos(page);
-    const dialog = page.getByRole("dialog");
 
-    // o gesto "pedir" mora no cardápio — um dialog compartilhado pra página
-    await agirComConfirma(
-      () => page.getByRole("button", { name: "Pedir trilha" }).click(),
-      () => dialog.isVisible()
-    );
-
-    // dirigido — e o alvo é um par NOVO (a trilha viva do jovem é com o
-    // outro especialista): o gate por par exige a demanda rica
+    // o gesto "pedir" mora no card do especialista — a seleção acontece na
+    // própria grade e a etapa horário+texto monta inline sob ela (023).
+    // O alvo é um par NOVO: a trilha viva do jovem é com o outro
+    // especialista, então o gate por par exige a demanda rica
+    const cardEsp2 = page
+      .locator("[data-slot='card']")
+      .filter({ hasText: "Esp Dois E2E" });
+    const painel = page.locator("section#pedir");
     await agirComConfirma(
       () =>
-        dialog
-          .getByRole("button", { name: "Um especialista específico" })
-          .click(),
-      async () =>
-        (await dialog
-          .getByRole("button", { name: "Um especialista específico" })
-          .getAttribute("aria-pressed")) === "true"
+        cardEsp2.getByRole("button", { name: /Pedir trilha com/ }).click(),
+      () => painel.isVisible()
     );
-    await agirComConfirma(
-      () => dialog.getByRole("button", { name: "Esp Dois E2E" }).click(),
-      async () =>
-        (await dialog
-          .getByRole("button", { name: "Esp Dois E2E" })
-          .getAttribute("aria-pressed")) === "true"
-    );
+    await expect(
+      painel.getByText("Pedido para Esp Dois E2E")
+    ).toBeVisible();
+    // a seleção é visível no card — selo + aria-pressed, nunca só cor
+    await expect(cardEsp2.getByText("Selecionado")).toBeVisible();
+    await expect(
+      cardEsp2.getByRole("button", { name: /Pedir trilha com/ })
+    ).toHaveAttribute("aria-pressed", "true");
 
-    // os chips são os horários livres reais da grade do esp2 (carregados
-    // on-demand pela action) — o "Deixar Esp propor" não conta
-    const chips = dialog.getByRole("button", { name: / às \d{2}:\d{2}/ });
+    // os chips são os horários livres reais da grade do esp2 — tocar num
+    // horário abre a confirmação curta (o atalho que o spec mantém)
+    const chips = painel.getByRole("button", { name: / às \d{2}:\d{2}/ });
     await expect(chips.first()).toBeVisible({ timeout: 15_000 });
     const qtd = await chips.count();
     const chip = chips.nth(qtd > 1 ? 1 : 0);
     const rotulo = (await chip.textContent())!.trim();
     const isoEscolhido = isoDoRotulo(rotulo);
+    const dialog = page.getByRole("dialog");
     await agirComConfirma(
       () => chip.click(),
-      async () => (await chip.getAttribute("aria-pressed")) === "true"
+      () => dialog.isVisible()
     );
 
     // par novo ⇒ a pergunta é a demanda (mínimo 10), não o motivo-curto
     await expect(
       dialog.getByText("Por que você quer esse apoio?")
     ).toBeVisible();
-    await dialog.locator("#pedido-texto").fill(DEMANDA_DIRIGIDA);
+    await dialog.locator("#slot-texto").fill(DEMANDA_DIRIGIDA);
     await agirComConfirma(
-      () => dialog.getByRole("button", { name: "Enviar pedido" }).click(),
+      () =>
+        dialog.getByRole("button", { name: "Pedir esse horário" }).click(),
       async () =>
         (
           await buscarViaServiceRole(
@@ -363,6 +360,8 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
         ).length > 0
     );
     await expect(dialog).toBeHidden();
+    // o envio desmonta o painel e limpa a seleção
+    await expect(painel).toHaveCount(0);
 
     // o pedido nasceu exatamente como a RPC promete: jovem, dirigido,
     // aberto (tem DPP), com o slot escolhido
@@ -438,44 +437,58 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem/especialistas");
     const secao = secaoPedidos(page);
-    // o pedido em aberto já aparece na lista — o gesto segue o mesmo dialog
+    // o pedido em aberto já aparece na lista — e o card do par conta a
+    // dedup no próprio cardápio: variante "Pedido em andamento", sem CTA
     await expect(
       secao.getByText("Esperando Esp responder.")
     ).toBeVisible();
-    const dialog = page.getByRole("dialog");
-    await agirComConfirma(
-      () => page.getByRole("button", { name: "Pedir trilha" }).click(),
-      () => dialog.isVisible()
+    const cardEsp2 = page
+      .locator("[data-slot='card']")
+      .filter({ hasText: "Esp Dois E2E" });
+    await expect(cardEsp2.getByText("Pedido em andamento")).toBeVisible();
+    await expect(
+      cardEsp2.getByRole("button", { name: /Pedir trilha com/ })
+    ).toHaveCount(0);
+
+    // a RPC segura a corrida de qualquer jeito — remove o pedido, abre o
+    // painel pro mesmo card e reinsere antes do envio: a seleção já tinha
+    // acontecido numa página sem o bloqueio, a recusa sobe como veio,
+    // inline no campo
+    await limparViaServiceRole(
+      "solicitacoes_especialista",
+      `id=eq.${IDS.solDedup}`
     );
+    await page.reload();
+    const painel = page.locator("section#pedir");
     await agirComConfirma(
       () =>
-        dialog
-          .getByRole("button", { name: "Um especialista específico" })
-          .click(),
-      async () =>
-        (await dialog
-          .getByRole("button", { name: "Um especialista específico" })
-          .getAttribute("aria-pressed")) === "true"
+        cardEsp2.getByRole("button", { name: /Pedir trilha com/ }).click(),
+      () => painel.isVisible()
     );
-    await agirComConfirma(
-      () => dialog.getByRole("button", { name: "Esp Dois E2E" }).click(),
-      async () =>
-        (await dialog
-          .getByRole("button", { name: "Esp Dois E2E" })
-          .getAttribute("aria-pressed")) === "true"
-    );
-    await dialog.locator("#pedido-texto").fill(DEMANDA_DEDUP_2);
+    // o par volta a ter pedido em aberto DEPOIS da seleção — a corrida real
+    await inserirViaServiceRole("solicitacoes_especialista", {
+      id: IDS.solDedup,
+      mentorado_id: IDS.mentorado,
+      dupla_dpp_id: IDS.duplaDpp,
+      demanda: DEMANDA_DEDUP,
+      especialista_desejado_id: IDS.esp2Profile,
+      origem: "jovem",
+      status: "aberta",
+      turma: await turmaDa(IDS.duplaDpp),
+      created_by: IDS.jovemProfile,
+    });
+    await painel.locator("#pedido-texto").fill(DEMANDA_DEDUP_2);
 
     // a RPC recusa com a regra do banco — a mensagem sobe como veio e o
-    // dialog segue aberto (nada foi gravado)
+    // painel segue aberto (nada foi gravado)
     await agirComConfirma(
-      () => dialog.getByRole("button", { name: "Enviar pedido" }).click(),
-      () =>
-        page
-          .getByText("Você já tem um pedido em aberto com esse especialista")
-          .isVisible()
+      () => painel.getByRole("button", { name: "Enviar pedido" }).click(),
+      () => painel.locator("#pedido-texto-erro").isVisible()
     );
-    await expect(dialog).toBeVisible();
+    await expect(painel).toBeVisible();
+    await expect(painel.locator("#pedido-texto-erro")).toContainText(
+      "pedido em aberto"
+    );
     const sols = await buscarViaServiceRole(
       "solicitacoes_especialista",
       `select=id&mentorado_id=eq.${IDS.mentorado}`
@@ -489,24 +502,20 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem/especialistas");
     const secao = secaoPedidos(page);
-    const dialog = page.getByRole("dialog");
 
+    // o broadcast é um card da grade — "Qualquer especialista" fecha a
+    // linha e seleciona como qualquer card (023)
+    const painel = page.locator("section#pedir");
     await agirComConfirma(
-      () => page.getByRole("button", { name: "Pedir trilha" }).click(),
-      () => dialog.isVisible()
+      () => page.locator("#cta-pedir-mural").click(),
+      () => painel.isVisible()
     );
-    await agirComConfirma(
-      () => dialog.getByRole("button", { name: "Qualquer especialista" }).click(),
-      async () =>
-        (await dialog
-          .getByRole("button", { name: "Qualquer especialista" })
-          .getAttribute("aria-pressed")) === "true"
-    );
+    await expect(painel.getByText("Pedido para o mural")).toBeVisible();
     // tem trilha ⇒ broadcast não pede demanda — o motivo-curto é opcional
-    await expect(dialog.getByText(/Pra que é a sessão\?/)).toBeVisible();
-    await dialog.locator("#pedido-texto").fill(MOTIVO_MURAL);
+    await expect(painel.getByText(/Pra que é a sessão\?/)).toBeVisible();
+    await painel.locator("#pedido-texto").fill(MOTIVO_MURAL);
     await agirComConfirma(
-      () => dialog.getByRole("button", { name: "Enviar pedido" }).click(),
+      () => painel.getByRole("button", { name: "Enviar pedido" }).click(),
       async () =>
         (
           await buscarViaServiceRole(
@@ -515,7 +524,8 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
           )
         ).length > 0
     );
-    await expect(dialog).toBeHidden();
+    // o envio desmonta o painel — não há dialog pra esperar esconder
+    await expect(painel).toHaveCount(0);
 
     const [sol] = await buscarViaServiceRole<
       {
@@ -551,9 +561,13 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     await page.goto("/");
     await abrirMural(page);
     const card = mural(page).locator("li", { hasText: MOTIVO_MURAL });
-    await expect(card.getByText("Mentorada E2E")).toBeVisible();
+    await expect(
+      card.getByText("Mentorada E2E", { exact: true })
+    ).toBeVisible();
     await expect(card.getByText("pedido do jovem")).toBeVisible();
-    await expect(card.getByText(/Solicitado por Jovem E2E/)).toBeVisible();
+    await expect(
+      card.getByText(/Solicitado por Mentorada E2E/)
+    ).toBeVisible();
   });
 
   test("jovem aceita a contra-proposta — a sessão nasce na agenda", async ({
@@ -688,31 +702,24 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
       page.getByRole("heading", { name: "Especialistas" })
     ).toBeVisible();
 
-    const dialog = page.getByRole("dialog");
+    const painel = page.locator("section#pedir");
     await agirComConfirma(
-      () => page.getByRole("button", { name: "Pedir trilha" }).click(),
-      () => dialog.isVisible()
-    );
-    await agirComConfirma(
-      () => dialog.getByRole("button", { name: "Qualquer especialista" }).click(),
-      async () =>
-        (await dialog
-          .getByRole("button", { name: "Qualquer especialista" })
-          .getAttribute("aria-pressed")) === "true"
+      () => page.locator("#cta-pedir-mural").click(),
+      () => painel.isVisible()
     );
 
     // sem trilha E sem DPP: a demanda rica é exigida (mínimo 10); não há
     // mais aviso de triagem — ninguém aprova no meio (0158)
     await expect(
-      dialog.getByText("Por que você quer esse apoio?")
+      painel.getByText("Por que você quer esse apoio?")
     ).toBeVisible();
     await expect(
-      dialog.getByText(/coordenação dá uma olhada no pedido/)
+      painel.getByText(/coordenação dá uma olhada no pedido/)
     ).toHaveCount(0);
-    const enviar = dialog.getByRole("button", { name: "Enviar pedido" });
-    await dialog.locator("#pedido-texto").fill("curto");
+    const enviar = painel.getByRole("button", { name: "Enviar pedido" });
+    await painel.locator("#pedido-texto").fill("curto");
     await expect(enviar).toBeDisabled();
-    await dialog.locator("#pedido-texto").fill(DEMANDA_SEM_DPP);
+    await painel.locator("#pedido-texto").fill(DEMANDA_SEM_DPP);
     await agirComConfirma(
       () => enviar.click(),
       async () =>
@@ -723,7 +730,7 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
           )
         ).length > 0
     );
-    await expect(dialog).toBeHidden();
+    await expect(painel).toHaveCount(0);
 
     // mesmo sem dupla DPP o pedido nasce no mural
     const [sol] = await buscarViaServiceRole<
@@ -750,7 +757,8 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
       secao.getByText("Seu pedido tá no mural dos especialistas.")
     ).toBeVisible();
 
-    // broadcast avisa o pool de especialistas e segue no radar da coord
+    // broadcast avisa o pool de especialistas; a coord fica fora do sino
+    // (REALIZA-468: sol_coords vazio — o radar dela é o mural, não o sino)
     const notifsPool = await buscarViaServiceRole(
       "notificacoes",
       `select=id&profile_id=eq.${IDS.espProfile}&tipo=eq.demanda_especialista`
@@ -760,7 +768,7 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
       "notificacoes",
       `select=id&profile_id=eq.${IDS.coordProfile}&tipo=eq.solicitacao_registrada`
     );
-    expect(notifsCoord.length).toBeGreaterThanOrEqual(1);
+    expect(notifsCoord).toHaveLength(0);
   });
 
   test("jovem cancela o próprio pedido — o alvo é avisado", async ({

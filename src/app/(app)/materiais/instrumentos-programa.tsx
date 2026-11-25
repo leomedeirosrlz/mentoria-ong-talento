@@ -6,18 +6,27 @@ import {
   InstrumentoEmblema,
   type InstrumentoChave,
 } from "@/components/instrumento-icone";
+import { BadgeEstado } from "@/components/instrumento-estado";
+import {
+  MentoradoSeletor,
+  type FichaMentor,
+} from "@/components/mentorado-seletor";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import type { FormularioSistema } from "@/lib/forms/schema";
+import type { InstrumentoDupla } from "@/lib/forms/queries";
 import {
   agrupaPorTurma,
   elegiveisLote,
+  entregasDoMomento,
   ESTACAO_CHAVES,
   ESTACOES,
+  estadoDeEntregas,
   liberaCopia,
   resolveLinhasPainel,
   SISTEMA_DA_ESTACAO,
   type EstacaoChave,
+  type EstacaoPainelEstado,
   type LinhaResolvida,
   type PainelJornadaLinha,
 } from "@/lib/jornada";
@@ -29,9 +38,10 @@ import type { CicloEvento } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 // Aba "Instrumentos" de /materiais: a régua oficial da jornada DPP — os 7
-// instrumentos da régua. A avaliação por terceiros ficou fora da plataforma
-// (decisão do Leo, out/2026: dinâmica pré-encontro 1 com dados confidenciais)
-// — o consolidado segue chegando por fora e morando na ficha da dupla.
+// instrumentos da régua + a avaliação por terceiros (0103), que voltou a
+// morar na plataforma e ganhou o 9º card: fora da régua de formulários
+// (sem estacao/sistemaForm) o detalhe fica na ficha — o card linka a ficha
+// e o mentor lê a contagem de respostas da dupla em foco (449/463).
 // Pra staff cada
 // card resume a coorte em 3 estados (responderam · aguardando · atrasados)
 // e a lista abaixo é a única fila de ação: jovem com instrumento fora do
@@ -90,7 +100,7 @@ export const CARDS: CardSpec[] = [
     chave: "pdm",
     titulo: ESTACOES.pdm.titulo,
     descricao:
-      "Documento vivo: Visão no topo, metas com indicador de sucesso e prazo, mapa de submetas.",
+      "Documento vivo: Visão no topo e de 3 a 8 metas, cada uma com indicador, prazo e desdobramento sob ela.",
     chips: ["Construir 1–4", "Revisar enc. 9"],
     estacao: "pdm",
     sistemaForm: "pdm",
@@ -165,7 +175,7 @@ function TagEstado({
         variant="outline"
         className="text-xs font-medium text-muted-foreground"
       >
-        janela não aberta
+        ainda não disponível
       </Badge>
     );
   }
@@ -294,7 +304,7 @@ function LinhaAtrasado({
             telefone={info.jovemWhatsapp}
             mensagem={`Oi ${primeiro}, tudo bem? ${autoria(eu || undefined)}. ${
               nomes.length === 1 ? "Uma atividade" : "Algumas atividades"
-            } da sua jornada ${nomes.length === 1 ? "está" : "estão"} esperando por você: ${lista}. É só abrir Minha jornada no app.`}
+            } da sua jornada ${nomes.length === 1 ? "está" : "estão"} esperando por você: ${lista}. É só abrir Materiais no app.`}
             nudge={{
               destino: "mentorado",
               titulo: "Sua jornada tem atividade esperando",
@@ -317,6 +327,10 @@ export function InstrumentosPrograma({
   duplasInfo,
   envioLiberado,
   fichasMentor = [],
+  duplaSelecionada = null,
+  instrumentosSelecionada = [],
+  avaliacoesSelecionada = null,
+  terceirosSelecionada = null,
   nudges = {},
   meuNome = "",
 }: {
@@ -336,8 +350,20 @@ export function InstrumentosPrograma({
     }
   >;
   envioLiberado: boolean;
-  /** mentor: as duplas DPP vivas dele — o rodapé linka cada ficha. */
-  fichasMentor?: { id: string; jovemNome: string }[];
+  /** mentor: as duplas DPP vivas dele — o seletor filtra por mentorado e
+   *  o rodapé linka a ficha da dupla em foco. */
+  fichasMentor?: FichaMentor[];
+  /** a dupla em foco do mentor (?dupla=, null = "Todas" — catálogo) —
+   *  sem ficha ou fora da aba de instrumentos também é null */
+  duplaSelecionada?: string | null;
+  /** os instrumentos da dupla em foco — o estado por card sai daqui */
+  instrumentosSelecionada?: InstrumentoDupla[];
+  /** avaliações feitas × encontros realizados da dupla em foco (a conta
+   *  da linha da página por instrumento) */
+  avaliacoesSelecionada?: { feitas: number; realizados: number } | null;
+  /** terceiros respondidos × indicados da dupla em foco (449/463) —
+   *  fora da régua, a contagem vem direto dos contatos */
+  terceirosSelecionada?: { respondidos: number; total: number } | null;
   /** último nudge por dupla — o cap de 48h do Lembrar. */
   nudges?: Record<string, Interacao>;
   meuNome?: string;
@@ -359,6 +385,18 @@ export function InstrumentosPrograma({
       <h2 id="instrumentos-titulo" className="text-base font-semibold">
         Instrumentos do programa
       </h2>
+      {/* REALIZA-440/512 — o nome do mentorado vira o controle: pills até
+          3 duplas, dropdown acima; "Todas" devolve a régua ao catálogo. A
+          escolha mora em ?dupla= e relê os cards com o estado daquela
+          dupla (o rodapé de links miúdos saiu) */}
+      {papel === "mentor" && (
+        <MentoradoSeletor
+          fichas={fichasMentor}
+          selecionada={duplaSelecionada}
+          hrefBase="/materiais?aba=instrumentos"
+          comTodas
+        />
+      )}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {CARDS.map((card) => {
           const estacao = card.estacao;
@@ -379,6 +417,31 @@ export function InstrumentosPrograma({
             ehCoord && sistemaLote && temEscopo && estacao != null
               ? elegiveisLote(resolvidas, estacao, duplasInfo)
               : [];
+          // mentor: o estado por instrumento DA DUPLA em foco — a mesma
+          // régua da linha na página por instrumento (o card deixa de ser
+          // catálogo cego e resume o que a dupla já fez)
+          let estadoMentor: EstacaoPainelEstado | null = null;
+          if (papel === "mentor" && duplaSelecionada && card.sistemaForm) {
+            if (estacao === "avaliacao_360") {
+              // o estado do 360º não chega ao mentor — idem a linha da
+              // página por instrumento
+              estadoMentor = "nao_enviado";
+            } else {
+              const inst = instrumentosSelecionada.find(
+                (i) => i.sistema === card.sistemaForm
+              );
+              let entregas = (inst?.entregas ?? []).filter(
+                (e) => e.destino === "mentorado"
+              );
+              if (card.sistemaForm === "roda_vida") {
+                entregas = entregasDoMomento(
+                  entregas,
+                  card.chave === "roda_inicial" ? "inicial" : "formal"
+                );
+              }
+              estadoMentor = estadoDeEntregas(entregas);
+            }
+          }
           // REALIZA-331: o card inteiro abre a página do instrumento —
           // /materiais/instrumentos/<chave> mostra as duplas do escopo do
           // papel com as respostas por linha (uma rota só pra coord, sup e
@@ -390,7 +453,11 @@ export function InstrumentosPrograma({
               className="relative flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)] transition-shadow hover:shadow-[var(--shadow-border-hover)]"
             >
               <Link
-                href={`/materiais/instrumentos/${card.chave}`}
+                href={`/materiais/instrumentos/${card.chave}${
+                  papel === "mentor" && duplaSelecionada
+                    ? `?dupla=${duplaSelecionada}`
+                    : ""
+                }`}
                 prefetch={false}
                 aria-label={`Abrir ${card.titulo}`}
                 className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -425,6 +492,18 @@ export function InstrumentosPrograma({
                         recorrente={estacao === "avaliacao_encontro"}
                       />
                     )}
+                    {papel === "mentor" &&
+                      duplaSelecionada &&
+                      (estacao === "avaliacao_encontro" ? (
+                        avaliacoesSelecionada && (
+                          <Badge variant="secondary" className="tabular-nums">
+                            {avaliacoesSelecionada.feitas} de{" "}
+                            {avaliacoesSelecionada.realizados} avaliados
+                          </Badge>
+                        )
+                      ) : estadoMentor ? (
+                        <BadgeEstado estado={estadoMentor} />
+                      ) : null)}
                   </p>
                 </div>
               </div>
@@ -497,37 +576,82 @@ export function InstrumentosPrograma({
                   ) : null}
                   {/* "Ver respostas" virou o próprio card (stretched link
                       acima) — a ação explícita saía daqui (REALIZA-233) */}
-                  {/* mentor — deep link pra seção de instrumentos da ficha
-                      de cada dupla dele; com várias duplas, um link por
-                      ficha rotulado pelo nome do jovem */}
-                  {papel === "mentor" && fichasMentor.length === 1 && (
+                  {/* mentor — deep link pra seção de instrumentos da
+                      ficha da dupla em foco (REALIZA-440: com várias
+                      duplas a escolha mora no seletor do topo, não num
+                      link miúdo por jovem) */}
+                  {papel === "mentor" && duplaSelecionada && (
                     <Link
-                      href={`/duplas/${fichasMentor[0]!.id}?aba=instrumentos#instrumentos`}
+                      href={`/duplas/${duplaSelecionada}?aba=instrumentos#instrumentos`}
                       className={buttonVariants({
                         variant: "outline",
                         size: "sm",
                       })}
                     >
                       <Eye aria-hidden />
-                      Na ficha
+                      Ficha
                     </Link>
                   )}
-                  {papel === "mentor" &&
-                    fichasMentor.length > 1 &&
-                    fichasMentor.map((f) => (
-                      <Link
-                        key={f.id}
-                        href={`/duplas/${f.id}?aba=instrumentos#instrumentos`}
-                        className="text-xs font-medium underline underline-offset-2 hover:text-foreground"
-                      >
-                        {f.jovemNome}
-                      </Link>
-                    ))}
                 </div>
               ) : null}
             </article>
           );
         })}
+        {/* 9º card — avaliação por terceiros (0103/449/463): instrumento
+            real do programa sem página /instrumentos/<chave> nem emissão
+            em lote — o detalhe (convites, respostas, consolidação) é por
+            dupla, então o card aponta pra ficha. Sem stretched link: não
+            inventar rota; a ação explícita do rodapé faz o papel. */}
+        <article className="relative flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)] transition-shadow hover:shadow-[var(--shadow-border-hover)]">
+          <div className="flex items-start gap-2.5">
+            <InstrumentoEmblema instrumento="avaliacao_terceiros" />
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold leading-snug">
+                Avaliação por terceiros
+              </h3>
+              <p className="mt-1 flex flex-wrap items-center gap-1.5">
+                <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground sm:text-[11px]">
+                  Enc. 1–2
+                </span>
+                {papel === "mentor" &&
+                  duplaSelecionada &&
+                  terceirosSelecionada &&
+                  terceirosSelecionada.total > 0 && (
+                    <Badge variant="secondary" className="tabular-nums">
+                      {terceirosSelecionada.respondidos} de{" "}
+                      {terceirosSelecionada.total} respostas
+                    </Badge>
+                  )}
+              </p>
+            </div>
+          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            O jovem indica pessoas que o conhecem bem; cada uma responde 2
+            perguntas por link (ou o mentor lança a resposta colhida por
+            fora) e a consolidação anônima chega ao jovem.
+          </p>
+          {(ehCoord || papel === "supervisor" || (papel === "mentor" && duplaSelecionada)) && (
+            <div className="relative mt-auto flex flex-wrap items-center gap-2 pt-1">
+              {ehCoord || papel === "supervisor" ? (
+                <Link
+                  href="/duplas"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  <Eye aria-hidden />
+                  Ver por dupla
+                </Link>
+              ) : (
+                <Link
+                  href={`/duplas/${duplaSelecionada}?aba=instrumentos#instrumentos`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  <Eye aria-hidden />
+                  Ficha
+                </Link>
+              )}
+            </div>
+          )}
+        </article>
       </div>
       {atrasados.length > 0 && (
         <section
@@ -557,22 +681,18 @@ export function InstrumentosPrograma({
           </ul>
         </section>
       )}
-      {/* mentor: o estado e o envio ficam na ficha da dupla — o rodapé linka
-          direto em vez de reimplementar estado/ação aqui */}
-      {papel === "mentor" && fichasMentor.length > 0 && (
+      {/* mentor: o estado e o envio ficam na ficha da dupla — o rodapé
+          linka a da dupla em foco em vez de reimplementar estado/ação
+          aqui (as outras duplas alternam pelo seletor do topo) */}
+      {papel === "mentor" && duplaSelecionada && (
         <p className="text-xs leading-relaxed text-muted-foreground">
           Estado e envio por dupla na ficha:{" "}
-          {fichasMentor.map((f, i) => (
-            <span key={f.id}>
-              {i > 0 && " · "}
-              <Link
-                href={`/duplas/${f.id}?aba=instrumentos#instrumentos`}
-                className="font-medium underline underline-offset-2 hover:text-foreground"
-              >
-                {f.jovemNome}
-              </Link>
-            </span>
-          ))}
+          <Link
+            href={`/duplas/${duplaSelecionada}?aba=instrumentos#instrumentos`}
+            className="font-medium underline underline-offset-2 hover:text-foreground"
+          >
+            {fichasMentor.find((f) => f.id === duplaSelecionada)?.jovemNome}
+          </Link>
         </p>
       )}
       {/* coord-only: os instrumentos que sobraram em /formularios são os

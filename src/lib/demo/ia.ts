@@ -9,13 +9,24 @@
 
 import { projetarFicha, projetarResumo } from "@/lib/ia/tools";
 import type { DuplaIa } from "@/lib/ia/queries";
+import {
+  escopoDaProposta,
+  montarPlanoEmDia,
+  type PlanoAplicavel,
+} from "@/lib/plano-em-dia";
+import { montarDocCombinado } from "@/lib/plano-roteiros";
+import { gradeCombinada, toDateStr } from "@/lib/ciclo";
+import type { Disponibilidade, Dupla, DuplaPlanoEscopo } from "@/lib/types";
 import { uiDaTool, type UiBloco } from "@/lib/ia/ui";
+import { leituraAderencia } from "@/lib/relatorios/leituras-aderencia";
+import { resumoAderencia } from "@/lib/relatorios/operacional";
 import { PERGUNTAS } from "@/lib/ajuda/conteudo";
 import { normaliza } from "@/lib/utils";
 import { demoRole } from "./mode";
 import { demoJovemJornada } from "./forms-data";
 import {
   demoCicloEventos,
+  demoCronogramas,
   demoDuplas,
   demoJovemDuplas,
   demoJovemEncaminhamentos,
@@ -77,6 +88,31 @@ function uiAjuda(pergunta: string): UiBloco | null {
   });
 }
 
+// primeiro nome normalizado pra casar com o texto da pergunta — "Kauã" e
+// "kaua" viram a mesma chave; o length>1 nos callers evita inicial solta
+const primeiroNome = (nome: string | null | undefined) =>
+  normaliza((nome ?? "").split(" ")[0]);
+
+/** "a dupla da Bia" / "a do Ricardo" → a dupla cujo primeiro nome do
+ *  mentorado (nome_social primeiro) ou do mentor aparece no pedido. O
+ *  mentorado desempata (é como a equipe nomeia a dupla); null quando
+ *  nenhum nome casa — o chamador decide o fallback. */
+function resolverDuplaNomeada(
+  pergunta: string,
+  duplas: DuplaIa[]
+): DuplaIa | null {
+  const pn = normaliza(pergunta);
+  const nomeia = (nome: string | null | undefined) => {
+    const n = primeiroNome(nome);
+    return n.length > 1 && pn.includes(n);
+  };
+  return (
+    duplas.find((d) => nomeia(d.mentorado?.nome_social ?? d.mentorado?.nome)) ??
+    duplas.find((d) => nomeia(d.mentor?.nome_social ?? d.mentor?.nome)) ??
+    null
+  );
+}
+
 export async function responderDemoIa(
   pergunta: string
 ): Promise<RespostaDemo | null> {
@@ -87,6 +123,108 @@ export async function responderDemoIa(
     ["ativa", "pausada"].includes(d.status)
   ) as unknown as DuplaIa[];
   const eventos = demoCicloEventos();
+
+  // templates do cap. 14 (REALIZA-388): mesmo desenho da rota real — sem
+  // a dupla nomeada no pedido a escolha vem primeiro; com ela, o rascunho
+  // sai com os dados demo da dupla (nomes e números de exemplo). O gatilho
+  // é o slug no pedido ("personalizar o template mensagem-…"): palavra
+  // solta tipo "encaminhamento" não basta
+  const slugDemo = /mensagem-preparacao|preparac|preparaç/.test(p)
+    ? "mensagem-preparacao"
+    : /mensagem-indicadas|indicad/.test(p)
+      ? "mensagem-indicadas"
+      : /mensagem-encaminhamento|encaminhamento/.test(p)
+        ? "mensagem-encaminhamento"
+        : null;
+  if (
+    role !== "mentorado" &&
+    slugDemo &&
+    /template|personaliz|modelo|pedido|pede/.test(p)
+  ) {
+    const d =
+      resolverDuplaNomeada(pergunta, duplas) ??
+      (duplas.length === 1 ? duplas[0] : null);
+    const rotuloTemplate =
+      slugDemo === "mensagem-preparacao"
+        ? "mensagem de preparação"
+        : slugDemo === "mensagem-indicadas"
+          ? "mensagem pras pessoas indicadas"
+          : "mensagem de encaminhamento";
+    if (!d) {
+      return {
+        content:
+          `Na demonstração a Liza perguntaria qual dupla antes de montar o texto, igual à rota real.\n\n` +
+          `\`\`\`escolha\n${JSON.stringify({
+            pergunta: `Pra qual dupla eu monto a ${rotuloTemplate}?`,
+            opcoes: duplas.slice(0, 5).map((x) => ({
+              rotulo: `${x.mentorado?.nome_social ?? x.mentorado?.nome ?? "dupla"} · ${x.mentor?.nome_social ?? x.mentor?.nome ?? "mentor"}`,
+              detalhe: x.turma,
+              valor: `pedido: personaliza a ${rotuloTemplate} pra dupla d${
+                primeiroNome(x.mentorado?.nome_social ?? x.mentorado?.nome).endsWith("a")
+                  ? "a"
+                  : "o"
+              } ${primeiroNome(x.mentorado?.nome_social ?? x.mentorado?.nome)}`,
+            })),
+          })}\n\`\`\`${sugestoes(["Como está minha dupla?", "Resumo da semana"])}`,
+        ui: [],
+      };
+    }
+    const jovem = d.mentorado?.nome_social ?? d.mentorado?.nome ?? "jovem";
+    const jovemPrimeiro = jovem.split(" ")[0];
+    const mentor = d.mentor?.nome_social ?? d.mentor?.nome ?? "seu mentor";
+    const numero = d.mentorado?.whatsapp ?? null;
+    const proximo = d.encontros
+      .filter(
+        (e) =>
+          (e.status === "agendado" || e.status === "remarcado") &&
+          e.data_hora &&
+          e.data_hora > new Date().toISOString()
+      )
+      .sort((a, b) => String(a.data_hora).localeCompare(String(b.data_hora)))[0];
+    const fmtDiaHora = (iso: string | null | undefined) =>
+      iso
+        ? new Intl.DateTimeFormat("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "America/Sao_Paulo",
+          }).format(new Date(iso))
+        : null;
+    const fmtDia = (iso: string | null | undefined) =>
+      iso
+        ? new Intl.DateTimeFormat("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            timeZone: "America/Sao_Paulo",
+          }).format(new Date(iso))
+        : null;
+    // a ficha demo veio como DuplaIa (projeção mínima da IA) — os
+    // encaminhamentos completos ficam no Dupla original do dataset
+    const pendente = ((d as unknown as Dupla).encaminhamentos ?? []).find(
+      (e) => e.status === "pendente"
+    );
+    const texto =
+      slugDemo === "mensagem-preparacao"
+        ? `${jovemPrimeiro}, seja muito bem-vindo(a) à mentoria!\n\nMuito prazer, meu nome é ${mentor} e vou ser seu(sua) mentor(a) ao longo do ciclo, com 16 encontros. Estou animado com essa jornada.\n\nPara o nosso primeiro encontro, preciso de três coisas:\n\n1. Os nomes e contatos de pelo menos três amigos e três familiares (e três colegas de trabalho, se você estiver trabalhando). Vou enviar a cada uma um link pra responder duas perguntas rápidas sobre você. Avise essas pessoas de que o link vai chegar.\n2. Um resumo da sua história de vida, pessoal e profissional, em ordem cronológica. Não precisa me enviar: guarde pra conversarmos no encontro.\n3. A sua Roda da Vida respondida na plataforma.\n\nFaça as tarefas com calma. Tudo o que você compartilhar comigo é confidencial. Qualquer dúvida, é só me chamar. Até logo!`
+        : slugDemo === "mensagem-indicadas"
+          ? `Prezada Maria,\n\nMeu nome é ${mentor}. ${jovemPrimeiro} está participando do Programa de Mentoria Social do Instituto Realiza.vc e eu sou o(a) mentor(a) que vai acompanhá-lo(a) nessa jornada.\n\nPara ajudar nesse trabalho, peço a sua colaboração respondendo a duas perguntas rápidas pelo link: https://realiza.vc/t/exemplo. Se puder, até a próxima semana.\n\nO seu nome foi indicado pelo(a) próprio(a) ${jovemPrimeiro}. Não há obrigação de responder, mas a sua contribuição ajuda muito. As respostas serão lidas apenas por mim e, ao comentá-las, não indicarei quem disse o quê.\n\n1. O que você considera pontos fortes d${jovemPrimeiro.endsWith("a") ? "a" : "o"} ${jovemPrimeiro}, na vida pessoal e profissional?\n2. Em quais aspectos ele(a) precisaria melhorar pra obter mais resultados?`
+          : `${jovemPrimeiro},\n\nGostei muito da nossa conversa. A sua abertura vai fazer diferença no nosso trabalho.\n\nSempre que a conversa gerar alguma reflexão, anote e traga no próximo encontro. Se for algo urgente, me chame antes.\n\nPróxima tarefa: ${pendente?.descricao ?? "revisar os combinados do último encontro"}. Prazo: ${fmtDia(pendente?.prazo) ?? "até o próximo encontro"}.\n\nNosso próximo encontro: ${fmtDiaHora(proximo?.data_hora) ?? "a combinar"}, já agendado na plataforma.\n\nAbraço!`;
+    return {
+      content:
+        `Na demonstração os dados são de exemplo: no ambiente real a Liza puxa nomes, contatos${slugDemo === "mensagem-indicadas" ? " e os links de cada indicada" : ", tarefas e agenda"} da própria plataforma.\n\n` +
+        `\`\`\`rascunho\n${JSON.stringify({
+          canal: "whatsapp",
+          para:
+            slugDemo === "mensagem-indicadas"
+              ? `Maria (pessoa indicada d${jovemPrimeiro.endsWith("a") ? "a" : "o"} ${jovemPrimeiro}, exemplo)`
+              : `${jovem} (mentorado)`,
+          ...(numero && slugDemo !== "mensagem-indicadas" ? { numero } : {}),
+          texto,
+        })}\n\`\`\`${sugestoes(["Como está minha dupla?", "Próximos encontros"])}`,
+      ui: [],
+    };
+  }
 
   // o rascunho é fala de staff pra dupla ("Oi, pessoal!") — pro mentorado
   // cai no bloco próprio abaixo em vez de um texto sem sentido pra ele
@@ -103,6 +241,197 @@ export async function responderDemoIa(
       )}\n\`\`\`${sugestoes(["Próximos encontros", "Como está minha dupla?"])}`,
       ui: [],
     };
+  }
+
+  // emitir link de instrumento (527): na vida real a escrita passa pelo
+  // card de confirmação e o "feito" mostra o link com Copiar + WhatsApp
+  // (repasse pro mentor quando o jovem não tem número). Na demo não há
+  // token — o texto conta o gesto em vez de inventar URL
+  if (
+    role !== "mentorado" &&
+    /emit|link/.test(p) &&
+    /roda|vis[aã]o|pdm|metas|instrumento|formul[aá]rio/.test(p)
+  ) {
+    return {
+      content: `Na demonstração o link sairia pelo card de confirmação: depois do "sim" ele já mostra o link pronto com Copiar e o botão de WhatsApp pra enviar direto pra pessoa (ou pro mentor repassar quando ela não tem número cadastrado).${sugestoes(["Como está minha dupla?", "Próximos encontros"])}`,
+      ui: [],
+    };
+  }
+
+  // catch-up (REALIZA-397): o plano sai do mesmo planner da ficha — roda
+  // antes do branch de agenda, que casaria com "adiantar encontros". A
+  // dupla nomeada no pedido ("e a dupla do Caio?") resolve antes de
+  // iterar: mostrar a primeira atrasada de outra seria atribuição errada,
+  // e quem já está em dia ou fora do "ficar em dia" ganha resposta honesta
+  // em vez do plano emprestado
+  if (
+    role !== "mentorado" &&
+    /ficar em dia|atrasad|recupera|adiant|plano d[ae] recupera|plano pra ficar/.test(p)
+  ) {
+    // mesmo payload da tool plano_em_dia (src/lib/ia/tools.ts): grade,
+    // recessos pendentes e o rascunho do combinado saem dos mesmos dados
+    // do contextoPlano — o card demo mostra o bloqueio e o documento de
+    // verdade (527)
+    const gradeDe = (d: DuplaIa) => {
+      const gM =
+        ((d.mentor as { disponibilidade?: Disponibilidade | null } | null)
+          ?.disponibilidade ?? null) as Disponibilidade | null;
+      const gJ =
+        ((d.mentorado as { disponibilidade?: Disponibilidade | null } | null)
+          ?.disponibilidade ?? null) as Disponibilidade | null;
+      // mesma régua do contextoPlano: interseção só com os DOIS lados
+      const comuns = gradeCombinada(gM, gJ)?.celulas ?? [];
+      return {
+        gM,
+        gJ,
+        combinada: comuns.length ? { celulas: comuns } : null,
+        diasComuns: new Set(comuns.map((c) => c.dia)).size,
+      };
+    };
+    const uiPlano = (d: DuplaIa, r: PlanoAplicavel) => {
+      const g = gradeDe(d);
+      const hojeStr = toDateStr(new Date());
+      const e =
+        r.estado === "recuperacao" ? escopoDaProposta(r, hojeStr) : null;
+      const pendenteIds = new Set(
+        r.recessosPendentes.map((x) => x.cicloEventoId)
+      );
+      const evPorId = new Map(eventos.map((ev) => [ev.id, ev]));
+      return uiDaTool("plano_em_dia", {
+        dupla_id: d.id,
+        mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
+        mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
+        trilha: d.trilha,
+        aplicavel: true,
+        em_dia: r.emDia,
+        estado: r.estado,
+        nivel: r.nivel,
+        ritmo: r.ritmo,
+        sugestao: r.sugestao,
+        plano: null,
+        grade: {
+          mentor: g.gM != null,
+          jovem: g.gJ != null,
+          dias_comuns: g.diasComuns,
+          sem_grade: false,
+        },
+        recessos_pendentes: r.recessosPendentes.map((x) => ({
+          ciclo_evento_id: x.cicloEventoId,
+          titulo: x.titulo,
+          inicio: x.inicio,
+          fim: x.fim,
+        })),
+        doc:
+          e && "escopo" in e
+            ? montarDocCombinado({
+                status: "proposto",
+                versao: 1,
+                quemPropos: STAFF.includes(role) ? "A equipe" : "Vocês",
+                escopo: e.escopo as DuplaPlanoEscopo,
+                recessos: [
+                  ...r.recessosPendentes.map((x) => ({
+                    titulo: x.titulo,
+                    inicio: x.inicio,
+                    fim: x.fim,
+                    usa: null as boolean | null,
+                  })),
+                  ...(d.recessos ?? [])
+                    .filter((rec) => {
+                      if (pendenteIds.has(rec.ciclo_evento_id)) return false;
+                      const ev = evPorId.get(rec.ciclo_evento_id);
+                      return (
+                        ev != null &&
+                        (ev.data_fim ?? ev.data ?? "") >= hojeStr
+                      );
+                    })
+                    .map((rec) => {
+                      const ev = evPorId.get(rec.ciclo_evento_id)!;
+                      return {
+                        titulo: ev.titulo,
+                        inicio: ev.data ?? "",
+                        fim: ev.data_fim ?? ev.data ?? "",
+                        usa: rec.usa as boolean | null,
+                      };
+                    }),
+                ],
+              })
+            : null,
+        pendencias_registro: r.pendenciasRegistro.map((p2) => ({
+          encontro_id: p2.encontroId,
+          numero: p2.numero,
+          estado: p2.estado,
+          data_hora: p2.dataHora,
+        })),
+        passos: r.passos.map((p2) => ({
+          numero: p2.numero,
+          titulo: p2.titulo,
+          acao: p2.acao,
+          encontro_id: p2.encontroId,
+          data_sugerida: p2.data,
+          data_oficial: p2.dataOficial,
+          vence_no_caminho: p2.venceNoCaminho === true,
+          precondicao: p2.precondicao ?? null,
+          aviso: p2.aviso ?? null,
+        })),
+        data_recuperacao: r.dataRecuperacao,
+        data_projetada: r.dataProjetada,
+        cabem_ate_encerramento: r.cabemAteEncerramento,
+        alternativa_ritmo: r.alternativaRitmo,
+        alternativa_recesso: r.alternativaRecesso,
+        encerramento: r.encerramento,
+        avisos: r.avisos,
+      });
+    };
+    const textoPlano = `Na demonstração o plano é de exemplo, calculado pelo mesmo motor da ficha da dupla. A sequência com as datas sugeridas tá acima: dois encontros por semana quando couber, respeitando os intervalos do guia. Quem agenda é a dupla, na ficha.${sugestoes(["Resumo da semana", "Escreva um lembrete pra dupla"])}`;
+    let ui: UiBloco | null = null;
+    let content: string;
+    const nomeada = resolverDuplaNomeada(pergunta, duplas);
+    if (nomeada) {
+      const r = montarPlanoEmDia({
+        dupla: nomeada as unknown as Dupla,
+        eventos,
+        disponibilidade: gradeDe(nomeada).combinada,
+        hoje: new Date(),
+      });
+      if (!r.aplicavel) {
+        // trilha de especialista, pausa ou falta de calendário: o motivo
+        // do planner já é a resposta honesta da rota real
+        content = `Na demonstração a resposta é a mesma da rota real: ${r.motivo}${sugestoes(["Resumo da semana"])}`;
+      } else {
+        ui = uiPlano(nomeada, r);
+        const jovem = (
+          nomeada.mentorado?.nome_social ??
+          nomeada.mentorado?.nome ??
+          "a dupla"
+        ).split(" ")[0];
+        const rotulo =
+          jovem === "a dupla"
+            ? jovem
+            : `d${jovem.endsWith("a") ? "a" : "o"} ${jovem}`;
+        content = r.emDia
+          ? `Na demonstração a dupla ${rotulo} já está em dia, então não existe plano de recuperação pra ela.${ui ? " O card acima sai do mesmo motor da ficha e mostra os encontros marcados." : " No ambiente real o mesmo motor da ficha faz essa conta."}${sugestoes(["Resumo da semana"])}`
+          : ui
+            ? textoPlano
+            : `Na demonstração a conta da dupla ${rotulo} não fecha antes do encerramento. ${r.sugestao ?? "Nem com 1 encontro por dia o plano fecha."}${sugestoes(["Resumo da semana"])}`;
+      }
+    } else {
+      for (const d of duplas) {
+        const r = montarPlanoEmDia({
+          dupla: d as unknown as Dupla,
+          eventos,
+          disponibilidade: gradeDe(d).combinada,
+          hoje: new Date(),
+        });
+        if (r.aplicavel && !r.emDia && r.passos.length) {
+          ui = uiPlano(d, r);
+          break;
+        }
+      }
+      content = ui
+        ? textoPlano
+        : `Na demonstração nenhuma dupla está atrasada o bastante pra um plano de recuperação. No ambiente real a Liza monta o plano com o mesmo motor do card "Para ficar em dia".${sugestoes(["Resumo da semana"])}`;
+    }
+    return { content, ui: ui ? [ui] : [] };
   }
 
   if (/agenda|encontro|próxim|proxim/.test(p) && role !== "mentorado") {
@@ -159,6 +488,46 @@ export async function responderDemoIa(
           ? `Na demonstração a resposta sai da ajuda oficial, igual ao card acima. No ambiente real a Liza também consulta os guias do programa.${sugestoes(["Como tá minha jornada?", "O que tenho pra fazer?"])}`
           : `Na demonstração a Liza responde dúvidas do programa com a ajuda oficial. No ambiente real ela também consulta os guias.${sugestoes(["Quem é meu mentor?"])}`,
         ui: ui ? [ui] : [],
+      };
+    }
+    // o combinado do plano "ficar em dia" (459): a rota real chama
+    // meu_plano (jovem_plano, recorte sem semáforo) — a demo devolve um
+    // plano aceito de exemplo na MESMA projeção
+    // "combinado" sozinho continua caindo nos combinados/tarefas — o
+    // branch dele vem depois; aqui só plano/ficar em dia
+    if (/plano|ficar em dia/.test(p)) {
+      const hoje = Date.now();
+      const em = (dias: number) => new Date(hoje + dias * 86_400_000).toISOString();
+      const ui = uiDaTool("meu_plano", {
+        status: "aceito",
+        versao: 1,
+        ritmo: "2",
+        aprovado_lado: "mentor",
+        expira_em: em(14),
+        passos: [
+          { numero: 4, data: em(3).slice(0, 10), acao: "remarcar" },
+          { numero: 5, data: em(10).slice(0, 10), acao: "remarcar" },
+        ],
+        passos_aplicados: [
+          { numero: 4, data_nova: em(3), aplicado_em: new Date(hoje).toISOString() },
+        ],
+      });
+      return {
+        content: `Na demonstração o combinado é de exemplo. No ambiente real ele sai da RPC jovem_plano — o recorte do jovem do plano "ficar em dia", sem os detalhes internos da equipe. Aceitar e confirmar datas valem pra você e pro seu mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`,
+        ui: ui ? [ui] : [],
+      };
+    }
+    // retroativo (461): "nos encontramos sem agendar" — a rota real chama
+    // encontros_retroativo e prepara o registro com o card de confirmação;
+    // a demo conta o caminho sem escrever (mutação demo é DEMO_MSG mesmo)
+    if (
+      /sem agendar|por fora|nos encontramos|a gente se encontr|encontramos sem|esquec|fora da plataforma|já rolou/.test(
+        p
+      )
+    ) {
+      return {
+        content: `Na demonstração a Liza perguntaria qual encontro do guia a sessão cobriu e prepararia o registro pra você confirmar no card — ele já nasce realizado e o seu mentor é avisado pra contar como foi. No ambiente real vale pra passo oficial que já venceu; o último encontro e os da trilha de especialista seguem com o mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`,
+        ui: [],
       };
     }
     if (/agenda|encontro|próxim|proxim|quando|tive|teve|rolou/.test(p)) {
@@ -315,8 +684,32 @@ export async function responderDemoIa(
     }
   }
 
+  // leitura de aderência (REALIZA-465): "e a adesão?" também na demo, com
+  // os números do dataset evergreen e o mesmo recorte de papel (as duplas
+  // que a persona enxerga). Sem card, como na tool real.
+  if (
+    role !== "mentorado" &&
+    /ades[ãa]o|m[eé]trica|indicador|insight/.test(p)
+  ) {
+    const achados = leituraAderencia(
+      resumoAderencia(duplas as unknown as Dupla[], eventos, demoCronogramas())
+    );
+    const principal = achados[0];
+    return {
+      content: `Na demonstração os números são de exemplo. **${principal.titulo}**: ${principal.metrica}. Próximo passo: ${principal.intervencao}.${sugestoes(["Quem está em risco?", "Encontros desta semana"])}`,
+      ui: [],
+    };
+  }
+
   if (STAFF.includes(role) && /resumo|semana|risco|aten|como est|duplas|apoio/.test(p)) {
-    const ui = uiDaTool("resumo_semana", projetarResumo(duplas, eventos));
+    // as fechadas contam na partição do resumo, como no getFechadasIa real
+    const fechadas = demoDuplas(role).filter((d) =>
+      ["concluida", "encerrada"].includes(d.status)
+    ) as unknown as DuplaIa[];
+    const ui = uiDaTool(
+      "resumo_semana",
+      projetarResumo(duplas, eventos, fechadas)
+    );
     const pedem = ui?.kind === "saude" ? ui.pedem_acao : 0;
     return {
       content: `Na demonstração os números são de exemplo. ${

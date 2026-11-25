@@ -7,6 +7,8 @@
 import {
   CAMPO_FORMATO_ERRO,
   campoFormato,
+  camposPerguntas,
+  visivel,
   type FormularioCampo,
   type RespostaValor,
 } from "./schema";
@@ -224,4 +226,23 @@ export function validaRespostas(
     }
   }
   return mapa;
+}
+
+/** Escopo de uma seção do wizard (REALIZA-144): valida só as perguntas
+ *  visíveis do bloco corrente — o condicional fora da condição não
+ *  bloqueia, como no submit. Nenhuma regra é copiada: a validação real
+ *  continua sendo validaRespostas; aqui só mudam os dois escopos (quais
+ *  campos e contra qual snapshot de visibilidade). `atuais` é o mapa cru
+ *  da coleta (sem "Outro: <texto>") — o mesmo que o render passa pro
+ *  visivel(). */
+export function validaSecao(
+  camposSecao: FormularioCampo[],
+  respostas: Record<string, RespostaValor>,
+  falhas: Set<string>,
+  atuais: Record<string, RespostaValor | undefined>
+): Record<string, string> {
+  const visiveis = camposPerguntas(camposSecao).filter((c) =>
+    visivel(c, atuais)
+  );
+  return validaRespostas(visiveis, respostas, falhas);
 }

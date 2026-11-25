@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { audienciaLegada, audienciasDe, veMaterial } from "./materiais";
+import {
+  audienciaLegada,
+  audienciasDe,
+  turmaDoMaterial,
+  veMaterial,
+  veMaterialDaTurma,
+} from "./materiais";
 import type { AppRole } from "./types";
 
 const coord = { role: "coordenacao" as const, papeis: ["coordenacao" as const] };
@@ -72,6 +78,48 @@ describe("veMaterial", () => {
 
   it("sem papel não vê nada", () => {
     expect(veMaterial(["todos"], semPapel)).toBe(false);
+  });
+});
+
+describe("turmaDoMaterial — material amarrado a uma turma", () => {
+  it("lê o nº da turma no título", () => {
+    expect(turmaDoMaterial("Cronograma do programa — Turma 1")).toBe("1");
+    expect(turmaDoMaterial("Cronograma do programa — Turma 2")).toBe("2");
+  });
+
+  it("material do programa inteiro devolve null", () => {
+    expect(turmaDoMaterial("Roteiro Semana 1 — Boas-vindas")).toBeNull();
+    expect(turmaDoMaterial("Roda da Vida (instrumento)")).toBeNull();
+    expect(turmaDoMaterial("Guia do Mentor DPP")).toBeNull();
+    expect(turmaDoMaterial(null)).toBeNull();
+    expect(turmaDoMaterial(undefined)).toBeNull();
+  });
+});
+
+describe("veMaterialDaTurma — recorte por turma da pessoa", () => {
+  const cronogramaT1 = { titulo: "Cronograma do programa — Turma 1" };
+  const cronogramaT2 = { titulo: "Cronograma do programa — Turma 2" };
+  const guia = { titulo: "Guia do Mentor DPP" };
+
+  it("só o cronograma da própria turma aparece", () => {
+    const turmas = new Set(["1"]);
+    expect(veMaterialDaTurma(cronogramaT1, turmas)).toBe(true);
+    expect(veMaterialDaTurma(cronogramaT2, turmas)).toBe(false);
+  });
+
+  it("quem não tem dupla (pessoa nova) não vê cronograma de turma", () => {
+    expect(veMaterialDaTurma(cronogramaT1, new Set())).toBe(false);
+    expect(veMaterialDaTurma(cronogramaT2, new Set())).toBe(false);
+  });
+
+  it("material sem turma no título passa sempre", () => {
+    expect(veMaterialDaTurma(guia, new Set())).toBe(true);
+    expect(veMaterialDaTurma(guia, new Set(["1"]))).toBe(true);
+  });
+
+  it("turmas null desliga o recorte (coordenação vê tudo)", () => {
+    expect(veMaterialDaTurma(cronogramaT1, null)).toBe(true);
+    expect(veMaterialDaTurma(cronogramaT2, null)).toBe(true);
   });
 });
 

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useId, useMemo, useState, useTransition } from "react";
 import type { ReactElement } from "react";
 import { CircleNotch, PaperPlaneTilt } from "@phosphor-icons/react";
-import { toast } from "sonner";
-import { AnimatePresence, motion } from "motion/react";
+import { toast } from "@/lib/toast";
+import { FadeTroca } from "@/components/ui/etapa";
 import {
   gerarLinksParaDupla,
   type LinkPronto,
@@ -18,7 +18,6 @@ import {
 import { ValidadeLinks } from "@/components/forms/validade-links";
 import { msgLinkWhatsApp } from "@/components/forms/link-shared";
 import { useOrigem } from "@/components/forms/use-origem";
-import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,7 +39,7 @@ import {
 } from "@/components/ui/select";
 import { normaliza } from "@/lib/utils";
 import { SISTEMA_LABEL, type FormularioSistema } from "@/lib/forms/schema";
-import { ehInstrumento } from "@/lib/forms/instrumentos";
+import { ehInstrumentoDeDupla } from "@/lib/forms/instrumentos";
 
 export type FormularioOpcao = {
   id: string;
@@ -103,7 +102,9 @@ export function EnviarFormularioDialog({
   const selecionaveis = useMemo(
     () =>
       formularios.filter(
-        (f) => !ehInstrumento(f.sistema) && f.sistema !== "avaliacao_especialista"
+        (f) =>
+          !ehInstrumentoDeDupla(f.sistema) &&
+          f.sistema !== "avaliacao_especialista"
       ),
     [formularios]
   );
@@ -229,32 +230,34 @@ export function EnviarFormularioDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <AnimatePresence mode="wait" initial={false}>
+        {/* troca de estado do kit (form ↔ links prontos): o painel entrante
+            recebe o foco — o botão que disparou a troca desmonta junto e o
+            foco não fica órfão no <body> */}
+        <FadeTroca
+          chave={
+            links
+              ? "prontos"
+              : selecionaveis.length === 0
+                ? carregando
+                  ? "carregando"
+                  : "vazio"
+                : "form"
+          }
+          foco
+        >
           {links ? (
-            <motion.div key="prontos" {...fade} transition={T.enter}>
-              <LinksProntos
-                itens={itensProntos}
-                onOutros={() => setLinks(null)}
-              />
-            </motion.div>
+            <LinksProntos
+              itens={itensProntos}
+              onOutros={() => setLinks(null)}
+            />
           ) : selecionaveis.length === 0 ? (
             carregando ? (
-              <motion.p
-                key="carregando"
-                {...fade}
-                transition={T.enter}
-                className="flex items-center gap-2 text-sm text-muted-foreground"
-              >
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CircleNotch className="animate-spin" aria-hidden />
                 Carregando os formulários ativos...
-              </motion.p>
+              </p>
             ) : (
-            <motion.p
-              key="vazio"
-              {...fade}
-              transition={T.enter}
-              className="text-sm text-muted-foreground"
-            >
+            <p className="text-sm text-muted-foreground">
               Nenhum formulário ativo. Crie um em{" "}
               <Link
                 href="/formularios"
@@ -263,15 +266,10 @@ export function EnviarFormularioDialog({
                 Formulários
               </Link>{" "}
               e volte pra enviar daqui.
-            </motion.p>
+            </p>
             )
           ) : (
-            <motion.div
-              key="form"
-              {...fade}
-              transition={T.enter}
-              className="space-y-4"
-            >
+            <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label id={formLabelId}>Formulário</Label>
                 <Select
@@ -353,9 +351,9 @@ export function EnviarFormularioDialog({
                     : "Escolha os destinatários"}
                 </Button>
               </DialogFooter>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </FadeTroca>
       </DialogContent>
     </Dialog>
   );

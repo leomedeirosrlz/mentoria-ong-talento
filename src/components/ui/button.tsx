@@ -1,6 +1,6 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 
 /* Hierarquia de ação, em ordem de ênfase — uma decisiva por contexto:
  *   default (1 ação decisiva por contexto) > outline (suporte) >

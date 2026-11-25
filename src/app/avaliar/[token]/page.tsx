@@ -9,8 +9,9 @@ import { demoRole } from "@/lib/demo/mode";
 import {
   avaliacaoPorToken,
   linkAvaliacaoMeta,
+  temMediaDpp,
 } from "@/lib/queries-avaliacao";
-import { formatDateTime } from "@/lib/ciclo";
+import { formatDiaSemanaHora } from "@/lib/ciclo";
 import { sharedOg } from "@/lib/og";
 import { SiteFooter } from "@/components/site-footer";
 import { EstadoCard } from "@/components/estado-card";
@@ -29,7 +30,10 @@ export async function generateMetadata({
   const { token } = await params;
   const r = TOKEN_RE.test(token) ? await avaliacaoPorToken(token) : null;
   const jovem = r?.kind === "ok" ? r.info.alvo?.jovem_nome : null;
-  const titulo = "Como foi o encontro?";
+  const trilha =
+    r?.kind === "ok" ? (await linkAvaliacaoMeta(token))?.trilha : null;
+  const titulo =
+    trilha === "especialista" ? "Como foi a sessão?" : "Como foi o encontro?";
   const descricao =
     "Sua avaliação ajuda a mentoria a melhorar. Leva menos de 1 minuto.";
   return {
@@ -60,11 +64,16 @@ export default async function AvaliarTokenPage({
 
   // a trilha decide se o toggle "mentor pode ler" aparece — a RPC pública
   // não a devolve de propósito (nem encontro_id); leitura coord-scope no
-  // servidor, fora do payload do client
+  // servidor, fora do payload do client. E o lote da média decide a copy
+  // de privacidade (027/FR-003): sem ≥3 respostas não há média a prometer
   const meta =
     info && TOKEN_RE.test(token) ? await linkAvaliacaoMeta(token) : null;
+  const temMedia =
+    meta?.trilha === "especialista"
+      ? false
+      : ((meta && (await temMediaDpp(meta.dupla_id))) ?? true);
 
-  // data do encontro pra contextualizar — "o encontro 4 de dd/mm"
+  // data+dia do encontro pra contextualizar — "terça-feira, 14/10 às 19:00"
   const quando =
     info?.encontro?.realizado_em ?? info?.encontro?.data_hora ?? null;
 
@@ -125,8 +134,12 @@ export default async function AvaliarTokenPage({
               acao={{ href: MAILTO, label: "Pedir um novo link" }}
             >
               <p>
-                O prazo pra avaliar este encontro terminou. Peça um novo
-                link à equipe Realiza.vc. Sua opinião continua valendo.
+                O prazo pra avaliar{" "}
+                {meta?.trilha === "especialista"
+                  ? "esta sessão"
+                  : "este encontro"}{" "}
+                terminou. Peça um novo link à equipe Realiza.vc. Sua
+                opinião continua valendo.
               </p>
             </EstadoCard>
           ) : (
@@ -138,15 +151,24 @@ export default async function AvaliarTokenPage({
             <AvaliarTokenFlow
               token={token}
               trilha={meta?.trilha ?? null}
+              temMedia={temMedia}
               jaRegistrada={info.status === "respondido" || !!info.respondida}
               primeiroNome={
                 info.alvo?.jovem_nome?.trim().split(/\s+/)[0] ?? null
               }
               contexto={
-                info.encontro && quando
-                  ? `Encontro ${info.encontro.numero}${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDateTime(quando)}`
+                info.encontro
+                  ? meta?.trilha === "especialista"
+                    ? `Sessão${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDiaSemanaHora(quando)}`
+                    : // sessão combinada (018): o link cobre todos os números
+                      // do grupo — o contexto nomeia a sessão inteira, não só
+                      // a âncora que carrega o token
+                      (meta?.cobertura ?? []).length > 1
+                      ? `Sessão combinada dos encontros ${(meta!.cobertura!).join(" e ")}${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDiaSemanaHora(quando)}`
+                      : `Encontro ${info.encontro.numero}${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDiaSemanaHora(quando)}`
                   : null
               }
+              sessao={meta?.cobertura ?? []}
               demo={!!demo}
               retryHref={`/avaliar/${token}`}
             />

@@ -1,22 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  cloneElement,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import { ClockCounterClockwise } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { registrarEncontroRetroativo } from "@/lib/actions";
-import { formatDate, type EncontroFaltante } from "@/lib/ciclo";
+import { formatDate, toDateStr, type EncontroFaltante } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { elementoReal } from "@/lib/elemento-lazy";
+import { SeletorDiaHora } from "@/components/seletor-dia-hora";
 
-/** datetime-local espera horário local — toISOString exibiria UTC (3h adiantado). */
+/** horário local "YYYY-MM-DDTHH:mm" — o clamp "cai em agora" compara civil. */
 function paraInputLocal(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
@@ -24,7 +25,9 @@ function paraInputLocal(d: Date): string {
 
 /**
  * Encontro que aconteceu sem agendamento prévio (combinado por WhatsApp etc.).
- * Nasce realizado com origem "externo" e leva direto pro follow-up.
+ * Nasce realizado com origem "externo" e leva direto pro follow-up. O "quando
+ * foi" usa o SeletorDiaHora em modo retroativo (530): campos nativos
+ * separados, dia limitado a hoje pra trás.
  */
 export function RegistrarRetroativoDialog({
   duplaId,
@@ -34,11 +37,13 @@ export function RegistrarRetroativoDialog({
   quandoPadrao,
   onCreated,
   esp,
+  open: openProp,
+  onOpenChange,
 }: {
   duplaId: string;
   faltantes: EncontroFaltante[];
-  /** Elemento do trigger — cada ponto da UI escolhe a aparência. */
-  trigger: React.ReactElement;
+  /** Elemento do trigger — `null` suprime (o pai abre controlado). */
+  trigger?: React.ReactElement | null;
   /** Pré-seleciona o encontro — a agenda já sabe qual dia o usuário clicou. */
   numeroInicial?: number;
   /** YYYY-MM-DD — pré-preenche "quando foi" (19h, caindo em agora se não passou). */
@@ -49,12 +54,13 @@ export function RegistrarRetroativoDialog({
   /** Trilha de especialista: faltantes vêm em passo do guia e a sessão nasce
    *  com numero-tentativa derivado no server (0074) — a UI fala em "passo". */
   esp?: boolean;
+  /** Modo controlado (opcional) — o ⋯/a grade abre o dialog direto. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [numero, setNumero] = useState<string | null>(
-    numeroInicial != null ? String(numeroInicial) : null,
-  );
-  const [quando, setQuando] = useState("");
+  const [openInterno, setOpenInterno] = useState(false);
+  const open = openProp ?? openInterno;
+  const [aviso, setAviso] = useState<string | null>(null);
   // id do card recém-criado — o efeito abaixo rola até ele quando o refresh
   // termina (router.push com hash não rola: o card não existia no DOM velho)
   const scrollTarget = useRef<string | null>(null);
@@ -62,23 +68,36 @@ export function RegistrarRetroativoDialog({
   const router = useRouter();
   // vocabulário da trilha — especialista fala em sessão/passo (0074)
   const nome = esp ? "sessão" : "encontro";
-  const rotuloFaltante = (f: EncontroFaltante) =>
-    esp
-      ? `Passo ${f.numero}`
-      : f.dataSugerida
-        ? `${f.numero}º encontro · sugerido ${formatDate(f.dataSugerida)}`
-        : `${f.numero}º encontro`;
-  // teto do datetime-local: não aceita futuro (o server também valida)
+  const rotuloFaltante = useCallback(
+    (f: EncontroFaltante) =>
+      esp
+        ? `Passo ${f.numero}`
+        : f.dataSugerida
+          ? `${f.numero}º encontro · sugerido ${formatDate(f.dataSugerida)}`
+          : `${f.numero}º encontro`,
+    [esp]
+  );
   const agora = paraInputLocal(new Date());
-  // default de "quando foi": o dia clicado (19h) ou a sugestão do encontro
-  // pré-selecionado — se ainda não passou, cai em agora
-  const quandoInicial = () => {
-    const base = quandoPadrao
-      ?? faltantes.find((f) => f.numero === numeroInicial)?.dataSugerida;
-    if (!base) return "";
-    const pre = `${base}T19:00`;
-    return pre > agora ? agora : pre;
+  const hoje = toDateStr(new Date());
+
+  // "quando foi" por candidato: o dia sugerido às 19h (a data oficial do
+  // guia entra como sugestão); sem sugestão ou ainda não passou, cai em
+  // agora — o mesmo clamp do input max do fluxo antigo
+  const clampAgora = (pre: string) => (pre > agora ? agora : pre);
+  const parDe = (base: string | null | undefined) => {
+    if (!base) return null;
+    const v = clampAgora(`${base}T19:00`);
+    return { data: v.slice(0, 10), hora: v.slice(11, 16) };
   };
+  const parDoNumero = (num: number | null) => {
+    const f = faltantes.find((x) => x.numero === num);
+    // sem data oficial (especialista) o prefill cai em agora
+    const v = clampAgora(`${f?.dataSugerida ?? hoje}T19:00`);
+    return { data: v.slice(0, 10), hora: v.slice(11, 16) };
+  };
+  const inicial = quandoPadrao
+    ? parDe(quandoPadrao)
+    : parDoNumero(numeroInicial ?? null);
 
   useEffect(() => {
     if (pending) return;
@@ -93,41 +112,32 @@ export function RegistrarRetroativoDialog({
       ?.scrollIntoView({ behavior: reduz ? "auto" : "smooth", block: "start" });
   }, [pending]);
 
-  function escolherNumero(v: string | null) {
-    setNumero(v);
-    const f = faltantes.find((x) => String(x.numero) === v);
-    if (!f) return;
-    // trilha sem data oficial (especialista) não tem sugestão — prefill cai em agora
-    if (!f.dataSugerida) {
-      setQuando(agora);
-      return;
-    }
-    // prefill na data sugerida às 19h — se ainda não passou (sugerido hoje), cai em agora
-    const pre = `${f.dataSugerida}T19:00`;
-    setQuando(pre > agora ? agora : pre);
+  // estado fresco por abertura — o seletor reseta os campos na borda de
+  // subida; aqui cai o aviso de uma visita anterior
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (open !== abertoAntes) {
+    setAbertoAntes(open);
+    if (open) setAviso(null);
   }
 
-  function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!numero) {
-      toast.error(`Escolha qual ${esp ? "passo" : "encontro"} foi.`);
-      return;
-    }
-    const local = String(new FormData(e.currentTarget).get("data_hora") ?? "");
-    if (!local) return;
-    // datetime-local é naïve — o server interpreta o valor sem fuso como
-    // horário de São Paulo, então manda o valor cru
+  function mudaOpen(o: boolean) {
+    setOpenInterno(o);
+    onOpenChange?.(o);
+  }
+
+  function confirmar(data: string, hora: string, n: number) {
+    // o par civil vai naïve — o server lê como horário de SP
+    const local = `${data}T${hora}`;
     start(async () => {
       try {
-        const res = await registrarEncontroRetroativo(duplaId, Number(numero), local);
-        if (res?.error) toast.error(res.error);
-        else {
+        const res = await registrarEncontroRetroativo(duplaId, n, local);
+        if (res?.error) {
+          setAviso(res.error);
+        } else {
           toast.success(
             `${esp ? "Sessão" : "Encontro"} registrad${esp ? "a" : "o"}. Agora complete o registro.`
           );
-          setOpen(false);
-          setNumero(null);
-          setQuando("");
+          mudaOpen(false);
           if (res.encontroId) {
             if (onCreated) {
               // a agenda navega pro dia do encontro e abre o form nela — "local"
@@ -152,89 +162,49 @@ export function RegistrarRetroativoDialog({
     });
   }
 
+  // trigger via RSC chega lazy — resolve antes de clonar (elementoReal)
+  const gatilho =
+    trigger === null
+      ? null
+      : cloneElement(
+          elementoReal(
+            trigger ?? (
+              <Button variant="outline" size="sm">
+                <ClockCounterClockwise size={16} />
+                Registrar {nome}
+              </Button>
+            )
+          ),
+          { onClick: () => mudaOpen(true), "aria-haspopup": "dialog" }
+        );
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (o) {
-          // abre no contexto que o trigger trouxe (dia clicado na agenda etc.)
-          setNumero(numeroInicial != null ? String(numeroInicial) : null);
-          setQuando(quandoInicial());
-        } else {
-          setNumero(null);
-          setQuando("");
+    <>
+      {gatilho}
+      <SeletorDiaHora
+        aberto={open}
+        onAberto={mudaOpen}
+        numero={numeroInicial ?? faltantes[0]?.numero ?? 0}
+        numeros={faltantes.map((f) => f.numero)}
+        encontroPrimario={faltantes.length > 0}
+        idEncontro="retro-numero-select"
+        rotuloEncontro={`Qual ${esp ? "passo" : "encontro"} foi`}
+        rotuloNumero={(n) =>
+          rotuloFaltante(faltantes.find((f) => f.numero === n)!)
         }
-      }}
-    >
-      <DialogTrigger render={trigger} />
-      <DialogContent size="md">
-        <DialogHeader>
-          <DialogTitle>Registrar {nome} que já aconteceu</DialogTitle>
-          <DialogDescription className="leading-relaxed">
-            Se encontraram sem agendar por aqui (combinaram por WhatsApp, por
-            exemplo), conte quando foi. {esp ? "A sessão" : "O encontro"} já
-            nasce como realizad{esp ? "a" : "o"} e você completa o registro em
-            seguida.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
-          <div className="space-y-2">
-            <Label id="retro-numero-label">
-              Qual {esp ? "passo" : "encontro"} foi
-            </Label>
-            <Select
-              name="numero"
-              required
-              value={numero}
-              // sem items o trigger fechado mostra só "3" — o label é o texto cheio
-              items={Object.fromEntries(
-                faltantes.map((f) => [String(f.numero), rotuloFaltante(f)])
-              )}
-              onValueChange={(v) => escolherNumero(v ?? null)}
-            >
-              <SelectTrigger
-                id="retro-numero-select"
-                aria-labelledby="retro-numero-label retro-numero-select"
-              >
-                <SelectValue placeholder={`Escolha ${esp ? "o passo" : "o encontro"}`} />
-              </SelectTrigger>
-              <SelectContent>
-                {faltantes.map((f) => (
-                  <SelectItem key={f.numero} value={String(f.numero)}>
-                    {rotuloFaltante(f)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="data_hora">Quando foi</Label>
-            <Input
-              id="data_hora"
-              name="data_hora"
-              type="datetime-local"
-              required
-              max={agora}
-              value={quando}
-              onChange={(e) => setQuando(e.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={pending}>
-              <ClockCounterClockwise size={16} />
-              {pending ? "Salvando…" : `Registrar ${nome}`}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        dataPorNumero={(n) => parDoNumero(n)}
+        modo="retroativo"
+        hoje={hoje}
+        rotuloDia="Quando foi"
+        titulo={`Registrar ${nome} que já aconteceu`}
+        descricao={`Se encontraram sem agendar por aqui (combinaram por WhatsApp, por exemplo), conte quando foi. ${esp ? "A sessão" : "O encontro"} já nasce como realizad${esp ? "a" : "o"} e você completa o registro em seguida.`}
+        inicial={inicial}
+        rotuloConfirmar={`Registrar ${nome}`}
+        pending={pending}
+        aviso={aviso}
+        onAviso={setAviso}
+        onConfirmar={confirmar}
+      />
+    </>
   );
 }

@@ -1,11 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies, headers } from "next/headers";
+import { AUTH_COOKIE_NAME } from "@/lib/supabase/config";
 
 // Secure follows the real request scheme, not NODE_ENV: a prod build over
 // LAN HTTP (192.168.x.x / Tailscale QA) silently drops Secure cookies and
 // the session never persists — same rule as the demo cookie (demo/mode.ts).
 // Vercel sets x-forwarded-proto=https, so real prod keeps Secure.
 const cookieOpts = async () => ({
+  name: AUTH_COOKIE_NAME,
   secure:
     process.env.NODE_ENV === "production" &&
     (await headers()).get("x-forwarded-proto") === "https",
@@ -48,6 +50,7 @@ export async function createClientDescartavel() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: { name: AUTH_COOKIE_NAME, sameSite: "lax" },
       cookies: {
         getAll() {
           return cookieStore.getAll();

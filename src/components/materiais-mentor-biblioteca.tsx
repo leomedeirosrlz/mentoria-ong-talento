@@ -2,13 +2,16 @@ import type { CSSProperties } from "react";
 import {
   ArrowSquareOut,
   BookOpen,
-  CaretDown,
+  Check,
   FileText,
   LinkSimple,
   PuzzlePiece,
 } from "@phosphor-icons/react/dist/ssr";
 import { formatDiaMes, formatDiaSemana, linkSeguro } from "@/lib/ciclo";
-import { guiaDoEncontro } from "@/lib/como-conduzir";
+import { hrefMaterial, refDoMaterial } from "@/lib/materiais";
+import { LinkComLeitura } from "@/components/material-leitura";
+import { ExpandirTexto } from "@/components/expandir-texto";
+import { guiaDoEncontro, sistemaDoDoc } from "@/lib/como-conduzir";
 import type { Material } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { BibliotecaLista } from "@/components/biblioteca-lista";
@@ -69,24 +72,35 @@ function quandoCurto(data: string): string {
  *  descrição curta, ação à direita (abrir arquivo/link em nova aba). Sem
  *  selo de público nem ⋯ — a linha inteira é o gesto; "em breve" é o
  *  estado legítimo de quem ainda não tem destino e não vira link. */
-function LinhaMaterial({ m }: { m: Material }) {
+function LinhaMaterial({ m, lido = false }: { m: Material; lido?: boolean }) {
   const Icone = TIPO_ICONE[m.tipo];
   // arquivo oficial ganha da url externa; "doc:<slug>" é documento nativo
   // (página do app); sem os três, "em breve"
   const urlOk = linkSeguro(m.url);
   const ehDoc = m.path?.startsWith("doc:") ?? false;
-  const href = ehDoc
-    ? `/materiais/documento/${m.path!.slice(4)}`
-    : m.path
-      ? `/api/material/${m.id}`
-      : urlOk;
+  const href = hrefMaterial(m);
   const conteudo = (
     <>
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
+      <span
+        className={cn(
+          "grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground",
+          lido && "opacity-60"
+        )}
+      >
         <Icone size={17} aria-hidden />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium">{m.titulo}</span>
+      <span className={cn("min-w-0 flex-1", lido && "opacity-60")}>
+        {/* lido é estado do item inteiro (REALIZA-439): título sublinhado +
+            conteúdo com opacidade — nunca só cor nem só o check do trilho */}
+        <span
+          className={cn(
+            "block text-sm font-medium",
+            lido &&
+              "underline decoration-muted-foreground/40 underline-offset-2"
+          )}
+        >
+          {m.titulo}
+        </span>
         {m.descricao && (
           <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
             {m.descricao}
@@ -96,7 +110,7 @@ function LinhaMaterial({ m }: { m: Material }) {
           {TIPO_LABEL[m.tipo]}
           {m.path
             ? m.path.startsWith("doc:")
-              ? " · documento"
+              ? ` · documento${sistemaDoDoc(m.path.slice(4)) ? " · instrumento oficial" : ""}`
               : " · arquivo"
             : urlOk && m.tipo !== "link"
               ? " · link externo"
@@ -119,18 +133,25 @@ function LinhaMaterial({ m }: { m: Material }) {
     );
   }
   return (
-    <a
+    <LinkComLeitura
+      materialRef={refDoMaterial(m)}
       href={href}
-      {...(ehDoc ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+      externo={!ehDoc}
       className={cn(
         cls,
         "transition-colors hover:bg-muted/50 active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       )}
     >
       {conteudo}
-      {/* um ícone só no trilho direito — "Abrir em nova aba", o mesmo do
-          ⋯ do MaterialMenu; documento nativo navega na mesma aba e não
-          leva o ícone de saída */}
+      {/* trilho direito: check discreto do já-lido (0196) + "Abrir em nova
+          aba" do ⋯ do MaterialMenu; doc nativo navega na mesma aba, sem
+          ícone de saída */}
+      {lido && (
+        <span className="shrink-0 text-muted-foreground" title="Lido">
+          <Check size={15} aria-hidden />
+          <span className="sr-only">Lido</span>
+        </span>
+      )}
       {!ehDoc && (
         <ArrowSquareOut
           size={17}
@@ -138,28 +159,28 @@ function LinhaMaterial({ m }: { m: Material }) {
           className="shrink-0 text-muted-foreground"
         />
       )}
-    </a>
+    </LinkComLeitura>
   );
 }
 
 /** "Encontro desta semana" — card neutro com acento de jornada na borda
  *  (o amarelo é próximo passo, não banho de fundo: REALIZA-335), o "Como
  *  conduzir" do guia e os materiais do encontro como linhas clicáveis.
- *  O texto longo vai em <details>: a prévia de 3 linhas mora no summary
- *  (única parte visível fechado) e o texto INTEIRO no corpo — antes o
- *  corpo era vazio e o texto morava todo no summary, então o "dropdown"
- *  não tinha nada dentro. Texto curto sai como parágrafo, sem um toggle
- *  que abriria pro mesmo trecho. */
-const CONDUZIR_LIMITE = 240;
+ *  O "Ler tudo" é do ExpandirTexto (REALIZA-438): gate por linhas
+ *  renderizadas, controle no fim do bloco — texto que cabe na prévia de
+ *  3 linhas não ganha toggle (antes o gate era por caracteres e em tela
+ *  larga o clique só deslocava o mesmo texto). */
 
 function CardSemana({
   turma,
   itens,
   indice,
+  lidos,
 }: {
   turma: TurmaMateriais;
   itens: Material[];
   indice: number;
+  lidos?: Set<string>;
 }) {
   const encontro = turma.encontros.find((e) => e.numero === turma.vigente);
   if (!encontro) return null;
@@ -194,56 +215,24 @@ function CardSemana({
           Encontro {encontro.numero}
           {encontro.titulo && ` · ${encontro.titulo}`}
         </h2>
-        {conduzir &&
-          (conduzir.length > CONDUZIR_LIMITE ? (
-            <details className="group/cc mt-1.5">
-              <summary className="cursor-pointer list-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                {/* prévia truncada — a única parte do details visível
-                    fechado; aria-hidden pra não virar nome acessível */}
-                <span
-                  aria-hidden
-                  className="line-clamp-3 text-sm leading-relaxed text-muted-foreground group-open/cc:hidden"
-                >
-                  <strong className="font-semibold text-foreground">
-                    Como conduzir:
-                  </strong>{" "}
-                  {conduzir}
-                </span>
-                <span className="mt-1 inline-flex min-h-8 items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
-                  <span className="group-open/cc:hidden">Ler tudo</span>
-                  <span className="hidden group-open/cc:inline">
-                    Mostrar menos
-                  </span>
-                  <CaretDown
-                    size={12}
-                    aria-hidden
-                    className="transition-transform group-open/cc:rotate-180"
-                  />
-                </span>
-              </summary>
-              {/* corpo real do dropdown — fechado o browser nem renderiza;
-                  o texto completo mora aqui, não no summary */}
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                <strong className="font-semibold text-foreground">
-                  Como conduzir:
-                </strong>{" "}
-                {conduzir}
-              </p>
-            </details>
-          ) : (
-            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-              <strong className="font-semibold text-foreground">
-                Como conduzir:
-              </strong>{" "}
-              {conduzir}
-            </p>
-          ))}
+        {conduzir && (
+          <ExpandirTexto className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+            <strong className="font-semibold text-foreground">
+              Como conduzir:
+            </strong>{" "}
+            {conduzir}
+          </ExpandirTexto>
+        )}
       </div>
       <div className="border-t border-border/60">
         {itens.length > 0 ? (
           <div className="divide-y divide-border/60">
             {itens.map((m) => (
-              <LinhaMaterial key={m.id} m={m} />
+              <LinhaMaterial
+                key={m.id}
+                m={m}
+                lido={lidos?.has(refDoMaterial(m))}
+              />
             ))}
           </div>
         ) : (
@@ -260,6 +249,7 @@ export function MateriaisMentorBiblioteca({
   turmas,
   porEncontro,
   referenciais,
+  lidos,
 }: {
   /** Turmas do mentor DPP (vigente + encontros do cronograma); vazia =
    *  especialista — a biblioteca vira lista plana, sem encontros. */
@@ -268,13 +258,26 @@ export function MateriaisMentorBiblioteca({
   porEncontro: Map<number, Material[]>;
   /** transversais pro mentor DPP; pro especialista, tudo que ele vê. */
   referenciais: Material[];
+  /** refs já lidas pelo usuário (0196) — check discreto na linha. */
+  lidos?: Set<string>;
 }) {
   // um card por turma com o encontro da semana; abaixo, o acervo agrupado
   // por categoria (REALIZA-250) — sem próximos/adiante/anteriores
+  // Dedup por path (REALIZA-394): a linha sintetizada do encontro e a real
+  // apontam pro mesmo `doc:<slug>` — a real sempre vence (ela carrega
+  // descrição e ordem do catálogo; a sintética só cobre a lacuna).
   const todos = new Map<string, Material>();
+  const sinteticos: Material[] = [];
   for (const lista of porEncontro.values())
-    for (const m of lista) todos.set(m.id, m);
-  for (const m of referenciais) todos.set(m.id, m);
+    for (const m of lista) {
+      if (m.id.startsWith("doc-")) sinteticos.push(m);
+      else todos.set(m.path ?? m.id, m);
+    }
+  for (const m of referenciais) todos.set(m.path ?? m.id, m);
+  for (const m of sinteticos) {
+    const chave = m.path ?? m.id;
+    if (!todos.has(chave)) todos.set(chave, m);
+  }
   const vigentes = turmas.map((t) => t.vigente).filter((n): n is number => n != null);
 
   return (
@@ -288,12 +291,14 @@ export function MateriaisMentorBiblioteca({
             turma={t}
             itens={porEncontro.get(vigenteE.numero) ?? []}
             indice={i}
+            lidos={lidos}
           />
         ) : null;
       })}
       <BibliotecaLista
         materiais={[...todos.values()]}
         vigente={vigentes.length === 1 ? vigentes[0]! : null}
+        lidos={lidos}
       />
     </section>
   );

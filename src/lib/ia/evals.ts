@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { AUTH_COOKIE_NAME } from "@/lib/supabase/config";
 
 // ---------- corpus ----------
 
@@ -176,6 +177,7 @@ async function cookieDeSessao(papel: "staff" | "mentorado") {
     );
   const jar = new Map<string, string>();
   const sb = createServerClient(url, anon, {
+    cookieOptions: { name: AUTH_COOKIE_NAME },
     cookies: {
       getAll: () => [...jar].map(([name, value]) => ({ name, value })),
       setAll: (lista) =>

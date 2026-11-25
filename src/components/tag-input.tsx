@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 /** Teto default = CHECK profiles_areas_ok (0030). Interesses (0034,
  *  interesses_ok) permite 60 por tag — o caller passa `maxChars=60`. */
@@ -94,7 +94,7 @@ export function TagInput({
               onClick={() => alternar(tag)}
               className={cn(
                 // ≥44px de alvo no mobile; desktop volta à densidade compacta
-                "min-h-11 rounded-full border px-3 text-sm transition-all outline-none active:scale-[0.97] focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-45 md:min-h-0 md:py-1.5",
+                "min-h-11 rounded-full border px-3 text-sm transition-[color,background-color,border-color,box-shadow,scale,opacity] outline-none active:scale-[0.97] focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-45 md:min-h-0 md:py-1.5",
                 ativa
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"

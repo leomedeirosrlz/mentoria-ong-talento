@@ -45,16 +45,31 @@ test.describe("navegação do celular", () => {
     await expect(menu).toBeHidden();
   });
 
-  test("jovem: Especialistas e Materiais na barra", async ({ page }) => {
+  test("jovem: barra e menu na mesma ordem — o hub se chama Materiais", async ({
+    page,
+  }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem");
     const barra = page.getByRole("navigation", { name: "Navegação principal" }).last();
-    for (const nome of ["Início", "Especialistas", "Materiais", "Agenda"]) {
-      await expect(barra.getByRole("link", { name: nome, exact: true })).toBeVisible();
-    }
+    // as primárias seguem a prioridade da sidebar (o rótulo do hub
+    // /jovem/materiais é Materiais — FR-007 da 010)
+    await expect(barra.getByRole("link")).toHaveText([
+      "Início",
+      "Agenda",
+      "Materiais",
+      "Especialistas",
+    ]);
     await barra.getByRole("button", { name: /^Menu/ }).click();
     const menu = page.getByRole("dialog", { name: "Menu" });
-    await expect(menu.getByRole("link", { name: "Perfil" })).toBeVisible();
-    await expect(menu.getByRole("link", { name: "Pessoas" })).toBeVisible();
+    // o painel tem a navegação inteira, na mesma ordem do desktop
+    await expect(menu.getByRole("link")).toHaveText([
+      "Início",
+      "Agenda",
+      "Materiais",
+      "Especialistas",
+      "Pessoas",
+      "Perfil",
+      "Ajuda",
+    ]);
   });
 });

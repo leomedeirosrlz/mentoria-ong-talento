@@ -18,17 +18,20 @@ import {
   formatDiaMes,
   formatDiaNum,
   formatDiaSemana,
+  formatDiaSemanaHora,
   formatDiaSemanaMes,
   formatMesAbrev,
   idade,
   linkSeguro,
   papelLabel,
   parseDisponibilidade,
+  podeEntrarAgora,
   podeSupervisionar,
   registroTardio,
   slotCompativel,
   toDateStr,
   ultimoRegistro,
+  waChatLink,
   waLink,
 } from "@/lib/ciclo";
 import type { DiaSemana, Disponibilidade, Periodo } from "@/lib/types";
@@ -81,6 +84,14 @@ describe("format* (pt-BR, fuso America/Sao_Paulo)", () => {
     expect(formatDiaSemanaMes("2025-10-14")).toBe("terça-feira (14/10/2025)");
     expect(formatDiaSemanaMes("lixo")).toBe("a definir");
     expect(formatDiaSemana(null)).toBe("");
+  });
+
+  it("formatDiaSemanaHora: dia da semana + data/hora; 'data a confirmar' sem data legível", () => {
+    expect(formatDiaSemanaHora("2025-10-14T19:00:00-03:00")).toBe(
+      "terça-feira, 14/10 às 19:00"
+    );
+    expect(formatDiaSemanaHora(null)).toBe("data a confirmar");
+    expect(formatDiaSemanaHora("lixo")).toBe("data a confirmar");
   });
 });
 
@@ -509,7 +520,7 @@ describe("slotCompativel — o slot do especialista × a grade do jovem (WP6)", 
   });
 });
 
-describe("waLink / linkSeguro", () => {
+describe("waLink / waChatLink / linkSeguro", () => {
   it("waLink limpa o telefone e encoda a mensagem", () => {
     expect(waLink("(11) 98765-4321", "Oi, tudo bem?")).toBe(
       "https://wa.me/11987654321?text=Oi%2C%20tudo%20bem%3F"
@@ -523,6 +534,26 @@ describe("waLink / linkSeguro", () => {
     expect(waLink(null, "oi")).toBeNull();
     expect(waLink("-", "oi")).toBeNull();
     expect(waLink("abc", "oi")).toBeNull();
+  });
+
+  it("waLink com mensagem vazia devolve null — rascunho em branco é caso do waChatLink", () => {
+    expect(waLink("11987654321", "")).toBeNull();
+    expect(waLink("11987654321", "   ")).toBeNull();
+    expect(waLink(null, "")).toBeNull();
+  });
+
+  it("waChatLink abre a conversa sem ?text=", () => {
+    expect(waChatLink("(11) 98765-4321")).toBe("https://wa.me/11987654321");
+    expect(waChatLink("55 11 9 8765-4321")).toBe(
+      "https://wa.me/5511987654321"
+    );
+  });
+
+  it("waChatLink sem dígito nenhum devolve null", () => {
+    expect(waChatLink(null)).toBeNull();
+    expect(waChatLink(undefined)).toBeNull();
+    expect(waChatLink("-")).toBeNull();
+    expect(waChatLink("abc")).toBeNull();
   });
 
   it("linkSeguro só passa http(s)", () => {
@@ -552,5 +583,33 @@ describe("podeSupervisionar", () => {
     expect(podeSupervisionar("mentor_especialista")).toBe(false);
     expect(podeSupervisionar(null)).toBe(false);
     expect(podeSupervisionar(undefined)).toBe(false);
+  });
+});
+
+describe("podeEntrarAgora (QW5)", () => {
+  const inicio = "2025-11-17T19:00:00-03:00";
+
+  it("abre 30 min antes do horário e fecha 2 h depois", () => {
+    // dentro da janela
+    expect(podeEntrarAgora(inicio, new Date("2025-11-17T18:30:00-03:00"))).toBe(true);
+    expect(podeEntrarAgora(inicio, new Date("2025-11-17T19:00:00-03:00"))).toBe(true);
+    expect(podeEntrarAgora(inicio, new Date("2025-11-17T21:00:00-03:00"))).toBe(true);
+    // fora dos dois lados
+    expect(podeEntrarAgora(inicio, new Date("2025-11-17T18:29:59-03:00"))).toBe(false);
+    expect(podeEntrarAgora(inicio, new Date("2025-11-17T21:00:01-03:00"))).toBe(false);
+    expect(podeEntrarAgora(inicio, new Date("2025-11-17T09:00:00-03:00"))).toBe(false);
+  });
+
+  it("aceita epoch (a agenda passa o ms do render)", () => {
+    const inicioMs = new Date(inicio).getTime();
+    expect(podeEntrarAgora(inicio, inicioMs - 30 * 60 * 1000)).toBe(true);
+    expect(podeEntrarAgora(inicio, inicioMs + 2 * 3600 * 1000)).toBe(true);
+    expect(podeEntrarAgora(inicio, inicioMs + 2 * 3600 * 1000 + 1)).toBe(false);
+  });
+
+  it("sem data válida nunca libera o botão preenchido", () => {
+    expect(podeEntrarAgora(null)).toBe(false);
+    expect(podeEntrarAgora(undefined)).toBe(false);
+    expect(podeEntrarAgora("não é data")).toBe(false);
   });
 });

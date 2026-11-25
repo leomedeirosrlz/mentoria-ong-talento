@@ -8,6 +8,7 @@
 import { CaretDown } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -389,16 +390,14 @@ export function NovoRunDialog({
                         return (
                           <li key={c.id}>
                             <label className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-1.5 hover:bg-muted/50">
-                              <input
-                                type="checkbox"
+                              <Checkbox
                                 checked={marcado}
-                                onChange={() => {
+                                onCheckedChange={() => {
                                   const sel = new Set(casosEscolhidos);
                                   if (marcado) sel.delete(c.id);
                                   else sel.add(c.id);
                                   set({ casoIds: [...sel] });
                                 }}
-                                className="size-4 shrink-0 accent-primary"
                               />
                               <span className="min-w-0 flex-1">
                                 <span className="block truncate text-sm font-medium">

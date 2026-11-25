@@ -171,6 +171,8 @@
   --inst-intake-mentorado-t: hsl(45 95% 92%);
   --inst-desfecho: hsl(160 50% 30%);
   --inst-desfecho-t: hsl(160 45% 92%);
+  --inst-checklist: hsl(265 45% 38%);
+  --inst-checklist-t: hsl(265 40% 93%);
   /* série categórica do mini-kit viz/ — 5 tons com distinção preattentiva
      sobre o papel, sempre como preenchimento/marcador (nunca texto).
      chart-1 e chart-2 leem ok×info por var(), então acompanham a troca de
@@ -297,6 +299,8 @@
   --inst-intake-mentorado-t: hsl(45 60% 16%);
   --inst-desfecho: hsl(160 50% 58%);
   --inst-desfecho-t: hsl(160 32% 16%);
+  --inst-checklist: hsl(265 50% 66%);
+  --inst-checklist-t: hsl(265 30% 17%);
 
   /* série categórica: chart-1/2 são var() de ok/info e já acompanham;
      3–5 clareiam pra distinguir sobre o papel escuro */
@@ -381,6 +385,64 @@
   --shadow-inset: inset 0 1px 2px 0 hsl(0 0% 0% / 0.05);
 }
 
+/* animate-in/out do tw-animate-css compilam pra keyframes `enter`/`exit`
+   que fecham o frame com `filter: blur(var(--tw-…-blur))` — mesmo em
+   blur(0), filter na lista animada força re-raster por frame no mobile
+   (a sheet da Liza re-desenhava o shadow-modal inteiro a cada frame do
+   slide). blur-in/out não é usado no app, então o namespace é trocado por
+   keyframes sem o canal de filtro — mesmo contrato de custom props
+   (translate/scale/rotate/opacity), só compositor. Nome único proposital:
+   redeclarar @keyframes enter aqui perde pro do import na dedupe do
+   compilador. blur-in/out passa a ser no-op — se um dia entrar, declarar
+   o filter naquele elemento, não no keyframe global. */
+@theme {
+  --animate-in: enter-flat var(--tw-animation-duration, var(--tw-duration, 0.15s))
+    var(--tw-ease, ease) var(--tw-animation-delay, 0s)
+    var(--tw-animation-iteration-count, 1)
+    var(--tw-animation-direction, normal)
+    var(--tw-animation-fill-mode, none);
+  --animate-out: exit-flat var(--tw-animation-duration, var(--tw-duration, 0.15s))
+    var(--tw-ease, ease) var(--tw-animation-delay, 0s)
+    var(--tw-animation-iteration-count, 1)
+    var(--tw-animation-direction, normal)
+    var(--tw-animation-fill-mode, none);
+}
+@keyframes enter-flat {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(
+        var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0
+      )
+      scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1))
+      rotate(var(--tw-enter-rotate, 0));
+  }
+}
+@keyframes exit-flat {
+  to {
+    opacity: var(--tw-exit-opacity, 1);
+    transform: translate3d(
+        var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0
+      )
+      scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1))
+      rotate(var(--tw-exit-rotate, 0));
+  }
+}
+
+/* chegada do FAB da Liza: um pulinho com overshoot — scale de 55% + leve
+   subida, ease back-out (y>1 passa do final e assenta). transform+opacity,
+   compositor; origem na base (50% 100%) — ela "aterrissa" no canto como a
+   squash do blob. Uma animação só: sem placeholder, sem dupla entrada. */
+@keyframes fab-chega {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.55);
+  }
+}
+.animate-fab-chega {
+  animation: fab-chega 450ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: 50% 100%;
+}
+
 /* stagger de entrada de listas: .animate-enter + --i inline (0, 1, 2…).
    O guard global de prefers-reduced-motion zera a animação.
    NB: keyframes nomeados enter-stagger — "enter" já existe no tw-animate-css
@@ -463,18 +525,6 @@
     135deg,
     var(--viz-hatch-a) 0 3px,
     var(--viz-hatch-b) 3px 6px
-  );
-}
-
-/* desistente nas barras de saúde (saude-programa): "fechou sem êxito" —
-   o mesmo cinza de concluída mas em listra, sem cor de status. O vão usa
-   --muted pra se fundir ao trilho da barra (bg-muted); no dot da legenda
-   lê como traços esparsos. Distinto do .viz-hatch ("sem dado", claro). */
-.viz-hatch-desistente {
-  background-image: repeating-linear-gradient(
-    135deg,
-    var(--muted-foreground) 0 2.5px,
-    var(--muted) 2.5px 5.5px
   );
 }
 
@@ -731,6 +781,10 @@
     @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* a página nunca rola na horizontal (REALIZA-525): qualquer filho que
+       estoure é cortado na borda em vez de abrir scroll — `clip` não cria
+       contexto de scroll, então position:sticky segue funcionando */
+    overflow-x: clip;
   }
   html {
     @apply font-sans;
@@ -822,6 +876,41 @@
     visibility: visible;
   }
   .resumo-jornada {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    border: none;
+    box-shadow: none;
+  }
+  /* resumo compacto (378): o relatório completo dorme num Collapsible na
+     tela; no papel o painel sai aberto — o relatório nunca imprime vazio.
+     `hidden="until-found"` esconde via content-visibility, não display —
+     sem a declaração abaixo o painel imprimiria como caixa vazia */
+  .resumo-jornada [hidden] {
+    display: block !important;
+    content-visibility: visible !important;
+    height: auto;
+  }
+  /* idem nas seções recolhidas da retrospectiva — na ficha staff ela já
+     sai invisível pelo isolamento acima; na página da jovem é ela quem
+     imprime, então o conteúdo atrás dos disclosures também abre */
+  section[aria-label="Retrospectiva da jornada"] [hidden] {
+    display: block !important;
+    content-visibility: visible !important;
+    height: auto;
+  }
+  /* isolamento simétrico pra superfície que NÃO tem resumo (a página da
+     jovem): só a retrospectiva sai no papel. O :not(:has(.resumo-jornada))
+     é o que impede a regra de re-exibi-la na ficha staff, onde o resumo
+     é o relatório canônico */
+  body:not(:has(.resumo-jornada)):has(section[aria-label="Retrospectiva da jornada"]) * {
+    visibility: hidden;
+  }
+  body:not(:has(.resumo-jornada)) section[aria-label="Retrospectiva da jornada"],
+  body:not(:has(.resumo-jornada)) section[aria-label="Retrospectiva da jornada"] * {
+    visibility: visible;
+  }
+  body:not(:has(.resumo-jornada)) section[aria-label="Retrospectiva da jornada"] {
     position: absolute;
     inset: 0 auto auto 0;
     width: 100%;

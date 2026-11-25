@@ -23,8 +23,18 @@ import {
   type InstrumentoSistema,
 } from "@/lib/forms/schema";
 import { erroAmigavel } from "@/lib/utils";
+import { semanaBounds } from "@/lib/ciclo";
+import {
+  montarDigestSemanal,
+  validarDigestConfigInput,
+} from "@/lib/relatorios/digest";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
+import {
+  emitirProdutoEvento,
+  superficieDaOrigem,
+} from "./produto-eventos-server";
+import { temPapel } from "@/lib/types";
 import type { ComunicadoPrioridade } from "@/lib/types";
 
 type Supa = Awaited<ReturnType<typeof createClient>>;
@@ -222,11 +232,14 @@ export async function dispararMaterialEmail({
   autorId: string;
   excluirRoles?: string[];
 }): Promise<ResumoEnvioEmail> {
-  // mesma regra da página de materiais: path ganha da url; sem nenhum dos
-  // dois o material está "a caminho" e o CTA cai na biblioteca
-  const destino = material.path
-    ? `${SITE_URL}/api/material/${material.id}`
-    : (material.url ?? `${SITE_URL}/materiais`);
+  // mesma regra da página de materiais: "doc:<slug>" abre o documento
+  // nativo, path de arquivo ganha da url; sem nenhum dos dois o material
+  // está "a caminho" e o CTA cai na biblioteca
+  const destino = material.path?.startsWith("doc:")
+    ? `${SITE_URL}/materiais/documento/${material.path.slice(4)}`
+    : material.path
+      ? `${SITE_URL}/api/material/${material.id}`
+      : (material.url ?? `${SITE_URL}/materiais`);
   const html = emailMaterial({
     titulo: material.titulo,
     descricao: material.descricao,
@@ -389,9 +402,9 @@ const MOTIVO_LOTE: Record<string, string> = {
   dupla_nao_concluida: "jornada ainda não concluiu",
   ja_respondido: "já respondeu este instrumento",
   emit_falhou: "não foi possível emitir o link",
-  sem_email: "sem e-mail do jovem nem do mentor — entregue à mão",
+  sem_email: "sem e-mail do jovem nem do mentor: entregue à mão",
   email_falhou: "o provedor não aceitou este endereço",
-  simulado: "modo demonstração — nada é emitido nem enviado",
+  simulado: "modo demonstração: nada é emitido nem enviado",
 };
 
 export async function enviarInstrumentoLote(input: {
@@ -452,6 +465,19 @@ export async function enviarInstrumentoLote(input: {
     p_dupla_ids: ids,
   });
   if (error) return { error: erroAmigavel(error) };
+
+  // telemetria (417): o gesto é a emissão do lote — e-mail e WhatsApp são
+  // entrega, não parte do gesto; emitidos = linhas ok (link emitido ou
+  // pendente reutilizado)
+  await emitirProdutoEvento(supabase, {
+    superficie: await superficieDaOrigem(),
+    acao: "form_emitido",
+    meta: {
+      sistema,
+      duplas: ids.length,
+      emitidos: ((data ?? []) as LinhaRpcLote[]).filter((r) => r.ok).length,
+    },
+  });
 
   const titulo = INSTRUMENTO_INFO[sistema as InstrumentoSistema].titulo;
   const linhas: LoteInstrumentoLinha[] = [];
@@ -687,6 +713,18 @@ export async function enviarDesfechoLote(input: {
   });
   if (error) return { error: erroAmigavel(error) };
 
+  // telemetria (417) — mesma régua do lote de instrumento acima: a emissão
+  // dos links é o gesto; a entrega por e-mail vem depois e não muda a conta
+  await emitirProdutoEvento(supabase, {
+    superficie: await superficieDaOrigem(),
+    acao: "form_emitido",
+    meta: {
+      sistema: "desfecho_6m",
+      duplas: ids.length,
+      emitidos: ((data ?? []) as LinhaRpcLote[]).filter((r) => r.ok).length,
+    },
+  });
+
   const linhas: LoteInstrumentoLinha[] = [];
   const mensagens: {
     to: string;
@@ -855,4 +893,85 @@ export async function enviarDesfechoLote(input: {
     envioLiberado: EMAIL_ENVIO_LIBERADO,
     linhas,
   };
+}
+
+/** Disparo manual do digest semanal (REALIZA-178) — botão da aba Saúde
+ *  de /relatorios/operacionais. Ignora a dedup do cron de propósito (o clique
+ *  de uma pessoa é a intenção, não o retry cego); a mesma row de log do
+ *  job grava aqui com o autor_id da coordenação. A montagem lê a
+ *  digest_config — o disparo respeita destinatários e seções ativas. */
+export async function enviarDigestSemanal(): Promise<{
+  ok?: true;
+  enviados?: number;
+  destinatarios?: number;
+  error?: string;
+}> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  // papel efetivo (0085): primário + secundários — a my_papeis cobre a
+  // coordenação carregada como papel extra (híbrido)
+  const { data: papeis } = await supabase.rpc("my_papeis");
+  if (!eu || !temPapel({ ...eu, papeis }, "coordenacao")) {
+    return { error: "Só a coordenação pode disparar o digest." };
+  }
+  const digest = await montarDigestSemanal(supabase, semanaBounds(new Date()));
+  const envio = digest.mensagens.length
+    ? await enviarEmailsIndividuais({ mensagens: digest.mensagens })
+    : { enviados: 0, falhas: [] as string[] };
+  const { error: errLog } = await supabase.from("emails_enviados").insert({
+    autor_id: eu.id,
+    tipo: "digest",
+    assunto: digest.assunto,
+    audiencia: digest.audiencia,
+    destinatarios: digest.mensagens.length,
+    enviados: envio.enviados,
+    falhas: envio.falhas,
+  });
+  if (errLog) console.error("enviarDigestSemanal: log", errLog);
+  if (envio.error) return { error: envio.error };
+  return {
+    ok: true,
+    enviados: envio.enviados,
+    destinatarios: digest.mensagens.length,
+  };
+}
+
+/** Salva a config do digest (REALIZA-451 / spec 007 US14) — card da aba
+ *  Saúde de /relatorios/operacionais. A row é singleton (id=true); a
+ *  validação rejeita input fora do contrato antes do upsert, e a policy
+ *  digest_config_coord segura a escrita no banco (mesma régua has_papel
+ *  da action — coord por papel primário ou secundário). */
+export async function salvarDigestConfig(input: {
+  diaSemana: unknown;
+  cadencia: unknown;
+  papeis: unknown;
+  profiles: unknown;
+  emails: unknown;
+  secoes: unknown;
+}): Promise<{ ok?: true; error?: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  const { data: papeis } = await supabase.rpc("my_papeis");
+  if (!eu || !temPapel({ ...eu, papeis }, "coordenacao")) {
+    return { error: "Só a coordenação pode configurar o digest." };
+  }
+  const v = validarDigestConfigInput(input);
+  if (!v.ok) return { error: v.error };
+  const { error } = await supabase.from("digest_config").upsert(
+    {
+      id: true,
+      dia_semana: v.config.diaSemana,
+      cadencia: v.config.cadencia,
+      destinatarios: v.config.destinatarios,
+      secoes: v.config.secoes,
+      atualizado_por: eu.id,
+      atualizado_em: new Date().toISOString(),
+    },
+    { onConflict: "id" }
+  );
+  if (error) {
+    console.error("salvarDigestConfig:", error.message);
+    return { error: "Não consegui salvar a configuração. Tente de novo." };
+  }
+  return { ok: true };
 }

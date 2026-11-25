@@ -25,7 +25,7 @@
 import { z } from "zod";
 import type { AppRole } from "@/lib/types";
 import type { EsforcoIa } from "./config";
-import { IA_TOOLS } from "./tools";
+import { ESCRITAS_DOMINIO, IA_TOOLS } from "./tools";
 
 /** Mensagem no formato chat.completions — `tool_calls`/`tool_call_id` são
  *  o que o provider devolve/exige no loop de tools. */
@@ -42,6 +42,28 @@ export type IaToolCall = {
   type: "function";
   function: { name: string; arguments: string };
 };
+
+/** Tool ad-hoc fora do registry do chat (ex.: match_semantico da
+ *  importação assistida — a saída do modelo chega SÓ por function-call,
+ *  nunca por texto livre parseado). Quando o caller a passa, substitui o
+ *  payload por papel — não é anunciável no chat. */
+export type IaToolDef = {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+};
+
+/** `tool_choice` do chat.completions — "required"/função nomeada forçam a
+ *  saída por tool_call (a importação exige: sem call válida a linha fica
+ *  como estava). */
+export type IaToolChoice =
+  | "auto"
+  | "none"
+  | "required"
+  | { type: "function"; function: { name: string } };
 
 /** usage da resposta (sdd D4): OpenAI-compatible estendido pelo Zen — cost
  *  é USD real (≈0 dentro do plano Go), allowance é o que o request descontou
@@ -68,7 +90,13 @@ export type UsoIa = {
 };
 
 export const IA_MSG_INDISPONIVEL =
-  "O assistente está indisponível no momento — tente de novo em instantes.";
+  "O assistente está indisponível no momento. Tente de novo em instantes.";
+
+/** `dormindo` on a failure = the provider let us down (rate limit/quota,
+ *  5xx, dead model slug, timeout, network drop, chain exhausted), so the
+ *  UI shows the sleeping-Liza state instead of a generic error
+ *  (REALIZA-363). Absent on real faults of ours: generic 400 payloads,
+ *  non-transient exceptions — those must not dress up as a nap. */
 
 /** Flag honesta: sem as três envs o assistente se esconde em vez de falhar
  *  em runtime (rollback = unset IA_API_KEY, plan §Rollback). */
@@ -85,14 +113,23 @@ export function providerConfigurado(): boolean {
 // mentores" de tools coord-only. Cache por conjunto de papéis.
 const toolsCache = new Map<string, unknown[]>();
 function toolsPayload(papeis: AppRole[] | undefined) {
-  const chave = papeis ? [...papeis].sort().join("|") : "*";
+  // as 5 escritas do domínio entram no chat quando IA_ESCRITAS≠0 — o card
+  // de confirmação é a via de approve delas; as demais (chamados, jovem_*)
+  // seguem não anunciadas aqui e entram por issues próprias. O env entra
+  // na chave: o conjunto muda com a flag sem restart em teste
+  const escritasChat = process.env.IA_ESCRITAS !== "0";
+  const chave = `${papeis ? [...papeis].sort().join("|") : "*"}|${escritasChat ? "1" : "0"}`;
   let cached = toolsCache.get(chave);
   if (!cached) {
     cached = Object.values(IA_TOOLS)
-      // tools de escrita nunca entram no payload do chat: são MCP-only —
-      // anunciar pro modelo interno só ensinaria a chamar o que o canal
-      // bloqueia (mesma lógica do filtro por papel)
-      .filter((t) => !(t as { escreve?: boolean }).escreve)
+      // escrita fora do lote do domínio nunca entra no payload do chat:
+      // anunciar o que o canal não aprovaria só ensinava o modelo a
+      // chamar (mesma lógica do filtro por papel — REALIZA-333)
+      .filter(
+        (t) =>
+          !(t as { escreve?: boolean }).escreve ||
+          (escritasChat && ESCRITAS_DOMINIO.has(t.nome))
+      )
       .filter((t) => !papeis || t.roles.some((r) => papeis.includes(r)))
       .map((t) => ({
         type: "function",
@@ -192,12 +229,64 @@ const EFFORT = { baixo: "low", medio: "medium", alto: "high" } as const;
 // raciocínio consomem o MESMO max_tokens: em "alto" um teto de 1600 era
 // engolido pelo raciocínio e a resposta saía vazia ou cortada. Sem
 // reasoning (ou "baixo") segue o 1600 de sempre — cobre folgado o formato
-// da casa (resposta curta + blocos GenUI)
+// da casa (resposta curta + blocos GenUI). medio/alto sobem (REALIZA-397):
+// plano multi-parte de recuperação precisava de espaço; o finish_reason
+// capturado agora permite ver se o corte realmente vinha do teto
 const MAX_TOKENS_POR_ESFORCO: Record<EsforcoIa, number> = {
   baixo: 1600,
-  medio: 4000,
-  alto: 8000,
+  medio: 6000,
+  alto: 12000,
 };
+
+/** Pedido de continuação após finish_reason=length — anexa ao histórico
+ *  como user msg; o modelo retoma no ponto de corte em vez de recomeçar. */
+const CONTINUAR_MSG =
+  "Continue exatamente de onde parou, sem repetir o que já escreveu.";
+
+/** Uma continuação por rodada: o plano inteiro quase sempre cabe em 2× o
+ *  teto; além disso o texto segue cortado e a rota emite o affordance de
+ *  "continuar" honesto em vez de gastar o orçamento em loop. */
+const MAX_CONTINUACOES = 1;
+
+/** Soma o usage de duas rodadas (original + continuação) — a telemetria da
+ *  request mede o total real, não só a última chamada. */
+function somarUsoIa(a?: UsoIa, b?: UsoIa): UsoIa | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const num = (x?: number, y?: number) =>
+    x != null || y != null ? (x ?? 0) + (y ?? 0) : undefined;
+  const tokens = (
+    t?: NonNullable<UsoIa["opencode"]>["tokens"],
+    u?: NonNullable<UsoIa["opencode"]>["tokens"]
+  ) =>
+    t || u
+      ? {
+          input: num(t?.input, u?.input),
+          output: num(t?.output, u?.output),
+          reasoning: num(t?.reasoning, u?.reasoning),
+          cache_read: num(t?.cache_read, u?.cache_read),
+          cache_write_5m: num(t?.cache_write_5m, u?.cache_write_5m),
+          cache_write_1h: num(t?.cache_write_1h, u?.cache_write_1h),
+        }
+      : undefined;
+  return {
+    prompt_tokens: num(a.prompt_tokens, b.prompt_tokens),
+    completion_tokens: num(a.completion_tokens, b.completion_tokens),
+    cost: num(a.cost, b.cost),
+    opencode:
+      a.opencode || b.opencode
+        ? {
+            billing_source:
+              b.opencode?.billing_source ?? a.opencode?.billing_source,
+            list_cost: num(a.opencode?.list_cost, b.opencode?.list_cost),
+            allowance: num(a.opencode?.allowance, b.opencode?.allowance),
+            estimated:
+              a.opencode?.estimated || b.opencode?.estimated || undefined,
+            tokens: tokens(a.opencode?.tokens, b.opencode?.tokens),
+          }
+        : undefined,
+  };
+}
 
 /** Corpo compartilhado das duas chamadas: tier de modelo vem do roteador
  *  (ia_config), não do env direto — slug ausente cai no IA_MODEL de
@@ -209,18 +298,27 @@ function montarBody(
   modelo: string | undefined,
   esforco: EsforcoIa | undefined,
   stream: boolean,
-  papeis: AppRole[] | undefined
+  papeis: AppRole[] | undefined,
+  ferramentas?: { tools: IaToolDef[]; toolChoice?: IaToolChoice },
+  /** override do teto de saída — o padrão por esforço cobre o chat, mas
+   *  saída estruturada grande (cronograma completo via tool_call) pede
+   *  teto explícito pra não truncar o arguments no meio */
+  maxTokens?: number
 ) {
-  const tools = toolsPayload(papeis);
+  // tools ad-hoc ganham do payload por papel — o caller que as passa quer
+  // exatamente elas no ar (a filtragem por papel é do registry do chat)
+  const tools = ferramentas?.tools ?? toolsPayload(papeis);
   return JSON.stringify({
     model: modelo || process.env.IA_MODEL,
     messages,
     // sem tools (papel sem acesso a nenhuma, ou tier rapido: saudação e
     // fora de escopo não consultam dados) — omite a chave em vez de
     // mandar [], que alguns providers recusam com 400
-    ...(tools.length ? { tools, tool_choice: "auto" as const } : {}),
+    ...(tools.length
+      ? { tools, tool_choice: ferramentas?.toolChoice ?? ("auto" as const) }
+      : {}),
     ...(esforco ? { reasoning_effort: EFFORT[esforco] } : {}),
-    max_tokens: MAX_TOKENS_POR_ESFORCO[esforco ?? "baixo"],
+    max_tokens: maxTokens ?? MAX_TOKENS_POR_ESFORCO[esforco ?? "baixo"],
     ...(stream
       ? { stream: true, stream_options: { include_usage: true } }
       : {}),
@@ -242,12 +340,49 @@ export async function chamarModelo(
     esforco?: EsforcoIa;
     fallbacks?: string[];
     papeis?: AppRole[];
-  }
+    /** tools ad-hoc fora do registry — substituem o payload por papel
+     *  (classificação estruturada, ex.: match_semantico da importação) */
+    tools?: IaToolDef[];
+    /** força a saída por tool_call — par de `tools` ad-hoc */
+    toolChoice?: IaToolChoice;
+    /** cap da rodada em ms (rota passa o que resta do orçamento do stream —
+     *  o fallback JSON não pode estourar o prazo da função). Vira um
+     *  deadline absoluto na entrada: cada tentativa da cadeia e cada
+     *  continuação consomem do MESMO orçamento. */
+    timeoutMs?: number;
+    /** override do teto de saída da rodada — default é a tabela por
+     *  esforço; caller com resposta estruturada grande (ex.: cronograma
+     *  completo via tool_call) sobe aqui em vez de forçar esforço alto. */
+    maxTokens?: number;
+    /** deadline absoluto (epoch ms) — set interno pela recursão da
+     *  continuação pra não rearmar o cap a cada chamada. */
+    prazoLimite?: number;
+  },
+  continuacoesRestantes = MAX_CONTINUACOES
 ): Promise<
-  | { ok: true; mensagem: MsgChat; usage?: UsoIa; modelo?: string }
-  | { ok: false; erro: string }
+  | {
+      ok: true;
+      mensagem: MsgChat;
+      usage?: UsoIa;
+      modelo?: string;
+      /** finish_reason cru do provider — "length" é o corte de max_tokens */
+      finishReason?: string;
+      /** a resposta voltou cortada mesmo depois das continuações possíveis */
+      truncado?: boolean;
+    }
+  | { ok: false; erro: string; dormindo?: boolean }
 > {
   const cadeia = cadeiaDeModelos(opts?.modelo, opts?.fallbacks);
+  // deadline compartilhado por TODA a chamada: sem ele, cada modelo da
+  // cadeia e cada continuação rearmariam o cap — modelos × requests
+  // estourariam o prazo da função e a resposta morria parcial sem evento
+  const prazo =
+    opts?.prazoLimite ??
+    (opts?.timeoutMs != null ? Date.now() + opts.timeoutMs : null);
+  const timeoutRestante = () =>
+    prazo != null
+      ? Math.max(prazo - Date.now(), 1)
+      : Number(process.env.IA_TIMEOUT_MS ?? 45_000);
   let esperaMs = 0; // Retry-After de um 429 carrega pro próximo modelo
   for (let i = 0; i < cadeia.length; i++) {
     const ultimo = i === cadeia.length - 1;
@@ -273,9 +408,13 @@ export async function chamarModelo(
             cadeia[i],
             mandarEsforco ? opts?.esforco : undefined,
             false,
-            opts?.papeis
+            opts?.papeis,
+            opts?.tools
+              ? { tools: opts.tools, toolChoice: opts.toolChoice }
+              : undefined,
+            opts?.maxTokens
           ),
-          signal: AbortSignal.timeout(Number(process.env.IA_TIMEOUT_MS ?? 20_000)),
+          signal: AbortSignal.timeout(timeoutRestante()),
         });
         if (!res.ok) {
           // provider que não conhece reasoning_effort: tira o campo e
@@ -293,19 +432,65 @@ export async function chamarModelo(
             esperaMs = delayDoRetry(res);
             break;
           }
-          return { ok: false, erro: IA_MSG_INDISPONIVEL };
+          return {
+            ok: false,
+            erro: IA_MSG_INDISPONIVEL,
+            dormindo: avancaCadeia(res.status, corpo) || undefined,
+          };
         }
         const json = await res.json();
         const msg = json?.choices?.[0]?.message as MsgChat | undefined;
         if (!msg || (msg.content == null && !msg.tool_calls?.length)) {
           console.error("chamarModelo: resposta sem mensagem utilizável");
-          return { ok: false, erro: IA_MSG_INDISPONIVEL };
+          return { ok: false, erro: IA_MSG_INDISPONIVEL, dormindo: true };
+        }
+        const finishReason = json?.choices?.[0]?.finish_reason as
+          | string
+          | undefined;
+        const usage = json?.usage as UsoIa | undefined;
+        const modelo = cadeia[i] ?? process.env.IA_MODEL;
+        // corte por max_tokens: continua onde parou — ANEXA ao parcial em
+        // vez de re-gerar (recomeçar re-imprime texto). Tool_call truncada
+        // não continua: o arguments chegou quebrado e não tem remendo
+        if (
+          finishReason === "length" &&
+          !msg.tool_calls?.length &&
+          msg.content &&
+          continuacoesRestantes > 0
+        ) {
+          const cont = await chamarModelo(
+            [
+              ...messages,
+              { role: "assistant", content: msg.content },
+              { role: "user", content: CONTINUAR_MSG },
+            ],
+            sessao,
+            { ...opts, prazoLimite: prazo ?? undefined },
+            continuacoesRestantes - 1
+          );
+          if (cont.ok) {
+            return {
+              ok: true,
+              mensagem: {
+                ...cont.mensagem,
+                content: `${msg.content}${cont.mensagem.content ?? ""}`,
+              },
+              usage: somarUsoIa(usage, cont.usage),
+              modelo: cont.modelo ?? modelo,
+              finishReason: cont.finishReason,
+              truncado: cont.truncado,
+            };
+          }
+          // a continuação falhou: o parcial segue válido, só sinalizado
+          return { ok: true, mensagem: msg, usage, modelo, finishReason, truncado: true };
         }
         return {
           ok: true,
           mensagem: msg,
-          usage: json?.usage as UsoIa | undefined,
-          modelo: cadeia[i] ?? process.env.IA_MODEL,
+          usage,
+          modelo,
+          finishReason,
+          truncado: finishReason === "length" || undefined,
         };
       } catch (e) {
         console.error(`chamarModelo: ${cadeia[i] ?? "env"}`, e);
@@ -313,11 +498,16 @@ export async function chamarModelo(
           esperaMs = RETRY_BACKOFF_MS;
           break;
         }
-        return { ok: false, erro: IA_MSG_INDISPONIVEL };
+        return {
+          ok: false,
+          erro: IA_MSG_INDISPONIVEL,
+          dormindo: erroTransitorio(e) || undefined,
+        };
       }
     }
   }
-  return { ok: false, erro: IA_MSG_INDISPONIVEL };
+  // chain exhausted: every model left on a transient/chain-advancing cause
+  return { ok: false, erro: IA_MSG_INDISPONIVEL, dormindo: true };
 }
 
 // ---------- streaming (SSE) ----------
@@ -329,10 +519,22 @@ export type ResultadoStream =
       toolCalls: IaToolCall[];
       usage?: UsoIa;
       modelo?: string;
+      /** finish_reason cru do último chunk — "length" é o corte de max_tokens */
+      finishReason?: string;
+      /** saiu cortado mesmo depois das continuações possíveis */
+      truncado?: boolean;
     }
   // fallback=true: o provider recusou o stream (HTTP != 2xx ou corpo que
-  // não é SSE) — a rota refaz a rodada via chamarModelo, mesmo contrato
-  | { ok: false; erro: string; fallback?: boolean; abortado?: boolean };
+  // não é SSE) — a rota refaz a rodada via chamarModelo, mesmo contrato.
+  // dormindo: falha do lado do provider (429/cota/5xx/timeout) → UI da
+  // Liza dormindo; ausente em erro nosso (400 genérico) — REALIZA-363
+  | {
+      ok: false;
+      erro: string;
+      fallback?: boolean;
+      abortado?: boolean;
+      dormindo?: boolean;
+    };
 
 /** Delta de tool_call como o OpenAI manda no stream: id/name vêm uma vez,
  *  arguments chega em pedaços — tudo indexado por `index`. */
@@ -371,7 +573,8 @@ export async function chamarModeloStream(
     /** papéis do usuário — o payload de tools já sai filtrado por eles
      *  (REALIZA-333); ausente = todas (MCP/tests que não têm papel) */
     papeis?: AppRole[];
-  }
+  },
+  continuacoesRestantes = MAX_CONTINUACOES
 ): Promise<ResultadoStream> {
   // retry só vale com a saída ainda limpa — depois de token emitido,
   // recomeçar (mesmo em outro modelo) re-imprime texto na tela
@@ -384,11 +587,22 @@ export async function chamarModeloStream(
       if (!(await esperar(esperaMs, opts.signal)))
         return opts.clienteAbortou()
           ? { ok: false, erro: "interrompido", abortado: true }
-          : { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
+          : {
+              ok: false,
+              erro: IA_MSG_INDISPONIVEL,
+              fallback: true,
+              dormindo: true,
+            };
       esperaMs = 0;
     }
     let mandarEsforco = Boolean(opts.esforco);
     for (;;) {
+    // hoisted out of `try` so the catch can return the emitted partial —
+    // a retry only happens before the stream opens (empty anyway)
+    let content = "";
+    let usage: UsoIa | undefined;
+    let finishReason: string | undefined;
+    const calls = new Map<number, IaToolCall>();
     try {
       const res = await fetch(`${process.env.IA_API_BASE}/chat/completions`, {
         method: "POST",
@@ -428,15 +642,17 @@ export async function chamarModeloStream(
           esperaMs = delayDoRetry(res);
           break;
         }
-        return { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
+        return {
+          ok: false,
+          erro: IA_MSG_INDISPONIVEL,
+          fallback: true,
+          dormindo: avancaCadeia(res.status, corpo) || undefined,
+        };
       }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let content = "";
-      let usage: UsoIa | undefined;
-      const calls = new Map<number, IaToolCall>();
       // token com delay artificial nenhum — onToken é enfileirado direto na
       // resposta da rota; a velocidade de exibição é a da rede do provider
 
@@ -461,12 +677,18 @@ export async function chamarModeloStream(
           return true; // linha não-JSON (comentário/heartbeat): ignora
         }
         const c = chunk as {
-          choices?: { delta?: { content?: string | null; tool_calls?: DeltaToolCall[] } }[];
+          choices?: {
+            delta?: { content?: string | null; tool_calls?: DeltaToolCall[] };
+            finish_reason?: string | null;
+          }[];
           usage?: UsoIa;
         };
         // stream_options.include_usage: o último chunk traz usage e
         // choices vazio (sdd D4) — telemetria da rodada inteira
         if (c.usage) usage = c.usage;
+        // "length" = cortou no max_tokens — sinaliza pra continuação anexar
+        if (c.choices?.[0]?.finish_reason)
+          finishReason = c.choices[0].finish_reason;
         const delta = c.choices?.[0]?.delta;
         if (delta?.content) {
           saiuAlgo = true;
@@ -508,16 +730,79 @@ export async function chamarModeloStream(
         }
       }
       decoder.decode(); // flush do restante multibyte
+      const toolCalls = [...calls.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([, t]) => t);
+      const modelo = cadeia[i] ?? process.env.IA_MODEL;
+      // corte por max_tokens: a continuação é uma request nova que ANEXA
+      // texto (os tokens seguem saindo por onToken — não é retry, não
+      // re-imprime). Tool_call truncada não continua: arguments quebrado
+      if (
+        finishReason === "length" &&
+        !toolCalls.length &&
+        content &&
+        continuacoesRestantes > 0
+      ) {
+        const cont = await chamarModeloStream(
+          [
+            ...messages,
+            { role: "assistant", content },
+            { role: "user", content: CONTINUAR_MSG },
+          ],
+          sessao,
+          opts,
+          continuacoesRestantes - 1
+        );
+        if (cont.ok) {
+          return {
+            ok: true,
+            content: content + cont.content,
+            toolCalls: cont.toolCalls,
+            usage: somarUsoIa(usage, cont.usage),
+            modelo: cont.modelo ?? modelo,
+            finishReason: cont.finishReason,
+            truncado: cont.truncado,
+          };
+        }
+        // continuação falhou (abort/erro): o parcial emitido é honesto,
+        // só sinalizado — a rota oferece o "continuar" ao usuário
+        return {
+          ok: true,
+          content,
+          toolCalls,
+          usage,
+          modelo,
+          finishReason,
+          truncado: true,
+        };
+      }
       return {
         ok: true,
         content,
-        toolCalls: [...calls.entries()].sort(([a], [b]) => a - b).map(([, t]) => t),
+        toolCalls,
         usage,
-        modelo: cadeia[i] ?? process.env.IA_MODEL,
+        modelo,
+        finishReason,
+        truncado: finishReason === "length" || undefined,
       };
     } catch (e) {
       if (opts.clienteAbortou()) {
         return { ok: false, erro: "interrompido", abortado: true };
+      }
+      // route deadline killed the stream mid-answer: the emitted text is
+      // already on screen and complete tool_calls can't be trusted, so a
+      // clean text-only partial returns as `truncado` — the route closes
+      // the round with the continue chip instead of an error
+      if (opts.signal.aborted && saiuAlgo && !calls.size) {
+        return {
+          ok: true,
+          content,
+          toolCalls: [],
+          usage,
+          modelo: cadeia[i] ?? process.env.IA_MODEL,
+          finishReason: "route_deadline",
+          truncado: true,
+        };
       }
       console.error(`chamarModeloStream: ${cadeia[i] ?? "env"}`, e);
       // não avança quando: o signal da rota abortou sem ser o cliente
@@ -531,12 +816,25 @@ export async function chamarModeloStream(
         saiuAlgo ||
         !erroTransitorio(e)
       ) {
-        return { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
+        return {
+          ok: false,
+          erro: IA_MSG_INDISPONIVEL,
+          fallback: true,
+          // route-side timeout (signal sem ser do cliente) e erro de rede
+          // são falha do provider; exceção não-transitória segue erro real
+          dormindo:
+            erroTransitorio(e) || opts.signal.aborted || undefined,
+        };
       }
       esperaMs = RETRY_BACKOFF_MS;
       break;
     }
     }
   }
-  return { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
+  return {
+    ok: false,
+    erro: IA_MSG_INDISPONIVEL,
+    fallback: true,
+    dormindo: true,
+  };
 }

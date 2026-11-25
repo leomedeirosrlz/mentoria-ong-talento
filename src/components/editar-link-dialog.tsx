@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PencilSimple } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { salvarLinkEncontro } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,18 +29,30 @@ export function EditarLinkDialog({
   linkAtual,
   trigger,
   onSaved,
+  open: openProp,
+  onOpenChange,
 }: {
   encontroId: string;
   /** Link gravado — o campo abre preenchido; null = ainda não tem link. */
   linkAtual: string | null;
-  /** Elemento do trigger — default é o lápis ghost pra fileira de chips. */
-  trigger?: React.ReactElement;
+  /** Elemento do trigger — default é o lápis ghost pra fileira de chips.
+   *  `null` suprime (o ⋯ da linha abre o dialog controlado). */
+  trigger?: React.ReactElement | null;
   /** Chamado depois do refresh — a agenda usa pra re-render local se precisar. */
   onSaved?: () => void;
+  /** Modo controlado (opcional) — o menu de ações abre o dialog direto. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInterno, setOpenInterno] = useState(false);
+  const open = openProp ?? openInterno;
   const [pending, start] = useTransition();
   const router = useRouter();
+
+  function mudaOpen(o: boolean) {
+    setOpenInterno(o);
+    onOpenChange?.(o);
+  }
 
   function salvar(link: string | null) {
     start(async () => {
@@ -51,7 +63,7 @@ export function EditarLinkDialog({
           return;
         }
         toast.success(link ? "Link atualizado." : "Link removido.");
-        setOpen(false);
+        mudaOpen(false);
         router.refresh();
         onSaved?.();
       } catch {
@@ -61,23 +73,25 @@ export function EditarLinkDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          trigger ?? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Editar link da chamada"
-              title="Editar link da chamada"
-              className="shrink-0 text-muted-foreground"
-            >
-              <PencilSimple aria-hidden />
-            </Button>
-          )
-        }
-      />
+    <Dialog open={open} onOpenChange={mudaOpen}>
+      {trigger !== null && (
+        <DialogTrigger
+          render={
+            trigger ?? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Editar link da chamada"
+                title="Editar link da chamada"
+                className="shrink-0 text-muted-foreground"
+              >
+                <PencilSimple aria-hidden />
+              </Button>
+            )
+          }
+        />
+      )}
       <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Editar link da chamada</DialogTitle>
@@ -126,7 +140,7 @@ export function EditarLinkDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              onClick={() => mudaOpen(false)}
             >
               Cancelar
             </Button>

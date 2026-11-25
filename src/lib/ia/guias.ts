@@ -49,12 +49,13 @@ const AUDIENCIA = new Map<string, string[]>(
   manifesto.fontes.map((f) => [f.guia, f.audiencia])
 );
 
-/** Mesma regra do corpusServePapel: audiência vazia serve a todos. Guia
- *  fora do manifest (chunk de ingest antigo) fica só pra coordenação. */
+/** Mesma regra do corpusServePapel: audiência vazia é fail-closed — cai
+ *  no veMaterial sem papel pra casar, só passa o bypass de coordenação.
+ *  Guia fora do manifest (chunk de ingest antigo) fica só pra coordenação. */
 export function guiaVisivel(guia: string, leitor: LeitorGuia): boolean {
   const aud = AUDIENCIA.get(guia);
   if (!aud) return temPapel(leitor, "coordenacao");
-  return aud.length === 0 || veMaterial(aud, leitor);
+  return veMaterial(aud, leitor);
 }
 
 export function limparCacheGuias() {

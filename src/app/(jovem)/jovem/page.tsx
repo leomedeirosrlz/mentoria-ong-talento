@@ -6,6 +6,7 @@ import {
   ArrowSquareOut,
   CaretDown,
   BookOpen,
+  ClockCounterClockwise,
   FileArrowDown,
   Flag,
   FolderOpen,
@@ -24,25 +25,32 @@ import {
 import { Avatar } from "@/components/avatar";
 import { JovemAvaliacoes } from "@/components/jovem-avaliacoes";
 import { JovemCombinados } from "@/components/jovem-combinados";
+import { JovemRetroativoDialog } from "@/components/jovem-retroativo-dialog";
 import { JovemEspecialistas } from "@/components/jovem-especialistas";
-import { JovemParaFazer } from "@/components/jovem-para-fazer";
+import {
+  JovemParaFazer,
+  type EncontroCtx,
+} from "@/components/jovem-para-fazer";
 import { ProximoEncontro } from "@/components/jovem-proximo-encontro";
 import { PedirAjudaLinha } from "@/components/jovem-pedir-ajuda";
 import { LembreteDisponibilidade } from "@/components/lembrete-disponibilidade";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  avaliacoesPendentesPorSessao,
   disponibilidadeVazia,
   formatDate,
   formatDateTime,
   formatDiaMes,
-  linkSeguro,
   maxEncontros,
   passoEsp,
+  progressoTrilha,
+  rotuloEncontro as rotuloDoEncontro,
   toDateStr,
   waLink,
 } from "@/lib/ciclo";
+import { hrefMaterial } from "@/lib/materiais";
 import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
 import {
   datasOficiaisDe,
@@ -59,9 +67,27 @@ import {
   getJovemJornada,
   getJovemPedidosEspecialista,
   getJovemPerfil,
+  getJovemPlano,
   type JovemEncontro,
 } from "@/lib/queries-jovem";
+import {
+  ocupadosDoJovem,
+  sugestoesEncontroDaDupla,
+} from "@/lib/sugestoes-encontro-server";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
+import { getChamados } from "@/lib/queries-chamados";
+import { chamadoPendencia, derivarPendencias } from "@/lib/pendencias-jovem";
+import {
+  combinadoDoJovem,
+  propostoEmDoPlano,
+} from "@/lib/plano-combinado";
+import { getRoteirosPlanos } from "@/lib/queries";
+import { materiaisComRoteiroPlano } from "@/lib/plano-roteiros";
+import { quemCombinou, suaSemana } from "@/lib/sua-semana";
+import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
+import { materiaisDoNumero } from "@/lib/materiais";
+import { PlanoContestarButton } from "@/components/plano-contestar";
+import { SuaSemanaPlano } from "@/components/sua-semana-plano";
 import { getComunicados, getMateriais, getMe } from "@/lib/queries";
 import type { Disponibilidade, JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -96,7 +122,7 @@ const TIPO_ICONE_MATERIAL = {
 // os adultos, e por fim o que é consulta (especialistas só com ação,
 // avaliações, combinados, documentos, avisos e materiais).
 export default async function JovemHome() {
-  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp, jornada] =
+  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp, planoJovem, jornada, meusChamados] =
     await Promise.all([
       getMe(),
       getJovemPerfil(),
@@ -109,10 +135,15 @@ export default async function JovemHome() {
       getMateriais(),
       getJovemAvaliacoes(),
       getJovemPedidosEspecialista(),
+      // o plano ancora a janela/o ritmo das sugestões de data (481)
+      getJovemPlano().catch(() => null),
       // além do cronograma oficial (a régua do acervo embaixo), a RPC é a
       // auto-cura da jornada — chamar na visita da home já dispara a
       // emissão do que a data oficial abriu (0123)
       getJovemJornada().catch(() => null),
+      // os chamados dele (489) — mesma leitura cacheada do perfil; pro
+      // mentorado a RLS entrega só os próprios
+      getChamados(),
     ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
@@ -203,6 +234,99 @@ export default async function JovemHome() {
   const trilhaPorDupla = new Map(duplas.map((d) => [d.id, d.trilha ?? "dpp"]));
   const encPorId = new Map(encontros.map((e) => [e.id, e]));
 
+  // "Sua semana" (520): o combinado "ficar em dia" entra como extensão
+  // do hero — a jovem_plano é da mesma dupla DPP viva que ancora a home
+  // e a derivação é a MESMA do card do mentor e da fila do staff.
+  const realizadosDpp = encontros
+    .filter((e) => e.dupla_id === duplaAtual?.id && e.status === "realizado")
+    .map((e) => e.numero);
+  const combinadoJovem = planoJovem ? combinadoDoJovem(planoJovem) : null;
+  // a janela de contestação é a guarda da RPC: um passo do plano feito
+  // depois da proposta fecha a contestação. Sem carimbo de proposta não
+  // dá pra medir — nesse caso o botão não aparece (não prometer gesto)
+  const propostoEm = propostoEmDoPlano(planoJovem);
+  const realizadosAposProposta = propostoEm
+    ? encontros
+        .filter(
+          (e) =>
+            e.dupla_id === duplaAtual?.id &&
+            e.status === "realizado" &&
+            e.realizado_em != null &&
+            e.realizado_em > propostoEm
+        )
+        .map((e) => e.numero)
+    : realizadosDpp;
+  const proximoNumeroDpp =
+    proximo != null &&
+    proximo.dupla_id === duplaAtual?.id &&
+    trilhaPorDupla.get(proximo.dupla_id) !== "especialista"
+      ? proximo.numero
+      : null;
+  const semanaJovem = combinadoJovem
+    ? suaSemana({
+        plano: combinadoJovem,
+        meuLado: "mentorado",
+        realizados: realizadosDpp,
+        realizadosAposProposta,
+        proximoNumero: proximoNumeroDpp,
+      })
+    : null;
+  // "que Fulano combinou": proposto_por é uuid de profiles — resolve
+  // pelos contatos que o jovem já enxerga; não achou = "a equipe"
+  const nomesContato = new Map(
+    contatosAtuais
+      .filter((c): c is JovemContato & { id: string } => c.id != null)
+      .map((c) => [
+        c.id,
+        (c.nome_social || c.nome || "").split(" ")[0],
+      ])
+  );
+  const quemPlano = quemCombinou({
+    propostoPor: planoJovem?.proposto_por,
+    propostoVia: planoJovem?.proposto_via,
+    euId: me.id,
+    nomesPorId: nomesContato,
+  });
+  // disclosure do próximo passo: os materiais do número que vem agora,
+  // na mesma régua do acervo da home (o que não liberou não aparece)
+  const numeroDisclosureJovem =
+    semanaJovem?.vinculo ?? semanaJovem?.resumo.proximo?.numero ?? null;
+  // roteiro vigente da dupla troca o link do corpus (020) — leitura só,
+  // o lazy nasce na agenda e na rota da semana
+  const roteirosJovem = planoJovem
+    ? await getRoteirosPlanos([planoJovem.id])
+    : [];
+  const roteiroVigenteJovem =
+    numeroDisclosureJovem != null
+      ? (roteirosJovem.find(
+          (r) =>
+            r.plano_id === planoJovem?.id &&
+            r.numero === numeroDisclosureJovem &&
+            r.status === "publicado" &&
+            r.plano_versao === planoJovem?.versao
+        ) ?? null)
+      : null;
+  const materiaisDoPasso = materiaisComRoteiroPlano(
+    numeroDisclosureJovem != null
+      ? materiaisDoNumero({
+          materiais: materiaisVisiveis,
+          trilha: "dpp",
+          numero: numeroDisclosureJovem,
+        })
+          .map((m) => ({
+            href: hrefMaterial(m, "/jovem/materiais/documento"),
+            titulo: m.titulo,
+          }))
+          .filter((m): m is { href: string; titulo: string } => m.href != null)
+      : [],
+    roteiroVigenteJovem
+      ? {
+          numero: roteiroVigenteJovem.numero,
+          href: `/jovem/roteiro/${roteiroVigenteJovem.numero}`,
+        }
+      : null
+  );
+
   // quem aparece no rótulo do encontro: o mentor DPP ou o especialista da
   // trilha (contato com papel 'especialista'; 'mentor' é o legado da DPP)
   const nomeDaDupla = (duplaId: string, esp: boolean): string => {
@@ -221,19 +345,17 @@ export default async function JovemHome() {
     return nome.split(" ")[0] || (esp ? "seu especialista" : "seu mentor");
   };
 
-  // DPP: "5º encontro com Ricardo". Especialista: "3ª sessão com Sofia" — o
-  // passo do guia (rank entre os realizados), não a tentativa.
+  // DPP: "5º encontro com Ricardo". Especialista: "Sessão 3 com Sofia" — o
+  // número é o passo do guia (rank entre as tentativas), nunca e.numero.
   const rotuloEncontro = (e: JovemEncontro): string => {
     const esp = trilhaPorDupla.get(e.dupla_id) === "especialista";
     const nome = nomeDaDupla(e.dupla_id, esp);
-    if (esp) {
-      const passo = passoEsp(
-        e,
-        encontros.filter((x) => x.dupla_id === e.dupla_id)
-      );
-      return `${passo}ª sessão com ${nome}`;
-    }
-    return `${e.numero}º encontro com ${nome}`;
+    const base = rotuloDoEncontro(
+      e,
+      encontros.filter((x) => x.dupla_id === e.dupla_id),
+      { esp }
+    );
+    return `${base} com ${nome}`;
   };
 
   // progresso da jornada: encontros realizados por trilha (a contagem não
@@ -245,43 +367,45 @@ export default async function JovemHome() {
   const feitosEsp = realizados.length - feitosDpp;
   const temDpp = duplas.some((d) => d.trilha !== "especialista");
 
-  // avaliação estrela (0071): pendente = realizado sem linha dele
-  const avaliados = new Set(avaliacoes.map((a) => a.encontro_id));
-  const avaliacoesPendentes = encontros
-    .filter((e) => e.status === "realizado" && !avaliados.has(e.id))
-    .map((e) => ({
-      encontroId: e.id,
-      numero: e.numero,
-      realizado_em: e.realizado_em,
-      trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
-      rotulo: rotuloEncontro(e),
-    }));
+  // avaliação estrela (0071/018): pendente = sessão realizado sem
+  // resposta — o grupo inteiro é uma unidade (sessao_id) e a resposta
+  // cai na âncora; `sessao` carrega os nºs pra UI dizer "cobre N passos"
+  const avaliacoesPendentes = avaliacoesPendentesPorSessao(
+    encontros,
+    avaliacoes
+  ).map(({ encontro: e, sessao }) => ({
+    encontroId: e.id,
+    numero: e.numero,
+    realizado_em: e.realizado_em,
+    trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
+    duplaId: e.dupla_id,
+    rotulo: rotuloEncontro(e),
+    sessao: sessao.length > 1 ? sessao : undefined,
+  }));
+  // lote da média por dupla (≥3 respostas, FR-003): a copy de privacidade
+  // promete média só quando ela existe de fato
+  const contagemDpp = new Map<string, number>();
+  for (const a of avaliacoes)
+    if (trilhaPorDupla.get(a.dupla_id) !== "especialista")
+      contagemDpp.set(a.dupla_id, (contagemDpp.get(a.dupla_id) ?? 0) + 1);
+  const mediaPorDupla = new Map<string, boolean>(
+    [...contagemDpp].map(([d, n]) => [d, n >= 3])
+  );
   const avaliacoesFeitas = avaliacoes.map((a) => {
     const enc = encPorId.get(a.encontro_id);
+    const trilha = trilhaPorDupla.get(a.dupla_id) ?? "dpp";
     return {
       ...a,
-      trilha: trilhaPorDupla.get(a.dupla_id) ?? "dpp",
+      trilha,
       rotulo: enc
         ? rotuloEncontro(enc)
-        : a.encontro?.numero
-          ? `${a.encontro.numero}º encontro`
-          : undefined,
+        : trilha === "especialista"
+          ? "Sessão de especialista"
+          : a.encontro?.numero
+            ? `${a.encontro.numero}º encontro`
+            : undefined,
     };
   });
-
-  // combinado aberto com o prazo mais próximo (sem prazo vai por último)
-  const combinadoProximo = encaminhamentos
-    .filter((c) => c.status === "pendente" && c.id != null && c.descricao != null)
-    .sort((a, b) =>
-      (a.prazo ?? "9999-12-31").localeCompare(b.prazo ?? "9999-12-31")
-    )[0];
-  const combinado = combinadoProximo
-    ? {
-        id: combinadoProximo.id!,
-        descricao: combinadoProximo.descricao!,
-        prazo: combinadoProximo.prazo ?? null,
-      }
-    : null;
 
   // agendar: só a DPP ativa agenda (a RPC recusa a trilha esp). O nº é o
   // primeiro livre depois do último realizado — o mesmo critério da agenda.
@@ -303,10 +427,127 @@ export default async function JovemHome() {
       .map((e) => e.numero)
   );
   const numeroAgendar = livres.find((n) => n > maxRealizado) ?? livres[0] ?? null;
+  // a sugestão da 481 nasce do mesmo motor da agenda: histórico da dupla +
+  // janela do plano + tudo o que já ocupa o jovem nas outras duplas
+  const sugestoesAgendar =
+    duplaDppId != null
+      ? await sugestoesEncontroDaDupla({
+          encontros: encontros.filter((e) => e.dupla_id === duplaDppId),
+          plano: planoJovem,
+          duplaId: duplaDppId,
+          agora,
+          ocupados: ocupadosDoJovem(encontros, duplas),
+        }).catch(() => null)
+      : null;
   const agendar =
     duplaDppId != null && numeroAgendar != null
-      ? { duplaId: duplaDppId, numero: numeroAgendar }
+      ? {
+          duplaId: duplaDppId,
+          numero: numeroAgendar,
+          numeros: livres,
+          comQuem: nomeDaDupla(duplaDppId, false),
+          sugestoes: sugestoesAgendar,
+        }
       : null;
+  // retroativo (0207+0208): nº sem row, menos o último do ciclo — e só
+  // passo oficial JÁ VENCIDO (a RPC recusa os dois casos também). Mesma
+  // cautela do acervo: o cronograma vale se é desta mesma dupla.
+  const oficiaisRetro =
+    jornada?.dupla_id === duplaDppId
+      ? datasOficiaisDe(jornada.cronograma)
+      : [];
+  const vencidosRetro = new Set(
+    oficiaisRetro.filter((e) => e.data <= hoje).map((e) => e.numero)
+  );
+  const numerosRetro = livres.filter(
+    (n) => n < maxEncontros("dpp") && vencidosRetro.has(n)
+  );
+
+  // a lista única de pendências (REALIZA-493): o motor puro ordena e a
+  // home só apresenta — a agenda lê da mesma régua. A entrada estrutural
+  // vem das views que a página já buscou; o motor decide o que entra.
+  const oficialPorNumero = new Map(
+    oficiaisRetro.map((e) => [e.numero, e.data])
+  );
+  const ctxPorEncontro: Record<string, EncontroCtx> = Object.fromEntries(
+    encontros.map((e) => [
+      e.id,
+      {
+        e,
+        ativa: porDupla.get(e.dupla_id)?.status === "ativa",
+        esp: trilhaPorDupla.get(e.dupla_id) === "especialista",
+      },
+    ])
+  );
+  const pendencias = derivarPendencias({
+    hoje,
+    agora: agora.toISOString(),
+    encontros: encontros.map((e) => {
+      const sessao = trilhaPorDupla.get(e.dupla_id) === "especialista";
+      return {
+        id: e.id,
+        numero: sessao
+          ? passoEsp(
+              e,
+              encontros.filter((x) => x.dupla_id === e.dupla_id)
+            )
+          : e.numero,
+        status: e.status,
+        dataHora: e.data_hora,
+        sessao,
+        comQuem: nomeDaDupla(e.dupla_id, sessao),
+      };
+    }),
+    avaliacoes: avaliacoesPendentes.map((p) => ({
+      id: p.encontroId,
+      rotulo: p.rotulo,
+      realizadoEm: p.realizado_em,
+      sessao: p.trilha === "especialista",
+      cobre: p.sessao?.length,
+    })),
+    documentos: assinaturas
+      .filter((a): a is typeof a & { id: string } => a.id != null)
+      .map((a) => ({
+        id: a.id,
+        slug: a.slug,
+        titulo: a.titulo,
+        status: a.status,
+        token: a.token,
+        tokenExpiraEm: a.token_expira_em,
+      })),
+    combinados: encaminhamentos
+      .filter((c): c is typeof c & { id: string } => c.id != null)
+      .map((c) => ({
+        id: c.id,
+        descricao: c.descricao,
+        prazo: c.prazo,
+        status: c.status,
+      })),
+    sugestoes: pedidosEsp.solicitacoes
+      .filter((s) => s.status === "sugerida")
+      .map((s) => ({
+        id: s.id,
+        sugeridoPor: s.solicitante?.nome_social ?? s.solicitante?.nome,
+        especialistaNome:
+          s.desejado?.nome_social ?? s.desejado?.nome ?? s.especialista_nome,
+        criadoEm: s.created_at,
+      })),
+    avisos: avisos.map((a) => ({
+      id: a.id,
+      titulo: a.titulo,
+      prioridade: a.prioridade,
+      criadoEm: a.created_at,
+    })),
+    retro: numerosRetro.map((numero) => ({
+      numero,
+      duplaId: duplaDppId,
+      dataOficial: oficialPorNumero.get(numero) ?? null,
+    })),
+    // a pendência de chamado nasce da trilha pública: "respondeu" só com
+    // atualização da equipe; com dono sem resposta vira "cuidando"; aberto
+    // sem dono e resolvido são espera/desfecho, não tarefa (régua no mapper)
+    chamados: meusChamados.itens.map(chamadoPendencia),
+  });
 
   // o lápis "trocar link" do próximo encontro — mesmo recorte da agenda:
   // agendado de dupla ativa e DPP (a RPC do jovem não escreve na trilha esp)
@@ -431,9 +672,11 @@ export default async function JovemHome() {
   const jornadaMeta = temDpp ? jornadaTotal : jornadaTotalEsp;
   const jornadaPct = Math.min(100, Math.round((jornadaAtual / jornadaMeta) * 100));
   const jornadaTexto = [
-    temDpp ? `${feitosDpp} de ${jornadaTotal} com seu mentor` : null,
+    temDpp
+      ? `${progressoTrilha({ esp: false, feitos: feitosDpp, total: jornadaTotal })} com seu mentor`
+      : null,
     feitosEsp > 0
-      ? `${feitosEsp} ${feitosEsp === 1 ? "sessão" : "sessões"} com especialista`
+      ? `${progressoTrilha({ esp: true, feitos: feitosEsp, total: jornadaTotalEsp })} com especialista`
       : null,
   ]
     .filter(Boolean)
@@ -459,12 +702,43 @@ export default async function JovemHome() {
       <ProximoEncontro
         proximo={proximo}
         rotulo={proximo ? rotuloEncontro(proximo) : null}
+        sessao={
+          proximo != null
+            ? trilhaPorDupla.get(proximo.dupla_id) === "especialista"
+            : !temDpp
+        }
         hoje={hoje}
         agendar={agendar}
         linkEditavel={linkEditavelProximo}
         emCurso={duplaEmCurso}
         concluida={concluida}
         primeiroNome={primeiroNome}
+        plano={
+          // "Sua semana" (520): o combinado no MESMO cartão do próximo
+          // encontro — nunca um segundo hero
+          semanaJovem && duplaAtual ? (
+            <SuaSemanaPlano
+              semana={semanaJovem}
+              perspectiva="jovem"
+              outro={
+                (duplaAtual.mentor_nome_social ?? duplaAtual.mentor_nome ?? "")
+                  .split(" ")[0] || "seu mentor"
+              }
+              quem={quemPlano}
+              combinadoHref="/jovem/combinado"
+              responderHref="/jovem/agenda#plano"
+              contestar={
+                semanaJovem.contestavel && planoJovem ? (
+                  <PlanoContestarButton
+                    planoId={planoJovem.id}
+                    duplaId={duplaAtual.id}
+                  />
+                ) : null
+              }
+              materiais={materiaisDoPasso}
+            />
+          ) : undefined
+        }
       />
 
       {/* pendência da grade — some quando a pessoa preenche (sem ficha não
@@ -472,10 +746,12 @@ export default async function JovemHome() {
       {gradeVazia && <LembreteDisponibilidade />}
 
       <JovemParaFazer
+        pendencias={pendencias}
+        encontros={ctxPorEncontro}
         pendentes={avaliacoesPendentes}
-        combinado={combinado}
-        hoje={hoje}
+        retro={{ duplaId: duplaDppId, numeros: numerosRetro }}
         primeiroNome={primeiroNome}
+        mediaPorDupla={mediaPorDupla}
       />
 
       {/* canal de segurança sempre à mão, sem competir com o encontro: uma
@@ -496,7 +772,7 @@ export default async function JovemHome() {
               href="/jovem/materiais"
               className="group inline-flex min-h-11 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              Ver jornada
+              Ver materiais
               <ArrowRight
                 size={14}
                 aria-hidden
@@ -614,8 +890,10 @@ export default async function JovemHome() {
       />
 
       {/* Suas avaliações (0071) — as pendentes e as duas últimas respondidas;
-          o resto recolhe em "Ver todas as avaliações" dentro do componente */}
-      {(avaliacoesPendentes.length > 0 || avaliacoesFeitas.length > 0) && (
+          o resto recolhe em "Ver todas as avaliações" dentro do componente.
+          Com dupla viva a seção entra mesmo vazia: o rodapé explica por que
+          um encontro já acontecido pode não aparecer aqui (REALIZA-428) */}
+      {(avaliacoesPendentes.length > 0 || avaliacoesFeitas.length > 0 || duplaEmCurso) && (
         <section aria-labelledby="avaliacoes-titulo">
           <h2 id="avaliacoes-titulo" className="mb-2.5 flex items-center gap-2 font-semibold">
             <Star size={18} className="text-muted-foreground" aria-hidden />
@@ -626,8 +904,24 @@ export default async function JovemHome() {
               <JovemAvaliacoes
                 pendentes={avaliacoesPendentes}
                 feitas={avaliacoesFeitas}
-                primeiroNome={primeiroNome}
               />
+              {/* retroativo só quando há passo elegível (QW1): o parágrafo
+                  que prometia "registre você aqui" sem candidato ensinava
+                  um gesto que a RPC recusaria */}
+              {duplaEmCurso && duplaDppId && numerosRetro.length > 0 && (
+                <div className="border-t border-border/60 px-4 py-1.5 sm:px-6">
+                  <JovemRetroativoDialog
+                    duplaId={duplaDppId}
+                    numeros={numerosRetro}
+                    trigger={
+                      <Button variant="ghost" size="sm" className="-ml-2.5">
+                        <ClockCounterClockwise size={15} aria-hidden />
+                        Encontro que não aparece aqui?
+                      </Button>
+                    }
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </section>
@@ -642,7 +936,11 @@ export default async function JovemHome() {
         </h2>
         <Card className="animate-enter">
           <CardContent className="px-4 py-0 sm:px-5">
-            <JovemCombinados itens={encaminhamentos} hoje={hoje} />
+            <JovemCombinados
+              itens={encaminhamentos}
+              hoje={hoje}
+              duplaId={duplaEmCurso ? (duplaAtual?.id ?? null) : null}
+            />
           </CardContent>
         </Card>
       </section>
@@ -841,7 +1139,7 @@ export default async function JovemHome() {
             <CardContent className="divide-y divide-border/60 p-0">
               {materiaisVisiveis.slice(0, 3).map((m) => {
                 const Icone = TIPO_ICONE_MATERIAL[m.tipo];
-                const href = m.path ? `/api/material/${m.id}` : linkSeguro(m.url);
+                const href = hrefMaterial(m, "/jovem/materiais/documento");
                 const interno = (
                   <>
                     <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
@@ -913,10 +1211,7 @@ function ContatoLinha({
   papel: string;
   nomeJovem: string;
 }) {
-  const wa = waLink(
-    c.whatsapp,
-    `Olá! Sou ${nomeJovem}, mentorado(a) do programa Realiza.vc.`
-  );
+  const wa = waLink(c.whatsapp, msgApresentacaoJovem(nomeJovem));
   return (
     <li className="flex items-center gap-2 py-0.5">
       <Link

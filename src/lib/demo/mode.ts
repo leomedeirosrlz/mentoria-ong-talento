@@ -1,6 +1,7 @@
 import { cookies, headers } from "next/headers";
 import type { AppRole } from "@/lib/types";
 import {
+  DEMO_EVAL_COOKIE,
   DEMO_ROLE_COOKIE,
   DEMO_ROLES,
   DEMO_TERMO_COOKIE,
@@ -17,7 +18,7 @@ import {
 // LAN HTTP (phone QA at 192.168.x.x:3100) silently drops Secure cookies —
 // /demo exited the moment a papel was picked. Vercel sets x-forwarded-proto
 // https, so prod keeps Secure.
-const cookieOpts = async () => ({
+export const demoCookieOpts = async () => ({
   path: "/",
   maxAge: 60 * 60 * 24 * 30,
   sameSite: "lax" as const,
@@ -45,11 +46,11 @@ export async function demoOnboarded(papel: AppRole): Promise<boolean> {
 }
 
 export async function definirPapelDemo(papel: AppRole) {
-  (await cookies()).set(DEMO_ROLE_COOKIE, papel, await cookieOpts());
+  (await cookies()).set(DEMO_ROLE_COOKIE, papel, await demoCookieOpts());
 }
 
 export async function marcarOnboardingDemo(papel: AppRole) {
-  (await cookies()).set(demoObCookie(papel), "1", await cookieOpts());
+  (await cookies()).set(demoObCookie(papel), "1", await demoCookieOpts());
 }
 
 export async function desmarcarOnboardingDemo(papel: AppRole) {
@@ -88,13 +89,52 @@ export async function marcarDemoLidas(ids: string[]) {
   (await cookies()).set(
     DEMO_LIDAS_COOKIE,
     JSON.stringify([...lidas].slice(-DEMO_LIDAS_MAX)),
-    await cookieOpts()
+    await demoCookieOpts()
   );
 }
 
 /** "Lidas" é estado da sessão — entrar na demo de novo recomeça zerado. */
 export async function limparDemoLidas() {
   (await cookies()).delete(DEMO_LIDAS_COOKIE);
+}
+
+/** Leituras de material marcadas na sessão demo (0196) — mesma mecânica
+ *  das lidas de notificação: cookie de refs, zera na troca de sessão. */
+const DEMO_MAT_LIDOS_COOKIE = "demo_materiais_lidos";
+
+export async function demoLidosMateriais(): Promise<Set<string>> {
+  const raw = (await cookies()).get(DEMO_MAT_LIDOS_COOKIE)?.value;
+  if (!raw) return new Set();
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((x): x is string => typeof x === "string")
+        : []
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+export async function marcarDemoMaterialLido(ref: string) {
+  const lidos = await demoLidosMateriais();
+  lidos.add(ref);
+  (await cookies()).set(
+    DEMO_MAT_LIDOS_COOKIE,
+    JSON.stringify([...lidos].slice(-DEMO_LIDAS_MAX)),
+    await demoCookieOpts()
+  );
+}
+
+export async function limparDemoMateriaisLidos() {
+  (await cookies()).delete(DEMO_MAT_LIDOS_COOKIE);
+}
+
+/** Sessão de evals (runs criados + células dirigidas + lápides) — mesma
+ *  regra das lidas: entra de novo, recomeça zerado. */
+export async function limparDemoEval() {
+  (await cookies()).delete(DEMO_EVAL_COOKIE);
 }
 
 /** Assinatura simulada do termo nesta sessão demo (o writer client é
@@ -122,5 +162,7 @@ export async function limparDemo() {
   store.delete(DEMO_ROLE_COOKIE);
   store.delete(DEMO_LIDAS_COOKIE);
   store.delete(DEMO_TERMO_COOKIE);
+  store.delete(DEMO_MAT_LIDOS_COOKIE);
+  await limparDemoEval();
   await resetarOnboardingDemo();
 }

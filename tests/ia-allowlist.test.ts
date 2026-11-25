@@ -31,17 +31,26 @@ const UUID = "11111111-2222-4333-8444-555555555555";
  *  e serve de base pro teste de estrictez (mesmo args + chave extra). */
 const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   resumo_semana: {},
+  operacional_insights: {},
   ficha_dupla: { dupla_id: UUID },
   registros_da_dupla: { dupla_id: UUID },
   aguardando_par: {},
   capacidade_mentores: {},
+  adocao_por_superficie: {},
+  adocao_por_dia: {},
+  adocao_caminhos: {},
+  adocao_coorte: {},
+  adocao_funil: {},
   duplas_do_usuario: {},
+  duplas_panorama: {},
+  mensagem_template: { slug: "mensagem-preparacao" },
   agenda_do_periodo: {},
   historico_encontros: {},
   guia_consulta: { pergunta: "como funciona o encontro?" },
   instrumentos_da_dupla: { dupla_id: UUID },
   chamados_resumo: {},
   pessoas_busca: { nome: "Maria" },
+  combinados_das_duplas: {},
   // mentorado (pacote nov/2026) — semArgs no resto, tópico na FAQ
   minha_dupla: {},
   minha_agenda: {},
@@ -50,6 +59,7 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   meus_pedidos: {},
   ajuda_faq: { topico: "encontro" },
   mural_especialista: {},
+  encontros_retroativo: {},
   // escrita (MCP + confirmação) — args mínimos válidos por schema
   abrir_chamado: {
     categoria: "agenda",
@@ -74,6 +84,16 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   desmarcar_encontro: { encontro_id: UUID },
   jovem_marcar_aconteceu: { encontro_id: UUID },
   jovem_marcar_nao_aconteceu: { encontro_id: UUID },
+  jovem_registrar_retroativo: {
+    dupla_id: UUID,
+    numero: 6,
+    data_hora: "2026-11-10T19:00:00-03:00",
+  },
+  jovem_desfazer_retroativo: { encontro_id: UUID },
+  declarar_recesso: { dupla_id: UUID, usa: false },
+  disponibilidade_semana: {
+    celulas: [{ dia: "seg", periodo: "noite" }],
+  },
   jovem_pedir_especialista: {},
   confirmar_sugestao_especialista: { solicitacao_id: UUID },
   aceitar_solicitacao: { solicitacao_id: UUID },
@@ -82,6 +102,35 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
     slot: "2026-11-15T19:00:00-03:00",
   },
   recusar_solicitacao: { solicitacao_id: UUID, justificativa: "Sem agenda" },
+  // escritas do domínio (REALIZA-126) — chat + MCP, confirmacao_id fica
+  // fora do schema (executarTool extrai antes do parse)
+  registrar_interacao: { dupla_id: UUID, tipo: "contato" },
+  marcar_situacao_mentorado: { mentorado_id: UUID, situacao: "concluido" },
+  emitir_link_instrumento: { dupla_id: UUID, sistema: "visao" },
+  agendar_encontro: {
+    dupla_id: UUID,
+    numero: 6,
+    data_hora: "2026-11-10T19:00:00-03:00",
+  },
+  editar_campo_pessoa: { pessoa_id: UUID, campo: "whatsapp", valor: "11987654321" },
+  plano_em_dia: { dupla_id: UUID },
+  // 459 — plano persistido + intervenções + ajustes de guia
+  plano_propor: { dupla_id: UUID },
+  plano_responder: { plano_id: UUID, acao: "aceitar" },
+  plano_aplicar_passo: {
+    plano_id: UUID,
+    numero: 5,
+    data_hora: "2026-11-10T19:00:00-03:00",
+  },
+  resumo_dupla: { dupla_id: UUID },
+  meu_plano: {},
+  intervencao_sugerir: { dupla_id: UUID, tipo: "pausa", destino: "auxiliar" },
+  guia_ajustar: {
+    dupla_id: UUID,
+    numero: 5,
+    ajustes: [{ sugestao: "Trazer o lanche", justificativa: "Ele gosta" }],
+  },
+  guia_limpar: { dupla_id: UUID, numero: 5 },
 };
 
 describe("allowlist — forma do registry", () => {

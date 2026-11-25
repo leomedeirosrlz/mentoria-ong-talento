@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, Plus } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { deleteMaterial, salvarMaterial } from "@/lib/actions";
 import { TRILHA_LEN } from "@/lib/ciclo";
 import { createClient } from "@/lib/supabase/client";

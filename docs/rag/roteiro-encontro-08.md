@@ -4,7 +4,7 @@ material: roteiro-encontro-08
 titulo: "Roteiro do 8º encontro: Monitoramento & Responsabilidade"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp, supervisor]
+audiencia: [mentor_dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-8 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

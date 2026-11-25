@@ -4,6 +4,7 @@ import {
   ehInstrumento,
   extraiEstruturaRoda,
   extraiGruposMeta,
+  idsEmGruposMeta,
   lePonteiro,
   pontoEixo,
   pontosPoligono,
@@ -237,6 +238,72 @@ describe("extraiGruposMeta", () => {
     expect(g[0].prazo?.id).toBe("prazo_1");
     expect(g[0].submetas?.id).toBe("submetas_1");
     expect(g[1].porque?.id).toBe("porque_2");
+  });
+});
+
+// ---------- aninhamento do PDM (REALIZA-512) ----------
+
+// O template antigo (0080) declara submetas_N no capítulo "Mapa de
+// submetas"; o novo (0223) declara inline sob a meta. Nos dois o
+// submetas_M com meta_M correspondente é consumido pela ficha da meta N
+// e sai do capítulo que o declarou — idsEmGruposMeta é a fonte do
+// "já foi renderizado"; o órfão (submetas_M sem meta_M) fica como
+// fallback no capítulo original.
+describe("idsEmGruposMeta — o dedupe do capítulo legado", () => {
+  it("todo campo de grupo sai do capítulo que o declarou; órfão fica", () => {
+    const def: FormularioCampo[] = [
+      secao("s_visao", "Visão e metas"),
+      campo({ id: "declaracao_visao", tipo: "texto_longo", obrigatorio: true }),
+      campo({ id: "meta_1", obrigatorio: true }),
+      campo({ id: "is_1" }),
+      campo({ id: "prazo_1", tipo: "data" }),
+      campo({ id: "meta_4" }), // meta extra (metas 4–8 do 0223)
+      campo({ id: "is_4" }),
+      campo({ id: "prazo_4", tipo: "data" }),
+      secao("s_mapa", "Mapa de submetas"),
+      campo({ id: "submetas_1", tipo: "texto_longo" }),
+      campo({ id: "submetas_4", tipo: "texto_longo" }),
+      campo({ id: "submetas_9", tipo: "texto_longo" }),
+    ];
+    const ids = idsEmGruposMeta(extraiGruposMeta(def));
+    expect(ids).toEqual(
+      new Set([
+        "meta_1",
+        "is_1",
+        "prazo_1",
+        "submetas_1",
+        "meta_4",
+        "is_4",
+        "prazo_4",
+        "submetas_4",
+      ])
+    );
+    // submetas_9 não tem meta_9 — NÃO é consumido (cai no fallback do
+    // capítulo que o declarou, nunca some da tela)
+    expect(ids.has("submetas_9")).toBe(false);
+    // a declaração não é subcampo de meta — segue pergunta solta
+    expect(ids.has("declaracao_visao")).toBe(false);
+  });
+
+  it("capítulo que só tinha ids de grupo evapora; o que tem órfão fica", () => {
+    const def: FormularioCampo[] = [
+      secao("s_visao", "Visão e metas"),
+      campo({ id: "meta_1", obrigatorio: true }),
+      campo({ id: "is_1" }),
+      campo({ id: "prazo_1", tipo: "data" }),
+      campo({ id: "submetas_1", tipo: "texto_longo" }),
+      secao("s_mapa", "Mapa de submetas"),
+      campo({ id: "submetas_2", tipo: "texto_longo" }),
+    ];
+    const ids = idsEmGruposMeta(extraiGruposMeta(def));
+    const restantes = agrupaEmSecoes(def).map((b) =>
+      b.campos.filter((c) => !ids.has(c.id))
+    );
+    // capítulo das metas: nada sobra solto (tudo é ficha)
+    expect(restantes[0]).toHaveLength(0);
+    // submetas_2 é órfão (sem meta_2 no template) — o capítulo vive pra
+    // renderizá-lo como editor de linhas comum
+    expect(restantes[1].map((c) => c.id)).toEqual(["submetas_2"]);
   });
 });
 

@@ -18,24 +18,23 @@ import {
   WarningOctagon,
 } from "@phosphor-icons/react";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import { AcoesMenu, type AcaoMenuItem } from "@/components/acoes-menu";
 import { Avatar } from "@/components/avatar";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import { avatarPublicUrl } from "@/lib/avatar";
 import {
   deriveAgendaMinha,
-  encontrosCobertos,
   filtraAgenda,
   primeiroNomeDaDupla,
+  type AgendaAcaoTipo,
   type AgendaItem,
   type AgendaMinhaDerivada,
   type AvisoAgenda,
   type EscopoAgenda,
   type AgendaSecao,
 } from "@/lib/agenda-minha";
-import { itensSemanaProgramaMentor } from "@/lib/agenda-coordenacao";
 import { turmaCurta } from "@/lib/turma";
-import { SemanaDoPrograma } from "@/components/semana-do-programa";
 import type {
   CicloEvento,
   Cronograma,
@@ -90,14 +89,36 @@ function iconeDoItem(
   return <Icone size={size} aria-hidden className={className} />;
 }
 
-/** Ações do item — decodifica os marcadores declarativos da derivação nos
- *  controles reais: link de chamada, deep-link de registro e o mesmo
- *  AgendarEncontroDialog da ficha/agenda semanal (nada de fluxo paralelo).
- *  `primario` vem da página: só UM CTA decisivo por agenda fica preenchido
- *  (o warnrow do topo tem precedência); os demais "Registrar"/"Agendar"
- *  saem em outline. A coluna é o 3º trilho da grade da linha — w-full no
- *  celular joga os botões pra uma linha própria abaixo do conteúdo; em sm+
- *  encolhe pro conteúdo e se centraliza na altura da linha. */
+// tamanho e cor explícitos nos ícones do ⋯ — é o que alinha o texto do
+// item com o da linha (mesma norma do ICONE do DuplaLinhaMenu)
+const ICONE_MENU = "size-4 shrink-0 text-muted-foreground";
+
+type DialogoItem = "agendar" | "remarcar";
+
+// ordem fixa de urgência do "1 primário + ⋯" — a 1ª ação presente fica
+// visível, o resto recolhe pro menu (remarcar é ajuste, nunca a decisão)
+const ORDEM_ACOES: AgendaAcaoTipo[] = [
+  "entrar",
+  "registrar",
+  "agendar",
+  "remarcar",
+];
+
+/** Ações do item — "1 primário + ⋯": a derivação manda marcadores e aqui
+ *  eles viram controles reais numa ordem fixa de urgência (entrar na
+ *  chamada rolando → registrar → agendar → remarcar). Só a PRIMEIRA sai
+ *  como controle visível; as demais recolhem pro AcoesMenu — a linha que
+ *  chegava a 4 botões agora respira a 390px. `primario` vem da página:
+ *  só UM CTA decisivo por agenda fica preenchido (o warnrow do topo tem
+ *  precedência) — vale pro Registrar/Agendar quando eles são o visível.
+ *
+ *  Os AgendarEncontroDialog (mesmos da ficha/agenda semanal — nada de
+ *  fluxo paralelo) ficam fora do popup, controlados por `dialogo`: fechar
+ *  o menu não desmonta e o foco volta pro ⋯. A coluna é o 3º trilho da
+ *  grade da linha — w-full no celular joga os controles pra uma linha
+ *  própria, indentada sob o texto (ps = trilho w-14 + gap-x-3, mesmo
+ *  alinhamento do EncontroLinha); em sm+ encolhe pro conteúdo e se
+ *  centraliza na altura da linha. */
 function AcoesItem({
   item,
   dupla,
@@ -107,36 +128,108 @@ function AcoesItem({
   dupla: Dupla | undefined;
   primario: boolean;
 }) {
-  if (item.acoes.length === 0) return null;
+  const [dialogo, setDialogo] = useState<DialogoItem | null>(null);
   const jovemNome = dupla ? primeiroNomeDaDupla(dupla) : undefined;
+
+  // filtrada pelas mesmas condições que cada controle exigia solto —
+  // a 1ª que sobra é a visível
+  const acoes = ORDEM_ACOES.filter((a) => item.acoes.includes(a)).filter((a) => {
+    switch (a) {
+      case "entrar":
+        return item.link != null;
+      case "registrar":
+      case "remarcar":
+        return item.encontro != null && item.duplaId != null;
+      case "agendar":
+        return item.duplaId != null && item.numero != null;
+    }
+  });
+  const [primaria, ...resto] = acoes;
+  if (item.acoes.length === 0 || primaria == null) return null;
+
+  const itensMenu: AcaoMenuItem[] = resto
+    .filter((a) => a !== "entrar")
+    .map((a) => {
+      switch (a) {
+        case "registrar":
+          return {
+            id: a,
+            rotulo: "Registrar como foi",
+            icone: <CheckCircle aria-hidden className={ICONE_MENU} />,
+            href: `/duplas/${item.duplaId}#registrar-${item.encontro!.id}`,
+          };
+        case "agendar":
+          return {
+            id: a,
+            rotulo: "Agendar",
+            icone: <CalendarPlus aria-hidden className={ICONE_MENU} />,
+            onEscolher: () => setDialogo("agendar"),
+          };
+        default:
+          // "remarcar" — único sobrando além dos de cima
+          return {
+            id: a,
+            rotulo: "Remarcar",
+            icone: <CalendarPlus aria-hidden className={ICONE_MENU} />,
+            onEscolher: () => setDialogo("remarcar"),
+          };
+      }
+    });
+
   return (
-    <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0 sm:self-center">
-      {item.acoes.includes("entrar") && item.link && (
-        <a
-          href={item.link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "border-[var(--ok)]/40 bg-[var(--ok)]/10 text-[var(--ok-text)] hover:bg-[var(--ok)]/15 hover:text-[var(--ok-text)]"
-          )}
-        >
-          <VideoCamera aria-hidden />
-          Entrar na chamada
-          <span className="sr-only"> (abre em nova aba)</span>
-        </a>
-      )}
-      {item.acoes.includes("registrar") && item.encontro && item.duplaId && (
-        <Link
-          href={`/duplas/${item.duplaId}#registrar-${item.encontro.id}`}
-          className={buttonVariants({
-            variant: primario ? "default" : "outline",
-            size: "sm",
-          })}
-        >
-          Registrar como foi
-        </Link>
-      )}
+    <>
+      <div className="flex w-full flex-wrap items-center justify-start gap-2 ps-[4.25rem] sm:ms-auto sm:w-auto sm:shrink-0 sm:justify-end sm:self-center sm:ps-0">
+        {primaria === "entrar" && item.link && (
+          <a
+            href={item.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "border-[var(--ok)]/40 bg-[var(--ok)]/10 text-[var(--ok-text)] hover:bg-[var(--ok)]/15 hover:text-[var(--ok-text)]"
+            )}
+          >
+            <VideoCamera aria-hidden />
+            Entrar na chamada
+            <span className="sr-only"> (abre em nova aba)</span>
+          </a>
+        )}
+        {primaria === "registrar" && item.encontro && item.duplaId && (
+          <Link
+            href={`/duplas/${item.duplaId}#registrar-${item.encontro.id}`}
+            className={buttonVariants({
+              variant: primario ? "default" : "outline",
+              size: "sm",
+            })}
+          >
+            Registrar como foi
+          </Link>
+        )}
+        {primaria === "agendar" && (
+          <Button
+            variant={primario ? "default" : "outline"}
+            size="sm"
+            onClick={() => setDialogo("agendar")}
+          >
+            <CalendarPlus aria-hidden />
+            Agendar
+          </Button>
+        )}
+        {primaria === "remarcar" && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDialogo("remarcar")}
+          >
+            <CalendarPlus aria-hidden />
+            Remarcar
+          </Button>
+        )}
+        <AcoesMenu itens={itensMenu} label="Ações" />
+      </div>
+
+      {/* fora do popup, controlados — fechar o menu não desmonta o dialog
+          e o foco volta pro ⋯ ao sair */}
       {item.acoes.includes("remarcar") && item.encontro && item.duplaId && (
         <AgendarEncontroDialog
           duplaId={item.duplaId}
@@ -144,31 +237,27 @@ function AcoesItem({
           atual={item.encontro}
           piso={dupla?.iniciada_em ?? undefined}
           jovemNome={jovemNome}
-          trigger={
-            <Button variant="outline" size="sm">
-              <CalendarPlus aria-hidden />
-              Remarcar
-            </Button>
-          }
+          trigger={null}
+          open={dialogo === "remarcar"}
+          onOpenChange={(o) => setDialogo(o ? "remarcar" : null)}
         />
       )}
-      {item.acoes.includes("agendar") && item.duplaId && item.numero != null && (
-        <AgendarEncontroDialog
-          duplaId={item.duplaId}
-          numero={item.numero}
-          atual={null}
-          sugerido={item.sugeridoDia ?? undefined}
-          piso={dupla?.iniciada_em ?? undefined}
-          jovemNome={jovemNome}
-          trigger={
-            <Button variant={primario ? "default" : "outline"} size="sm">
-              <CalendarPlus aria-hidden />
-              Agendar
-            </Button>
-          }
-        />
-      )}
-    </div>
+      {item.acoes.includes("agendar") &&
+        item.duplaId &&
+        item.numero != null && (
+          <AgendarEncontroDialog
+            duplaId={item.duplaId}
+            numero={item.numero}
+            atual={null}
+            sugerido={item.sugeridoDia ?? undefined}
+            piso={dupla?.iniciada_em ?? undefined}
+            jovemNome={jovemNome}
+            trigger={null}
+            open={dialogo === "agendar"}
+            onOpenChange={(o) => setDialogo(o ? "agendar" : null)}
+          />
+        )}
+    </>
   );
 }
 
@@ -199,8 +288,11 @@ function LinhaItem({
         <div className="flex flex-wrap items-start gap-x-3 gap-y-2.5 sm:flex-nowrap sm:gap-x-4">
           {/* coluna de horário de largura fixa — itens por dia (programa,
               "a agendar") não fingem hora que o domínio não tem:
-              o ícone do tipo ocupa o mesmo trilho, centralizado */}
-          <div className="w-18 shrink-0 pt-0.5 text-center">
+              o ícone do tipo ocupa o mesmo trilho, centralizado. No
+              celular o trilho afunila (w-14) pra linha respirar; a partir
+              do sm volta ao w-18 — e a linha de ações indenta sob o
+              texto com ps = trilho + gap */}
+          <div className="w-14 shrink-0 pt-0.5 text-center sm:w-18">
             {item.hora ? (
               <>
                 <span className="block text-sm font-semibold tabular-nums">
@@ -265,6 +357,7 @@ function LinhaAviso({
   dupla: Dupla | undefined;
   destaque: boolean;
 }) {
+  const [remarcarAberto, setRemarcarAberto] = useState(false);
   const limbo = aviso.remarcar;
   return (
     <div className="flex flex-wrap items-start gap-x-3 gap-y-2.5 rounded-xl border border-[var(--warn)]/40 bg-[var(--warn)]/[0.07] px-4 py-3 sm:flex-nowrap sm:px-5">
@@ -281,6 +374,8 @@ function LinhaAviso({
           {aviso.detalhe}
         </p>
       </div>
+      {/* "1 primário + ⋯": o registro é a resposta decisiva; a remarcação
+          recolhe pro menu — mesmo padrão das linhas comuns */}
       <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0 sm:self-center">
         <Link
           href={aviso.href}
@@ -292,21 +387,33 @@ function LinhaAviso({
           {limbo ? "Registrar como foi" : aviso.cta}
         </Link>
         {limbo && aviso.encontro && (
-          <AgendarEncontroDialog
-            duplaId={aviso.duplaId}
-            numero={aviso.encontro.numero}
-            atual={aviso.encontro}
-            piso={dupla?.iniciada_em ?? undefined}
-            jovemNome={dupla ? primeiroNomeDaDupla(dupla) : undefined}
-            trigger={
-              <Button variant="outline" size="sm">
-                <CalendarPlus aria-hidden />
-                Remarcar
-              </Button>
-            }
+          <AcoesMenu
+            label="Ações"
+            itens={[
+              {
+                id: "remarcar",
+                rotulo: "Remarcar",
+                icone: <CalendarPlus aria-hidden className={ICONE_MENU} />,
+                onEscolher: () => setRemarcarAberto(true),
+              },
+            ]}
           />
         )}
       </div>
+      {/* fora do popup, controlado — fechar o menu não desmonta o dialog
+          e o foco volta pro ⋯ ao sair */}
+      {limbo && aviso.encontro && (
+        <AgendarEncontroDialog
+          duplaId={aviso.duplaId}
+          numero={aviso.encontro.numero}
+          atual={aviso.encontro}
+          piso={dupla?.iniciada_em ?? undefined}
+          jovemNome={dupla ? primeiroNomeDaDupla(dupla) : undefined}
+          trigger={null}
+          open={remarcarAberto}
+          onOpenChange={setRemarcarAberto}
+        />
+      )}
     </div>
   );
 }
@@ -529,8 +636,6 @@ export type AgendaMinhaProps = {
    *  usaria Date.now() no cliente e SSR×hidratação podiam discordar na
    *  janela de 15min do "Entrar" (hydration mismatch). */
   agora: number;
-  /** usuário híbrido — os links da faixa precisam preservar `&visao=dpp`. */
-  hibrido?: boolean;
 };
 
 export function AgendaMinha({
@@ -540,7 +645,6 @@ export function AgendaMinha({
   cronogramas,
   hoje,
   agora,
-  hibrido = false,
 }: AgendaMinhaProps) {
   const [escopo, setEscopo] = useState<EscopoAgenda>("tudo");
   const agenda = useMemo(
@@ -562,22 +666,6 @@ export function AgendaMinha({
   const duplasPorId = useMemo(
     () => new Map(duplas.map((d) => [d.id, d])),
     [duplas]
-  );
-  // a faixa e a lista apresentam o MESMO encontro: o dedup é na faixa —
-  // a lista detém as ações (entrar/remarcar/agendar/registrar), então o
-  // card coberto por `encontrosCobertos` sai. Sem item restante a seção
-  // inteira some: "Nada marcado" mentiria (o encontro está na lista)
-  const itensFaixa = useMemo(
-    () =>
-      itensSemanaProgramaMentor(
-        duplas,
-        eventos,
-        cronogramas,
-        new Date(hoje + "T12:00:00"),
-        agora,
-        encontrosCobertos(agenda)
-      ),
-    [duplas, eventos, cronogramas, hoje, agora, agenda]
   );
   // o CTA preenchido (lima) é um por agenda: o 1º warnrow do "Hoje" leva —
   // sem warnrow, o destaque cai na 1ª ação decisiva da lista (registrar ou
@@ -606,23 +694,6 @@ export function AgendaMinha({
 
   return (
     <div className="space-y-4">
-      {/* faixa "Minha agenda" (v8b): a semana do programa recortada na
-          agenda dele — formações e eventos oficiais
-          e o encontro oficial ainda fora da lista (o coberto por item
-          ou aviso já aparece uma vez lá embaixo). Some quando um chip de
-          escopo filtra uma dupla só — a faixa é a leitura da agenda
-          inteira, não do recorte */}
-      {escopo === "tudo" && itensFaixa.length > 0 && (
-        <SemanaDoPrograma
-          itens={itensFaixa}
-          hoje={hoje}
-          modo="mentor"
-          titulo="Minha agenda"
-          ariaLabel="Minha agenda · semana do programa"
-          sufixoVisao={hibrido ? "&visao=dpp" : ""}
-        />
-      )}
-
       {/* escopo interno — estado local, nunca URL: é um recorte de leitura,
           não um endereço compartilhável. O "você não participa" dos itens
           convidados já explica o recorte — sem parágrafo de legenda */}
@@ -630,7 +701,7 @@ export function AgendaMinha({
         <span className="text-xs font-medium text-muted-foreground">
           Agenda de:
         </span>
-        <div role="group" aria-label="Escopo da agenda" className="flex flex-wrap gap-1.5">
+        <FilterChipRow role="group" aria-label="Escopo da agenda" className="gap-1.5">
           {agenda.chips.map((chip) => (
             <button
               key={chip.id}
@@ -642,7 +713,7 @@ export function AgendaMinha({
               {chip.rotulo}
             </button>
           ))}
-        </div>
+        </FilterChipRow>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_290px]">

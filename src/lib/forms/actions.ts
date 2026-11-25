@@ -14,7 +14,15 @@ import {
   type RespostaValor,
 } from "./schema";
 import { erroAmigavel as erroAmigavelBase } from "../utils";
+import {
+  emitirProdutoEvento,
+  superficieDaOrigem,
+} from "../produto-eventos-server";
 import type { CorRaca, Genero, PrefGeneroPar } from "../types";
+import {
+  emitirDocumentosMentorado,
+  templatesMentoradoAtivos,
+} from "../documentos/emissao";
 
 // Actions da engine de formulários (0034).
 // · coordenação: salvar/ativar/excluir forms, gerar e revogar links
@@ -187,6 +195,42 @@ async function duplaDoDestino(
   return data?.id ?? null;
 }
 
+/** Versão em lote de duplaDoDestino: uma query por âncora (.in) em vez de
+ *  uma por destinatário — lote de 200 virava 200 round-trips sequenciais.
+ *  created_at desc + primeiro por pessoa = o .limit(1) da versão unitária;
+ *  falha de leitura segue tolerada igual (dupla_id null). */
+async function duplasDosDestinos(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  destinos: DestinoLink[]
+): Promise<Map<string, string | null>> {
+  const mapa = new Map<string, string | null>();
+  const carregar = async (col: "mentor_id" | "mentorado_id", ids: string[]) => {
+    if (!ids.length) return;
+    const { data } = await supabase
+      .from("duplas")
+      .select("id, mentor_id, mentorado_id")
+      .in(col, ids)
+      .neq("trilha", "especialista")
+      .in("status", ["ativa", "pausada"])
+      .order("created_at", { ascending: false });
+    for (const row of data ?? []) {
+      const pid = row[col];
+      if (pid && !mapa.has(pid)) mapa.set(pid, row.id);
+    }
+  };
+  await Promise.all([
+    carregar(
+      "mentor_id",
+      destinos.filter((d) => d.tipo === "profile").map((d) => d.id)
+    ),
+    carregar(
+      "mentorado_id",
+      destinos.filter((d) => d.tipo === "mentorado").map((d) => d.id)
+    ),
+  ]);
+  return mapa;
+}
+
 const VALIDADES_DIAS = new Set([7, 15, 30, 60]);
 
 /** Link vigente devolvido pela geração — criado agora ou pendente
@@ -221,7 +265,7 @@ export async function gerarLinksFormulario(input: {
   )
     return {
       error:
-        "Links genéricos não são mais aceitos — escolha um destinatário. Pra divulgação aberta, use o link de inscrição do formulário oficial de intake.",
+        "Links genéricos não são mais aceitos. Escolha um destinatário. Pra divulgação aberta, use o link de inscrição do formulário oficial de intake.",
     };
   const destinos = (input.destinos ?? []).filter(
     (d): d is DestinoLink =>
@@ -296,26 +340,26 @@ export async function gerarLinksFormulario(input: {
     pendentePorDest.set(key, l.id);
   }
 
-  let criados = 0;
-  let reutilizados = 0;
-  for (const dest of unicos) {
-    if (pendentePorDest.has(dest.id)) {
-      reutilizados++;
-      continue;
-    }
-    const dupla_id = await duplaDoDestino(supabase, dest);
-    const { error: insErr } = await supabase.from("formulario_links").insert({
-      formulario_id: input.formularioId,
-      token: randomBytes(24).toString("base64url"),
-      dest_profile_id: dest.tipo === "profile" ? dest.id : null,
-      dest_mentorado_id: dest.tipo === "mentorado" ? dest.id : null,
-      dupla_id,
-      expira_em,
-      created_by: eu.id,
-    });
+  const novos = unicos.filter((d) => !pendentePorDest.has(d.id));
+  const reutilizados = unicos.length - novos.length;
+  const duplas = await duplasDosDestinos(supabase, novos);
+  if (novos.length) {
+    // um INSERT só: atômico — ou o lote inteiro entra ou nada entra; um
+    // erro nunca deixa links válidos mintados "por baixo" de um {error}
+    const { error: insErr } = await supabase.from("formulario_links").insert(
+      novos.map((dest) => ({
+        formulario_id: input.formularioId,
+        token: randomBytes(24).toString("base64url"),
+        dest_profile_id: dest.tipo === "profile" ? dest.id : null,
+        dest_mentorado_id: dest.tipo === "mentorado" ? dest.id : null,
+        dupla_id: duplas.get(dest.id) ?? null,
+        expira_em,
+        created_by: eu.id,
+      }))
+    );
     if (insErr) return { error: erroAmigavel(insErr) };
-    criados++;
   }
+  const criados = novos.length;
 
   // relê os vigentes destes destinos — criados agora + pendentes reutilizados
   // voltam pro caller exibir/copiar sem perseguir a lista (ordem do pedido)
@@ -352,6 +396,18 @@ export async function gerarLinksFormulario(input: {
   }
 
   revalidatePath(`/formularios/${input.formularioId}`);
+  // telemetria (417): um gesto por disparo — os volumes ficam em meta;
+  // a superfície vem do referer (dialog na tela onde a pessoa emitiu)
+  await emitirProdutoEvento(supabase, {
+    superficie: await superficieDaOrigem(),
+    acao: "form_emitido",
+    meta: {
+      formulario_id: input.formularioId,
+      criados,
+      reutilizados,
+      destinos: unicos.length,
+    },
+  });
   return { ok: true, criados, reutilizados, links };
 }
 
@@ -447,7 +503,7 @@ export async function vincularRespostaOrfa(linkId: string, mentoradoId: string) 
   if (link.multi_uso || link.origem === "intake")
     return {
       error:
-        "Resposta de inscrição não se vincula assim — ela vira cadastro pela revisão (Revisar e cadastrar).",
+        "Resposta de inscrição não se vincula assim: ela vira cadastro pela revisão (Revisar e cadastrar).",
     };
   if (link.dest_profile_id || link.dest_mentorado_id || link.dupla_id)
     return { error: "Esse link já está vinculado." };
@@ -612,8 +668,14 @@ export async function subirAnexoFormulario(
     .upload(put.path, file, { contentType: file.type, upsert: false });
   if (upErr) {
     // a linha de metadados órfã some junto — a resposta apontaria pra um
-    // objeto que não existe (o sanitizer confere a linha, não o objeto)
-    await admin.from("formulario_anexos").delete().eq("id", put.id);
+    // objeto que não existe (o sanitizer confere a linha, não o objeto).
+    // Se nem a limpeza rodar, a row segura o path pra sempre: loga.
+    const { error: delErr } = await admin
+      .from("formulario_anexos")
+      .delete()
+      .eq("id", put.id);
+    if (delErr)
+      console.error("subirAnexoFormulario: limpeza da row de metadados:", delErr);
     return { error: "Não foi possível enviar o arquivo. Tente de novo." };
   }
   return {
@@ -734,7 +796,7 @@ export async function promoverRespostaIntake(respostaId: string) {
   if (!prefill.nome || !prefill.email)
     return {
       error:
-        "A resposta não tem nome e e-mail preenchidos — cadastre pela ficha manual.",
+        "A resposta não tem nome e e-mail preenchidos. Cadastre pela ficha manual.",
     };
   // o sistema do form confirma a via de promoção — as duas vias de intake
   // (mentores e mentorados) usam o mesmo shape de resposta e prefill
@@ -752,8 +814,8 @@ export async function promoverRespostaIntake(respostaId: string) {
  *  a segunda desfaz o insert e avisa. */
 export async function finalizarPromocaoIntake(respostaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
-  const { supabase, error } = await meCoord();
-  if (error) return { error };
+  const { supabase, eu, error } = await meCoord();
+  if (error || !eu) return { error: error! };
   if (!UUID_RE.test(respostaId)) return { error: "Resposta inválida." };
 
   const { data: r, error: rErr } = await supabase
@@ -786,7 +848,7 @@ export async function finalizarPromocaoIntake(respostaId: string) {
   if (!prefill.nome || !prefill.email)
     return {
       error:
-        "A resposta não tem nome e e-mail preenchidos — cadastre pela ficha manual.",
+        "A resposta não tem nome e e-mail preenchidos. Cadastre pela ficha manual.",
     };
 
   const { createAdminClient } = await import("@/lib/supabase/admin");
@@ -861,9 +923,35 @@ export async function finalizarPromocaoIntake(respostaId: string) {
     pessoaId = m.id;
   }
 
+  // carimbo único: ganha quem chegar primeiro; o perdedor desfaz a pessoa
+  // recém-criada pra não deixar cadastro órfão da resposta. Cada via tem a
+  // própria coluna (profile × mentorado) porque a FK aponta pra tabelas
+  // diferentes — gravar id de mentorado em promovido_profile_id violava a
+  // FK e derrubava a promoção (REALIZA-229).
+  const carimbo =
+    sistema === "intake_mentorado"
+      ? "promovido_mentorado_id"
+      : "promovido_profile_id";
+  const { data: marcada, error: markErr } = await admin
+    .from("formulario_respostas")
+    .update({ [carimbo]: pessoaId })
+    .eq("id", respostaId)
+    .is(carimbo, null)
+    .select("id");
+  if (markErr) {
+    await supabase.from(pessoaTabela).delete().eq("id", pessoaId);
+    return { error: erroAmigavel(markErr) };
+  }
+  if (!marcada?.length) {
+    await supabase.from(pessoaTabela).delete().eq("id", pessoaId);
+    return { error: "Essa resposta acabou de ser promovida em outra aba." };
+  }
+
   // foto da inscrição vira avatar — copia bucket privado → avatares
-  // (admin: anon não lê form-anexos). Falha aqui não derruba a promoção:
-  // a ficha abre sem foto, o original segue na resposta.
+  // (admin: anon não lê form-anexos). Fica DEPOIS do carimbo: se a cópia
+  // rodasse antes, a pessoa desfeita pelos returns acima deixaria o
+  // objeto <pessoaId>/<uuid>.<ext> órfão no bucket. Falha aqui não
+  // derruba a promoção: a ficha abre sem foto, o original segue na resposta.
   let aviso: string | null = null;
   const campoFoto = camposArquivo(
     (form?.campos as FormularioCampo[]) ?? []
@@ -889,7 +977,19 @@ export async function finalizarPromocaoIntake(respostaId: string) {
           .from(pessoaTabela)
           .update({ avatar_path: destino })
           .eq("id", pessoaId);
-        if (avErr) aviso = "Cadastro feito, mas a foto não entrou. Suba na edição.";
+        if (avErr) {
+          // sem a row apontando o objeto recém-subido é lixo — remove; se
+          // nem a remoção rodar ele fica órfão no bucket: loga
+          const { error: rmErr } = await admin.storage
+            .from("avatares")
+            .remove([destino]);
+          if (rmErr)
+            console.error(
+              "finalizarPromocaoIntake: limpeza do avatar órfão:",
+              rmErr
+            );
+          aviso = "Cadastro feito, mas a foto não entrou. Suba na edição.";
+        }
       } else {
         aviso = "Cadastro feito, mas a foto não entrou. Suba na edição.";
       }
@@ -898,28 +998,25 @@ export async function finalizarPromocaoIntake(respostaId: string) {
     }
   }
 
-  // carimbo único: ganha quem chegar primeiro; o perdedor desfaz a pessoa
-  // recém-criada pra não deixar cadastro órfão da resposta. Cada via tem a
-  // própria coluna (profile × mentorado) porque a FK aponta pra tabelas
-  // diferentes — gravar id de mentorado em promovido_profile_id violava a
-  // FK e derrubava a promoção (REALIZA-229).
-  const carimbo =
-    sistema === "intake_mentorado"
-      ? "promovido_mentorado_id"
-      : "promovido_profile_id";
-  const { data: marcada, error: markErr } = await admin
-    .from("formulario_respostas")
-    .update({ [carimbo]: pessoaId })
-    .eq("id", respostaId)
-    .is(carimbo, null)
-    .select("id");
-  if (markErr) {
-    await supabase.from(pessoaTabela).delete().eq("id", pessoaId);
-    return { error: erroAmigavel(markErr) };
-  }
-  if (!marcada?.length) {
-    await supabase.from(pessoaTabela).delete().eq("id", pessoaId);
-    return { error: "Essa resposta acabou de ser promovida em outra aba." };
+  // idem cadastro manual (REALIZA-436): documentos de assinatura nascem
+  // com a promoção — depois do carimbo, que é o ponto sem volta do mentorado
+  if (pessoaTabela === "mentorados" && pessoaId) {
+    const tplsDoc = await templatesMentoradoAtivos(supabase);
+    const falhasDoc = await emitirDocumentosMentorado(supabase, tplsDoc, {
+      mentoradoId: pessoaId,
+      dataNascimento: ficha.data_nascimento,
+      createdBy: eu.id,
+    });
+    if (falhasDoc.length) {
+      aviso = [
+        aviso,
+        falhasDoc.length > 1
+          ? "Os documentos de assinatura não foram emitidos. Emita pela ficha da pessoa."
+          : "Um documento de assinatura não foi emitido. Emita pela ficha da pessoa.",
+      ]
+        .filter(Boolean)
+        .join(" ");
+    }
   }
 
   revalidatePath(`/formularios/${formularioId}`);

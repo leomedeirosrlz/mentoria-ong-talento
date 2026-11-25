@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowsLeftRight } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
 import { remanejarDupla } from "@/lib/actions";
 import {
@@ -15,6 +14,7 @@ import {
 } from "@/lib/ciclo";
 import type { AppRole, Dupla, SituacaoMentorado } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PessoaSelect } from "@/components/pessoa-select";
 
 type Opt = {
   id: string;
@@ -102,7 +103,6 @@ export function RemanejarDuplaDialog({
   // ser outra escolha no próprio form, então a mensagem não pode sumir
   const [erro, setErro] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const router = useRouter();
   // estado fresco por abertura — um remanejo abortado não pode vazar
   // seleção pra próxima vez; com preseleção a sugestão já chega com lado
   // e par escolhidos. Ajuste durante o render na borda de subida do `open`
@@ -309,21 +309,23 @@ export function RemanejarDuplaDialog({
           novoId,
           motivo,
           registrarNota,
-          devolutiva
+          devolutiva,
+          true
         );
-        if (res?.error) {
-          setErro(res.error);
+        // sucesso não retorna: a action redireciona pra ficha sucessora e o
+        // NEXT_REDIRECT cai no catch — a confirmação é o banner da ficha
+        // nova. O que volta por aqui é só erro pra mostrar inline
+        if (res?.error) setErro(res.error);
+      } catch (err) {
+        // o redirect da action chega como NEXT_REDIRECT: deixa o Next navegar
+        if (
+          typeof err === "object" &&
+          err !== null &&
+          "digest" in err &&
+          String((err as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")
+        ) {
           return;
         }
-        toast.success(
-          resumo
-            ? `Nova dupla formada: ${resumo.depois.replace(" + ", " e ")}.`
-            : "Dupla remanejada."
-        );
-        setOpen(false);
-        if (res?.novaDuplaId) router.push(`/duplas/${res.novaDuplaId}`);
-        else router.refresh();
-      } catch {
         toast.error("Sem conexão. Tente de novo.");
       }
     });
@@ -434,7 +436,7 @@ export function RemanejarDuplaDialog({
                 <Label id="remanejo-novo-label" htmlFor="remanejo-novo">
                   {lado === "mentor" ? "Novo mentor" : "Novo mentorado"}
                 </Label>
-                <Select
+                <PessoaSelect
                   // remonta na troca de lado — senão o valor interno ficaria
                   // o do lado anterior (lista e vocabulário mudam)
                   key={lado}
@@ -443,48 +445,37 @@ export function RemanejarDuplaDialog({
                   // controlado: a sugestão de remanejo entra com o par já
                   // escolhido — null segue mostrando o placeholder
                   value={novoId}
-                  items={Object.fromEntries(
-                    poolAtual.map((o) => [
-                      o.id,
+                  id="remanejo-novo"
+                  aria-labelledby="remanejo-novo-label remanejo-novo"
+                  vazio={
+                    lado === "mentor"
+                      ? "Nenhum mentor disponível"
+                      : "Nenhum mentorado disponível"
+                  }
+                  // o "por que não" mora no meta (lotado/em dupla) — o item
+                  // fica visível sem deixar escolher, como no Select antigo
+                  itens={poolAtual.map((o) => {
+                    const ocupado =
                       lado === "mentor"
-                        ? `${o.nome_social ?? o.nome} · ${emUso[o.id] ?? 0}/${capacidade[o.id] ?? 1}`
-                        : (o.nome_social ?? o.nome),
-                    ])
-                  )}
+                        ? mentorLotado(o.id)
+                        : mentoradoOcupado(o.id);
+                    return {
+                      value: o.id,
+                      label: o.nome_social ?? o.nome,
+                      meta:
+                        lado === "mentor"
+                          ? `${emUso[o.id] ?? 0}/${capacidade[o.id] ?? 1}${ocupado ? " · lotado" : ""}`
+                          : ocupado
+                            ? `em dupla ${ehEsp ? "especialista" : "DPP"}`
+                            : null,
+                      disabled: ocupado,
+                    };
+                  })}
                   onValueChange={(v) => {
-                    setNovoId(v ? String(v) : null);
+                    setNovoId(v);
                     setErro(null);
                   }}
-                >
-                  <SelectTrigger
-                    id="remanejo-novo"
-                    aria-labelledby="remanejo-novo-label remanejo-novo"
-                  >
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {poolAtual.length === 0 && (
-                      <SelectItem value="__vazio" disabled>
-                        {lado === "mentor"
-                          ? "Nenhum mentor disponível"
-                          : "Nenhum mentorado disponível"}
-                      </SelectItem>
-                    )}
-                    {poolAtual.map((o) => {
-                      const ocupado =
-                        lado === "mentor"
-                          ? mentorLotado(o.id)
-                          : mentoradoOcupado(o.id);
-                      return (
-                        <SelectItem key={o.id} value={o.id} disabled={ocupado}>
-                          {lado === "mentor"
-                            ? `${o.nome_social ?? o.nome} · ${emUso[o.id] ?? 0}/${capacidade[o.id] ?? 1}${ocupado ? " · lotado" : ""}`
-                            : `${o.nome_social ?? o.nome}${ocupado ? ` (em dupla ${ehEsp ? "especialista" : "DPP"})` : ""}`}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+                />
                 {poolAtual.length === 0 && (
                   <p className="text-xs text-muted-foreground">
                     {lado === "mentor"
@@ -574,11 +565,10 @@ export function RemanejarDuplaDialog({
               )}
 
               <label className="flex cursor-pointer items-start gap-2.5 rounded-lg bg-muted/40 px-3 py-2.5 text-sm transition-colors hover:bg-muted/70">
-                <input
-                  type="checkbox"
+                <Checkbox
                   name="registrar_nota"
                   defaultChecked
-                  className="mt-0.5 accent-primary"
+                  className="mt-0.5"
                 />
                 <span>
                   Registrar saída na ficha de quem está saindo

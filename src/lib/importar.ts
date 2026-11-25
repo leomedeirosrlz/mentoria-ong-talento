@@ -900,7 +900,7 @@ export function normalizaLinha(l: LinhaImportada): {
       aviso:
         r.aviso ??
         (r.valor === null && revisar
-          ? (opts?.falha ?? "não reconhecido — descartado")
+          ? (opts?.falha ?? "não reconhecido: descartado")
           : null),
     });
     linha[campo] = para;
@@ -940,7 +940,7 @@ export function normalizaLinha(l: LinhaImportada): {
     "uf",
     "UF",
     { valor: ufOk, mudou: ufOk !== String(l.uf ?? "").trim() },
-    { falha: "UF não reconhecida — descartada" }
+    { falha: "UF não reconhecida: descartada" }
   );
 
   return { linha, diffs };

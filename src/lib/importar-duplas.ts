@@ -129,6 +129,9 @@ export type PessoaRef = {
   role?: AppRole | null;
   papeis?: AppRole[];
   ativo?: boolean;
+  /** mentorados só: conta de jovem vinculada — o sino dela recebe o
+   *  pareamento junto com o do mentor (importDuplas) */
+  profile_id?: string | null;
 };
 
 /** Dupla como o diretório precisa — o status decide se ocupa vaga.
@@ -236,11 +239,11 @@ function nomesDe(p: PessoaRef): string[] {
 function erroAmbiguo(valor: string, achados: PessoaRef[]): { erro: string } {
   const nomes = achados
     .slice(0, 3)
-    .map((p) => p.nome)
+    .map((p) => p.nome_social ?? p.nome)
     .join(", ");
   const resto = achados.length > 3 ? ` e mais ${achados.length - 3}` : "";
   return {
-    erro: `"${valor}" é ambíguo (${nomes}${resto}) — use o e-mail`,
+    erro: `"${valor}" é ambíguo (${nomes}${resto}). Use o e-mail`,
   };
 }
 
@@ -300,8 +303,8 @@ function resolverCronograma(
       erro: ativos.length
         ? `sem turma na linha e ${ativos.length} cronogramas ativos (${ativos
             .map((c) => c.turma)
-            .join(", ")}) — informe a coluna turma`
-        : "sem turma na linha e nenhum cronograma ativo — informe a coluna turma",
+            .join(", ")}). Informe a coluna turma`
+        : "sem turma na linha e nenhum cronograma ativo. Informe a coluna turma",
     };
   }
   const q = chaveNome(txt);
@@ -310,7 +313,7 @@ function resolverCronograma(
     ? exatos
     : cronogramas.filter((c) => chaveNome(c.turma).includes(q));
   if (!match.length) {
-    return { erro: `turma "${txt}" não encontrada — existentes: ${rotulos || "nenhuma"}` };
+    return { erro: `turma "${txt}" não encontrada. Existentes: ${rotulos || "nenhuma"}` };
   }
   if (match.length === 1) return { cronograma: match[0] };
   // turma duplicada entre cronogramas: o ativo é a leitura óbvia do label
@@ -375,9 +378,9 @@ export function resolverPares(
       );
     }
     const mentor = rMentor.pessoa;
-    r.mentorNome = mentor.nome;
+    r.mentorNome = mentor.nome_social ?? mentor.nome;
     if (mentor.ativo === false) {
-      return falha(`${mentor.nome}: cadastro inativo — reative antes de parear`);
+      return falha(`${mentor.nome_social ?? mentor.nome}: cadastro inativo. Reative antes de parear`);
     }
     // papel efetivo (0085): o papel mentor_* pode ser só secundário — vive
     // em profile_papeis, não no primário. Sem `papeis` na ref cai no
@@ -389,7 +392,7 @@ export function resolverPares(
     const temDpp = papeisMentor.has("mentor_dpp");
     const temEsp = papeisMentor.has("mentor_especialista");
     if (!temDpp && !temEsp) {
-      return falha(`${mentor.nome}: não tem papel de mentor`);
+      return falha(`${mentor.nome_social ?? mentor.nome}: não tem papel de mentor`);
     }
     // mesma régua do createDupla — a trilha sai do papel do mentor. A
     // coluna `trilha` (opcional) é o desempate do híbrido: com os DOIS
@@ -405,12 +408,12 @@ export function resolverPares(
           : null;
     if (trilhaTxt && !trilhaCol) {
       return falha(
-        `trilha inválida ("${linha.trilha.trim()}" — use dpp ou especialista)`
+        `trilha inválida ("${linha.trilha.trim()}": use dpp ou especialista)`
       );
     }
     if (!trilhaCol && temDpp && temEsp) {
       return falha(
-        `${mentor.nome}: mentor híbrido — informe a coluna trilha (dpp ou especialista)`
+        `${mentor.nome_social ?? mentor.nome}: mentor híbrido. Informe a coluna trilha (dpp ou especialista)`
       );
     }
     const trilha: Trilha = trilhaCol ?? (temEsp ? "especialista" : "dpp");
@@ -419,7 +422,7 @@ export function resolverPares(
       (trilha === "dpp" && !temDpp)
     ) {
       return falha(
-        `${mentor.nome}: não tem papel na trilha ${trilha === "especialista" ? "especialista" : "DPP"}`
+        `${mentor.nome_social ?? mentor.nome}: não tem papel na trilha ${trilha === "especialista" ? "especialista" : "DPP"}`
       );
     }
 
@@ -433,7 +436,7 @@ export function resolverPares(
       );
     }
     const mentorado = rMd.pessoa;
-    r.mentoradoNome = mentorado.nome;
+    r.mentoradoNome = mentorado.nome_social ?? mentorado.nome;
 
     // supervisor — só DPP leva (a especialista não tem supervisor, força
     // null como o cadastro manual); informado e não resolvido falha a
@@ -443,10 +446,10 @@ export function resolverPares(
       const rSup = resolverPessoa(linha.supervisor, dir.profiles);
       if ("erro" in rSup) return falha(`auxiliar executivo: ${rSup.erro}`);
       if (!podeSupervisionar(rSup.pessoa.role)) {
-        return falha(`${rSup.pessoa.nome}: não pode supervisionar duplas`);
+        return falha(`${rSup.pessoa.nome_social ?? rSup.pessoa.nome}: não pode supervisionar duplas`);
       }
       supervisor = rSup.pessoa;
-      r.supervisorNome = supervisor.nome;
+      r.supervisorNome = supervisor.nome_social ?? supervisor.nome;
     }
 
     // idempotência — mesmo par ativo/pausado no banco ou já criado no lote
@@ -457,8 +460,8 @@ export function resolverPares(
     if (vagaOcupada.has(`${mentorado.id}|${trilha}`)) {
       return existe(
         trilha === "especialista"
-          ? `${mentorado.nome} já está em uma dupla de especialista ativa`
-          : `${mentorado.nome} já está em uma dupla ativa`
+          ? `${mentorado.nome_social ?? mentorado.nome} já está em uma dupla de especialista ativa`
+          : `${mentorado.nome_social ?? mentorado.nome} já está em uma dupla ativa`
       );
     }
     // capacidade do mentor — o trigger do banco é a trava final; aqui é a
@@ -471,7 +474,7 @@ export function resolverPares(
     const emUso = duplasDoMentor.get(`${mentor.id}|${trilha}`) ?? 0;
     if (emUso >= capacidade) {
       return falha(
-        `${mentor.nome}: sem vaga (${emUso}/${capacidade} ${capacidade === 1 ? "dupla" : "duplas"} em curso)`
+        `${mentor.nome_social ?? mentor.nome}: sem vaga (${emUso}/${capacidade} ${capacidade === 1 ? "dupla" : "duplas"} em curso)`
       );
     }
 
@@ -510,7 +513,7 @@ export function resolverPares(
       iniciadaEm = normData(iniciadaRaw);
       if (!iniciadaEm) {
         return falha(
-          `iniciada_em inválida ("${linha.iniciada_em.trim()}" — use dd/mm/aaaa ou aaaa-mm-dd)`
+          `iniciada_em inválida ("${linha.iniciada_em.trim()}": use dd/mm/aaaa ou aaaa-mm-dd)`
         );
       }
     } else if (trilha === "especialista") {

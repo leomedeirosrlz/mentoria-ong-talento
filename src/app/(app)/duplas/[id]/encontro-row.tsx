@@ -18,10 +18,12 @@ import {
   formatDate,
   formatDateTime,
   linkSeguro,
+  podeEntrarAgora,
   registroTardio,
   semanaBounds,
   type PassoGuia,
 } from "@/lib/ciclo";
+import { hrefMaterial } from "@/lib/materiais";
 import type { DestinoWA } from "@/components/whatsapp-rapido";
 import { WhatsAppRapido } from "@/components/whatsapp-rapido";
 import { AvaliacaoBadge } from "@/components/semaforo";
@@ -29,7 +31,8 @@ import { CopiarChamada } from "@/components/copiar-chamada";
 import { NotaEncontro } from "@/components/nota-encontro";
 import { CombinadosEncontro } from "@/components/combinados-encontro";
 import {
-  AvaliacaoJovemCard,
+  AvaliacaoJovemResumo,
+  AvaliacaoJovemDetalhe,
   AvaliacaoPendenteLinha,
   EstrelaEspecialistaChip,
 } from "@/components/avaliacao-jovem";
@@ -38,7 +41,10 @@ import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { NaoAconteceuButton, DesfazerNaoAconteceuButton } from "@/components/nao-aconteceu-button";
 import { RegistroFormLazy } from "@/components/registro-form-lazy";
 import {
-  RegistroDetails,
+  EncontroDisclosure,
+  EncontroDisclosurePar,
+} from "@/components/encontro-disclosure";
+import {
   RegistroInline,
   RegistroInlinePanel,
   RegistroInlineTrigger,
@@ -76,7 +82,6 @@ export function EncontroRow({
   nota,
   combinadosDoNumero,
   combinadosAnteriores,
-  registroAberto,
   apoioDestinos,
   linkAvaliacao,
   estrelaJovem,
@@ -88,6 +93,10 @@ export function EncontroRow({
   jornadaViva,
   lacunaAnterior,
   autorNome,
+  proximosRegistros,
+  cobertura,
+  sessaoGrupo,
+  ancora,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
   passo: PassoGuia;
@@ -121,9 +130,6 @@ export function EncontroRow({
   combinadosDoNumero: Encaminhamento[];
   /** Pendentes de nºs anteriores — carry-over taggeado "do Nº encontro". */
   combinadosAnteriores: Encaminhamento[];
-  /** Encontro atual ou pendente de registro — nasce com o registro expandido;
-   *  os demais viram linha-resumo sob disclosure (o deep link `#registrar-{id}` abre). */
-  registroAberto: boolean;
   /** Destinos do nudge do pedido de apoio (só o mentor — o pedido é dele).
    *  Vazio pro próprio mentor: WhatsAppRapido some sozinho. */
   apoioDestinos: DestinoWA[];
@@ -150,6 +156,20 @@ export function EncontroRow({
   lacunaAnterior?: number | null;
   /** Nome de quem vê — assina o convite de avaliação pro jovem. */
   autorNome?: string;
+  /** Fila de encontros devendo registro, em ordem de nº (sessão dupla,
+   *  REALIZA-397) — o pós-save oferece "Registrar o Nº também?" pro
+   *  primeiro que a sessão não cobriu. */
+  proximosRegistros?: { encontroId: string; numero: number }[] | null;
+  /** Passos do guia que a sessão pode cobrir junto do registro (007 US11)
+   *  — a mesma régua que o salvarRegistro revalida no servidor. */
+  cobertura?: { numero: number; titulo: string }[] | null;
+  /** Demais membros do grupo sessao_id deste encontro (sessão planejada,
+   *  018): o form os mostra travados na cobertura. */
+  sessaoGrupo?: { numero: number; titulo: string }[] | null;
+  /** Âncora da sessão combinada que cobre ESTE encontro (018): o registro
+   *  e a avaliação do jovem moram nela — a linha mostra os da sessão, não
+   *  "pendente" fantasma. Só chega quando o próprio não tem registro. */
+  ancora?: Encontro | null;
 }) {
   const feito = encontro?.status === "realizado";
   const naoAconteceu = encontro?.status === "nao_aconteceu";
@@ -158,7 +178,16 @@ export function EncontroRow({
   const marcado =
     (encontro?.status === "agendado" || encontro?.status === "remarcado") &&
     !!encontro.data_hora;
-  const reg = encontro?.registro;
+  // sessão combinada (018): coberto = a âncora carrega o registro da sessão
+  // e ele vale por este nº — mesma régua do cobertosDaDupla, já resolvida
+  // na página
+  const ancoraDaSessao = encontro?.registro == null ? (ancora ?? null) : null;
+  const coberto = ancoraDaSessao?.registro != null;
+  const reg = encontro?.registro ?? ancoraDaSessao?.registro ?? null;
+  // avaliação do jovem: uma por sessão, na âncora (0228) — o coberto lê a
+  // da sessão
+  const avaliacaoJovem =
+    encontro?.avaliacao_jovem ?? ancoraDaSessao?.avaliacao_jovem ?? null;
   // combinados gravados por ESTE registro — alimentam a view do card e o
   // form de edição (que devolve os ids de banco pro salvarRegistro casar)
   const combinadosDoRegistro = reg
@@ -174,30 +203,41 @@ export function EncontroRow({
   // material do encontro: com destino (arquivo oficial ou url) vira chip; sem, só o título muted
   const material = materiais.find((m) => m.path || m.url) ?? materiais[0] ?? null;
   const materiaisComDestino = materiais.filter((m) => m.path || linkSeguro(m.url));
-  const materialHref = material?.path
-    ? `/api/material/${material.id}`
-    : linkSeguro(material?.url);
-  // a chamada é a ação nº1 na janela do encontro (15 min antes a 2h depois do
-  // início) — vira CTA primário; fora da janela fica chip de apoio comum
-  const msAteInicio = encontro?.data_hora
-    ? new Date(encontro.data_hora).getTime() - new Date().getTime()
-    : null;
+  // doc nativo navega na mesma aba e carrega a ficha no ?dupla= — o
+  // "Abrir instrumento" do documento volta pra esta dupla (REALIZA-386);
+  // arquivo/storage e url externa seguem em aba nova
+  const ehDoc = (m: Material) => m.path?.startsWith("doc:") ?? false;
+  const hrefDoMaterial = (m: Material) => {
+    const h = hrefMaterial(m);
+    return h && ehDoc(m) ? `${h}?dupla=${duplaId}` : h;
+  };
+  const materialHref = material ? hrefDoMaterial(material) : null;
+  // a chamada é a ação nº1 na janela do encontro (QW5: 30 min antes a 2h
+  // depois — mesma régua da home/agenda do jovem) — vira CTA primário;
+  // fora da janela fica link de apoio comum
   const chamadaAgora =
     (encontro?.status === "agendado" || encontro?.status === "remarcado") &&
-    msAteInicio != null &&
-    msAteInicio <= 15 * 60000 &&
-    msAteInicio >= -2 * 3600000;
+    podeEntrarAgora(encontro.data_hora);
   // registro feito mais de 3 dias depois do encontro → "registro tardio"
   const tardio = reg != null && registroTardio(reg, encontro);
   // CTA e form de registro: realizado libera na hora; pros demais status
   // (agendado vencido, não-aconteceu) só depois do horário — RevelarApos cobre
-  // a aba que ficou aberta atravessando o encontro, sem depender de re-render
-  const liberadoNoHorario = (node: React.ReactNode) =>
-    encontro?.status === "realizado"
-      ? node
-      : encontro?.data_hora
-        ? <RevelarApos from={encontro.data_hora}>{node}</RevelarApos>
-        : null;
+  // a aba que ficou aberta atravessando o encontro, sem depender de re-render.
+  // O wrapper é o MESMO em todo status com data: se o save vira "realizado" e
+  // o refresh troca RevelarApos por nó cru, o subtree remonta e o posSave
+  // morre na mesma corrida do gate !reg — no realizado o from é realizado_em
+  // (sempre passado: revela na hora mesmo com data_hora futura divergente)
+  const liberadoNoHorario = (node: React.ReactNode) => {
+    const desde =
+      encontro?.status === "realizado"
+        ? (encontro.realizado_em ?? encontro.data_hora)
+        : encontro?.data_hora;
+    return desde ? (
+      <RevelarApos from={desde}>{node}</RevelarApos>
+    ) : encontro?.status === "realizado" ? (
+      node
+    ) : null;
+  };
   const podeRegistrar = !!(encontro && !reg && podeEditar);
   // remarcar e trocar o link são gestos do encontro em aberto — o servidor
   // aceita reagendar remarcado/nao_aconteceu/cancelado via `atual` (só
@@ -252,6 +292,8 @@ export function EncontroRow({
     diverge && `de fato em ${formatDate(encontro?.realizado_em)}`,
     encontro?.origem === "externo" && "marcado fora da plataforma",
     encontro?.motivo_reagendamento && `remarcado: ${encontro.motivo_reagendamento}`,
+    coberto &&
+      `sessão combinada com o ${ancoraDaSessao!.numero}º encontro`,
     tentativasFalhas > 0 &&
       `${tentativasFalhas === 1 ? "1 tentativa anterior não aconteceu" : `${tentativasFalhas} tentativas anteriores não aconteceram`}`,
     !materialHref &&
@@ -357,7 +399,7 @@ export function EncontroRow({
                       })}
                     >
                       <VideoCamera />
-                      Entrar na chamada
+                      {chamadaAgora ? "Entrar na chamada" : "Link da chamada"}
                     </a>
                   ) : (
                     <CopiarChamada url={linkSeguro(encontro?.link)!} />
@@ -373,8 +415,9 @@ export function EncontroRow({
                 {materialHref && materiaisComDestino.length <= 1 && (
                   <a
                     href={materialHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    {...(ehDoc(material!)
+                      ? {}
+                      : { target: "_blank", rel: "noopener noreferrer" })}
                     className={buttonVariants({ variant: "outline", size: "sm" })}
                   >
                     <BookOpen />
@@ -393,13 +436,14 @@ export function EncontroRow({
                       <PopoverTitle className="px-2 pb-1 pt-1 text-sm font-semibold">
                         Material de apoio
                       </PopoverTitle>
-                      <ul>
+                      <ul className="max-h-80 overflow-y-auto">
                         {materiaisComDestino.map((m) => (
                           <li key={m.id}>
                             <a
-                              href={m.path ? `/api/material/${m.id}` : linkSeguro(m.url)!}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              href={hrefDoMaterial(m)!}
+                              {...(ehDoc(m)
+                                ? {}
+                                : { target: "_blank", rel: "noopener noreferrer" })}
                               className="flex min-h-11 items-center gap-2 rounded-md px-2 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9"
                             >
                               <BookOpen aria-hidden size={15} className="shrink-0 text-muted-foreground" />
@@ -440,7 +484,11 @@ export function EncontroRow({
                 jovemNome={jovemNome}
                 rotulo={ehEsp ? "sessão de especialista" : undefined}
                 trigger={
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-telemetry-alvo="agendar-encontro"
+                  >
                     <CalendarBlank size={16} />
                     Remarcar
                   </Button>
@@ -478,7 +526,11 @@ export function EncontroRow({
                   jovemNome={jovemNome}
                   rotulo={ehEsp ? "sessão de especialista" : undefined}
                   trigger={
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-telemetry-alvo="agendar-encontro"
+                    >
                       <CalendarPlus size={16} />
                       Agendar
                     </Button>
@@ -486,7 +538,7 @@ export function EncontroRow({
                 />
                 {lacunaAnterior != null && (
                   <span className="max-w-56 text-right text-[11px] leading-snug text-muted-foreground">
-                    o {lacunaAnterior}º ainda está pendente — você pode agendar
+                    o {lacunaAnterior}º ainda está pendente, mas você pode agendar
                     este mesmo assim
                   </span>
                 )}
@@ -510,15 +562,22 @@ export function EncontroRow({
       </div>
 
       {/* registro salvo = histórico: linha-resumo (apoio, avaliação, tema) +
-          disclosure pro corpo completo. Só o encontro atual e os pendentes
-          nascem abertos; o deep link #registrar-{id} continua abrindo o bloco */}
-      {(reg && encontro) || (feito && (encontro?.avaliacao_jovem || (!souMentor && estrelaJovem == null))) ? (
+          disclosure pro corpo completo. Os dois blocos nascem FECHADOS: a
+          ficha é índice, o caminho de escrita é a rota dedicada. O par
+          segura UM estado pros dois lados — um clique abre registro e
+          avaliação juntos (FR-007), e o deep link #registrar-{id} segue
+          abrindo os dois */}
+      {encontro &&
+      (reg != null ||
+        (feito &&
+          (avaliacaoJovem != null ||
+            (!souMentor && estrelaJovem == null)))) ? (
+        <EncontroDisclosurePar encontroId={encontro.id}>
         <div className="grid gap-3 lg:grid-cols-2">
           {reg && encontro && (
             <div className="space-y-2">
-              <RegistroDetails
+              <EncontroDisclosure
                 encontroId={encontro.id}
-                aberto={registroAberto}
                 className="border-t border-border/60 bg-muted/50 shadow-[var(--shadow-inset)]"
                 summary={
                   <>
@@ -567,30 +626,56 @@ export function EncontroRow({
                       />
                     }
                   />
-                  {podeEditar && (
+                  {/* a edição mora na linha da âncora — o registro é dela;
+                      duplicar o gesto aqui abriria o form com o encontro
+                      errado como contexto */}
+                  {podeEditar && !coberto && (
                     <div className="pt-1">
                       <EditarRegistro
                         encontroId={encontro.id}
                         duplaId={duplaId}
                         evento={passo}
+                        trilha={ehEsp ? "especialista" : "dpp"}
                         registro={reg}
                         combinados={combinadosDoRegistro}
                       />
                     </div>
                   )}
                 </div>
-              </RegistroDetails>
+              </EncontroDisclosure>
             </div>
           )}
           {feito && (
             <div className="space-y-2">
-              {encontro?.avaliacao_jovem ? (
-                <AvaliacaoJovemCard
-                  avaliacao={encontro.avaliacao_jovem}
-                  duplaId={duplaId}
-                  souCoord={souCoord}
-                  liberadaProMentor={souMentor}
-                />
+              {avaliacaoJovem ? (
+                <EncontroDisclosure
+                  encontroId={encontro.id}
+                  className={cn(
+                    "border-t border-border/60",
+                    avaliacaoJovem.pedir_apoio
+                      ? "bg-[var(--danger)]/5"
+                      : "bg-muted/50"
+                  )}
+                  summary={
+                    <>
+                      <AvaliacaoJovemResumo avaliacao={avaliacaoJovem} />
+                      <CaretDown
+                        size={13}
+                        aria-hidden
+                        className="shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
+                      />
+                    </>
+                  }
+                >
+                  <div className="px-4 pb-3.5 pt-1 text-sm">
+                    <AvaliacaoJovemDetalhe
+                      avaliacao={avaliacaoJovem}
+                      duplaId={duplaId}
+                      souCoord={souCoord}
+                      liberadaProMentor={souMentor}
+                    />
+                  </div>
+                </EncontroDisclosure>
               ) : !souMentor && estrelaJovem == null ? (
                 <AvaliacaoPendenteLinha
                   link={linkAvaliacao}
@@ -598,6 +683,7 @@ export function EncontroRow({
                   jovemNome={jovemNome}
                   jovemWhatsapp={jovemWhatsapp}
                   numero={passo.numero}
+                  sessao={ehEsp}
                   souCoord={souCoord}
                   duplaId={duplaId}
                   jornadaViva={jornadaViva}
@@ -605,12 +691,15 @@ export function EncontroRow({
                 />
               ) : (
                 <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-                  Sem avaliação do jovem para este encontro.
+                  {ehEsp
+                    ? "Sem avaliação do jovem para esta sessão."
+                    : "Sem avaliação do jovem para este encontro."}
                 </div>
               )}
             </div>
           )}
         </div>
+        </EncontroDisclosurePar>
       ) : null}
       {/* combinados logo abaixo do registro (0157): uma lista só, a do
           registro e a do preparo, marcável aqui mesmo — quem acabou de ler
@@ -619,6 +708,7 @@ export function EncontroRow({
         <CombinadosEncontro
           duplaId={duplaId}
           numero={passo.numero}
+          sessao={ehEsp}
           itens={combinadosDoNumero}
           pendentesAnteriores={combinadosAnteriores}
           jovemNome={jovemNome.split(" ")[0] || "Mentorado"}
@@ -635,6 +725,7 @@ export function EncontroRow({
           <NotaEncontro
             duplaId={duplaId}
             numero={passo.numero}
+            sessao={ehEsp}
             nota={nota}
             somenteLeitura={!podeEditar}
           />
@@ -648,7 +739,14 @@ export function EncontroRow({
         </div>
       )}
 
-      {encontro && !reg && podeEditar &&
+      {/* o painel NÃO desmonta quando o registro chega — o refresh pós-save
+          o entrega com o posSave ainda na tela e derrubar o subtree matava
+          a oferta "registrar o próximo também". Com reg o form se recusa a
+          renderizar (o salvo é do RegistroDetails) e o empty:hidden do
+          painel colapsa a faixa */}
+      {/* coberto já tem o registro da sessão — o form dele não existe;
+          quem registra é a linha da âncora */}
+      {encontro && podeEditar && !coberto &&
         liberadoNoHorario(
           <RegistroInlinePanel
             encontroId={encontro.id}
@@ -664,10 +762,15 @@ export function EncontroRow({
               encontroId={encontro.id}
               duplaId={duplaId}
               evento={passo}
+              trilha={ehEsp ? "especialista" : "dpp"}
+              registro={reg ?? null}
               combinadosPendentes={combinadosPendentes}
               // telemetria (REALIZA-217): o encontro "externo" nasceu no
               // fluxo retroativo — a sessão do form é catch-up, não novo
               origem={encontro.origem === "externo" ? "retroativo" : "novo"}
+              proximosRegistros={proximosRegistros}
+              cobertura={cobertura}
+              sessaoGrupo={sessaoGrupo}
             />
           </RegistroInlinePanel>
         )}
@@ -675,8 +778,10 @@ export function EncontroRow({
   );
 
   // um form de registro aberto por vez: o provider lê o hash #registrar-{id}
-  // (mesma âncora do CTA da linha e dos deep-links) e fecha os irmãos
-  return encontro && !reg && podeEditar ? (
+  // (mesma âncora do CTA da linha e dos deep-links) e fecha os irmãos.
+  // Desmontar quando o registro chega no refresh pós-action derrubava o
+  // card inteiro — posSave, rascunho e foco — no meio da corrida do save
+  return encontro && podeEditar ? (
     <RegistroInline encontroId={encontro.id}>{card}</RegistroInline>
   ) : (
     card

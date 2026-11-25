@@ -10,7 +10,7 @@
 // quadrado, sempre com rótulo. Dupla em dia é neutra; apoio é pill à
 // parte, nunca fatia. Entrada: .animate-enter com --i curto (≤300ms).
 
-import { useId, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -21,6 +21,7 @@ import {
   Clock,
   Lifebuoy,
   WarningCircle,
+  WhatsappLogo,
 } from "@phosphor-icons/react";
 import type {
   UiAgenda,
@@ -28,9 +29,13 @@ import type {
   UiCapacidade,
   UiChamados,
   UiCombinados,
+  UiConfirmacao,
   UiDupla,
+  UiDuplas,
   UiJornada,
   UiPedidos,
+  UiPlano,
+  UiPlanoJovem,
   UiDuplaMini,
   UiFila,
   UiFontes,
@@ -50,12 +55,26 @@ import {
   formatDate,
   maxEncontros,
   papelLabel,
+  passoEsp,
+  progressoTrilha,
   tempoRelativo,
   toDateStr,
   type Semaforo,
 } from "@/lib/ciclo";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import type { RecorteFatia } from "@/lib/agenda-coordenacao";
+import {
+  rotaChamados,
+  rotaDupla,
+  rotaDuplas,
+  rotaPessoa,
+} from "@/lib/ia/rotas";
+import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+  type DuplaDesfecho,
+} from "@/lib/dupla-desfecho";
+import { rotuloRitmo } from "@/lib/plano-em-dia";
 import type {
   AppRole,
   ChamadoStatus,
@@ -72,6 +91,16 @@ import {
 import { T } from "@/components/motion";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { BarraSegmentada } from "@/components/viz";
+import { CopiarLink } from "@/components/forms/copiar-link";
+import {
+  msgLinkWhatsApp,
+  msgLinkWhatsAppRepasse,
+  primeiroNome as primeiroNomeLink,
+} from "@/components/forms/link-shared";
+import { useOrigem } from "@/components/forms/use-origem";
+import { DocBlocos } from "@/components/material-documento";
+import { INSTRUMENTO_INFO } from "@/lib/forms/schema";
+import { waLink } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 
 // ---------- vocabulário compartilhado ----------
@@ -117,19 +146,26 @@ const plural = (n: number, um: string, varios: string) =>
 
 const primeiroNome = (n: string | null) => (n ?? "").split(" ")[0] || "dupla";
 
-/** Mesma régua do situacaoDaDupla da home: status fora da jornada manda;
- *  ativa lê a situação. Em dia é neutro, sem cor de status. Na voz do
- *  jovem a dupla encerrada lê "Encerrada" (neutro) — "desistente" é o
- *  vocabulário interno da equipe, nunca sobre ele mesmo. */
+/** Mesma régua do situacaoLinha da home: fechada lê a situação canônica
+ *  (dupla-desfecho), ativa lê o semáforo. Em dia é neutro, sem cor de
+ *  status. Na voz do jovem a dupla encerrada lê "Encerrada" (neutro) —
+ *  "desistente" é o vocabulário interno da equipe, nunca sobre ele mesmo. */
 function situacao(
-  status: DuplaStatus,
+  d: { status: DuplaStatus; desfecho?: DuplaDesfecho | null },
   semaforo?: Semaforo,
   jovem = false
 ): { rotulo: string; tom: TomSituacao } {
-  if (status === "concluida") return { rotulo: "Concluída", tom: "pausa" };
-  if (status === "encerrada")
-    return { rotulo: jovem ? "Encerrada" : "Desistente", tom: "pausa" };
-  if (status === "pausada") return { rotulo: "Pausada", tom: "pausa" };
+  if (d.status !== "ativa") {
+    // desfecho separa Desistente × Encerrada pra equipe; pro jovem a
+    // palavra neutra cobre qualquer fechamento cedo (pausada e
+    // concluída seguem lendo o próprio nome)
+    const sit = situacaoDaDupla(d);
+    const rotulo =
+      jovem && (sit === "desistente" || sit === "encerrada")
+        ? SITUACAO_DUPLA_LABEL.encerrada
+        : SITUACAO_DUPLA_LABEL[sit];
+    return { rotulo, tom: "pausa" };
+  }
   if (semaforo === "risco") return { rotulo: "Em risco", tom: "risco" };
   if (semaforo === "atencao") return { rotulo: "Atenção", tom: "atencao" };
   return { rotulo: "Em dia", tom: "neutro" };
@@ -310,14 +346,16 @@ function rotas(jovem: boolean) {
         ficha: () => "/jovem",
         encontros: () => "/jovem/agenda",
         instrumentos: () => "/jovem",
-        chamados: "/jovem/perfil",
+        chamados: () => "/jovem/perfil",
         agenda: "/jovem/agenda",
       }
     : {
-        ficha: (id: string) => `/duplas/${id}`,
-        encontros: (id: string) => `/duplas/${id}?aba=encontros`,
-        instrumentos: (id: string) => `/duplas/${id}?aba=instrumentos`,
-        chamados: "/chamados",
+        // os builders de ia/rotas centralizam o vocabulário de params —
+        // link com filtro errado abria a tela sem aplicar (REALIZA-396)
+        ficha: (id: string) => rotaDupla(id),
+        encontros: (id: string) => rotaDupla(id, "encontros"),
+        instrumentos: (id: string) => rotaDupla(id, "instrumentos"),
+        chamados: (id?: string) => rotaChamados(id),
         agenda: "/agenda",
       };
 }
@@ -334,6 +372,8 @@ export function UiCard({ bloco, jovem }: { bloco: UiBloco; jovem?: boolean }) {
       return <CardSaude b={bloco} />;
     case "dupla":
       return <CardDupla b={bloco} jovem={ehJovem} r={r} />;
+    case "duplas":
+      return <CardDuplas b={bloco} />;
     case "agenda":
       return <CardAgenda b={bloco} r={r} />;
     case "registros":
@@ -356,6 +396,12 @@ export function UiCard({ bloco, jovem }: { bloco: UiBloco; jovem?: boolean }) {
       return <CardJornada b={bloco} />;
     case "pedidos":
       return <CardPedidos b={bloco} />;
+    case "plano":
+      return <CardPlano b={bloco} r={r} />;
+    case "plano_jovem":
+      return <CardPlanoJovem b={bloco} />;
+    case "confirmacao":
+      return <CardConfirmacao b={bloco} />;
   }
 }
 
@@ -374,7 +420,7 @@ export function CardSaude({ b }: { b: UiSaude }) {
       titulo="Situação das duplas"
       meta={
         <Link
-          href="/duplas?recorte=andamento"
+          href={rotaDuplas({ recorte: "andamento" })}
           className={cn("rounded-sm underline-offset-2 hover:underline", FOCO)}
         >
           <b className="font-semibold text-foreground">{c.em_andamento}</b> em
@@ -383,7 +429,7 @@ export function CardSaude({ b }: { b: UiSaude }) {
       }
       rodape={
         resto > 0 ? (
-          <Rodape href={`/duplas?recorte=${recorteAcao}`}>
+          <Rodape href={rotaDuplas({ recorte: recorteAcao })}>
             Ver todas as {b.pedem_acao} que pedem ação
           </Rodape>
         ) : (
@@ -406,8 +452,8 @@ export function CardSaude({ b }: { b: UiSaude }) {
         />
       )}
       <ul className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-        <Contagem n={c.risco} rotulo="em risco" dot="bg-[var(--danger)]" texto="text-[var(--danger-text)]" href="/duplas?recorte=risco" />
-        <Contagem n={c.atencao} rotulo="em atenção" dot="bg-[var(--warn)]" texto="text-[var(--warn-text)]" href="/duplas?recorte=atencao" />
+        <Contagem n={c.risco} rotulo="em risco" dot="bg-[var(--danger)]" texto="text-[var(--danger-text)]" href={rotaDuplas({ recorte: "risco" })} />
+        <Contagem n={c.atencao} rotulo="em atenção" dot="bg-[var(--warn)]" texto="text-[var(--warn-text)]" href={rotaDuplas({ recorte: "atencao" })} />
         <Contagem n={c.em_dia} rotulo="em dia" dot="bg-[var(--ok)]" texto="text-[var(--ok-text)]" />
         {c.pausadas > 0 && (
           <Contagem
@@ -415,14 +461,32 @@ export function CardSaude({ b }: { b: UiSaude }) {
             rotulo={c.pausadas === 1 ? "pausada" : "pausadas"}
             dot="bg-[var(--pausa)]"
             texto="text-muted-foreground"
-            href="/duplas?recorte=pausada"
+            href={rotaDuplas({ recorte: "pausada" })}
+          />
+        )}
+        {c.concluidas > 0 && (
+          <Contagem
+            n={c.concluidas}
+            rotulo={c.concluidas === 1 ? "concluída" : "concluídas"}
+            dot="bg-muted-foreground"
+            texto="text-foreground"
+            href={rotaDuplas({ recorte: "concluida" })}
+          />
+        )}
+        {c.encerradas > 0 && (
+          <Contagem
+            n={c.encerradas}
+            rotulo={c.encerradas === 1 ? "encerrada" : "encerradas"}
+            dot="bg-muted-foreground/40"
+            texto="text-muted-foreground"
+            href={rotaDuplas({ recorte: "encerrada" })}
           />
         )}
         {c.apoio > 0 && (
           // apoio é sobreposição: pill à parte, não soma nem tira do risco
           <li>
             <Link
-              href="/duplas?recorte=apoio"
+              href={rotaDuplas({ recorte: "apoio" })}
               className={cn(
                 "inline-flex min-h-7 items-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors hover:brightness-95",
                 PILL.info,
@@ -488,16 +552,18 @@ function Contagem({
 }
 
 /** DuplaLinha de bolso: situação + apoio, nomes que não truncam, motivo
- *  em até duas linhas, n de esperados. O card inteiro abre a ficha. */
+ *  em até duas linhas, n de esperados e o próximo encontro. O card
+ *  inteiro abre a ficha. */
 function DestaqueLinha({ d, i }: { d: UiDuplaMini; i: number }) {
-  const sit = situacao(d.status, d.semaforo);
+  const agora = useAgora();
+  const sit = situacao(d, d.semaforo);
   return (
     <li
       style={passo(i)}
       className="animate-enter relative rounded-lg border border-border/70 p-2.5 transition-colors hover:bg-muted/50"
     >
       <Link
-        href={`/duplas/${d.id}`}
+        href={rotaDupla(d.id)}
         aria-label={`Ver ficha da dupla de ${primeiroNome(d.mentorado)}`}
         className={cn("absolute inset-0 z-10 rounded-lg", FOCO)}
       />
@@ -524,7 +590,46 @@ function DestaqueLinha({ d, i }: { d: UiDuplaMini; i: number }) {
           ? ` de ${plural(d.esperado, "encontro esperado", "encontros esperados")}`
           : ` ${d.feitos === 1 ? "encontro realizado" : "encontros realizados"}`}
       </p>
+      {d.proximo && (
+        <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+          <Clock size={12} aria-hidden className="shrink-0" />
+          Próximo: {d.proximo.numero}º encontro
+          {valida(d.proximo.data_hora)
+            ? ` · ${quandoTexto(d.proximo.data_hora!, agora)}`
+            : " · data a combinar"}
+        </p>
+      )}
     </li>
+  );
+}
+
+// ---------- duplas (panorama) ----------
+
+/** "Como estão minhas duplas?" — as linhas-mini com situação, progresso
+ *  e próximo encontro; o radar completo segue em /duplas. */
+export function CardDuplas({ b }: { b: UiDuplas }) {
+  return (
+    <Cartao
+      titulo="Suas duplas"
+      meta={
+        b.truncado
+          ? `${b.itens.length} de ${b.total}`
+          : plural(b.total, "dupla", "duplas")
+      }
+      rodape={
+        b.truncado ? (
+          <Rodape href="/duplas">Ver todas as {b.total} duplas</Rodape>
+        ) : (
+          <Rodape href="/duplas">Abrir duplas</Rodape>
+        )
+      }
+    >
+      <ul className="space-y-1.5">
+        {b.itens.map((d, i) => (
+          <DestaqueLinha key={d.id} d={d} i={i + 1} />
+        ))}
+      </ul>
+    </Cartao>
   );
 }
 
@@ -565,10 +670,30 @@ function Quadrado({ estado, tom }: { estado: EstadoQuadrado; tom: TomSituacao })
  *  Pro jovem "registro" é conceito interno do mentor — o quadrado cheio
  *  lê "aconteceu" e os anéis nunca aparecem (a tool nem devolve o dado). */
 function EncontrosDupla({ b, tom, jovem = false }: { b: UiDupla; tom: TomSituacao; jovem?: boolean }) {
+  const ehEsp = b.trilha === "especialista";
+  // um quadrado por passo do guia: no DPP o nº oficial já é o passo; na
+  // trilha esp a tentativa que mira o passo (realizado preferido, senão a
+  // mais recente) — a régua é passoEsp, o numero cru de tentativa não vaza
+  // nem estufa o total (REALIZA-498, mesma regra do encontroDoPassoEsp)
+  const representanteEsp = (passo: number) => {
+    let alvo: (typeof b.encontros)[number] | undefined;
+    for (const e of b.encontros) {
+      if (passoEsp(e, b.encontros) !== passo) continue;
+      if (
+        !alvo ||
+        e.status === "realizado" ||
+        (alvo.status !== "realizado" && e.numero > alvo.numero)
+      )
+        alvo = e;
+    }
+    return alvo;
+  };
   const por = new Map(b.encontros.map((e) => [e.numero, e]));
-  const total = Math.max(maxEncontros(b.trilha), ...b.encontros.map((e) => e.numero), 0);
+  const total = ehEsp
+    ? maxEncontros(b.trilha)
+    : Math.max(maxEncontros(b.trilha), ...b.encontros.map((e) => e.numero), 0);
   const estados = Array.from({ length: total }, (_, k) => {
-    const e = por.get(k + 1);
+    const e = ehEsp ? representanteEsp(k + 1) : por.get(k + 1);
     if (jovem && e?.status === "realizado") return "registro" as EstadoQuadrado;
     return estadoEncontro(e);
   });
@@ -591,12 +716,11 @@ function EncontrosDupla({ b, tom, jovem = false }: { b: UiDupla; tom: TomSituaca
   return (
     <div className="mt-3">
       <div className="flex items-baseline justify-between gap-2">
-        <p className={EYEBROW}>Encontros</p>
+        <p className={EYEBROW}>{ehEsp ? "Sessões" : "Encontros"}</p>
         <p className="text-xs">
           <b className="font-semibold tabular-nums">
-            {feitos} de {total}
+            {progressoTrilha({ esp: ehEsp, feitos, total, curta: true })}
           </b>
-          <span className="text-muted-foreground"> realizados</span>
         </p>
       </div>
       {/* a leitura acessível é a legenda em texto; os quadrados são o desenho */}
@@ -644,7 +768,7 @@ export function CardDupla({
   r?: Rotas;
 }) {
   const agora = useAgora();
-  const sit = situacao(b.status, b.semaforo, jovem);
+  const sit = situacao(b, b.semaforo, jovem);
   const mentor = b.mentor ?? "Mentor a definir";
   const mentorado = b.mentorado ?? "Mentorado a definir";
   const turma = b.turma ? turmaCurta(b.turma) : null;
@@ -694,7 +818,7 @@ export function CardDupla({
         href={r.ficha(b.id)}
         className={cn(buttonVariants({ size: "sm" }), "mt-3 w-full @sm:w-auto")}
       >
-        {jovem ? "Ver minha jornada" : "Abrir ficha"}
+        {jovem ? "Ver meu início" : "Abrir ficha"}
       </Link>
     </Cartao>
   );
@@ -712,13 +836,13 @@ const STATUS_ENCONTRO: Record<EncontroStatus, { rotulo: string; tom: Tom }> = {
 
 export function CardAgenda({ b, r = rotas(false) }: { b: UiAgenda; r?: Rotas }) {
   const agora = useAgora();
-  // agrupa por dia no fuso; sem data vai pro fim
+  // agrupa por dia no fuso; sem agendamento vai pro fim
   const grupos: { chave: string; rotulo: string; itens: UiAgenda["encontros"] }[] = [];
   for (const e of b.encontros) {
     const chave = valida(e.data_hora) ? toDateStr(quando(e.data_hora)) : "9999-12-31";
     let g = grupos.find((x) => x.chave === chave);
     if (!g) {
-      g = { chave, rotulo: valida(e.data_hora) ? rotuloDia(e.data_hora, agora) : "Sem data", itens: [] };
+      g = { chave, rotulo: valida(e.data_hora) ? rotuloDia(e.data_hora, agora) : "Sem agendamento", itens: [] };
       grupos.push(g);
     }
     g.itens.push(e);
@@ -785,6 +909,435 @@ export function CardAgenda({ b, r = rotas(false) }: { b: UiAgenda; r?: Rotas }) 
       ) : (
         <Vazio>Nenhum encontro marcado no período</Vazio>
       )}
+    </Cartao>
+  );
+}
+
+// ---------- plano em dia (REALIZA-397) ----------
+
+const ACAO_PLANO: Record<UiPlano["passos"][number]["acao"], string> = {
+  agendar: "sugestão",
+  remarcar: "remarcar pra",
+  travado: "marcado pra",
+};
+
+/** Dobra inicial do card (026): o resto dos passos mora sob o toggle. */
+const PASSOS_DOBRA = 4;
+
+/** O custo do plano em pill — o nível nomeado vira o rótulo em palavras
+ *  (rotuloRitmo, o mesmo do card da ficha); conversa_coord nomeia o
+ *  caminho, não o ritmo. */
+const NIVEL_PLANO: Record<
+  NonNullable<UiPlano["nivel"]>,
+  { rotulo: (ritmo: number | null) => string; tom: Tom }
+> = {
+  ritmo_normal: { rotulo: (r) => rotuloRitmo(r ?? 1), tom: "neutro" },
+  semana_dupla: { rotulo: (r) => rotuloRitmo(r ?? 2), tom: "atencao" },
+  semana_tripla: { rotulo: (r) => rotuloRitmo(r ?? 3), tom: "atencao" },
+  um_por_dia: { rotulo: (r) => rotuloRitmo(r ?? 7), tom: "atencao" },
+  conversa_coord: { rotulo: () => "Conversa com a coordenação", tom: "risco" },
+};
+
+/** A leitura da grade semanal (518): quem já marcou e o que falta — o
+ *  sinal pra pedir a grade no chat antes de propor (dias_comuns 0 com os
+ *  dois lados marcados = grades não se cruzam, a saída é sem_grade). */
+function gradeTexto(g: NonNullable<UiPlano["grade"]>): string | null {
+  if (g.sem_grade) return "Combinado sem a grade de disponibilidade.";
+  if (!g.mentor && !g.jovem)
+    return "Nenhum lado marcou a disponibilidade semanal ainda: dá pra pedir no chat ou combinar sem ela.";
+  if (!g.mentor || !g.jovem)
+    return `Só ${g.mentor ? "o mentor" : "o jovem"} marcou a grade: sem a outra as datas não cruzam.`;
+  if (g.dias_comuns === 0)
+    return "As grades dos dois não se cruzam em nenhum dia: dá pra combinar sem ela.";
+  return null;
+}
+
+/** O plano de recuperação sai pronto do planner — o card nomeia a dupla,
+ *  resume o custo numa dobra e guarda o detalhe a um toque (527): os
+ *  bloqueios do combinado (recesso sem decisão, grade faltando) leem
+ *  junto do plano e o rascunho do documento abre sob "Ler o combinado",
+ *  pra dupla revisar antes de pedir pra publicar. Combinado gravado
+ *  vira pill com o aceite único. Quem agenda é a dupla, por isso o
+ *  rodapé leva à ficha (a Liza propõe, nunca grava cronograma). */
+export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
+  const agora = useAgora();
+  const [aberto, setAberto] = useState(false);
+  const [docAberto, setDocAberto] = useState(false);
+  const passosId = useId();
+  const docId = useId();
+  const estado = b.estado ?? (b.em_dia ? "em_dia" : "recuperacao");
+  const conversa = estado === "conversa";
+  const marcados = b.passos.filter((p) => p.acao === "travado").length;
+  const aMarcar = b.passos.length - marcados;
+  const resto = b.passos.slice(PASSOS_DOBRA);
+
+  const meta =
+    estado === "em_dia"
+      ? "em dia"
+      : conversa
+        ? "não fecha até o encerramento"
+        : b.data_recuperacao && valida(b.data_recuperacao)
+          ? `em dia ${quandoTexto(b.data_recuperacao, agora)}`
+          : undefined;
+
+  const resumo = [
+    aMarcar > 0 && plural(aMarcar, "passo a marcar", "passos a marcar"),
+    marcados > 0 && `${marcados} já ${marcados === 1 ? "marcado" : "marcados"}`,
+    b.pendencias.length > 0 &&
+      plural(
+        b.pendencias.length,
+        "pendência pra resolver antes",
+        "pendências pra resolver antes"
+      ),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const passoLi = (p: UiPlano["passos"][number], i: number) => (
+    <li
+      key={p.numero}
+      style={passo(i + 1)}
+      className="animate-enter flex items-start gap-2.5 py-2 first:pt-0 last:pb-0"
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "grid size-7 shrink-0 place-items-center rounded-full font-mono text-[11px] font-semibold tabular-nums",
+          p.acao === "travado"
+            ? "bg-[var(--ok-bg)] text-[var(--ok-text)] ring-1 ring-[var(--ok-border)]"
+            : "bg-[var(--destaque)]/25 text-foreground"
+        )}
+      >
+        {p.numero}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium leading-snug">
+          {p.titulo}
+        </span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">
+          {ACAO_PLANO[p.acao]}{" "}
+          {valida(p.data) ? diaSemanaCurto(p.data) : "a definir"}
+          {valida(p.data_oficial) && p.data_oficial !== p.data
+            ? ` · oficial era ${diaMesCurto(p.data_oficial)}`
+            : ""}
+          {p.vence_no_caminho ? " · vence no caminho" : ""}
+        </span>
+        {(p.precondicao || p.aviso) && (
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            {p.precondicao ? `Precisa antes: ${p.precondicao}` : p.aviso}
+          </span>
+        )}
+      </span>
+    </li>
+  );
+
+  return (
+    <Cartao
+      titulo="Para ficar em dia"
+      meta={meta}
+      rodape={
+        <Rodape href={`${r.encontros(b.dupla_id)}#plano-em-dia`}>
+          {b.plano ? "Ver o combinado na ficha" : "Combinar o plano na ficha"}
+        </Rodape>
+      }
+    >
+      {/* a dupla do plano — o card diz de quem é e leva à ficha (026) */}
+      <Link
+        href={r.ficha(b.dupla_id)}
+        className={cn(
+          "-mx-1.5 block rounded-md px-1.5 py-1 text-sm font-semibold leading-snug transition-colors hover:bg-muted/60",
+          FOCO
+        )}
+      >
+        <DuplaNomes
+          mentor={b.mentor ?? "Mentor a definir"}
+          mentorado={b.mentorado ?? "Mentorado a definir"}
+        />
+      </Link>
+
+      {/* resumo do custo sempre visível: nível em pill, conta dos passos
+          e das pendências — ninguém descobre pré-requisito só ao abrir */}
+      {(b.nivel || resumo) && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          {b.nivel && (
+            <Pill tom={NIVEL_PLANO[b.nivel].tom}>
+              {NIVEL_PLANO[b.nivel].rotulo(b.ritmo)}
+            </Pill>
+          )}
+          {resumo && (
+            <p className="text-xs text-muted-foreground tabular-nums">{resumo}</p>
+          )}
+        </div>
+      )}
+
+      {conversa && (
+        <div className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2">
+          <p className="text-sm font-semibold leading-snug">
+            {b.data_projetada && valida(b.data_projetada)
+              ? `Em dia só em ${formatDate(b.data_projetada)}`
+              : "Nem com 1 encontro por dia fecha"}
+            {b.encerramento && valida(b.encerramento)
+              ? `, depois do encerramento (${formatDate(b.encerramento)})`
+              : ""}
+            .
+          </p>
+          {b.cabem_ate_encerramento && (
+            <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+              Cabem {b.cabem_ate_encerramento.cabem} dos{" "}
+              {b.cabem_ate_encerramento.faltam} encontros que faltam
+              {b.encerramento && valida(b.encerramento)
+                ? " até o encerramento"
+                : ""}
+              .
+            </p>
+          )}
+        </div>
+      )}
+
+      {b.pendencias.length > 0 && (
+        <p className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground">
+          Antes do plano: {b.pendencias.map((p) => (
+            `${p.numero}º ${p.estado === "limbo" ? "(confirmar se aconteceu)" : "(falta o registro)"}`
+          )).join(", ")}.
+        </p>
+      )}
+
+      {/* o que trava a proposta (527): recesso sem decisão e grade
+          faltando leem junto do plano — a plano_propor recusa os dois */}
+      {b.recessos_pendentes.length > 0 && (
+        <div className="mt-2 rounded-lg bg-[var(--warn-bg)] px-2.5 py-2">
+          <p className="text-xs font-semibold text-[var(--warn-text)]">
+            A dupla decide sobre{" "}
+            {plural(b.recessos_pendentes.length, "o recesso", "os recessos")}{" "}
+            antes de propor
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            {b.recessos_pendentes.map((rec) => (
+              <li
+                key={rec.ciclo_evento_id}
+                className="text-xs text-muted-foreground"
+              >
+                {rec.titulo}
+                {valida(rec.inicio)
+                  ? `, ${diaMesCurto(rec.inicio)} a ${valida(rec.fim) ? diaMesCurto(rec.fim) : "?"}`
+                  : ""}
+                : pausa ou segue nos encontros?
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {b.grade && gradeTexto(b.grade) && (
+        <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+          <Clock size={13} aria-hidden className="mt-0.5 shrink-0" />
+          {gradeTexto(b.grade)}
+        </p>
+      )}
+
+      {/* rascunho do combinado — a dupla lê o que a proposta grava antes
+          de pedir pra publicar (mesma montagem do wizard da aba Agora) */}
+      {b.doc && b.doc.length > 0 && (
+        <div className="mt-2">
+          <AnimatePresence initial={false}>
+            {docAberto && (
+              <motion.div
+                id={docId}
+                key="doc"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={T.panel}
+                style={{ overflow: "clip" }}
+                className="space-y-3 rounded-lg border border-border/60 bg-background px-3 py-2.5 text-sm"
+              >
+                <DocBlocos blocos={b.doc} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-expanded={docAberto}
+            aria-controls={docAberto ? docId : undefined}
+            onClick={() => setDocAberto((v) => !v)}
+            className="h-auto min-h-11 w-full items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold hover:bg-muted/50 active:not-aria-[haspopup]:scale-100 md:min-h-11"
+          >
+            {docAberto ? "Fechar o combinado" : "Ler o combinado"}
+            <CaretDown
+              size={14}
+              weight="bold"
+              aria-hidden
+              className={cn(
+                "shrink-0 text-muted-foreground transition-transform duration-200 ease-snappy",
+                docAberto && "rotate-180"
+              )}
+            />
+          </Button>
+        </div>
+      )}
+
+      {b.passos.length > 0 && (
+        <ol className="mt-1 divide-y divide-border/60">
+          {b.passos.slice(0, PASSOS_DOBRA).map(passoLi)}
+        </ol>
+      )}
+      {resto.length > 0 && (
+        <>
+          {/* o molde do FonteItem: botão real com aria e o painel em
+              height auto — reduced-motion sai pelo guard global */}
+          <AnimatePresence initial={false}>
+            {aberto && (
+              <motion.ol
+                id={passosId}
+                key="resto"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={T.panel}
+                style={{ overflow: "clip" }}
+                className="divide-y divide-border/60"
+              >
+                {resto.map(passoLi)}
+              </motion.ol>
+            )}
+          </AnimatePresence>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-expanded={aberto}
+            aria-controls={aberto ? passosId : undefined}
+            onClick={() => setAberto((v) => !v)}
+            className="h-auto min-h-11 w-full items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold hover:bg-muted/50 active:not-aria-[haspopup]:scale-100 md:min-h-11"
+          >
+            {aberto ? "Ver menos" : `Ver mais ${resto.length} passos`}
+            <CaretDown
+              size={14}
+              weight="bold"
+              aria-hidden
+              className={cn(
+                "shrink-0 text-muted-foreground transition-transform duration-200 ease-snappy",
+                aberto && "rotate-180"
+              )}
+            />
+          </Button>
+        </>
+      )}
+      {b.passos.length === 0 && (
+        <Vazio>Nada a marcar: a dupla segue o calendário</Vazio>
+      )}
+
+      {b.sugestao && (
+        <p className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+          {b.sugestao}
+        </p>
+      )}
+      {b.plano && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2">
+          <Pill tom={TOM_PLANO[b.plano.status] ?? "neutro"}>
+            Combinado {STATUS_PLANO[b.plano.status] ?? b.plano.status}
+          </Pill>
+          <span className="text-xs text-muted-foreground">
+            {b.plano.versao > 1 ? `v${b.plano.versao}` : ""}
+            {b.plano.status === "proposto"
+              ? // aceite ÚNICO (0225): um aceite da dupla já põe pra valer —
+                // `falta` nomeia quem pode carimbar e os booleans cobrem o
+                // row legado da era bilateral (proposto com um carimbo só)
+                b.plano.falta === "mentor" ||
+                  (b.plano.falta == null && b.plano.aceito_mentorado && !b.plano.aceito_mentor)
+                ? " · o aceite do mentor põe pra valer"
+                  : b.plano.falta === "mentorado" ||
+                      (b.plano.falta == null && b.plano.aceito_mentor && !b.plano.aceito_mentorado)
+                    ? " · o aceite do jovem põe pra valer"
+                    : `${b.plano.versao > 1 ? " · " : ""}um aceite da dupla põe pra valer`
+              : ""}
+          </span>
+        </div>
+      )}
+      {b.avisos.length > 0 && (
+        <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
+          {b.avisos.map((a) => (
+            <li
+              key={a}
+              className="flex items-start gap-1.5 text-xs text-muted-foreground"
+            >
+              <WarningCircle size={13} aria-hidden className="mt-0.5 shrink-0" />
+              {a}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Cartao>
+  );
+}
+
+const STATUS_PLANO: Record<string, string> = {
+  proposto: "proposto",
+  aceito: "aceito",
+  ativo: "em andamento",
+  concluido: "concluído",
+  expirado: "expirado",
+  contestado: "contestado",
+};
+
+/** Tom da pill do combinado — proposto pede o aceite (info), o que já
+ *  vale lê ok e o que espera revisão lê atenção. */
+const TOM_PLANO: Record<string, Tom> = {
+  proposto: "info",
+  aceito: "ok",
+  ativo: "ok",
+  contestado: "atencao",
+};
+
+// ---------- plano do jovem ----------
+
+/** O combinado como o jovem o vê (0219 — meu_plano): status, ritmo e as
+ *  datas — sem semáforo nem motivos internos (o recorte é da RPC). */
+export function CardPlanoJovem({ b }: { b: UiPlanoJovem }) {
+  const aplicados = new Map(b.passos_aplicados.map((p) => [p.numero, p]));
+  return (
+    <Cartao
+      titulo="O combinado"
+      meta={STATUS_PLANO[b.status] ?? b.status}
+    >
+      <p className="text-xs text-muted-foreground">
+        {b.ritmo === 1
+          ? "1 encontro por semana."
+          : `Até ${b.ritmo ?? 2} encontros por semana.`}{" "}
+        Confirmem as datas juntos.
+      </p>
+      <ol className="mt-2 divide-y divide-border/60">
+        {b.passos.map((p, i) => {
+          const aplicado = aplicados.get(p.numero);
+          return (
+            <li
+              key={p.numero}
+              style={passo(i + 1)}
+              className="animate-enter flex items-center gap-2.5 py-2 first:pt-0 last:pb-0"
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  "grid size-7 shrink-0 place-items-center rounded-full font-mono text-[11px] font-semibold tabular-nums",
+                  aplicado
+                    ? "bg-[var(--ok-bg)] text-[var(--ok-text)] ring-1 ring-[var(--ok-border)]"
+                    : "bg-[var(--destaque)]/25 text-foreground"
+                )}
+              >
+                {p.numero}
+              </span>
+              <span className="min-w-0 flex-1 text-sm">
+                {p.numero}º encontro ·{" "}
+                <span className="text-muted-foreground">
+                  {aplicado
+                    ? `marcado pra ${valida(aplicado.data_nova) ? diaSemanaCurto(aplicado.data_nova) : "a definir"}`
+                    : `sugestão ${valida(p.data) ? diaSemanaCurto(p.data) : "a definir"}`}
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </Cartao>
   );
 }
@@ -917,7 +1470,7 @@ export function CardFila({ b }: { b: UiFila }) {
             return (
               <LinhaPessoa
                 key={m.id}
-                href={`/pessoas/${m.id}`}
+                href={rotaPessoa(m.id)}
                 nome={m.nome}
                 meta={ha && (ha === "desde hoje" ? "Entrou na fila hoje" : `Esperando ${ha}`)}
                 i={i + 1}
@@ -935,7 +1488,7 @@ export function CardFila({ b }: { b: UiFila }) {
             return (
               <LinhaPessoa
                 key={m.id}
-                href={`/pessoas/${m.id}`}
+                href={rotaPessoa(m.id)}
                 nome={m.nome}
                 meta={[plural(m.vagas, "vaga livre", "vagas livres"), ha && `com vaga ${ha}`]
                   .filter(Boolean)
@@ -975,7 +1528,7 @@ export function CardCapacidade({ b }: { b: UiCapacidade }) {
             <li key={m.id} style={passo(i + 1)} className="animate-enter">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <Link
-                  href={`/pessoas/${m.id}`}
+                  href={rotaPessoa(m.id)}
                   className={cn("rounded-sm text-sm font-medium underline-offset-2 hover:underline", FOCO)}
                 >
                   {m.nome}
@@ -1040,7 +1593,7 @@ export function CardPessoas({ b }: { b: UiPessoas }) {
         {b.pessoas.map((p, i) => (
           <li key={p.id} style={passo(i + 1)} className="animate-enter">
             <Link
-              href={`/pessoas/${p.id}`}
+              href={rotaPessoa(p.id)}
               className={cn(
                 "-mx-1.5 flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-muted/60",
                 FOCO
@@ -1070,7 +1623,7 @@ const STATUS_CHAMADO: Record<ChamadoStatus, { tom: Tom; icone: ReactNode }> = {
 export function CardChamados({ b, r = rotas(false) }: { b: UiChamados; r?: Rotas }) {
   const agora = useAgora();
   return (
-    <Cartao titulo="Chamados" rodape={<Rodape href={r.chamados}>Abrir chamados</Rodape>}>
+    <Cartao titulo="Chamados" rodape={<Rodape href={r.chamados()}>Abrir chamados</Rodape>}>
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
         <Contagem n={b.aberto} rotulo={b.aberto === 1 ? "aberto" : "abertos"} dot="bg-[var(--danger)]" texto="text-[var(--danger-text)]" />
         <Contagem n={b.em_atendimento} rotulo="em atendimento" dot="bg-[var(--warn)]" texto="text-[var(--warn-text)]" />
@@ -1080,27 +1633,32 @@ export function CardChamados({ b, r = rotas(false) }: { b: UiChamados; r?: Rotas
           {b.chamados.map((c, i) => {
             const st = STATUS_CHAMADO[c.status];
             return (
-              <li key={c.numero} style={passo(i + 1)} className="animate-enter py-2 first:pt-0 last:pb-0">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {/* assunto primeiro, como nas filas — o número CHA não
-                      aparece (ruído de protocolo, e o card vai pro jovem
-                      também) */}
-                  <p className={cn("min-w-0 flex-1 break-words text-sm font-medium leading-snug", !c.assunto && "font-normal text-muted-foreground")}>
-                    {c.assunto ?? "Sem assunto"}
-                  </p>
-                  <Pill tom={st.tom} icone={st.icone}>
-                    {CHAMADO_STATUS_LABEL[c.status]}
-                  </Pill>
-                </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {CHAMADO_CATEGORIA_LABEL[c.categoria]}
-                  {valida(c.criado_em) && (
-                    <>
-                      {" · Aberto "}
-                      <time dateTime={c.criado_em}>{tempoRelativo(c.criado_em, agora)}</time>
-                    </>
-                  )}
-                </p>
+              <li key={c.id ?? c.numero} style={passo(i + 1)} className="animate-enter py-2 first:pt-0 last:pb-0">
+                <Link
+                  href={r.chamados(c.id)}
+                  className="-mx-2 block rounded-md px-2 py-0.5 transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {/* assunto primeiro, como nas filas — o número CHA não
+                        aparece (ruído de protocolo, e o card vai pro jovem
+                        também) */}
+                    <span className={cn("min-w-0 flex-1 break-words text-sm font-medium leading-snug", !c.assunto && "font-normal text-muted-foreground")}>
+                      {c.assunto ?? "Sem assunto"}
+                    </span>
+                    <Pill tom={st.tom} icone={st.icone}>
+                      {CHAMADO_STATUS_LABEL[c.status]}
+                    </Pill>
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {CHAMADO_CATEGORIA_LABEL[c.categoria]}
+                    {valida(c.criado_em) && (
+                      <>
+                        {" · Aberto "}
+                        <time dateTime={c.criado_em}>{tempoRelativo(c.criado_em, agora)}</time>
+                      </>
+                    )}
+                  </span>
+                </Link>
               </li>
             );
           })}
@@ -1253,7 +1811,7 @@ function FonteItem({
 const PEDIDO_LABEL: Record<string, { rotulo: string; tom: Tom }> = {
   sugerida: { rotulo: "sugerida", tom: "neutro" },
   aberta: { rotulo: "esperando especialista", tom: "info" },
-  aguardando_coord: { rotulo: "com a coordenação", tom: "info" },
+  aguardando_coord: { rotulo: "no mural", tom: "info" }, // legado da triagem (0158)
   contra_proposta: { rotulo: "novo horário proposto", tom: "atencao" },
   aceita: { rotulo: "aceita", tom: "ok" },
   recusada: { rotulo: "não deu certo", tom: "neutro" },
@@ -1312,7 +1870,7 @@ export function CardJornada({ b }: { b: UiJornada }) {
   return (
     <Cartao
       titulo="Sua jornada"
-      meta={`${b.total_respondidos} de ${total} feitos`}
+      meta={`${b.total_respondidos} de ${total} instrumentos`}
       rodape={<Rodape href="/jovem">Abrir sua jornada</Rodape>}
     >
       {total > 0 && (
@@ -1320,6 +1878,7 @@ export function CardJornada({ b }: { b: UiJornada }) {
           <BarraSegmentada
             altura="md"
             animate
+            legenda
             denominador={total}
             segmentos={[
               { valor: b.total_respondidos, rotulo: "feitos", cls: "bg-[var(--ok)]" },
@@ -1354,6 +1913,259 @@ export function CardJornada({ b }: { b: UiJornada }) {
         ))}
       </ul>
     </Cartao>
+  );
+}
+
+// ---------- confirmacao (escritas REALIZA-126) ----------
+
+/** Prévia de escrita aguardando o "sim" humano — o card é a ÚNICA via de
+ *  approve (o confirmacao_id nunca vai pro modelo, então só este botão
+ *  executa). Confirmar chama o endpoint determinístico e o resultado da
+ *  escrita fica inline; Cancelar descarta e a prévia expira sozinha.
+ *  Uso único: confirmado, recusado, cancelado ou expirado, o card trava. */
+/** O que a emitir_link_instrumento devolve além do url (527): quem recebe
+ *  e a ponte de WhatsApp pra o card virar o gesto de envio completo. */
+type DocFeito = {
+  token: string;
+  sistema: string;
+  url: string;
+  remetente: "mentor" | "equipe";
+  jovem: { nome: string | null; whatsapp: string | null } | null;
+  mentor: { nome: string | null; whatsapp: string | null } | null;
+};
+
+export function CardConfirmacao({ b }: { b: UiConfirmacao }) {
+  type Estado =
+    | "pendente"
+    | "enviando"
+    | "feito"
+    | "erro"
+    | "cancelado"
+    | "expirado";
+  const [estado, setEstado] = useState<Estado>("pendente");
+  const [detalhe, setDetalhe] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [doc, setDoc] = useState<DocFeito | null>(null);
+  const origem = useOrigem();
+  // o prazo visual espelha o do banco (a linha tem expira_em) — vencer
+  // aqui poupa um clique fadado a falhar no servidor
+  const [expiraEm] = useState(() => Date.now() + b.expira_em_minutos * 60_000);
+  useEffect(() => {
+    if (estado !== "pendente") return;
+    const t = setTimeout(
+      () => setEstado("expirado"),
+      Math.max(expiraEm - Date.now(), 0)
+    );
+    return () => clearTimeout(t);
+  }, [estado, expiraEm]);
+
+  async function confirmar() {
+    setEstado("enviando");
+    setDetalhe(null);
+    try {
+      const res = await fetch("/api/ia/confirmacao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          confirmacao_id: b.confirmacao_id,
+          tool: b.tool,
+          args: b.args,
+          request_id: b.request_id,
+        }),
+      });
+      const j = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            erro?: string;
+            dados?: ({ url?: string | null } & Partial<DocFeito>) | null;
+          }
+        | null;
+      if (!res.ok || !j) {
+        // falha de transporte não consumiu a prévia — volta pra tentar
+        setDetalhe("Não consegui concluir. Tente de novo.");
+        setEstado("pendente");
+        return;
+      }
+      if (j.ok) {
+        const dados = j.dados;
+        setUrl(dados?.url ?? null);
+        // card de documento (527): token+sistema = emitir_link_instrumento
+        setDoc(
+          dados?.token && dados.sistema && dados.url
+            ? {
+                token: dados.token,
+                sistema: dados.sistema,
+                url: dados.url,
+                remetente: dados.remetente === "mentor" ? "mentor" : "equipe",
+                jovem: dados.jovem ?? null,
+                mentor: dados.mentor ?? null,
+              }
+            : null
+        );
+        setEstado("feito");
+      } else {
+        // o servidor é quem sabe: recusa de domínio consumiu a prévia e
+        // inválida/expirada/usada já não prestava — as duas encerram o card
+        setDetalhe(j.erro ?? "Não foi possível confirmar.");
+        setEstado("erro");
+      }
+    } catch {
+      setDetalhe("Falha de rede. Tente de novo.");
+      setEstado("pendente");
+    }
+  }
+
+  return (
+    <Cartao
+      titulo="Confirmação pendente"
+      meta={
+        estado === "pendente" || estado === "enviando"
+          ? `expira em ${b.expira_em_minutos} min`
+          : undefined
+      }
+    >
+      <p className="text-sm leading-snug">{b.resumo}</p>
+      {estado === "feito" && doc ? (
+        <BlocoDocFeito doc={doc} origem={origem} />
+      ) : estado === "feito" ? (
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-[var(--ok-text)]">
+          <CheckCircle size={16} aria-hidden className="shrink-0" />
+          Feito.
+          {url && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(
+                "rounded-sm font-semibold text-foreground underline-offset-2 hover:underline",
+                FOCO
+              )}
+            >
+              {url}
+            </a>
+          )}
+        </div>
+      ) : estado === "erro" ? (
+        <p className="mt-2.5 flex items-start gap-1.5 text-sm text-[var(--danger-text)]">
+          <WarningCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+          {detalhe}
+        </p>
+      ) : estado === "cancelado" ? (
+        <p className="mt-2.5 text-sm text-muted-foreground">
+          Cancelado. Nada foi alterado.
+        </p>
+      ) : estado === "expirado" ? (
+        <p className="mt-2.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Clock size={16} aria-hidden className="shrink-0" />
+          A prévia expirou. Peça a ação de novo.
+        </p>
+      ) : (
+        <>
+          <div className="mt-2.5 flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={confirmar}
+              disabled={estado === "enviando"}
+            >
+              {estado === "enviando" ? "Confirmando…" : "Confirmar"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setEstado("cancelado")}
+              disabled={estado === "enviando"}
+            >
+              Cancelar
+            </Button>
+          </div>
+          {detalhe && (
+            <p className="mt-2 text-xs text-[var(--danger-text)]">{detalhe}</p>
+          )}
+        </>
+      )}
+    </Cartao>
+  );
+}
+
+/** O link emitido pronto pra sair (527): o título do instrumento, a URL
+ *  pra copiar e o WhatsApp já com a mensagem — direto pro jovem quando
+ *  ele tem número; repasse pelo mentor quando não tem (a mensagem pede a
+ *  ponte, como o lote da ficha); sem nenhum número, só o copiar. */
+function BlocoDocFeito({ doc, origem }: { doc: DocFeito; origem: string }) {
+  const titulo =
+    INSTRUMENTO_INFO[doc.sistema as keyof typeof INSTRUMENTO_INFO]?.titulo ??
+    doc.sistema;
+  const wa = doc.jovem?.whatsapp
+    ? {
+        href: waLink(
+          doc.jovem.whatsapp,
+          msgLinkWhatsApp(
+            titulo,
+            doc.jovem.nome,
+            doc.token,
+            origem,
+            doc.remetente === "mentor"
+              ? (doc.mentor?.nome ?? undefined)
+              : undefined
+          )
+        ),
+        repasse: false,
+      }
+    : doc.mentor?.whatsapp && doc.jovem
+      ? {
+          href: waLink(
+            doc.mentor.whatsapp,
+            msgLinkWhatsAppRepasse(
+              titulo,
+              doc.mentor.nome,
+              doc.jovem.nome,
+              doc.token,
+              origem
+            )
+          ),
+          repasse: true,
+        }
+      : null;
+  return (
+    <div className="mt-2.5">
+      <p className="flex items-start gap-1.5 text-sm font-medium text-[var(--ok-text)]">
+        <CheckCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+        Link de &quot;{titulo}&quot; pronto
+        {doc.jovem?.nome ? ` pra ${primeiroNomeLink(doc.jovem.nome)}` : ""}.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <code className="rounded-md bg-muted px-1.5 py-1 font-mono text-xs">
+          {doc.url}
+        </code>
+        <CopiarLink token={doc.token} />
+        {wa?.href && (
+          <a
+            href={wa.href}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "gap-1.5"
+            )}
+          >
+            <WhatsappLogo aria-hidden />
+            WhatsApp{wa.repasse ? " pro mentor" : ""}
+          </a>
+        )}
+      </div>
+      {wa?.repasse && doc.jovem?.nome && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {primeiroNomeLink(doc.jovem.nome)} não tem WhatsApp cadastrado: a
+          mensagem pede o repasse.
+        </p>
+      )}
+      {!wa && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Sem WhatsApp cadastrado na dupla: copie o link e envie pelo canal
+          de sempre.
+        </p>
+      )}
+    </div>
   );
 }
 

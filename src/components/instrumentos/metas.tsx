@@ -1,14 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { FlagPennant, Plus, X } from "@phosphor-icons/react";
+import { toast } from "@/lib/toast";
 import { agrupaEmSecoes, extraiGruposMeta } from "@/lib/forms/instrumentos";
 import { campoRespondido } from "@/lib/forms/resposta";
-import { type FormularioCampo } from "@/lib/forms/schema";
+import {
+  camposPerguntas,
+  type FormularioCampo,
+} from "@/lib/forms/schema";
 import { T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { RotuloPergunta } from "@/components/forms/pergunta";
 import { cn } from "@/lib/utils";
 import type { RespostaApi } from "./use-resposta";
 import { SubmetasEditor } from "./submetas-editor";
@@ -24,7 +29,7 @@ import {
 
 // Definindo Minhas Metas — metas como cards vivos: cada grupo meta_N +
 // porque_N (+ submetas_N, o desdobramento da 0118) é uma ficha que
-// acende quando preenchida (número vira lime).
+// ganha o selo "pronta" quando preenchida.
 // As metas opcionais (4–5) entram por "Adicionar meta" com animação de
 // altura e saem pelo X — o conjunto fixo da definição não muda, só a
 // apresentação. O fechamento (rev_* + meta_principal) vira revisão em
@@ -41,6 +46,14 @@ export function Metas({
   api: RespostaApi;
 }) {
   const blocos = useMemo(() => agrupaEmSecoes(campos), [campos]);
+  // posição na régua do form — os campos soltos fora das fichas de meta
+  // carregam o mesmo número em texto do form genérico (a Meta N da ficha
+  // já é a identidade numerada do grupo, não repete a régua)
+  const numeroPorId = useMemo(() => {
+    const m = new Map<string, number>();
+    camposPerguntas(campos).forEach((c, i) => m.set(c.id, i + 1));
+    return m;
+  }, [campos]);
 
   return (
     <>
@@ -54,13 +67,26 @@ export function Metas({
             primeiro={bi === 0}
           >
             {ehMetas ? (
-              <CorpoMetas campos={b.campos} api={api} />
+              <CorpoMetas
+                campos={b.campos}
+                api={api}
+                numeroPorId={numeroPorId}
+              />
             ) : ehVisao ? (
-              <CorpoVisao campos={b.campos} api={api} />
+              <CorpoVisao
+                campos={b.campos}
+                api={api}
+                numeroPorId={numeroPorId}
+              />
             ) : (
               <div className="space-y-3">
                 {b.campos.map((c) => (
-                  <CampoRevisao key={c.id} campo={c} api={api} />
+                  <CampoRevisao
+                    key={c.id}
+                    campo={c}
+                    api={api}
+                    numeroPorId={numeroPorId}
+                  />
                 ))}
               </div>
             )}
@@ -83,10 +109,10 @@ function Capitulo({
   children: React.ReactNode;
 }) {
   return (
-    <section className={cn(!primeiro && "pt-2")}>
+    <section className={cn(!primeiro && "pt-7")}>
       {secao && (
         <header className="px-1 pb-3">
-          <h2 className="text-base font-semibold tracking-tight sm:text-lg">
+          <h2 className="text-base font-semibold tracking-tight @xl:text-lg">
             {secao.label}
           </h2>
           {secao.descricao && (
@@ -107,9 +133,11 @@ function Capitulo({
 function CorpoVisao({
   campos,
   api,
+  numeroPorId,
 }: {
   campos: FormularioCampo[];
   api: RespostaApi;
+  numeroPorId: Map<string, number>;
 }) {
   const declaracao = campos.find((c) => c.id === "declaracao_visao");
   const precisos = campos.filter((c) => c.id.startsWith("preciso_"));
@@ -123,13 +151,13 @@ function CorpoVisao({
         <div
           data-campo={declaracao.id}
           className={cn(
-            "rounded-xl border-l-2 border-[var(--brand-lime)] bg-card p-4 shadow-[var(--shadow-border)] sm:p-5",
+            "rounded-xl border-l-2 border-[var(--brand-lime)] bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5",
             api.erros[declaracao.id] && "ring-2 ring-destructive/60"
           )}
         >
           <label
             htmlFor={campoDomId(declaracao)}
-            className="block text-[15px] font-semibold leading-snug sm:text-base"
+            className="block text-[15px] font-semibold leading-snug text-foreground @xl:text-base"
           >
             {declaracao.label}
           </label>
@@ -148,22 +176,21 @@ function CorpoVisao({
       )}
 
       {precisos.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 @xl:grid-cols-2">
           {precisos.map((c) => (
             <div
               key={c.id}
               data-campo={c.id}
               className={cn(
-                "space-y-1.5 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]",
+                "space-y-1.5 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5",
                 api.erros[c.id] && "ring-2 ring-destructive/60"
               )}
             >
-              <label
+              <RotuloPergunta
+                campo={c}
+                n={numeroPorId.get(c.id)}
                 htmlFor={campoDomId(c)}
-                className="block text-sm font-medium leading-snug"
-              >
-                {c.label}
-              </label>
+              />
               <EntradaTexto
                 campo={c}
                 valor={api.valores[c.id]}
@@ -177,7 +204,12 @@ function CorpoVisao({
       )}
 
       {soltos.map((c) => (
-        <CampoGenerico key={c.id} campo={c} api={api} />
+        <CampoGenerico
+          key={c.id}
+          campo={c}
+          api={api}
+          n={numeroPorId.get(c.id)}
+        />
       ))}
     </div>
   );
@@ -188,14 +220,17 @@ function CorpoVisao({
 function CorpoMetas({
   campos,
   api,
+  numeroPorId,
 }: {
   campos: FormularioCampo[];
   api: RespostaApi;
+  numeroPorId: Map<string, number>;
 }) {
   const grupos = useMemo(() => extraiGruposMeta(campos), [campos]);
   // metas abertas além das obrigatórias — deriva do conteúdo também (o
   // rascunho restaura DEPOIS do mount: meta_4 salva volta aberta sozinha)
   const [abertas, setAbertas] = useState<Set<number>>(new Set());
+  const addRef = useRef<HTMLButtonElement>(null);
 
   // conteúdo segura a ficha aberta — desdobramento/is/prazo também
   // contam (a pessoa pode ter começado pelas submetas)
@@ -228,16 +263,29 @@ function CorpoMetas({
   function remover(n: number) {
     const g = grupos.find((x) => x.n === n);
     if (!g) return;
-    api.definir(g.meta.id, undefined);
-    if (g.porque) api.definir(g.porque.id, undefined);
-    if (g.is) api.definir(g.is.id, undefined);
-    if (g.prazo) api.definir(g.prazo.id, undefined);
-    if (g.submetas) api.definir(g.submetas.id, undefined);
+    // snapshot pra Desfazer — a remoção limpa todos os campos do grupo
+    const backup = [g.meta, g.porque, g.is, g.prazo, g.submetas]
+      .filter((c): c is FormularioCampo => c != null)
+      .map((c) => [c.id, api.valores[c.id]] as const);
+    for (const c of [g.meta, g.porque, g.is, g.prazo, g.submetas]) {
+      if (c) api.definir(c.id, undefined);
+    }
     setAbertas((prev) => {
       const next = new Set(prev);
       next.delete(n);
       return next;
     });
+    toast(`Meta ${n} removida`, {
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          for (const [id, v] of backup) api.definir(id, v);
+          setAbertas((prev) => new Set(prev).add(n));
+        },
+      },
+    });
+    // foco cai no gatilho que reabre a ficha — sem ele o teclado órfão
+    requestAnimationFrame(() => addRef.current?.focus());
   }
 
   return (
@@ -264,12 +312,19 @@ function CorpoMetas({
 
       {proximaFechada && (
         <Button
+          ref={addRef}
           type="button"
           variant="outline"
           className="w-full border-dashed"
-          onClick={() =>
-            setAbertas((prev) => new Set(prev).add(proximaFechada.n))
-          }
+          onClick={() => {
+            const alvo = proximaFechada;
+            setAbertas((prev) => new Set(prev).add(alvo.n));
+            // ficha nova entra focada — o input da meta é o primeiro
+            // controle e já vem com o rascunho de volta se houver
+            requestAnimationFrame(() =>
+              document.getElementById(campoDomId(alvo.meta))?.focus()
+            );
+          }}
         >
           <Plus aria-hidden />
           Adicionar meta {proximaFechada.n}
@@ -283,7 +338,12 @@ function CorpoMetas({
         return c.tipo === "texto_longo" && subN ? (
           <SubmetasEditor key={c.id} campo={c} api={api} metaN={Number(subN)} />
         ) : (
-          <CampoGenerico key={c.id} campo={c} api={api} />
+          <CampoGenerico
+            key={c.id}
+            campo={c}
+            api={api}
+            n={numeroPorId.get(c.id)}
+          />
         );
       })}
     </div>
@@ -328,19 +388,11 @@ function FichaMeta({
         (erroMeta || erroPorque) && "ring-2 ring-destructive/60"
       )}
     >
-      <div className="space-y-3 p-4 sm:p-5">
+      <div className="space-y-3 p-4 @xl:p-5">
         <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden
-            className={cn(
-              "grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold tabular-nums transition-colors",
-              completa
-                ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
-                : "bg-[var(--brand-lime)]/15 text-[var(--ok-text)]"
-            )}
-          >
-            {g.n}
-          </span>
+          {/* "Meta N" já carrega o N — não vira número da régua (o campo
+              meta_N tem posição própria na régua, exibida no rótulo dele
+              quando a ficha não é a dona daquele número) */}
           <h3 className="flex-1 text-[15px] font-semibold">
             Meta {g.n}
             {!g.meta.obrigatorio && (
@@ -369,12 +421,7 @@ function FichaMeta({
         </div>
 
         <div className="space-y-1.5" data-campo={g.meta.id}>
-          <label
-            htmlFor={campoDomId(g.meta)}
-            className="block text-sm font-medium leading-snug"
-          >
-            {g.meta.label}
-          </label>
+          <RotuloPergunta campo={g.meta} htmlFor={campoDomId(g.meta)} />
           <EntradaTexto
             campo={g.meta}
             valor={api.valores[g.meta.id]}
@@ -387,17 +434,7 @@ function FichaMeta({
 
         {g.porque && (
           <div className="space-y-1.5" data-campo={g.porque.id}>
-            <label
-              htmlFor={campoDomId(g.porque)}
-              className="block text-sm font-medium leading-snug"
-            >
-              {g.porque.label}
-              {!g.porque.obrigatorio && (
-                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                  (opcional)
-                </span>
-              )}
-            </label>
+            <RotuloPergunta campo={g.porque} htmlFor={campoDomId(g.porque)} />
             <EntradaTextoLongo
               campo={g.porque}
               valor={api.valores[g.porque.id]}
@@ -435,9 +472,11 @@ function FichaMeta({
 function CampoRevisao({
   campo,
   api,
+  numeroPorId,
 }: {
   campo: FormularioCampo;
   api: RespostaApi;
+  numeroPorId: Map<string, number>;
 }) {
   // um submetas_N fora do capítulo das metas (form editado) mantém o
   // editor de linhas — a serialização é a mesma de qualquer lugar
@@ -451,11 +490,13 @@ function CampoRevisao({
       <div
         data-campo={campo.id}
         className={cn(
-          "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5",
+          "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5",
           api.erros[campo.id] && "ring-2 ring-destructive/60"
         )}
       >
-        <p className="text-[15px] font-medium leading-snug">{campo.label}</p>
+        <p className="text-[15px] font-semibold leading-snug text-foreground">
+          {campo.label}
+        </p>
         <div className="mt-2">
           <SimNao
             campo={campo}
@@ -480,7 +521,7 @@ function CampoRevisao({
       <div
         data-campo={campo.id}
         className={cn(
-          "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5",
+          "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5",
           api.erros[campo.id] && "ring-2 ring-destructive/60"
         )}
       >
@@ -491,7 +532,7 @@ function CampoRevisao({
           >
             <FlagPennant size={15} />
           </span>
-          <p className="flex-1 text-[15px] font-medium leading-snug">
+          <p className="flex-1 text-[15px] font-semibold leading-snug text-foreground">
             {campo.label}
           </p>
         </div>
@@ -518,5 +559,11 @@ function CampoRevisao({
     );
   }
 
-  return <CampoGenerico campo={campo} api={api} />;
+  return (
+    <CampoGenerico
+      campo={campo}
+      api={api}
+      n={numeroPorId.get(campo.id)}
+    />
+  );
 }

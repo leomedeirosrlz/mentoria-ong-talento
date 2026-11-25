@@ -34,15 +34,35 @@ jobs:
       - run: npx eslint src/
       - run: pnpm test
 
-  # código não pode mergear pedindo coluna que o remoto não tem — a 0061/0062
-  # foi exatamente esse caso. Falha até a migration ser aplicada (gate humano).
+  # guarda anti-regressão de agente: migrations imutáveis contra a base,
+  # segredos, marcadores do AGENTS.md, links de docs, numeração, actionlint.
+  # Node puro (sem pnpm install) — ver scripts/repo-guard.mjs.
+  repo-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # R1/R9 comparam o HEAD contra a base — histórico completo
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/repo-guard.mjs
+        env:
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
+
+  # O contrato compara o código com o ambiente que ele vai encontrar:
+  #   - PR/push de feature → staging (onde as migrations já foram aplicadas)
+  #   - release (PR para main ou push em main) → produção, que é o schema do deploy
+  # Antes todo PR comparava com prod e ficava vermelho enquanto as migrations
+  # pendentes não fossem aplicadas — um bloqueio que não era do PR.
   schema-contract:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # produção — é o schema que o deploy usa; E2E_* é staging e não vale aqui
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_URL: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main') && secrets.SUPABASE_URL || secrets.E2E_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main') && secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - name: checa tipos × schema remoto

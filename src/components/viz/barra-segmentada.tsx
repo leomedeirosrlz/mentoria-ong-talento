@@ -105,7 +105,10 @@ export function BarraSegmentada({
                   // legenda (no toque a legenda nomeada já cobre)
                   title={`${s.valor} ${s.rotulo}`}
                   // transition-[width]: update de dados (refresh/filtro)
-                  // interpola em vez de repaint seco — reduced-motion zera
+                  // interpola em vez de repaint seco — reduced-motion zera.
+                  // Exceção deliberada registrada da spec 028: segmentos
+                  // empilhados proporcionais não têm equivalente em
+                  // transform (scaleX quebraria as frações entre irmãos)
                   className={cn(
                     "transition-[width] duration-500 ease-snappy",
                     s.cls ?? SEGMENTO_NEUTRO
@@ -124,13 +127,22 @@ export function BarraSegmentada({
                   key={`${idx}-${s.rotulo}`}
                   className="inline-flex items-center gap-1"
                 >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "size-2 rounded-full",
-                      s.cls ?? SEGMENTO_NEUTRO
-                    )}
-                  />
+                  {s.cls ? (
+                    <span
+                      aria-hidden
+                      className={cn("size-2 rounded-full", s.cls)}
+                    />
+                  ) : (
+                    /* hatch em 8px vira borrão — o swatch retangular
+                       (mesmo padrão do FunilEtapas) mostra as listras */
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "h-2 w-4 rounded-sm ring-1 ring-inset ring-border",
+                        SEGMENTO_NEUTRO
+                      )}
+                    />
+                  )}
                   {s.valor} {s.rotulo}
                 </span>
               )

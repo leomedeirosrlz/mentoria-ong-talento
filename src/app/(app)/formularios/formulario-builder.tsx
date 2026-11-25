@@ -18,7 +18,7 @@ import {
   useDragControls,
   type DragControls,
 } from "motion/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   CalendarBlank,
   CaretDown,
@@ -61,6 +61,7 @@ import {
 import { FormularioPublico } from "@/app/f/[token]/formulario-publico";
 import { fade, T } from "@/components/motion";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -984,7 +985,10 @@ export function FormularioBuilder({
           min" com a mesma régua de 15s/pergunta que a página pública
           anuncia, então o número que a coord vê aqui é o que a pessoa lê
           lá no link */}
-      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card/95 px-4 py-3 shadow-[var(--shadow-border)] backdrop-blur-sm md:bottom-3">
+      {/* pr-16 no mobile: a barra divide a faixa do FAB da Liza (acima da
+          bottom-nav, 530) — reserva o canto dele e os botões nunca nascem
+          cobertos; no md+ o FAB vai pro canto do viewport, longe da barra */}
+      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card/95 pl-4 pr-16 py-3 shadow-[var(--shadow-border)] backdrop-blur-sm md:pr-4 md:bottom-3">
         <p
           aria-live="polite"
           className="text-xs tabular-nums text-muted-foreground"
@@ -1281,11 +1285,7 @@ function MockTipo({ tipo }: { tipo: FormularioCampoTipo }) {
       )}
       {tipo === "checkbox" && (
         <span className="flex items-center gap-2.5 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            disabled
-            className="size-4 shrink-0 accent-primary"
-          />
+          <Checkbox disabled />
           A pessoa marca a caixa pra confirmar
         </span>
       )}

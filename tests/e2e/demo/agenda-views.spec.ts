@@ -65,7 +65,7 @@ test.describe("agenda demo — visões Semana e Horários (REALIZA-25)", () => {
     await expect(
       dialog.getByRole("heading", { name: /º encontro/ })
     ).toBeVisible();
-    await expect(dialog.locator("#data_hora")).toBeVisible();
+    await expect(dialog.locator('input[type="date"]')).toBeVisible();
     await page.screenshot({ path: "/tmp/realiza25-demo-dialog.png" });
 
     // submit não persiste: a action responde o toast do modo demo

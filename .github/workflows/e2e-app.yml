@@ -49,6 +49,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   # O modo sai UMA vez daqui; os shards leem o output. Staging exige os 3
@@ -122,9 +123,18 @@ jobs:
       # Fora os serviços que a suite não toca (encurta o pull de imagens).
       - if: env.BACKEND == 'local'
         name: supabase local
-        run: >-
-          pnpm exec supabase start
-          -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+        run: |
+          # imagens do Supabase vêm do GHCR (sem rate limit do ECR público):
+          # baixa o espelho e retaga no nome original que o CLI espera
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          repo="${GITHUB_REPOSITORY,,}"
+          while read -r img; do
+            case "$img" in ""|\#*) continue;; esac
+            base="${img##*/}"; name="${base%%:*}"; tag="${base##*:}"
+            docker pull "ghcr.io/$repo/supabase-mirror/$name:$tag"
+            docker tag "ghcr.io/$repo/supabase-mirror/$name:$tag" "$img"
+          done < .github/supabase-images.txt
+          pnpm exec supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
       - if: env.BACKEND == 'local'
         name: capturar envs do supabase local
         # status -o env emite valores COM aspas (API_URL="http://...") e
@@ -179,8 +189,14 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY || secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
           RESEND_API_KEY: re_placeholder
           EMAIL_FROM: noreply@realiza.vc
+      - name: cache playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-playwright-
       - name: playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium || pnpm exec playwright install chromium
       # Fixtures só no modo local (stack nasce zerada): as do e2e e o
       # dataset demo, igual ao e2e local do dia a dia. No STAGING o seed é
       # manual (`pnpm seed:e2e` com .env.staging): re-seed a cada run

@@ -9,24 +9,12 @@ import {
   useSyncExternalStore,
 } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Collapsible } from "@base-ui/react/collapsible";
 import { CaretDown } from "@phosphor-icons/react";
 import { buttonVariants } from "@/components/ui/button";
 import { T } from "@/components/motion";
+import { assinarHash } from "@/components/encontro-disclosure";
+import { abrirAncoraRegistro } from "@/lib/ancora-registro";
 import { cn } from "@/lib/utils";
-
-/** Assina as três formas de o hash mudar: hashchange nativo, popstate e o
- *  `realiza:hash` que quem navega por pushState dispara. */
-function assinarHash(cb: () => void) {
-  window.addEventListener("hashchange", cb);
-  window.addEventListener("popstate", cb);
-  window.addEventListener("realiza:hash", cb);
-  return () => {
-    window.removeEventListener("hashchange", cb);
-    window.removeEventListener("popstate", cb);
-    window.removeEventListener("realiza:hash", cb);
-  };
-}
 
 /** Form de registro por card, um aberto por vez. O hash `#registrar-{id}` é a
  *  fonte de verdade do "qual está aberto": o CTA da linha É a âncora (mesmo
@@ -119,9 +107,11 @@ function primeiroCampo(painel: HTMLElement | null): HTMLElement | null {
   );
 }
 
-/** CTA da linha — link pra âncora `#registrar-{id}` do próprio card: clicar
- *  rola até o card e abre o form; já aberto, fecha no lugar (o href só
- *  rolaria de novo). */
+/** CTA da linha — link pra âncora `#registrar-{id}` do próprio card. O clique
+ *  vai pelo pushState patcheado do Next (e não pela navegação nativa do
+ *  <a>) pra o router aprender o hash no canonicalUrl — a âncora nativa morria
+ *  no write do refresh pós-action e o painel fechava sozinho. Já aberto,
+ *  fecha no lugar (o href só rolaria de novo). */
 export function RegistroInlineTrigger({
   encontroId,
   primario = true,
@@ -139,12 +129,13 @@ export function RegistroInlineTrigger({
       aria-expanded={aberto}
       aria-controls={`registro-form-${encontroId}`}
       onClick={(e) => {
+        e.preventDefault();
         if (aberto) {
-          e.preventDefault();
           alternar(false);
         } else {
-          // hash já neste card não dispara hashchange — abre pelo estado local
-          alternar(true);
+          // a abertura segue o hash como num deep link — rola o card e foca
+          // o primeiro campo (o realiza:hash do helper acorda o painel)
+          abrirAncoraRegistro(encontroId);
         }
       }}
       className={buttonVariants({
@@ -178,7 +169,10 @@ export function RegistroInlinePanel({
       {aberto && (
         <motion.div
           id={`registro-form-${encontroId}`}
-          className={className}
+          // empty:hidden cobre o form que se recusa a renderizar (encontro
+          // já registrado — o RegistroDetails exibe o salvo): sem ele a
+          // área abriria uma faixa vazia
+          className={cn(className, "empty:hidden")}
           // continuidade espacial: o card cresce pra revelar o form em vez de
           // teleportar (spec §2)
           initial={{ height: 0, opacity: 0 }}
@@ -193,57 +187,5 @@ export function RegistroInlinePanel({
         </motion.div>
       )}
     </AnimatePresence>
-  );
-}
-
-/** Registro salvo na ficha da dupla: Collapsible com a linha-resumo sempre
- *  visível e o corpo sob disclosure (a página abre por padrão só os mais
- *  recentes). O hash `#registrar-{id}` abre o corpo — mesmo alvo dos deep
- *  links de /registros e dos nudges; a escolha local vale até o próximo
- *  hashchange (espelha o RegistroInline). */
-export function RegistroDetails({
-  encontroId,
-  aberto = false,
-  className,
-  summary,
-  children,
-}: {
-  encontroId: string;
-  /** Nasce aberto — os registros mais recentes da lista (SSR já renderiza o painel). */
-  aberto?: boolean;
-  className?: string;
-  /** Linha-resumo dentro do trigger — spans/badges (phrasing content, é um button). */
-  summary: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const alvo = `#registrar-${encontroId}`;
-  // null = segue hash/default · true/false = escolha local até o hash mudar
-  const [forcado, setForcado] = useState<boolean | null>(null);
-  // o hash é store externo: lido por useSyncExternalStore, e não por um
-  // efeito de montagem. O efeito re-roda quando o React reexibe uma árvore
-  // escondida por Suspense, e zerar ali fechava o card recém-aberto
-  const hashBate = useSyncExternalStore(
-    assinarHash,
-    () => window.location.hash === alvo,
-    () => false
-  );
-  // só um hash novo de fato devolve o controle ao hash
-  useEffect(() => assinarHash(() => setForcado(null)), []);
-
-  return (
-    <Collapsible.Root
-      open={forcado ?? (hashBate || aberto)}
-      onOpenChange={(o) => setForcado(o)}
-      className={className}
-    >
-      {/* mesma gramática do summary anterior: linha toda é o alvo; o caret
-          dos filhos gira via group-data-[panel-open] */}
-      <Collapsible.Trigger className="group flex min-h-11 w-full cursor-pointer items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-        {summary}
-      </Collapsible.Trigger>
-      <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
-        {children}
-      </Collapsible.Panel>
-    </Collapsible.Root>
   );
 }

@@ -27,8 +27,15 @@ import {
   ThumbsUp,
   Trash,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { extrairAcoes, montarEnvioChat, msgAmigavel } from "@/lib/ia/mensagens";
+import {
+  catalogo,
+  gravarDeckPills,
+  lerDeckPills,
+  marcarClicada,
+  sortearLote,
+} from "@/lib/ia/pills";
 import { deveMostrarFeedback, temLinkMarkdown } from "@/lib/ia/feedback";
 import { metaFonte, rotuloTool, type FonteIa } from "@/lib/ia/fontes";
 import { extrairFontesTexto } from "@/lib/ia/render";
@@ -41,10 +48,10 @@ import {
 } from "@/components/assistente-md";
 import { Sugestoes } from "@/components/assistente-blocos";
 import { UiCard } from "@/components/assistente-cards";
+import { LizaDormindo } from "@/components/liza/liza-dormindo";
 import { T } from "@/components/motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AppRole } from "@/lib/types";
@@ -67,10 +74,23 @@ type Msg = {
   /** x-ia-request-id of the response — ties the thumbs vote to the
    *  round logged in ia_eventos; absent on demo/error/interrupted */
   reqId?: string;
+  /** falha do provider (evento error da rota com `dormindo`): a bolha
+   *  mostra a LizaDormindo em vez de texto de erro — REALIZA-363 */
+  dormindo?: boolean;
 };
 
+/** Opções do envio: `origem` marca gestos que não vieram do composer
+ *  (hoje só "pill", o chip do empty state) — viaja no body da rota e
+ *  sai em ia_eventos, nunca em messages/prompt. */
+type EnviarOpts = { origem?: "pill" };
+
 /** Estado que a bolha traduz em expressão do mascote. */
-export type EstadoConversa = "parado" | "consultando" | "escrevendo" | "erro";
+export type EstadoConversa =
+  | "parado"
+  | "consultando"
+  | "escrevendo"
+  | "erro"
+  | "sonolento";
 
 const primeiroNome = (nome?: string) => nome?.trim().split(/\s+/)[0];
 
@@ -202,50 +222,90 @@ function respostaDemo(texto: string): string {
   return DEMO_RESPOSTAS.find(([re]) => re.test(texto))?.[1] ?? DEMO_FALLBACK;
 }
 
-/** Sugestões por papel e pela página aberta — caminhos que as tools
- *  respondem de fato (dados via registry; guias via guia_consulta). A
- *  página entra primeiro: na ficha da dupla a pergunta mais provável é
- *  sobre ela (o prompt recebe a rota e resolve "esta dupla"). */
+/** Sugestões por papel e pela página aberta — a lista plana de textos
+ *  do catálogo (lib/ia/pills.ts), já filtrada pela allowlist do papel.
+ *  O empty state consome o lote rotativo (PillsSugestoes); a lista cheia
+ *  segue pra quem quer a pergunta mais provável da página (o chip do
+ *  balão usa a primeira, que é a mais relevante do contexto). */
 export function sugestoes(papeis: AppRole[], pagina: string): string[] {
-  const staff = papeis.some((p) => p === "coordenacao" || p === "supervisor");
-  const soJovem = papeis.length > 0 && papeis.every((p) => p === "mentorado");
-  if (soJovem) {
-    if (pagina.startsWith("/jovem/agenda"))
-      return ["Quando é o próximo encontro?", "Tive encontro essa semana?", "O que é o PDM?"];
-    if (pagina.startsWith("/jovem/especialistas"))
-      return ["E meu pedido de especialista?", "Como funciona o especialista?", "Como tá minha jornada?"];
-    if (pagina.startsWith("/jovem/materiais"))
-      return ["O que é o PDM?", "O que tenho pra fazer?", "Como tá minha jornada?"];
-    return ["O que tenho pra fazer?", "Como tá minha jornada?", "Quem é meu mentor?"];
+  return catalogo(papeis, pagina).map((p) => p.texto);
+}
+
+// storage do deck de pills — injetado nas funções puras de pills.ts;
+// qualquer falha de acesso vira null (modo privado, quota) e o módulo
+// degrada pro catálogo inteiro da visita sem derrubar o empty state
+const storagePills = () => {
+  try {
+    return typeof localStorage === "undefined" ? null : localStorage;
+  } catch {
+    return null;
   }
-  if (/^\/duplas\/[0-9a-f-]{36}/.test(pagina))
-    // ficha de staff — híbrido (mentorado + papel de equipe) lê chips de
-    // equipe; mentorado puro nunca alcança esta rota
-    return ["Resuma esta dupla", "O que falta registrar?", "Escreva um lembrete pra dupla"];
-  if (pagina.startsWith("/agenda") && !papeis.includes("mentorado"))
-    return ["Encontros desta semana", "Alguém sem encontro marcado?", "Escreva um lembrete pra dupla"];
-  if (pagina.startsWith("/duplas") && staff)
-    return ["Quem está em risco?", "Quem pediu apoio?", "Resumo da semana"];
-  if (pagina.startsWith("/materiais"))
-    return ["O que diz o guia sobre a Roda da Vida?", "Como dar um feedback construtivo?", "O que é o PDM?"];
-  if (papeis.includes("coordenacao"))
-    return [
-      "Resumo da semana",
-      "Quem está aguardando par?",
-      "O que diz o guia sobre a Roda da Vida?",
-      "Encontros desta semana",
-    ];
-  if (papeis.includes("supervisor"))
-    return [
-      "Resumo da semana",
-      "Alguma dupla minha pede atenção?",
-      "Encontros desta semana",
-    ];
-  return [
-    "Como está minha dupla?",
-    "O que é o PDM?",
-    "Próximos encontros",
-  ];
+};
+
+/** As pills do empty state (spec 026): o lote de 3 é sorteado UMA vez
+ *  por mount — o painel só renderiza este grupo aberto, então montar de
+ *  novo = visita nova = lote novo, e nada re-sorteia em re-render, por
+ *  timer ou sob foco. Vistos + clicados persistem por papel e saem do
+ *  baralho até ele esgotar e resetar junto. O alvo de telemetria marca o
+ *  gesto no beacon `clique` global; o envio carrega origem:"pill" pra
+ *  rota distinguir sugestão de texto digitado. */
+function PillsSugestoes({
+  papeis,
+  pagina,
+  desabilitado,
+  onEnviar,
+}: {
+  papeis: AppRole[];
+  pagina: string;
+  desabilitado: boolean;
+  onEnviar: (texto: string) => void;
+}) {
+  // papel primário ancora o deck — mesmo padrão da memória `liza:*`
+  const papel = papeis[0] ?? "sem-papel";
+  const [{ lote, deck: deckNovo }] = useState(() =>
+    sortearLote(
+      catalogo(papeis, pagina),
+      lerDeckPills(storagePills(), papel),
+      3,
+      Math.random
+    )
+  );
+  // a gravação sai do initializer e vai pro efeito: StrictMode invoca o
+  // initializer duas vezes em dev e a segunda leria o deck já marcado
+  // pela primeira, drenando o baralho ao dobro. O efeito escreve o mesmo
+  // deck nas duas passadas — idempotente — e a visita persiste uma vez
+  useEffect(() => {
+    gravarDeckPills(storagePills(), papel, deckNovo);
+  }, [papel, deckNovo]);
+  if (!lote.length) return null;
+  return (
+    <div
+      role="group"
+      aria-label="Perguntas sugeridas"
+      className="mt-5 flex max-w-80 flex-wrap gap-2"
+    >
+      {lote.map((p, i) => (
+        <button
+          key={p.texto}
+          type="button"
+          data-telemetry-alvo="liza-sugestao"
+          disabled={desabilitado}
+          onClick={() => {
+            gravarDeckPills(
+              storagePills(),
+              papel,
+              marcarClicada(lerDeckPills(storagePills(), papel), p.texto)
+            );
+            onEnviar(p.texto);
+          }}
+          style={{ "--i": i + 2 } as CSSProperties}
+          className="animate-enter min-h-9 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-[var(--shadow-border)] transition-[color,border-color,transform] duration-150 ease-snappy hover:border-foreground/25 hover:text-foreground active:scale-[0.97] disabled:opacity-50"
+        >
+          {p.texto}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 // ---------- conversa ----------
@@ -290,10 +350,13 @@ export function AssistenteConversa({
   onRespostaPronta?: () => void;
   /** mascote no tamanho pedido — a bolha é dona do componente e do estado
    *  ("aberto" saúda no empty state; "pronto" comemora a resposta que
-   *  acabou de fechar) */
+   *  acabou de fechar). `responsivo` liga o modo por container: o slot
+   *  (className) é medido e `tamanho` vira só o fallback do 1º frame */
   Avatar: (p: {
     tamanho: number;
     estado: EstadoConversa | "aberto" | "pronto";
+    responsivo?: boolean;
+    className?: string;
   }) => React.ReactNode;
 }) {
   const pagina = usePathname();
@@ -348,9 +411,9 @@ export function AssistenteConversa({
       erro?: string;
       fontes?: FonteIa[];
       reqId?: string;
+      dormindo?: boolean;
     };
   } | null>(null);
-  const chips = sugestoes(papeis, pagina);
   const [busca, setBusca] = useState("");
   // topo anterior do log — o detach por direção compara gesto, não
   // distância (programático só empurra pra baixo, usuário sobe)
@@ -361,14 +424,20 @@ export function AssistenteConversa({
   const inicioRef = useRef(0);
 
   // estado da rodada pra fora (mascote): status de tool = consultando,
-  // token chegando = escrevendo, bolha de erro = erro
+  // token chegando = escrevendo, bolha de erro = erro — e falha do
+  // provider cochila o rosto inteiro (REALIZA-363). Provider desligado
+  // na configuração é o mesmo sono, sem precisar de uma falha primeiro
   const ultimaMsg = msgs[msgs.length - 1];
-  const estado: EstadoConversa = pending
+  const estado: EstadoConversa = !configurado && !demo
+    ? "sonolento"
+    : pending
     ? status || !ultimaMsg?.content
       ? "consultando"
       : "escrevendo"
     : ultimaMsg?.estado === "erro"
-      ? "erro"
+      ? ultimaMsg.dormindo
+        ? "sonolento"
+        : "erro"
       : "parado";
   useEffect(() => onEstado?.(estado), [estado, onEstado]);
 
@@ -538,9 +607,14 @@ export function AssistenteConversa({
   );
   // enviar fecha sobre msgs/pending do render — a bolha chama a versão
   // mais nova pelo ref (registrada uma vez, lida só no clique)
-  const enviarRef = useRef<(t: string) => void>(() => {});
+  const enviarRef = useRef<(t: string, o?: EnviarOpts) => void>(() => {});
+  // CTA externo clicado durante um stream não pode sumir — fila de um
+  // slot: a última pergunta pendente dispara quando a rodada fecha. A
+  // origem viaja junto: pill clicada no meio do stream segue contando
+  // como pill quando a fila drena
+  const filaEnvioRef = useRef<{ texto: string; origem?: "pill" } | null>(null);
   useEffect(() => {
-    enviarRef.current = (t) => void enviar(t);
+    enviarRef.current = (t, o) => void enviar(t, o);
   });
   useEffect(
     () => registrarEnviar?.((t) => enviarRef.current(t)),
@@ -553,6 +627,7 @@ export function AssistenteConversa({
   function soltarStream() {
     abortRef.current?.abort();
     abortRef.current = null;
+    filaEnvioRef.current = null;
     if (flushRef.current) {
       cancelAnimationFrame(flushRef.current);
       flushRef.current = 0;
@@ -687,6 +762,7 @@ export function AssistenteConversa({
       erro?: string;
       fontes?: FonteIa[];
       reqId?: string;
+      dormindo?: boolean;
     }
   ) {
     const pend = tokensRef.current;
@@ -717,6 +793,7 @@ export function AssistenteConversa({
       erro?: string;
       fontes?: FonteIa[];
       reqId?: string;
+      dormindo?: boolean;
     },
     pend = ""
   ) {
@@ -729,8 +806,14 @@ export function AssistenteConversa({
           ...ms.slice(0, -1),
           {
             role: "assistant",
-            content: content || extra?.erro || FALHA,
+            // dormindo keeps only the real partial text — the error
+            // string is replaced by the LizaDormindo card, not shown
+            // as prose inside the bubble (REALIZA-363)
+            content: extra?.dormindo
+              ? content
+              : content || extra?.erro || FALHA,
             estado: "erro",
+            dormindo: extra?.dormindo || undefined,
             ui: ultima.ui,
           },
         ];
@@ -758,6 +841,16 @@ export function AssistenteConversa({
       onRespostaPronta?.();
       setCelebra(true);
     }
+    // drena a pergunta que chegou durante o stream — "parar" não dispara
+    // (quem interrompeu não quer outra rodada logo atrás)
+    if (estado !== "interrompido" && filaEnvioRef.current) {
+      const prox = filaEnvioRef.current;
+      filaEnvioRef.current = null;
+      // um tick: enviarRef lê o render novo, já com pending false
+      setTimeout(() => enviarRef.current(prox.texto, { origem: prox.origem }), 0);
+    } else {
+      filaEnvioRef.current = null;
+    }
     focarComposer(inputRef.current);
   }
 
@@ -768,7 +861,7 @@ export function AssistenteConversa({
   /** POST + leitura do SSE até done/erro/fechamento — único caminho de
    *  resposta real (envio normal e retry compartilham). Falha de rede ou
    *  provider fora tenta uma vez de novo sozinho (REALIZA-284). */
-  async function rodar(base: Msg[], tentativas = 0) {
+  async function rodar(base: Msg[], origem?: "pill", tentativas = 0) {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     // body strict na rota: campos de UI (estado, tools) ou >20 mensagens
@@ -784,6 +877,10 @@ export function AssistenteConversa({
         body: JSON.stringify({
           messages: envio,
           ...(/^\/[\w\-/]*$/.test(pagina) ? { pagina } : {}),
+          // origem do gesto ("pill" = chip do empty state): viaja fora de
+          // messages — nunca entra no prompt; a rota a registra em
+          // ia_eventos pra distinguir sugestão de digitado (FR-014)
+          ...(origem ? { origem } : {}),
         }),
         signal: ctrl.signal,
       });
@@ -810,6 +907,8 @@ export function AssistenteConversa({
       let tools: string[] | undefined;
       let fontes: FonteIa[] | undefined;
       let falha: string | null = null;
+      // a rota marca erro do provider com `dormindo` (REALIZA-363)
+      let falhaDormindo = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -836,11 +935,16 @@ export function AssistenteConversa({
               tools = d.tools;
               fontes = d.fontes;
             }
-            else if (ev.type === "error") falha = (ev as { e: string }).e;
+            else if (ev.type === "error") {
+              const d = ev as { e: string; dormindo?: boolean };
+              falha = d.e;
+              falhaDormindo = d.dormindo === true;
+            }
           }
         }
       }
-      if (falha) finalizar("erro", { erro: falha });
+      if (falha)
+        finalizar("erro", { erro: falha, dormindo: falhaDormindo || undefined });
       // stream fechou sem done (rede caiu no fim): finaliza com o que tem
       else finalizar("ok", { tools, fontes, reqId });
     } catch (e) {
@@ -857,15 +961,26 @@ export function AssistenteConversa({
           interromper(ctrl);
           return;
         }
-        return rodar(base, tentativas + 1);
+        return rodar(base, origem, tentativas + 1);
       }
-      finalizar("erro", { erro: msgAmigavel(e, statusHttp, FALHA) });
+      finalizar("erro", {
+        erro: msgAmigavel(e, statusHttp, FALHA),
+        // 503 pré-stream = provider desconfigurado: mesma cara de sono
+        // que a rota emite por evento — não é erro de pedido nosso
+        dormindo: statusHttp === 503 || undefined,
+      });
     }
   }
 
-  async function enviar(conteudo: string) {
+  async function enviar(conteudo: string, opts?: EnviarOpts) {
     const limpo = conteudo.trim();
-    if (!limpo || pending) return;
+    if (!limpo) return;
+    // stream em andamento: guarda a última pergunta — dispara no fechar()
+    // em vez de sumir (CTA "Pedir pra Liza" clicado no meio da resposta)
+    if (pending) {
+      filaEnvioRef.current = { texto: limpo, origem: opts?.origem };
+      return;
+    }
     if (!conversaId) setConversaId(novoUuid());
     setVisao("chat");
     const novas: Msg[] = [
@@ -881,7 +996,7 @@ export function AssistenteConversa({
     requestAnimationFrame(() => rolarFim(true));
 
     if (demo) await rodarDemo(limpo);
-    else await rodar(novas);
+    else await rodar(novas, opts?.origem);
   }
 
   /** Demo: sem provider nem API, mas com o mesmo ritmo da rota real —
@@ -1011,7 +1126,7 @@ export function AssistenteConversa({
           transition={T.panel}
           className="relative min-h-0 flex-1"
         >
-          <div className="scroll-fina h-full overflow-y-auto px-4 py-4">
+          <div className="scroll-fina h-full overflow-y-auto overscroll-y-none px-4 py-4">
             {conversas.length > 4 && (
               <label className="relative mb-3 block">
                 <span className="sr-only">Buscar conversa</span>
@@ -1113,13 +1228,24 @@ export function AssistenteConversa({
           exclusivo com o transcript: os dois com flex-1 dividiam a altura
           e o conteúdo centralizado transbordava pra cima do header */}
       {restaurada && msgs.length === 0 ? (
-        <div className="scroll-fina flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-8">
+        <div className="scroll-fina flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-none px-6 py-8">
           {/* a Liza senta no canto superior esquerdo — mascote de verdade,
-              não ícone decorativo centralizado */}
+              não ícone decorativo centralizado. O tamanho vem do slot
+              medido (REALIZA-447): ~28% da largura do painel entre 64 e
+              160px — acompanha o redimensionamento e o modo expandido */}
           <div className="animate-enter flex items-start gap-4">
-            <div className="shrink-0">
-              <Avatar tamanho={96} estado={aberto ? "aberto" : "parado"} />
-            </div>
+            <Avatar
+              responsivo
+              tamanho={96}
+              className="size-[clamp(4rem,calc(var(--painel-w,24rem)*0.28),10rem)] shrink-0"
+              estado={
+                !configurado && !demo
+                  ? "sonolento"
+                  : aberto
+                    ? "aberto"
+                    : "parado"
+              }
+            />
             <div className="min-w-0 pt-4 text-left">
               <p className="text-base font-semibold text-balance">
                 {primeiroNome(nome) ? `Oi, ${primeiroNome(nome)}! Eu sou a Liza.` : "Oi! Eu sou a Liza."}
@@ -1131,20 +1257,21 @@ export function AssistenteConversa({
               </p>
             </div>
           </div>
-          <div className="mt-5 flex max-w-80 flex-wrap gap-2">
-            {chips.map((s, i) => (
-              <button
-                key={s}
-                type="button"
-                disabled={pending || (!configurado && !demo)}
-                onClick={() => enviar(s)}
-                style={{ "--i": i + 2 } as CSSProperties}
-                className="animate-enter min-h-9 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-[var(--shadow-border)] transition-[color,border-color,transform] duration-150 ease-snappy hover:border-foreground/25 hover:text-foreground active:scale-[0.97] disabled:opacity-50"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+          {/* lote rotativo por visita (FR-012): o grupo só existe com o
+              painel aberto — fechar desmonta, reabrir remonta e sorteia
+              de novo, então nada troca escondido nem sob foco. `aberto`
+              ausente (embed sem bolha) = painel sempre visível: monta
+              direto. A key ancora o deck no contexto — trocar de página
+              ou papel com o painel aberto resorteia pra aquele catálogo */}
+          {(aberto ?? true) && (
+            <PillsSugestoes
+              key={`${papeis[0] ?? "sem-papel"}|${pagina}`}
+              papeis={papeis}
+              pagina={pagina}
+              desabilitado={pending || (!configurado && !demo)}
+              onEnviar={(t) => void enviar(t, { origem: "pill" })}
+            />
+          )}
         </div>
       ) : (
       /* transcript — role=log; a rolagem só segue o fim quando o usuário
@@ -1182,7 +1309,7 @@ export function AssistenteConversa({
           role="log"
           aria-live="off"
           aria-label="Conversa com a Liza"
-          className="scroll-fina @container h-full space-y-5 overflow-y-auto overscroll-contain px-4 py-4"
+          className="scroll-fina @container h-full space-y-5 overflow-y-auto overscroll-y-none px-4 py-4"
         >
           {/* role=log seria live por definição (ARIA 1.2) — aria-live=off
               silencia a rajada de tokens; a região sr-only anuncia só as
@@ -1194,7 +1321,9 @@ export function AssistenteConversa({
                 ? ultimaMsg.estado === "erro"
                   ? // frase fixa: no erro o content pode ser a resposta
                     // parcial inteira, longa demais pra um anúncio
-                    "A Liza não conseguiu responder."
+                    ultimaMsg.dormindo
+                    ? "A Liza está dormindo e volta mais tarde."
+                    : "A Liza não conseguiu responder."
                   : "A Liza respondeu."
                 : ""}
           </div>
@@ -1239,7 +1368,9 @@ export function AssistenteConversa({
                 : ultimaDaConversa && celebra
                   ? "pronto"
                   : m.estado === "erro"
-                    ? "erro"
+                    ? m.dormindo
+                      ? "sonolento"
+                      : "erro"
                     : "parado";
             // indicador pré-token: status da tool (shimmer) ou a onda de
             // pontos — dentro da própria resposta, nunca bolha de espera dupla
@@ -1270,12 +1401,29 @@ export function AssistenteConversa({
                 {ui.length ? (
                   <div className="space-y-2.5">
                     {ui.map((b) => (
-                      <UiCard key={b.kind} bloco={b} jovem={soJovem} />
+                      // duas prévias de escrita podem coexistir na mesma
+                      // resposta — a chave delas é o confirmacao_id
+                      <UiCard
+                        key={
+                          b.kind === "confirmacao" ? b.confirmacao_id : b.kind
+                        }
+                        bloco={b}
+                        jovem={soJovem}
+                      />
                     ))}
                   </div>
                 ) : null}
                 {esperando ? (
                   indicador
+                ) : m.estado === "erro" && m.dormindo ? (
+                  // provider dormiu: o pedaço real que chegou fica legível
+                  // e o card leva o "volte mais tarde" — sem texto de erro
+                  <>
+                    {m.content ? (
+                      <RespostaMd analise={analise} ctx={ctx} />
+                    ) : null}
+                    <LizaDormindo compacto />
+                  </>
                 ) : (
                   <RespostaMd analise={analise} ctx={ctx} />
                 )}
@@ -1437,8 +1585,9 @@ export function AssistenteConversa({
                     />
                   ) : null}
                   {/* meta: hora + o que consultou + copy/retry — discreto,
-                      sempre no ar (touch não tem hover) */}
-                  {!streaming && (m.content || m.estado === "erro") && (
+                      sempre no ar (touch não tem hover). Dormindo não tem
+                      linha: o card já carrega a saída "volte mais tarde" */}
+                  {!streaming && (m.content || m.estado === "erro") && !m.dormindo && (
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-0.5">
                       {m.em && (
                         <span className="text-xs text-muted-foreground sm:text-[11px]">
@@ -1578,9 +1727,9 @@ export function AssistenteConversa({
           na home indicator */}
       <div className="space-y-2 border-t border-border/60 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
         {!configurado && !demo ? (
-          <Card className="px-4 py-3 text-sm text-muted-foreground">
-            A Liza está indisponível no momento. Tente de novo em instantes.
-          </Card>
+          // provider desligado = Liza dormindo (REALIZA-363), o mesmo
+          // estado que uma falha de quota exibiria na conversa
+          <LizaDormindo compacto />
         ) : (
           <>
             <form

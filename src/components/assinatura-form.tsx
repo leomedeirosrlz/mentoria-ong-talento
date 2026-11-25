@@ -1,23 +1,37 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { CircleNotch, Signature } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { maskCep, maskCpf } from "@/lib/utils";
-import type { DadosCivis } from "@/lib/types";
+import { maskCpf } from "@/lib/utils";
+import { STATUS_CEP, useBuscaCep } from "@/lib/use-busca-cep";
+import type { ViaCepEndereco } from "@/lib/viacep";
+import type { DadosCivis, Endereco } from "@/lib/types";
 
 type Resultado = { error?: string; ok?: boolean };
+
+/** Retrato dos dados civis conforme digitados no form — alimenta o preview
+ *  vivo do documento (o que falta volta a virar blank sublinhado, como no
+ *  papel). `parentesco` só existe no modo autorização. */
+export type CivisDigitados = {
+  nome_civil: string | null;
+  rg: string | null;
+  cpf: string | null;
+  data_nascimento: string | null;
+  endereco: Endereco;
+  parentesco: string | null;
+};
 
 /** máscara live no input uncontrolled — reformat a cada tecla */
 const onInputMask = (mask: (v: string) => string) => (e: React.FormEvent<HTMLInputElement>) => {
   e.currentTarget.value = mask(e.currentTarget.value);
 };
 const cpfMask = maskCpf;
-const cepMask = maskCep;
 
 /** Campos civis do signatário — compartilhados pelo termo do voluntário
  *  (logado), pela autorização do responsável (token) e pela ficha de
@@ -27,23 +41,98 @@ const cepMask = maskCep;
  *  — `prefix` distingue o bloco do responsável na ficha do mentorado.
  *  `defaults` preenche com o que já está na ficha (prefill de 0046).
  *  `compacto` (cadastro) omite nome civil/nascimento/cidade/UF — a ficha
- *  já pede esses, o parser do action junta tudo no jsonb. */
+ *  já pede esses, o parser do action junta tudo no jsonb. `onEndereco`
+ *  recebe o endereço resolvido pelo ViaCEP: no compacto o hospedeiro usa
+ *  pra alimentar os campos simples cidade/UF que vivem fora do bloco. */
 export function DadosCivisFields({
   defaults,
   opcional,
   prefix = "",
   compacto,
+  onEndereco,
 }: {
   defaults?: DadosCivis | null;
   opcional?: boolean;
   prefix?: string;
   compacto?: boolean;
+  onEndereco?: (endereco: ViaCepEndereco) => void;
 }) {
   const req = opcional ? undefined : true;
   const n = (k: string) => `${prefix}${k}`;
   const e = defaults?.endereco;
+  // bloco de endereço controlado: o autofill do ViaCEP (REALIZA-37) precisa
+  // escrever nos inputs — defaultValue não dá. Os `name`s seguem os mesmos,
+  // então FormData e parseCivis não veem diferença nenhuma. A máquina da
+  // busca (máscara, race-guard, status) mora no useBuscaCep compartilhado.
+  const [end, setEnd] = useState({
+    logradouro: e?.logradouro ?? "",
+    numero: e?.numero ?? "",
+    complemento: e?.complemento ?? "",
+    bairro: e?.bairro ?? "",
+    cidade: e?.cidade ?? "",
+    uf: e?.uf ?? "",
+  });
+  const busca = useBuscaCep({
+    cepInicial: e?.cep,
+    onEndereco: (endereco) => {
+      // numero/complemento nunca vêm do ViaCEP; em compacto cidade/UF
+      // não renderizam aqui — o hospedeiro alimenta os campos simples
+      // dele via onEndereco (só CEP novo dispara: edição manual segue
+      // valendo até a próxima busca)
+      setEnd((atual) => ({
+        ...atual,
+        logradouro: endereco.logradouro,
+        bairro: endereco.bairro,
+        ...(compacto
+          ? {}
+          : { cidade: endereco.cidade, uf: endereco.uf }),
+      }));
+      onEndereco?.(endereco);
+    },
+  });
+
+  const blocoRef = useRef<HTMLDivElement>(null);
+
+  /** Autofill do browser/gerenciador escreve nos inputs sem disparar
+   *  change — e num campo controlado o estado reporia o valor velho na
+   *  render seguinte. Foco ou blur em qualquer campo do bloco adota o
+   *  que está no DOM; o CEP adotado segue a régua normal de busca. */
+  function adotarAutofill() {
+    const root = blocoRef.current;
+    if (!root) return;
+    const valor = (k: string) =>
+      root.querySelector<HTMLInputElement>(`[name="${n(k)}"]`)?.value;
+    const cepDom = valor("cep");
+    if (cepDom !== undefined) busca.onCepBlur(cepDom);
+    setEnd((atual) => {
+      const prox = {
+        ...atual,
+        logradouro: valor("logradouro") ?? atual.logradouro,
+        numero: valor("numero") ?? atual.numero,
+        complemento: valor("complemento") ?? atual.complemento,
+        bairro: valor("bairro") ?? atual.bairro,
+        ...(compacto
+          ? {}
+          : {
+              cidade: valor("cidade") ?? atual.cidade,
+              uf: valor("uf")?.toUpperCase() ?? atual.uf,
+            }),
+      };
+      return (Object.keys(prox) as (keyof typeof prox)[]).every(
+        (k) => prox[k] === atual[k]
+      )
+        ? atual
+        : prox;
+    });
+  }
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div
+      ref={blocoRef}
+      onFocusCapture={adotarAutofill}
+      onBlurCapture={adotarAutofill}
+      className="grid gap-4 sm:grid-cols-2"
+    >
       {!compacto && (
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor={n("nome_civil")}>Nome civil completo</Label>
@@ -96,17 +185,37 @@ export function DadosCivisFields({
       )}
       <div className="space-y-2">
         <Label htmlFor={n("cep")}>CEP</Label>
-        <Input
-          id={n("cep")}
-          name={n("cep")}
-          required={req}
-          inputMode="numeric"
-          autoComplete="postal-code"
-          maxLength={9}
-          placeholder="00000-000"
-          onInput={onInputMask(maskCep)}
-          defaultValue={e?.cep ? cepMask(e.cep) : ""}
-        />
+        <div className="relative">
+          <Input
+            id={n("cep")}
+            name={n("cep")}
+            required={req}
+            inputMode="numeric"
+            autoComplete="postal-code"
+            maxLength={9}
+            placeholder="00000-000"
+            value={busca.cep}
+            onChange={(ev) => busca.onCepChange(ev.target.value)}
+            onBlur={(ev) => busca.onCepBlur(ev.currentTarget.value)}
+            aria-describedby={n("cep_status")}
+          />
+          {busca.buscando && (
+            <CircleNotch
+              size={16}
+              aria-hidden
+              className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground"
+            />
+          )}
+        </div>
+        {busca.status !== "idle" && (
+          <p
+            id={n("cep_status")}
+            aria-live="polite"
+            className="text-xs text-muted-foreground"
+          >
+            {STATUS_CEP[busca.status]}
+          </p>
+        )}
       </div>
       {/* a 320px o grid fixo [1fr_100px] espremia o Logradouro em ~124px —
           número vira linha própria abaixo de 420px */}
@@ -120,7 +229,8 @@ export function DadosCivisFields({
             placeholder="Rua, avenida…"
             autoComplete="street-address"
             autoCapitalize="words"
-            defaultValue={e?.logradouro ?? ""}
+            value={end.logradouro}
+            onChange={(ev) => setEnd({ ...end, logradouro: ev.target.value })}
           />
         </div>
         <div className="space-y-2">
@@ -129,7 +239,8 @@ export function DadosCivisFields({
             id={n("numero")}
             name={n("numero")}
             required={req}
-            defaultValue={e?.numero ?? ""}
+            value={end.numero}
+            onChange={(ev) => setEnd({ ...end, numero: ev.target.value })}
           />
         </div>
       </div>
@@ -139,7 +250,8 @@ export function DadosCivisFields({
           id={n("complemento")}
           name={n("complemento")}
           placeholder="Opcional"
-          defaultValue={e?.complemento ?? ""}
+          value={end.complemento}
+          onChange={(ev) => setEnd({ ...end, complemento: ev.target.value })}
         />
       </div>
       <div className="space-y-2">
@@ -150,7 +262,8 @@ export function DadosCivisFields({
           required={req}
           autoComplete="address-level3"
           autoCapitalize="words"
-          defaultValue={e?.bairro ?? ""}
+          value={end.bairro}
+          onChange={(ev) => setEnd({ ...end, bairro: ev.target.value })}
         />
       </div>
       {!compacto && (
@@ -163,7 +276,8 @@ export function DadosCivisFields({
               required={req}
               autoComplete="address-level2"
               autoCapitalize="words"
-              defaultValue={e?.cidade ?? ""}
+              value={end.cidade}
+              onChange={(ev) => setEnd({ ...end, cidade: ev.target.value })}
             />
           </div>
           <div className="space-y-2">
@@ -176,10 +290,10 @@ export function DadosCivisFields({
               placeholder="SP"
               autoComplete="address-level1"
               className="uppercase"
-              onInput={(e) => {
-                e.currentTarget.value = e.currentTarget.value.toUpperCase();
-              }}
-              defaultValue={e?.uf ?? ""}
+              value={end.uf}
+              onChange={(ev) =>
+                setEnd({ ...end, uf: ev.target.value.toUpperCase() })
+              }
             />
           </div>
         </>
@@ -199,6 +313,10 @@ export function AssinaturaForm({
   parentesco,
   etapas,
   onSucesso,
+  id,
+  semBotao,
+  onMudanca,
+  onPendingChange,
 }: {
   modo: "termo" | "autorizacao";
   /** nome do jovem (autorização) — read-only, vem do servidor */
@@ -216,29 +334,104 @@ export function AssinaturaForm({
    *  pra avançar pro fechamento (o router.refresh() interno continua; a
    *  instância do wizard sobrevive ao refresh e preserva o step) */
   onSucesso?: () => void;
+  /** id do <form> — o botão externo do rodapé fixo submete via `form=` */
+  id?: string;
+  /** o primário mora no rodapé fixo do wizard — sem submit interno */
+  semBotao?: boolean;
+  /** cada tecla/autocomplete reemite o retrato dos civis — o preview do
+   *  documento interpola o que já foi digitado (REALIZA-497) */
+  onMudanca?: (d: CivisDigitados) => void;
+  /** espelha `pending` pro rodapé fixo (desabilita/subtitui o primário) */
+  onPendingChange?: (p: boolean) => void;
 }) {
   const [pending, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    onPendingChange?.(pending);
+    // o cleanup solta o pending do rodapé fixo quando o passo desmonta
+    // no meio do submit — sem ele "Assinar depois" ficava morto
+    return () => onPendingChange?.(false);
+  }, [pending, onPendingChange]);
+
+  /** FormData → retrato dos civis — mesmos `name`s do parseDadosCivis, só
+   *  que tolerante: vazio vira null e o preview repõe o blank sublinhado. */
+  function retrato(): CivisDigitados {
+    const f = formRef.current;
+    const s = (k: string) => String(f ? new FormData(f).get(k) ?? "" : "").trim();
+    return {
+      nome_civil: s("nome_civil") || null,
+      rg: s("rg") || null,
+      cpf: s("cpf").replace(/\D/g, "") || null,
+      data_nascimento: s("data_nascimento") || null,
+      endereco: {
+        logradouro: s("logradouro") || null,
+        numero: s("numero") || null,
+        complemento: s("complemento") || null,
+        bairro: s("bairro") || null,
+        cidade: s("cidade") || null,
+        uf: s("uf") || null,
+        cep: s("cep").replace(/\D/g, "") || null,
+      },
+      parentesco: s("parentesco") || null,
+    };
+  }
+
+  /** O autofill do ViaCEP escreve nos inputs controlados fora do ciclo de
+   *  change — junta o endereço resolvido ao retrato atual e reemite. */
+  function reportarAutofill(endereco: ViaCepEndereco) {
+    const atual = retrato();
+    onMudanca?.({
+      ...atual,
+      endereco: {
+        ...atual.endereco,
+        logradouro: endereco.logradouro,
+        bairro: endereco.bairro,
+        cidade: endereco.cidade,
+        uf: endereco.uf,
+      },
+    });
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     start(async () => {
       setErro(null);
-      const res = await acao(fd);
-      if (res?.error) {
-        setErro(res.error);
-        return;
+      try {
+        const res = await acao(fd);
+        if (res?.error) {
+          setErro(res.error);
+          return;
+        }
+        toast.success("Documento assinado.");
+        router.refresh();
+        onSucesso?.();
+      } catch {
+        // action rejeitada (rede, sessão) sem catch deixava o pending
+        // preso — o primário externo nunca destravava
+        setErro("Sem conexão. Tente de novo.");
       }
-      toast.success("Documento assinado.");
-      router.refresh();
-      onSucesso?.();
     });
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-6">
+    <form
+      ref={formRef}
+      id={id}
+      onSubmit={onSubmit}
+      onChange={() => onMudanca?.(retrato())}
+      // autofill do browser/gerenciador não dispara change — foco/blur
+      // reemitem o retrato e o documento vivo interpola (REALIZA-503)
+      onFocusCapture={() => onMudanca?.(retrato())}
+      onBlurCapture={() => onMudanca?.(retrato())}
+      // validação é a da action (mensagens pt-BR no card): o submit
+      // externo (form=id) mostraria a bolha nativa em inglês
+      noValidate
+      className="grid gap-6"
+    >
       {modo === "autorizacao" && (
         <>
           <div className="space-y-2">
@@ -262,7 +455,7 @@ export function AssinaturaForm({
         </>
       )}
 
-      <DadosCivisFields defaults={dados} />
+      <DadosCivisFields defaults={dados} onEndereco={reportarAutofill} />
 
       {etapas && (
         <h3
@@ -274,12 +467,7 @@ export function AssinaturaForm({
       )}
 
       <label className="flex items-start gap-3 rounded-xl border border-input bg-muted/40 p-4 text-sm leading-relaxed">
-        <input
-          type="checkbox"
-          name="aceite"
-          required
-          className="mt-0.5 size-4 shrink-0 accent-primary"
-        />
+        <Checkbox name="aceite" required className="mt-0.5" />
         <span>
           Li o documento acima e declaro que as informações são verdadeiras.
           Entendo que esta assinatura eletrônica tem a mesma validade de uma
@@ -307,15 +495,18 @@ export function AssinaturaForm({
       )}
 
       {/* w-full no mobile como todo CTA público — no desktop volta ao
-          tamanho natural alinhado à esquerda do form */}
-      <Button type="submit" disabled={pending} className="w-full justify-center sm:w-auto sm:px-8">
-        {pending ? (
-          <CircleNotch size={16} className="animate-spin" aria-hidden />
-        ) : (
-          <Signature size={16} aria-hidden />
-        )}
-        {pending ? "Assinando…" : "Assinar eletronicamente"}
-      </Button>
+          tamanho natural alinhado à esquerda do form. `semBotao`: no
+          wizard o primário mora no rodapé fixo (submit via form=id) */}
+      {!semBotao && (
+        <Button type="submit" disabled={pending} className="w-full justify-center sm:w-auto sm:px-8">
+          {pending ? (
+            <CircleNotch size={16} className="animate-spin" aria-hidden />
+          ) : (
+            <Signature size={16} aria-hidden />
+          )}
+          {pending ? "Assinando…" : "Assinar eletronicamente"}
+        </Button>
+      )}
     </form>
   );
 }

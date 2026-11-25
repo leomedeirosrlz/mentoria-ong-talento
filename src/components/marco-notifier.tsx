@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 import { Flag, FlagCheckered, Medal, Trophy } from "@phosphor-icons/react";
-import { toast } from "sonner";
-import { marcosEntre, type MarcoJornada } from "@/lib/ciclo";
+import { toast } from "@/lib/toast";
+import { marcosEntre, progressoTrilha, type MarcoJornada } from "@/lib/ciclo";
 import { demoAtivoClient } from "@/lib/demo/shared";
 
 const ICONE_MARCO: Record<MarcoJornada, typeof Flag> = {
@@ -18,7 +18,10 @@ function textoMarco(marco: MarcoJornada, feitos: number, total: number) {
     case "primeiro":
       return { titulo: "Primeiro encontro realizado", descricao: "A jornada de vocês começou." };
     case "metade":
-      return { titulo: "Metade do caminho", descricao: `${feitos} de ${total} encontros feitos.` };
+      return {
+        titulo: "Metade do caminho",
+        descricao: `${progressoTrilha({ esp: false, feitos, total })}.`,
+      };
     case "reta_final": {
       const faltam = total - feitos;
       return {
@@ -31,7 +34,7 @@ function textoMarco(marco: MarcoJornada, feitos: number, total: number) {
     case "completo":
       return {
         titulo: "Jornada completa",
-        descricao: `${total} encontros realizados · jornada concluída.`,
+        descricao: `${progressoTrilha({ esp: false, feitos: total, total })} · jornada concluída.`,
       };
   }
 }

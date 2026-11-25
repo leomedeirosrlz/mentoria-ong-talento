@@ -10,8 +10,8 @@ import {
   PaperPlaneTilt,
   Signature,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
-import { AnimatePresence, motion } from "motion/react";
+import { toast } from "@/lib/toast";
+import { FadeTroca } from "@/components/ui/etapa";
 import {
   emitirAssinaturasEmLote,
   enviarLinksAssinatura,
@@ -26,9 +26,10 @@ import type { DocsPessoa } from "@/components/pessoas-listas";
 import { useOrigem } from "@/components/forms/use-origem";
 import { CopiarLink } from "@/components/forms/copiar-link";
 import { NudgeButton } from "@/components/nudge-button";
-import { fade, T } from "@/components/motion";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -57,6 +58,9 @@ export type PessoaAlvo = {
   nome: string;
   email: string | null;
   whatsapp: string | null;
+  /** menor de idade — recebe o par de documentos (termo + autorização)
+   *  numa passada só; a linha do checklist avisa pra não parecer link a mais */
+  menor?: boolean;
 };
 
 /** Os documentos do fluxo de link derivam de TEMPLATES_POR_TIPO (fonte
@@ -76,6 +80,29 @@ const fmtDia = (iso: string) =>
     timeZone: "America/Sao_Paulo",
   }).format(new Date(iso));
 
+/** Rótulo curto do documento pra distinguir as linhas do mesmo jovem no
+ *  resultado — os rótulos do select ("Termo de participação (o(a) jovem
+ *  assina)") são contexto de escolha, longos demais pro meta da linha. */
+const ROTULO_DOC: Record<string, string> = {
+  "termo-voluntario": "Termo de adesão",
+  "termo-mentorando": "Termo de participação",
+  "autorizacao-responsavel": "Autorização do responsável",
+};
+const rotuloDoc = (slug: string) => ROTULO_DOC[slug] ?? slug;
+
+/** Documentos que a emissão toca pra essa pessoa: o escolhido e, pro
+ *  mentorado menor de idade, o irmão devido — o servidor emite o par na
+ *  mesma passada, então o checklist já apresenta o conjunto inteiro. */
+function docsDaEmissao(
+  p: PessoaAlvo,
+  docSlug: string,
+  tipo: TipoAlvoAssinatura
+): string[] {
+  return tipo === "mentorado" && p.menor
+    ? TEMPLATES_POR_TIPO.mentorado.map((t) => t.slug)
+    : [docSlug];
+}
+
 /** Linha do checklist — mais rica que DestinoCheckRow: carrega o status do
  *  documento ("assinado" trava a linha, "link emitido" reusa) e o badge de
  *  faltantes civis, que é o alerta pra completar a ficha. */
@@ -83,6 +110,7 @@ function TermoCheckRow({
   nome,
   status,
   faltantes,
+  detalhe,
   fichaHref,
   checked,
   onToggle,
@@ -93,6 +121,9 @@ function TermoCheckRow({
   /** labels do que falta na ficha — nunca valores (a página calcula no
    *  servidor dentro do escopo coord) */
   faltantes: string[];
+  /** contexto extra sob o nome (o menor recebe os dois documentos de uma
+   *  vez — sem a nota o link a mais pareceria erro) */
+  detalhe?: string | null;
   fichaHref: string;
   checked: boolean;
   onToggle: () => void;
@@ -109,12 +140,10 @@ function TermoCheckRow({
     >
       <div className="flex items-center gap-3">
         <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 data-[disabled]:cursor-default">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={checked}
             disabled={disabled}
-            onChange={onToggle}
-            className="size-4 shrink-0 accent-primary"
+            onCheckedChange={onToggle}
           />
           <span className="min-w-0 flex-1 truncate">{nome}</span>
         </label>
@@ -146,6 +175,11 @@ function TermoCheckRow({
       </div>
       {/* lacuna da ficha vira linha própria — na linha do nome ela
           competia por espaço e escondia quem é a pessoa */}
+      {status !== "assinado" && detalhe && (
+        <p className="mt-0.5 truncate pl-7 text-xs text-muted-foreground">
+          {detalhe}
+        </p>
+      )}
       {status !== "assinado" && faltantes.length > 0 && (
         <p
           title={`Falta: ${faltantes.join(" · ")}. Quem assina completa na hora`}
@@ -213,11 +247,17 @@ export function EnviarTermosDialog({
     [docSel, pessoas, mentorados]
   );
 
-  const statusDe = (id: string): "assinado" | "pendente" | "emitir" => {
-    const d = docs[id];
-    if (!docSel || !d) return "emitir";
-    if (d.assinado[docSel.slug]) return "assinado";
-    if (d.pendente.includes(docSel.slug)) return "pendente";
+  const statusDe = (p: PessoaAlvo): "assinado" | "pendente" | "emitir" => {
+    const d = docs[p.id];
+    const emitidos = docSel
+      ? docsDaEmissao(p, docSel.slug, docSel.tipo)
+      : [];
+    if (!d || !emitidos.length) return "emitir";
+    // trava só quando nada do conjunto sairia — o menor com um dos dois
+    // assinados ainda recebe o outro documento na mesma passada
+    if (emitidos.every((s) => d.assinado[s])) return "assinado";
+    if (emitidos.every((s) => d.assinado[s] || d.pendente.includes(s)))
+      return "pendente";
     return "emitir";
   };
 
@@ -228,13 +268,20 @@ export function EnviarTermosDialog({
   } | null>(null);
 
   /** Marca todo mundo que ainda pode receber link — emissão em lote assume
-   *  "todos menos quem eu desmarcar" (já-assinado nunca entra). */
+   *  "todos menos quem eu desmarcar" (já-assinado nunca entra). Pro menor
+   *  "assinado" quer dizer o par inteiro — um dos dois pendente ainda
+   *  deixa a linha marcável. */
   function preencherMarcados(docSlug: string, tipo: TipoAlvoAssinatura) {
     const lista = tipo === "profile" ? pessoas : mentorados;
     setMarcados(
       new Set(
         lista
-          .filter((p) => !docs[p.id]?.assinado[docSlug])
+          .filter(
+            (p) =>
+              !docsDaEmissao(p, docSlug, tipo).every(
+                (s) => docs[p.id]?.assinado[s]
+              )
+          )
           .map((p) => p.id)
       )
     );
@@ -297,29 +344,55 @@ export function EnviarTermosDialog({
   // disparo em massa por e-mail — só pra quem tem link pronto e e-mail
   // cadastrado; quem ficou de fora segue com copiar/WhatsApp manual
   const comEmail = (resultado?.itens ?? []).filter((i) => i.link && i.email);
+  // lote misto (menor leva o par) pede rótulo por linha e um disparo de
+  // e-mail por documento — cada envelope nomeia e saúda o doc certo
+  const slugsUnicos = new Set(
+    (resultado?.itens ?? []).map((i) => i.slug)
+  );
 
   async function enviarPorEmail() {
-    if (!docSel || !resultado || !comEmail.length) return;
+    if (!resultado || !comEmail.length) return;
     setEnviando(true);
     try {
-      const r = await enviarLinksAssinatura({
-        slug: docSel.slug,
-        envios: comEmail.map((i) => ({
-          para: i.email as string,
-          nome: i.nome,
-          link: i.link as string,
-          destinatario: i.destinatario,
-        })),
-      });
-      if ("error" in r) {
-        toast.error(r.error);
+      const porSlug = new Map<string, typeof comEmail>();
+      for (const i of comEmail) {
+        const arr = porSlug.get(i.slug) ?? [];
+        arr.push(i);
+        porSlug.set(i.slug, arr);
+      }
+      let enviados = 0;
+      let destinatarios = 0;
+      let falhas: string[] = [];
+      let primeiroErro: string | undefined;
+      for (const [slugDoc, itensDoc] of porSlug) {
+        const r = await enviarLinksAssinatura({
+          slug: slugDoc,
+          envios: itensDoc.map((i) => ({
+            para: i.email as string,
+            nome: i.nome,
+            link: i.link as string,
+            destinatario: i.destinatario,
+          })),
+        });
+        if ("error" in r) {
+          primeiroErro ??= r.error;
+          continue;
+        }
+        enviados += r.enviados;
+        destinatarios += r.destinatarios;
+        falhas = falhas.concat(r.falhas);
+      }
+      if (!enviados && primeiroErro) {
+        toast.error(primeiroErro);
         return;
       }
       setEnviado(true);
       toast.success(
-        `${r.enviados} de ${r.destinatarios} ${
-          r.destinatarios === 1 ? "e-mail enviado" : "e-mails enviados"
-        }.${r.falhas.length ? ` Falha em: ${r.falhas.join(", ")}.` : ""}`
+        `${enviados} de ${destinatarios} ${
+          destinatarios === 1 ? "e-mail enviado" : "e-mails enviados"
+        }.${falhas.length ? ` Falha em: ${falhas.join(", ")}.` : ""}${
+          primeiroErro ? ` ${primeiroErro}` : ""
+        }`
       );
     } catch {
       toast.error("Sem conexão. Tente de novo.");
@@ -335,7 +408,11 @@ export function EnviarTermosDialog({
     try {
       await navigator.clipboard.writeText(
         itens
-          .map((i) => `${i.nome}: ${origem}${i.link}`)
+          .map((i) =>
+            slugsUnicos.size > 1
+              ? `${i.nome} · ${rotuloDoc(i.slug)}: ${origem}${i.link}`
+              : `${i.nome}: ${origem}${i.link}`
+          )
           .join("\n")
       );
       setCopiouTodos(true);
@@ -367,36 +444,49 @@ export function EnviarTermosDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <AnimatePresence mode="wait" initial={false}>
+        {/* troca de estado do kit: o painel entrante recebe o foco — o
+            botão que emitiu os links desmonta junto */}
+        <FadeTroca
+          chave={
+            resultado
+              ? "prontos"
+              : docsDisponiveis.length === 0
+                ? "vazio"
+                : "form"
+          }
+          foco
+        >
           {resultado ? (
-            <motion.div
-              key="prontos"
-              {...fade}
-              transition={T.enter}
-              className="min-w-0 space-y-3"
-            >
+            <div className="min-w-0 space-y-3">
               <p className="text-sm font-medium">
-                {resultado.docTitulo} · links prontos
+                {slugsUnicos.size > 1
+                  ? "Documentos do jovem · links prontos"
+                  : `${resultado.docTitulo} · links prontos`}
               </p>
               <ul className="scroll-fina max-h-64 space-y-2 overflow-y-auto pr-1">
                 {resultado.itens.map((i) => (
                   <li
-                    key={i.id}
+                    key={`${i.id}:${i.slug}`}
                     className="rounded-lg border border-input px-3 py-2.5"
                   >
                     <div className="flex items-center gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{i.nome}</p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {i.assinado
-                            ? "já assinado, nada a emitir"
-                            : i.link
-                              ? `${i.existente ? "link reutilizado" : "link emitido"}${
-                                  i.criado_em
-                                    ? ` · emitido em ${fmtDia(i.criado_em)}`
-                                    : ""
-                                }`
-                              : "não foi possível emitir"}
+                          {[
+                            slugsUnicos.size > 1 ? rotuloDoc(i.slug) : null,
+                            i.assinado
+                              ? "já assinado, nada a emitir"
+                              : i.link
+                                ? `${i.existente ? "link reutilizado" : "link emitido"}${
+                                    i.criado_em
+                                      ? ` · emitido em ${fmtDia(i.criado_em)}`
+                                      : ""
+                                  }`
+                                : "não foi possível emitir",
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </p>
                         {i.faltantes.length > 0 && (
                           <p className="mt-0.5 truncate text-xs text-[var(--warn-text)]">
@@ -416,7 +506,7 @@ export function EnviarTermosDialog({
                         <NudgeButton
                           telefone={i.whatsapp}
                           mensagem={msgLinkAssinatura(
-                            docSel?.slug,
+                            i.slug,
                             i.nome,
                             `${origem}${i.link}`
                           )}
@@ -489,24 +579,14 @@ export function EnviarTermosDialog({
                   {copiouTodos ? "Copiados" : "Copiar todos"}
                 </Button>
               </DialogFooter>
-            </motion.div>
+            </div>
           ) : docsDisponiveis.length === 0 ? (
-            <motion.p
-              key="vazio"
-              {...fade}
-              transition={T.enter}
-              className="text-sm text-muted-foreground"
-            >
+            <p className="text-sm text-muted-foreground">
               Ninguém cadastrado ainda. Cadastre pessoas e jovens primeiro e
               volte pra enviar daqui.
-            </motion.p>
+            </p>
           ) : (
-            <motion.div
-              key="form"
-              {...fade}
-              transition={T.enter}
-              className="min-w-0 space-y-4"
-            >
+            <div className="min-w-0 space-y-4">
               <div className="space-y-1.5">
                 <Label id={docLabelId}>Documento</Label>
                 <Select
@@ -534,20 +614,34 @@ export function EnviarTermosDialog({
                   {docSel?.tipo === "profile" ? "Pessoas" : "Jovens"}
                 </legend>
                 <ul className="scroll-fina max-h-60 space-y-0.5 overflow-y-auto pr-1">
-                  {pool.map((p) => (
-                    <li key={p.id}>
-                      <TermoCheckRow
-                        nome={p.nome}
-                        status={statusDe(p.id)}
-                        faltantes={
-                          docSel ? (faltantes[p.id]?.[docSel.slug] ?? []) : []
-                        }
-                        fichaHref={`/pessoas/${p.id}`}
-                        checked={marcados.has(p.id)}
-                        onToggle={() => toggle(p.id)}
-                      />
-                    </li>
-                  ))}
+                  {pool.map((p) => {
+                    const emitidos = docSel
+                      ? docsDaEmissao(p, docSel.slug, docSel.tipo)
+                      : [];
+                    return (
+                      <li key={p.id}>
+                        <TermoCheckRow
+                          nome={p.nome}
+                          status={statusDe(p)}
+                          faltantes={[
+                            ...new Set(
+                              emitidos.flatMap(
+                                (s) => faltantes[p.id]?.[s] ?? []
+                              )
+                            ),
+                          ]}
+                          detalhe={
+                            emitidos.length > 1
+                              ? "menor de idade: recebe os dois documentos"
+                              : null
+                          }
+                          fichaHref={`/pessoas/${p.id}`}
+                          checked={marcados.has(p.id)}
+                          onToggle={() => toggle(p.id)}
+                        />
+                      </li>
+                    );
+                  })}
                 </ul>
               </fieldset>
 
@@ -582,9 +676,9 @@ export function EnviarTermosDialog({
                     : "Escolha as pessoas"}
                 </Button>
               </DialogFooter>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </FadeTroca>
       </DialogContent>
     </Dialog>
   );

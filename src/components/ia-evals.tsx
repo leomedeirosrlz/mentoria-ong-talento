@@ -284,7 +284,7 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
           }
           if (errosSeguidos >= 3) {
             setErro(
-              "Três falhas seguidas de infra — o run pausou. Confira as credenciais do eval e retome."
+              "Três falhas seguidas de infra. O run pausou. Confira as credenciais do eval e retome."
             );
             break;
           }

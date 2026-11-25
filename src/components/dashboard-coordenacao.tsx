@@ -7,17 +7,23 @@ import {
   cronogramaVigente,
   eventoDaSemana,
   eventosDoCronograma,
+  passosRealizadosDe,
   resumoSemanaDe,
   rotuloCronograma,
   saudadeDaDupla,
   semanaBounds,
   textoResumoSemana,
+  toDateStr,
   totalDaTrilha,
   TRILHA_LABEL,
   type DuplaSaude,
 } from "@/lib/ciclo";
 import { paraAcompanhar, saudeDoRecorte } from "@/lib/agenda-coordenacao";
+import { precisaDeVoce } from "@/lib/sua-semana";
+import { PrecisaDeVoce } from "@/components/precisa-de-voce";
+import { situacaoDaDupla, SITUACAO_DUPLA_LABEL } from "@/lib/dupla-desfecho";
 import { painelTrilhasCoord, type AlertaPedido } from "@/lib/trilhas-coord";
+import { pedidosAcionaveis } from "@/lib/solicitacoes-coord";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import { lembreteDaDupla } from "@/components/agenda-partes";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
@@ -165,6 +171,15 @@ export function DashboardCoordenacao({
         })
       : null;
 
+  // "O que precisa de você" (520): a fila plano+recesso — uma linha por
+  // dupla com o motivo na frente; o recorte já é o que a query entregou
+  // (coordenação tudo, auxiliar o escopo dele)
+  const precisaVoce = precisaDeVoce({
+    duplas,
+    eventos,
+    hoje: toDateStr(hoje),
+  });
+
   const precisa = montarPrecisa({
     duplas,
     eventos,
@@ -173,22 +188,22 @@ export function DashboardCoordenacao({
     encerramentos,
     alertas: alertas?.alertas ?? [],
     meuNome,
-    // o ⋯ leva as ações de coordenação só pra coordenação — pro supervisor
-    // fica o "Ver ficha" (a tela é compartilhada)
-    menuDa: (d) => (
-      <DuplaLinhaMenu
-        dupla={d}
-        fichaHref={`/duplas/${d.id}`}
-        formulario={!supervisor}
-        remanejar={!supervisor}
-        encerrar={
-          !supervisor &&
-          d.trilha === "especialista" &&
-          !d.encerrada_em &&
-          (d.status === "ativa" || d.status === "pausada")
-        }
-      />
-    ),
+    // o ⋯ leva as ações de coordenação só pra coordenação — supervisor não
+    // tem ação sobrando, o ⋯ decorativo mantém o visual (tela compartilhada)
+    menuDa: (d) =>
+      supervisor ? null : (
+        <DuplaLinhaMenu
+          dupla={d}
+          editar
+          formulario
+          remanejar
+          encerrar={
+            d.trilha === "especialista" &&
+            !d.encerrada_em &&
+            (d.status === "ativa" || d.status === "pausada")
+          }
+        />
+      ),
   });
 
   const emRisco = duplas
@@ -199,9 +214,8 @@ export function DashboardCoordenacao({
         `${primeiroNome(dupla.mentor.nome_social || dupla.mentor.nome)} & ${primeiroNome(dupla.mentorado.nome_social || dupla.mentorado.nome)} (${motivoCurto(saude)})`
     );
 
-  const pedidosAbertos = solicitacoes.filter((s) =>
-    ["aberta", "contra_proposta", "aguardando_coord"].includes(s.status_efetivo ?? s.status)
-  ).length;
+  // mesmo helper do card: o contador é o length da lista que ele renderiza
+  const pedidosAbertos = pedidosAcionaveis(solicitacoes).length;
 
   return (
     <div className="space-y-6">
@@ -328,6 +342,11 @@ export function DashboardCoordenacao({
             </section>
           )}
 
+          {/* "O que precisa de você" (520): plano e recesso pedindo
+              atenção — motivo antes do rótulo, saída na ficha. Logo
+              depois da fila de situação, antes do termo */}
+          <PrecisaDeVoce itens={precisaVoce.itens} total={precisaVoce.total} />
+
           {termo}
 
           {/* esta semana: uma linha por turma — o fechamento do encontro com
@@ -397,6 +416,7 @@ export function DashboardCoordenacao({
                       </div>
                       <BarraSegmentada
                         altura="sm"
+                        legenda
                         segmentos={[
                           { valor: resumo.comRegistro, rotulo: "com registro", cls: "bg-[var(--ok)]" },
                           { valor: resumo.aguardandoRegistro, rotulo: "aguardando registro", cls: "bg-[var(--warn)]" },
@@ -582,10 +602,11 @@ function montarPrecisa({
 
     const rank = pedeApoio ? 0 : encerra ? 4 : saude.semaforo === "risco" ? 1 : 3;
     const total = totalDaTrilha(d.trilha, eventosDoCronograma(eventos, d.cronograma_id));
-    const realizados = d.encontros.filter((e) => e.status === "realizado").map((e) => e.numero);
+    const realizados = passosRealizadosDe(d);
     const progresso: ProgressoDupla = {
       total,
       realizados,
+      sessao: d.trilha === "especialista",
       esperado: d.status === "ativa" && !encerra ? saude.esperado : null,
       legenda: encerra
         ? "jornada fechada"
@@ -665,7 +686,7 @@ function montarPrecisa({
       linha: {
         mentor: pessoaLinha(d.mentor),
         mentorado: pessoaLinha(d.mentorado),
-        situacao: situacaoDaDupla(d, saude),
+        situacao: situacaoLinha(d, saude),
         apoio: pedeApoio ? { detalhe: ORIGEM_APOIO[saude.apoio.origem ?? "mentor"] } : null,
         meta: meta || null,
         motivo: item ? item.contextoPartes.join(" · ") : saude.motivo,
@@ -708,10 +729,11 @@ function lembreteDoItem(
 
 type ItemFila = ReturnType<typeof paraAcompanhar>[number];
 
-function situacaoDaDupla(d: Dupla, saude: DuplaSaude): { rotulo: string; tom: TomSituacao } {
-  if (d.status === "concluida") return { rotulo: "Concluída", tom: "pausa" };
-  if (d.status === "encerrada") return { rotulo: "Desistente", tom: "pausa" };
-  if (d.status === "pausada") return { rotulo: "Pausada", tom: "pausa" };
+/** Linha da ficha-resumo: fechadas leem a situação canônica
+ *  (dupla-desfecho); as ativas leem o semáforo. */
+function situacaoLinha(d: Dupla, saude: DuplaSaude): { rotulo: string; tom: TomSituacao } {
+  if (d.status !== "ativa")
+    return { rotulo: SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)], tom: "pausa" };
   if (saude.semaforo === "risco") return { rotulo: "Em risco", tom: "risco" };
   if (saude.semaforo === "atencao") return { rotulo: "Atenção", tom: "atencao" };
   return { rotulo: "Em dia", tom: "neutro" };

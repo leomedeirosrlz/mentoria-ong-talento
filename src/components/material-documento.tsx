@@ -19,6 +19,7 @@ import type {
   DocItem,
   DocTom,
 } from "@/lib/materiais-documentos";
+import { PedirLizaPersonalizar } from "@/components/pedir-liza-personalizar";
 import { cn } from "@/lib/utils";
 
 // Documento nativo de /materiais — os templates do cap. 14 do guia DPP vivem
@@ -134,7 +135,7 @@ function DocTabela({
                     // marcado, diferente do quadrado vazio do PDF)
                     <input
                       type="checkbox"
-                      aria-label={`${ln[0].replace(/<[^>]+>/g, "")} — ${b.cabecalho[k].replace(/<[^>]+>/g, "")}`}
+                      aria-label={`${ln[0].replace(/<[^>]+>/g, "")}, ${b.cabecalho[k].replace(/<[^>]+>/g, "")}`}
                       className="size-4 cursor-pointer accent-[var(--ring)] print:[-webkit-print-color-adjust:exact]"
                     />
                   ) : (
@@ -286,9 +287,11 @@ function EncontroCard({ b }: { b: Extract<DocBloco, { kind: "encontro" }> }) {
           ) : null}
           {b.roteiro ? (
             <p>
-              {/* the guide's "Passo a passo" slot as an amber chip-link */}
+              {/* the guide's "Passo a passo" slot as an amber chip-link —
+                  "./" relativo como os refs do corpus: resolve na casa de
+                  quem lê (/materiais no staff, /jovem no mentorado) */}
               <Link
-                href={`/materiais/documento/${b.roteiro.slug}`}
+                href={`./${b.roteiro.slug}`}
                 aria-label={`Passo a passo: ${b.roteiro.rotulo}`}
                 className="inline-flex items-center gap-1.5 rounded-full border border-[var(--warn-border)] bg-[var(--warn-bg)] px-3 py-1 text-xs font-semibold text-[var(--warn-text)] transition-colors hover:border-[var(--warn)]"
               >
@@ -338,6 +341,19 @@ function NumeroCard({
 
 function DocBlocoView({ b, tom }: { b: DocBloco; tom: DocTom }) {
   switch (b.kind) {
+    case "subtitulo":
+      // cabeçalhos dos documentos gerados (roteiro do plano): a mesma
+      // gramática dos h2/h3 do corpus — nivel 2 com a régua lime, nivel
+      // 3 só negrito (o h1 fica no hero do documento)
+      return b.nivel === 3 ? (
+        <h4 className="pt-1 text-[15px] font-semibold tracking-tight sm:text-base">
+          {b.texto}
+        </h4>
+      ) : (
+        <h3 className="border-b-2 border-[var(--brand-lime)] pb-2 pt-2 text-lg font-semibold tracking-tight sm:text-xl">
+          {b.texto}
+        </h3>
+      );
     case "subj":
       // stray subject outside a card (linhasDoc wraps every subj — fallback)
       return (
@@ -527,15 +543,22 @@ export function DocBlocos({
 export function MaterialDocumento({
   slug,
   voltar,
+  lizaPergunta,
 }: {
   slug: string;
   voltar: { href: string; rotulo: string };
+  /** quando setada (só a rota de staff, com a bolha ligada), mostra o CTA
+   *  "Pedir pra Liza personalizar" — a página manda a pergunta pronta com
+   *  o slug; o documento em si segue verbatim */
+  lizaPergunta?: string;
 }) {
   const doc = materialDocumento(slug);
   if (!doc) return null;
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6 print:px-0 lg:max-w-4xl xl:max-w-5xl">
+    // div, não <main>: o landmark vem do shell (AppShell/JovemShell já dão
+    // <main id="conteudo">) — <main> aninhado era landmark duplicado
+    <div className="mx-auto max-w-3xl px-4 py-6 print:px-0 lg:max-w-4xl xl:max-w-5xl">
       <Link
         href={voltar.href}
         className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground print:hidden"
@@ -560,9 +583,15 @@ export function MaterialDocumento({
         <DocBlocos blocos={doc.blocos} />
       </div>
 
+      {lizaPergunta ? (
+        <div className="mt-6">
+          <PedirLizaPersonalizar pergunta={lizaPergunta} />
+        </div>
+      ) : null}
+
       <footer className="mt-8 border-t border-border/60 pt-3 text-xs text-muted-foreground">
-        Template do guia do programa — adapte ao seu jeito de escrever.
+        Template do guia do programa: adapte ao seu jeito de escrever.
       </footer>
-    </main>
+    </div>
   );
 }

@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
-import { WarningCircle } from "@phosphor-icons/react";
-import { Button } from "@/components/ui/button";
+import { CartaoErro } from "@/components/cartao-erro";
 
 // Boundary do grupo (jovem) inteiro — pega o que quebra no próprio
 // jovem/layout (gate de papel, getMe), onde nem o JovemShell existe pra
@@ -15,23 +13,7 @@ export default function Error({
   error: Error & { digest?: string };
   retry: () => void;
 }) {
-  useEffect(() => {
-    console.error(error);
-  }, [error]);
-
   return (
-    <div className="min-h-[100dvh] grid place-items-center px-4">
-      <div className="max-w-sm rounded-xl bg-card shadow-[var(--shadow-border)] p-6 text-center">
-        <WarningCircle size={32} className="mx-auto text-muted-foreground" />
-        <p className="mt-2 font-medium">Algo deu errado</p>
-        <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-          Ocorreu um erro inesperado ao carregar esta página. Tente de novo.
-          Se continuar assim, fale com a equipe do Realiza.vc.
-        </p>
-        <Button onClick={() => retry()} className="mt-4">
-          Tentar de novo
-        </Button>
-      </div>
-    </div>
+    <CartaoErro error={error} retry={retry} variante="pagina" tom="equipe" />
   );
 }

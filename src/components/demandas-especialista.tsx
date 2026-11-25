@@ -19,7 +19,7 @@ import type {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import { SolicitacaoNegociacao } from "@/components/solicitacao-negociacao";
 
 /** Busca/filtro sem acento nem caixa — "fração" acha "fracao" e vice-versa;
@@ -173,10 +173,10 @@ export function DemandasEspecialista({
               />
             </div>
             {areas.length > 0 && (
-              <div
+              <FilterChipRow
                 role="group"
                 aria-label="Filtrar pedidos"
-                className="flex flex-wrap gap-1.5"
+                className="w-full gap-1.5"
               >
                 <button
                   type="button"
@@ -202,7 +202,7 @@ export function DemandasEspecialista({
                     {a}
                   </button>
                 ))}
-              </div>
+              </FilterChipRow>
             )}
           </div>
         )}

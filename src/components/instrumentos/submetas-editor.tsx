@@ -8,7 +8,8 @@ import type { FormularioCampo } from "@/lib/forms/schema";
 import { T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { campoErroId, ErroCampo, RotuloCampo } from "./campos";
+import { RotuloPergunta } from "@/components/forms/pergunta";
+import { campoErroId, ErroCampo } from "./campos";
 import type { RespostaApi } from "./use-resposta";
 
 // Submetas — o desdobramento "uma por linha" (0118). O campo segue
@@ -87,13 +88,8 @@ export function SubmetasEditor({
       className="min-w-0 space-y-2"
     >
       <legend>
-        <RotuloCampo campo={campo} className="text-sm sm:text-sm" />
+        <RotuloPergunta campo={campo} className="text-sm @xl:text-sm" />
       </legend>
-      {campo.descricao && (
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          {campo.descricao}
-        </p>
-      )}
 
       {/* o <ol> fica sempre montado (empty:hidden some com ele vazio) —
           assim a última linha removida ainda anima a saída */}

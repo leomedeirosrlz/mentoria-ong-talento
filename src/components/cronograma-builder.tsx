@@ -8,7 +8,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   ArrowDown,
   ArrowLeft,
@@ -34,6 +34,7 @@ import {
   rotuloCronograma,
 } from "@/lib/ciclo";
 import type { CicloEvento, Cronograma } from "@/lib/types";
+import type { RascunhoImportacao } from "@/lib/importar-cronograma/normalizar";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -42,6 +43,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Etapa,
+  useTrocaDeEtapa,
+  type DirecaoEtapa,
+} from "@/components/ui/etapa";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -89,18 +95,34 @@ const rascunhoVazio = (): EventoRascunho => ({
 export function CronogramaBuilder({
   cronogramas,
   eventos,
+  importado,
+  onVoltar,
+  direcaoInicial,
 }: {
   cronogramas: Cronograma[];
   /** todos os eventos — o modo "copiar" recorta o conteúdo do cronograma fonte */
   eventos: CicloEvento[];
+  /** REALIZA-34 — prévia alimentada por arquivo importado: pula a etapa
+   *  de parâmetros (o arquivo já traz a sequência); a identidade fica
+   *  editável no topo da prévia, junto dos avisos do parse. */
+  importado?: { rascunho: RascunhoImportacao; arquivo: string };
+  /** volta pro fluxo de importação (a etapa "config" não existe nesse modo) */
+  onVoltar?: () => void;
+  /** direção do slide no MOUNT — o flow pai dita (Voltar remonta o builder
+   *  deslizando da esquerda); interno à fase a assinalar toma conta */
+  direcaoInicial?: DirecaoEtapa;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [etapa, setEtapa] = useState<"config" | "previa">("config");
+  const [etapa, setEtapa] = useState<"config" | "previa">(
+    importado ? "previa" : "config"
+  );
 
   // ---------- parâmetros ----------
-  const [turma, setTurma] = useState("");
-  const [nome, setNome] = useState("Calendário oficial");
+  const [turma, setTurma] = useState(importado?.rascunho.turma ?? "");
+  const [nome, setNome] = useState(
+    importado?.rascunho.nome ?? "Calendário oficial"
+  );
   const [status, setStatus] = useState<"rascunho" | "ativo">("rascunho");
   const [conteudo, setConteudo] = useState<ConteudoFonte>("guia_dpp");
   const [copiarDe, setCopiarDe] = useState(cronogramas[0]?.id ?? "");
@@ -123,10 +145,17 @@ export function CronogramaBuilder({
   const [encerramento, setEncerramento] = useState(true);
 
   // ---------- prévia ----------
-  const [linhas, setLinhas] = useState<Linha[]>([]);
+  const [linhas, setLinhas] = useState<Linha[]>(() =>
+    (importado?.rascunho.eventos ?? []).map((e) => ({ ...e, key: novaChave() }))
+  );
   const [editando, setEditando] = useState<string | null>(null);
   const [novoAberto, setNovoAberto] = useState(false);
   const [novo, setNovo] = useState<EventoRascunho>(rascunhoVazio);
+  // duas fases por remount (config ↔ prévia): o kit entrega o slide
+  // direcional e o foco no painel que entra — o botão que disparou a
+  // troca (Gerar/Voltar) desmonta junto e o foco não fica órfão
+  const { direcao, assinalar, tituloEtapaRef } =
+    useTrocaDeEtapa<HTMLDivElement>(1, direcaoInicial);
 
   const erroLista = useMemo(
     () => (linhas.length ? validaEventos(linhas) : null),
@@ -181,6 +210,7 @@ export function CronogramaBuilder({
       toast.error(r.error);
       return;
     }
+    assinalar(1);
     setLinhas(r.eventos.map((e) => ({ ...e, key: novaChave() })));
     setEtapa("previa");
   }
@@ -231,7 +261,74 @@ export function CronogramaBuilder({
   if (etapa === "previa") {
     const editandoLinha = linhas.find((l) => l.key === editando) ?? null;
     return (
-      <div className="space-y-5">
+      <Etapa key="previa" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-5 outline-none">
+        {importado && (
+          <>
+            {/* origem + avisos do parse — a revisão humana é obrigatória por
+                contrato, os avisos dizem exatamente o que conferir */}
+            <div className="rounded-xl bg-card px-4 py-3 shadow-[var(--shadow-border)] sm:px-5">
+              <p className="text-sm font-medium">
+                Importado de {importado.arquivo}
+                {importado.rascunho.viaIa && " · montado com IA"}
+              </p>
+              {importado.rascunho.avisos.length > 0 && (
+                <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-muted-foreground">
+                  {importado.rascunho.avisos.map((a, i) => (
+                    <li key={i}>{a}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* identidade — no fluxo manual vem do passo 1; aqui fica no
+                topo da prévia porque o arquivo já trouxe a sequência */}
+            <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="cb-turma">Turma</Label>
+                  <Input
+                    id="cb-turma"
+                    required
+                    maxLength={80}
+                    placeholder="Ex.: T3 · 2026/2027"
+                    value={turma}
+                    onChange={(e) => setTurma(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cb-nome">Nome do cronograma</Label>
+                  <Input
+                    id="cb-nome"
+                    required
+                    maxLength={120}
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label id="cb-status-label">Status inicial</Label>
+                  <Select
+                    value={status}
+                    items={STATUS_OPCOES}
+                    onValueChange={(v) => setStatus(v as typeof status)}
+                  >
+                    <SelectTrigger aria-labelledby="cb-status-label">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(STATUS_OPCOES).map(([v, l]) => (
+                        <SelectItem key={v} value={v}>
+                          {l}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+
         {/* resumo derivado — os mesmos campos que a action grava no cronograma */}
         <div className="rounded-xl bg-card px-4 py-3 shadow-[var(--shadow-border)] sm:px-5">
           <p className="text-sm font-medium">
@@ -360,9 +457,17 @@ export function CronogramaBuilder({
             Adicionar evento
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setEtapa("config")}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                onVoltar
+                  ? onVoltar()
+                  : (assinalar(-1), setEtapa("config"))
+              }
+            >
               <ArrowLeft aria-hidden />
-              Voltar aos parâmetros
+              {importado ? "Importar outro arquivo" : "Voltar aos parâmetros"}
             </Button>
             <Button size="sm" disabled={pending || !!erroLista} onClick={criar}>
               {pending && <CircleNotch className="animate-spin" />}
@@ -394,13 +499,13 @@ export function CronogramaBuilder({
             setNovoAberto(false);
           }}
         />
-      </div>
+      </Etapa>
     );
   }
 
   // ---------- passo 1: parâmetros ----------
   return (
-    <div className="space-y-5">
+    <Etapa key="config" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-5 outline-none">
       <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
         <h2 className="text-sm font-semibold">A turma</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -721,7 +826,7 @@ export function CronogramaBuilder({
           Gerar prévia do calendário
         </Button>
       </div>
-    </div>
+    </Etapa>
   );
 }
 

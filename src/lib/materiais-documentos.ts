@@ -16,6 +16,10 @@ export type DocTom = "lima" | "destaque" | "info";
 
 export type DocBloco =
   | { kind: "par"; html: string }
+  // título de seção do documento gerado (roteiros do plano, 020/021):
+  // nivel 2 = cabeçalho de "##" (regra lime), nivel 3 = sub "###" —
+  // os docs do corpus mantêm o heading próprio e não usam este bloco
+  | { kind: "subtitulo"; texto: string; nivel?: 2 | 3 }
   // ordenada=false → <ul> (listas "-" do corpus); ausente/true → <ol>
   // check: itens de marcação (seções "Antes do encontro", checklist) —
   // o renderer desenha checkbox real em vez de bullet
@@ -231,7 +235,7 @@ export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
       {
         kind: "lista",
         itens: [
-          "Os nomes e contatos de pelo menos <b>três amigos e três familiares</b> (e três colegas de trabalho, se você estiver trabalhando). Vou enviar a cada uma um link para responder duas perguntas rápidas sobre você. Avise essas pessoas de que o link vai chegar.",
+          "Os nomes e contatos de pelo menos <b>três pessoas que conhecem você bem</b>. Vale misturar os vínculos: amigos, familiares e colegas de trabalho ou de escola. Vou enviar a cada uma um link para responder duas perguntas rápidas sobre você. Avise essas pessoas de que o link vai chegar.",
           "Um <b>resumo da sua história de vida</b>, pessoal e profissional. Sugiro listar em ordem cronológica os fatos que foram importantes para você, formando uma linha do tempo. Não precisa me enviar: guarde para conversarmos no encontro.",
           "A sua <b>Roda da Vida</b> respondida na plataforma, com uma reflexão sobre as áreas que você mais gostaria de melhorar.",
         ],

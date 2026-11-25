@@ -60,7 +60,7 @@ A visibilidade é por papel: coordenação e supervisor leem cada resposta; o(a)
 
 ## Avaliação por terceiros
 
-O(a) jovem indica ao(à) mentor(a) três amigos, três familiares e, se estiver trabalhando, três colegas de trabalho. O(a) mentor(a) cadastra essas pessoas na ficha da dupla, gera e envia o link de cada uma; o consolidado publicado aparece para o(a) jovem na área dele(a).
+O(a) jovem indica ao(à) mentor(a) pelo menos três pessoas que o(a) conhecem bem, até nove no total (o guia sugere misturar amigos, familiares e, se estiver trabalhando, colegas de trabalho). O(a) mentor(a) cadastra essas pessoas na ficha da dupla, gera e envia o link de cada uma; o consolidado publicado aparece para o(a) jovem na área dele(a).
 
 - As pessoas indicadas respondem pelo link na plataforma, sem login. São **duas perguntas abertas**: quais são os pontos fortes do(a) jovem e o que ele(a) poderia melhorar.
 - O(a) mentor(a) lê as respostas identificadas, consolida removendo o que identifica quem respondeu e publica a síntese anônima, que o(a) jovem lê na própria home. Em nenhum momento se indica quem disse o quê.

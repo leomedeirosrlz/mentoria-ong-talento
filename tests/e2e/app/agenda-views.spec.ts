@@ -346,10 +346,13 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
     await expect(
       dialog.getByRole("heading", { name: "1º encontro" })
     ).toBeVisible();
-    // o slot clicado preenche o datetime-local — dia da coluna + a hora do Y
-    const campo = dialog.locator("#data_hora");
-    await expect(campo).toHaveValue(new RegExp(`^${qua}T19:(00|30)$`));
-    const valor = await campo.inputValue();
+    // o slot clicado preenche os campos nativos do seletor — dia da
+    // coluna pro input[type=date] e a hora do Y pro input[type=time] (530)
+    const campoData = dialog.locator('input[type="date"]');
+    const campoHora = dialog.locator('input[type="time"]');
+    await expect(campoData).toHaveValue(qua);
+    await expect(campoHora).toHaveValue(/^19:(00|30)$/);
+    const valor = `${await campoData.inputValue()}T${await campoHora.inputValue()}`;
     await page.screenshot({ path: "/tmp/realiza25-dialog-slot.png" });
 
     await confirmarNoDialogAgendar(dialog, "Confirmar agendamento");

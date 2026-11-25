@@ -9,7 +9,7 @@ import {
   Monitor,
   Tag,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { abrirChamado } from "@/lib/actions-chamados";
 import { CHAMADO_CATEGORIA_LABEL } from "@/lib/ciclo";
 import type { ChamadoCategoria } from "@/lib/types";
@@ -33,7 +33,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CAT_ICON } from "@/components/chamados-shared";
+import {
+  CAT_ICON,
+  rotuloAberturaChamado,
+  rotuloEnvioChamado,
+} from "@/components/chamados-shared";
 
 // Dialog de abertura de chamado — mesmo canal pros 4 papéis. O jovem vê
 // opções na linguagem dele; mentor/equipe veem as 5 categorias. No celular
@@ -80,21 +84,37 @@ export function NovoChamadoDialog({
   duplaId,
   duplas,
   onAberto,
+  open: openProp,
+  onOpenChange,
+  inicial,
 }: {
   papel: string;
+  /** `null` suprime o trigger embutido — o host abre de forma controlada
+   *  (item do ⋯ do cabeçalho da ficha). */
   trigger: React.ReactNode;
   /** Dupla travada (ficha da dupla) ou select quando vier lista. */
   duplaId?: string;
   duplas?: { id: string; label: string }[];
   onAberto?: (r: { id?: string; numero?: string }) => void;
+  /** Modo controlado (opcional) — mesmo padrão do AgendarEncontroDialog. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Rascunho pré-preenchido (staff): quem abre de um contexto pronto,
+   *  como a conversa do plano "ficar em dia", só revisa e envia. */
+  inicial?: { categoria: ChamadoCategoria; assunto: string; mensagem?: string };
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInterno, setOpenInterno] = useState(false);
+  const open = openProp ?? openInterno;
+  function setOpen(o: boolean) {
+    setOpenInterno(o);
+    onOpenChange?.(o);
+  }
   const [pending, start] = useTransition();
   const jovem = papel === "mentorado";
-  const [cat, setCat] = useState<ChamadoCategoria | "">("");
+  const [cat, setCat] = useState<ChamadoCategoria | "">(inicial?.categoria ?? "");
   const [opcaoJovem, setOpcaoJovem] = useState<OpcaoJovem | "">("");
-  const [assunto, setAssunto] = useState("");
-  const [mensagem, setMensagem] = useState("");
+  const [assunto, setAssunto] = useState(inicial?.assunto ?? "");
+  const [mensagem, setMensagem] = useState(inicial?.mensagem ?? "");
   const [dupla, setDupla] = useState(duplaId ?? "");
   const [maisOpcoes, setMaisOpcoes] = useState(false);
   const temDuplas = !jovem && !duplaId && !!duplas && duplas.length > 0;
@@ -122,10 +142,10 @@ export function NovoChamadoDialog({
   const pronto = !!categoriaFinal && assunto.trim().length >= 2;
 
   function limpar() {
-    setCat("");
+    setCat(inicial?.categoria ?? "");
     setOpcaoJovem("");
-    setAssunto("");
-    setMensagem("");
+    setAssunto(inicial?.assunto ?? "");
+    setMensagem(inicial?.mensagem ?? "");
     setMaisOpcoes(false);
     if (!duplaId) setDupla("");
   }
@@ -166,7 +186,7 @@ export function NovoChamadoDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={trigger as never} />
+      {trigger !== null && <DialogTrigger render={trigger as never} />}
       <DialogContent
         size="lg"
         className={cn(
@@ -176,7 +196,7 @@ export function NovoChamadoDialog({
       >
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
-            {jovem ? "Pedir ajuda" : "Novo chamado"}
+            {rotuloAberturaChamado(papel)}
           </DialogTitle>
         </DialogHeader>
 
@@ -334,7 +354,7 @@ export function NovoChamadoDialog({
             disabled={pending || !pronto}
           >
             {pending && <CircleNotch className="animate-spin" aria-hidden />}
-            {jovem ? "Enviar pedido" : "Abrir chamado"}
+            {rotuloEnvioChamado(papel)}
           </Button>
         </DialogFooter>
       </DialogContent>

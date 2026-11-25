@@ -3,9 +3,12 @@ import {
   atualizarViaServiceRole,
   buscarViaServiceRole,
   expect,
+  inserirViaServiceRole,
+  jwtDoUsuario,
   limparViaServiceRole,
   loginComSenha,
   relogar,
+  restComoUsuario,
   test,
 } from "../helpers";
 
@@ -17,7 +20,7 @@ import {
 // jovem_duplas — um embed errado aqui morria silencioso).
 //
 // Piso: o sweep zera os convites/consolidado da dupla …0030 antes de cada
-// run (e no afterAll) — spec idempotente, o cap 3-por-vínculo não acumula.
+// run (e no afterAll) — spec idempotente, o cap total de 9 não acumula.
 
 const MENTOR_EMAIL = process.env.E2E_MENTOR_EMAIL ?? "e2e-mentor@realiza.test";
 const JOVEM_EMAIL = process.env.E2E_JOVEM_EMAIL ?? "jovem-e2e@realiza.test";
@@ -124,4 +127,220 @@ test("fluxo completo: convite → resposta pública → consolidado pro jovem", 
   ).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(CONSOLIDADO)).toBeVisible();
   await expect(page.getByText(CONVIDADO)).toHaveCount(0);
+});
+
+// REALIZA-449/463 (0216) — resposta colhida por fora (telefone, presencial,
+// papel) entra pelo mentor/coord com a proveniência declarada. O fluxo
+// cobre a ponta a ponta (UI → RPC → carimbo no banco → selo na ficha); o
+// segundo teste fica na borda do PostgREST pra provar que a autorização e
+// as réguas moram na RPC, não na tela.
+
+const CONTATO_MANUAL = "Tia Dalva E2E";
+
+test("registro manual: mentor lança a resposta e a proveniência aparece na ficha", async ({
+  page,
+}) => {
+  const contato = await inserirViaServiceRole("terceiros_contatos", {
+    dupla_id: DUPLA_ID,
+    nome: CONTATO_MANUAL,
+    vinculo: "familiar",
+  });
+
+  await loginComSenha(page, MENTOR_EMAIL, SENHA);
+  await page.goto(`/duplas/${DUPLA_ID}?aba=instrumentos`);
+
+  // o menu do convite pendente ganhou o gesto novo
+  await page
+    .getByRole("button", { name: `Ações do contato ${CONTATO_MANUAL}` })
+    .click();
+  await page
+    .getByRole("menuitem", { name: "Registrar resposta" })
+    .click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("heading", { name: "Registrar resposta de Tia" })
+  ).toBeVisible();
+  await dialog.locator("#manual-fortes").fill("Persistente, não larga fácil.");
+  await dialog
+    .locator("#manual-melhorar")
+    .fill("Some quando a rotina aperta.");
+  // via default "telefone" — o cenário real do contato. O submit só
+  // destrava com o consentimento declarado
+  const submit = dialog.getByRole("button", {
+    name: "Registrar resposta",
+    exact: true,
+  });
+  await expect(submit).toBeDisabled();
+  await dialog
+    .getByText("A pessoa autorizou o registro desta resposta")
+    .click();
+  await expect(submit).toBeEnabled();
+  await submit.click();
+
+  // a linha vira respondida com o selo de origem — registrante, via e
+  // consentimento visíveis sem abrir o detalhe
+  const linha = page.locator("li", { hasText: CONTATO_MANUAL });
+  await expect(linha.getByText("respondeu", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(linha.getByText(/registro manual/)).toBeVisible();
+  await linha.getByText("Ver resposta de Tia").click();
+  await expect(linha.getByText(/Registrada por/)).toBeVisible();
+  await expect(linha.getByText(/coleta por telefone/)).toBeVisible();
+  await expect(linha.getByText(/consentimento declarado/)).toBeVisible();
+
+  // o carimbo no banco fecha a história: origem, registrante, via,
+  // consentimento — e o contato saiu de 'pendente'
+  const [resp] = await buscarViaServiceRole<
+    {
+      origem: string;
+      registrado_por: string | null;
+      coletado_via: string | null;
+      consentimento_declarado: boolean;
+    }[]
+  >(
+    "terceiros_respostas",
+    `select=origem,registrado_por,coletado_via,consentimento_declarado&contato_id=eq.${contato.id}`
+  );
+  expect(resp.origem).toBe("manual");
+  expect(resp.registrado_por).not.toBeNull();
+  expect(resp.coletado_via).toBe("telefone");
+  expect(resp.consentimento_declarado).toBe(true);
+  const [cont] = await buscarViaServiceRole<{ status: string }[]>(
+    "terceiros_contatos",
+    `select=status&id=eq.${contato.id}`
+  );
+  expect(cont.status).toBe("respondido");
+});
+
+test("registro manual de pessoa nova: cria o contato e grava a resposta na mesma ação", async ({
+  page,
+}) => {
+  await loginComSenha(page, MENTOR_EMAIL, SENHA);
+  await page.goto(`/duplas/${DUPLA_ID}?aba=instrumentos`);
+
+  await page
+    .getByRole("button", { name: "Registrar resposta", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("heading", {
+      name: "Registrar resposta de pessoa nova",
+    })
+  ).toBeVisible();
+  await dialog.locator("#manual-nome").fill("Vizinha Dona Rute");
+  await dialog.locator("#manual-vinculo").click();
+  await page.getByRole("option", { name: /^outro/i }).click();
+  await dialog.locator("#manual-fortes").fill("Cuida dos irmãos menor.");
+  await dialog.locator("#manual-melhorar").fill("Fala pouco de si.");
+  await dialog.locator("#manual-via").click();
+  await page.getByRole("option", { name: "presencial" }).click();
+  await dialog
+    .getByText("A pessoa autorizou o registro desta resposta")
+    .click();
+  await dialog
+    .getByRole("button", { name: "Registrar resposta", exact: true })
+    .click();
+
+  const linha = page.locator("li", { hasText: "Vizinha Dona Rute" });
+  await expect(linha.getByText("respondeu", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(linha.getByText(/registro manual/)).toBeVisible();
+
+  // o contato nasceu já respondido, sem token de link nem convite pendente
+  const [contato] = await buscarViaServiceRole<
+    { id: string; status: string }[]
+  >(
+    "terceiros_contatos",
+    `select=id,status&dupla_id=eq.${DUPLA_ID}&nome=eq.${encodeURIComponent("Vizinha Dona Rute")}`
+  );
+  expect(contato?.status).toBe("respondido");
+  const [resp] = await buscarViaServiceRole<
+    { origem: string; coletado_via: string | null }[]
+  >(
+    "terceiros_respostas",
+    `select=origem,coletado_via&contato_id=eq.${contato.id}`
+  );
+  expect(resp?.origem).toBe("manual");
+  expect(resp?.coletado_via).toBe("presencial");
+});
+
+// Réguas da RPC na borda — a tela esconde, o PostgREST tem que barrar:
+// sem consentimento não registra, via fora do vocabulário não registra,
+// respondido não regrava (imutável) e quem não é da dupla nem enxerga.
+test("RPC manual: consentimento, via, imutabilidade e escopo barrados", async () => {
+  const jwt = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
+  const corpo = (over: Record<string, unknown>) => ({
+    p_contato_id: null,
+    p_pontos_fortes: "Persistente.",
+    p_a_melhorar: "Some quando aperta.",
+    p_coletado_via: "telefone",
+    p_consentimento: true,
+    ...over,
+  });
+
+  const alvo = await inserirViaServiceRole("terceiros_contatos", {
+    dupla_id: DUPLA_ID,
+    nome: "Guard Régua E2E",
+    vinculo: "amigo",
+  });
+
+  // sem consentimento declarado → não registra
+  let res = await restComoUsuario(
+    "rpc/registrar_resposta_terceiro_manual",
+    jwt,
+    { method: "POST", body: corpo({ p_contato_id: alvo.id, p_consentimento: false }) }
+  );
+  expect(res.status).toBeGreaterThanOrEqual(400);
+  expect(await res.text()).toContain("autorizou");
+
+  // via fora do vocabulário → não registra
+  res = await restComoUsuario(
+    "rpc/registrar_resposta_terceiro_manual",
+    jwt,
+    {
+      method: "POST",
+      body: corpo({ p_contato_id: alvo.id, p_coletado_via: "sinal de fumaça" }),
+    }
+  );
+  expect(res.status).toBeGreaterThanOrEqual(400);
+  expect(await res.text()).toContain("coletada");
+
+  // feliz → grava (e o contato vira respondido)
+  res = await restComoUsuario(
+    "rpc/registrar_resposta_terceiro_manual",
+    jwt,
+    { method: "POST", body: corpo({ p_contato_id: alvo.id }) }
+  );
+  expect(res.ok).toBe(true);
+
+  // replay → imutável: a resposta não pode ser alterada nem regrava
+  res = await restComoUsuario(
+    "rpc/registrar_resposta_terceiro_manual",
+    jwt,
+    {
+      method: "POST",
+      body: corpo({ p_contato_id: alvo.id, p_pontos_fortes: "Reescrito." }),
+    }
+  );
+  expect(res.status).toBeGreaterThanOrEqual(400);
+  expect(await res.text()).toContain("não pode ser alterada");
+
+  // escopo: o jovem não é mentor nem coord da dupla → 'dupla não
+  // encontrada' (a RPC esconde a existência, como no resto do sistema)
+  const jwtJovem = await jwtDoUsuario(JOVEM_EMAIL, SENHA);
+  const alvo2 = await inserirViaServiceRole("terceiros_contatos", {
+    dupla_id: DUPLA_ID,
+    nome: "Guard Escopo E2E",
+    vinculo: "amigo",
+  });
+  res = await restComoUsuario(
+    "rpc/registrar_resposta_terceiro_manual",
+    jwtJovem,
+    { method: "POST", body: corpo({ p_contato_id: alvo2.id }) }
+  );
+  expect(res.status).toBeGreaterThanOrEqual(400);
+  expect(await res.text()).toContain("não encontrada");
 });

@@ -37,7 +37,7 @@ export default async function JovemPdm() {
           className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ArrowLeft size={16} aria-hidden />
-          Minha jornada
+          Materiais
         </Link>
       </div>
 
@@ -57,12 +57,12 @@ export default async function JovemPdm() {
             Seu plano de desenvolvimento
           </h1>
           <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-            O PDM nasce na jornada com a sua mentora: Declaração de Visão,
+            O PDM nasce na jornada com seu mentor: Declaração de Visão,
             metas e os passos até elas. Quando vocês começarem a construir,
             ele aparece aqui pra vocês editarem juntos.
           </p>
           <Link href="/jovem/materiais" className={buttonVariants({ variant: "outline", size: "sm" }) + " mt-2"}>
-            Ver minha jornada
+            Ver meus instrumentos
           </Link>
         </div>
       )}

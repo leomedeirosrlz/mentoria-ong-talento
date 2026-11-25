@@ -4,14 +4,23 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowCounterClockwise,
+  Clock,
   DotsThreeVertical,
+  FileText,
+  IdentificationCard,
+  MapPin,
+  Paperclip,
+  PaperPlaneTilt,
   PencilSimple,
   SignOut,
+  Sparkle,
   Trash,
+  Users,
   UserSwitch,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { deleteMentorado, marcarSaidaMentorado, updateMentorado } from "@/lib/actions";
+import { convidarAcesso } from "@/lib/actions-convite";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { FotoField } from "@/components/foto-field";
 import {
@@ -23,9 +32,9 @@ import {
   CampoNascimento,
   CampoPrefGenero,
   CampoUf,
-  WizardFicha,
-  type PassoFicha,
+  SENTINEL_VAZIO,
 } from "@/components/campos-pessoais";
+import { WizardPassos, type PassoWizard } from "@/components/ui/etapa";
 import { formatWhatsApp, foraDoPrograma } from "@/lib/ciclo";
 import { cn, maskWhatsApp } from "@/lib/utils";
 import type { Disponibilidade, Mentorado } from "@/lib/types";
@@ -64,6 +73,10 @@ export function MentoradoActions({
   const [promoverOpen, setPromoverOpen] = useState(false);
   const [interesses, setInteresses] = useState<string[]>(mentorado.interesses ?? []);
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(mentorado.disponibilidade ?? null);
+  // cidade/UF da ficha — controlados pro autofill do CEP (modo compacto
+  // do DadosCivisFields) alcançar o passo "Onde vive e origem"
+  const [cidade, setCidade] = useState(mentorado.cidade ?? "");
+  const [uf, setUf] = useState(mentorado.uf ?? "");
   const [pending, start] = useTransition();
   const router = useRouter();
   const primeiroNome = (mentorado.nome_social || mentorado.nome).split(" ")[0];
@@ -107,10 +120,13 @@ export function MentoradoActions({
   }
 
   // um passo por SecaoFicha — 7 seções seguidas de scroll viravam parede
-  // de campos (docs do jovem e do responsável ficam perto do fim)
-  const passos: PassoFicha[] = [
+  // de campos. Ordem: identidade/contato → operacional → dados pessoais
+  // por último (interesses e objetivos fecham o wizard — REALIZA-384).
+  // Anamnese é instrumento externo ao programa: o campo de notas saiu da UI.
+  const passos: PassoWizard[] = [
     {
       titulo: "Identificação e contato",
+      icone: IdentificationCard,
       conteudo: (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -147,7 +163,7 @@ export function MentoradoActions({
               />
               {mentorado.profile_id && (
                 <p className="text-xs text-muted-foreground">
-                  Já entrou na plataforma — trocar aqui muda o e-mail de acesso
+                  Já entrou na plataforma. Trocar aqui muda o e-mail de acesso
                   dela.
                 </p>
               )}
@@ -163,14 +179,24 @@ export function MentoradoActions({
     },
     {
       titulo: "Onde vive e origem",
+      icone: MapPin,
       conteudo: (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="em_cidade">Cidade</Label>
-              <Input id="em_cidade" name="cidade" maxLength={100} defaultValue={mentorado.cidade ?? ""} />
+              <Input
+                id="em_cidade"
+                name="cidade"
+                maxLength={100}
+                value={cidade}
+                onChange={(e) => setCidade(e.target.value)}
+              />
             </div>
-            <CampoUf defaultValue={mentorado.uf ?? ""} />
+            <CampoUf
+              value={uf}
+              onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -191,7 +217,75 @@ export function MentoradoActions({
       ),
     },
     {
+      titulo: "Disponibilidade semanal",
+      icone: Clock,
+      conteudo: (
+        <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
+      ),
+    },
+    {
+      titulo: "Documentos do(a) jovem (termo de participação)",
+      icone: FileText,
+      conteudo: (
+        <DadosCivisFields
+          prefix="civis_"
+          opcional
+          compacto
+          defaults={mentorado.dados_civis}
+          onEndereco={(e) => {
+            setCidade(e.cidade);
+            setUf(e.uf);
+          }}
+        />
+      ),
+    },
+    {
+      titulo: "Responsável legal (autorização de menor)",
+      icone: Users,
+      conteudo: (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="em_parentesco">Parentesco com o(a) jovem</Label>
+            <Input
+              id="em_parentesco" name="resp_parentesco" maxLength={60}
+              autoCapitalize="sentences" placeholder="Mãe, pai, avó, tio…"
+              defaultValue={mentorado.responsavel?.parentesco ?? ""}
+            />
+          </div>
+          <DadosCivisFields
+            prefix="resp_"
+            opcional
+            defaults={mentorado.responsavel}
+          />
+        </>
+      ),
+    },
+    {
+      titulo: "Arquivos",
+      icone: Paperclip,
+      conteudo: (
+        <>
+          <FotoField
+            id="em_foto"
+            defaultUrl={mentorado.avatar_path ? avatarPublicUrl(mentorado.avatar_path) : null}
+          />
+          <DocumentoPessoa
+            tipo="mentorado"
+            id={mentorado.id}
+            documentoPath={mentorado.documento_path}
+          />
+          <AssinaturasPessoa
+            tipo="mentorado"
+            id={mentorado.id}
+            nome={mentorado.nome_social || mentorado.nome}
+            whatsapp={mentorado.whatsapp}
+          />
+        </>
+      ),
+    },
+    {
       titulo: "Interesses e objetivos",
+      icone: Sparkle,
       conteudo: (
         <>
           <CampoInteresses value={interesses} onChange={setInteresses} />
@@ -212,69 +306,6 @@ export function MentoradoActions({
             />
           </div>
           <CampoPrefGenero defaultValue={mentorado.pref_genero_par ?? ""} />
-        </>
-      ),
-    },
-    {
-      titulo: "Disponibilidade semanal",
-      conteudo: (
-        <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
-      ),
-    },
-    {
-      titulo: "Documentos do(a) jovem (termo de participação)",
-      conteudo: (
-        <DadosCivisFields
-          prefix="civis_"
-          opcional
-          compacto
-          defaults={mentorado.dados_civis}
-        />
-      ),
-    },
-    {
-      titulo: "Responsável legal (autorização de menor)",
-      conteudo: (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="em_parentesco">Parentesco com o(a) jovem</Label>
-            <Input
-              id="em_parentesco" name="resp_parentesco" maxLength={60}
-              autoCapitalize="sentences" placeholder="Mãe, pai, avó, tio…"
-              defaultValue={mentorado.responsavel?.parentesco ?? ""}
-            />
-          </div>
-          <DadosCivisFields
-            prefix="resp_"
-            opcional
-            defaults={mentorado.responsavel}
-          />
-        </>
-      ),
-    },
-    {
-      titulo: "Anamnese e arquivos",
-      conteudo: (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="em_notas">Notas / referência da anamnese</Label>
-            <Textarea id="em_notas" name="notas" rows={2} defaultValue={mentorado.notas ?? ""} />
-          </div>
-          <FotoField
-            id="em_foto"
-            defaultUrl={mentorado.avatar_path ? avatarPublicUrl(mentorado.avatar_path) : null}
-          />
-          <DocumentoPessoa
-            tipo="mentorado"
-            id={mentorado.id}
-            documentoPath={mentorado.documento_path}
-          />
-          <AssinaturasPessoa
-            tipo="mentorado"
-            id={mentorado.id}
-            nome={mentorado.nome}
-            whatsapp={mentorado.whatsapp}
-          />
           <p className="text-xs text-muted-foreground">
             Nascimento, gênero, cor/raça, motivação e preferência de par ficam visíveis só pra coordenação.
           </p>
@@ -287,7 +318,7 @@ export function MentoradoActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          aria-label={`Ações de "${mentorado.nome}"`}
+          aria-label={`Ações de "${mentorado.nome_social || mentorado.nome}"`}
           className={cn(
             buttonVariants({ variant: "ghost", size: "icon" }),
             "size-11 shrink-0 sm:size-8"
@@ -323,6 +354,46 @@ export function MentoradoActions({
               Promover a mentor…
             </DropdownMenuItem>
           )}
+          {/* convite de acesso (0180): o link vai pro e-mail do cadastro e
+              só vale ~1h — "Reenviar" cobre o token expirado. Sobe até a
+              conta vinculada passar pelo onboarding (embed `conta`) */}
+          {mentorado.email &&
+            !fora &&
+            !mentorado.conta?.onboarded_em && (
+              <DropdownMenuItem
+                disabled={pending}
+                onClick={() =>
+                  start(async () => {
+                    try {
+                      const res = await convidarAcesso({
+                        tipo: "mentorado",
+                        id: mentorado.id,
+                      });
+                      if ("error" in res) toast.error(res.error);
+                      else if ("demo" in res) {
+                        toast.success("Modo demo: nada é enviado de verdade.");
+                      } else {
+                        toast.success(
+                          `Convite enviado pra ${res.email}. O link vale ~1 hora. Se não chegar, peça pra conferir o spam.`
+                        );
+                        router.refresh();
+                      }
+                    } catch {
+                      toast.error("Sem conexão. Tente de novo.");
+                    }
+                  })
+                }
+              >
+                <PaperPlaneTilt
+                  size={16}
+                  data-icon="inline-start"
+                  aria-hidden
+                />{" "}
+                {mentorado.profile_id
+                  ? "Reenviar convite de acesso"
+                  : "Enviar convite de acesso"}
+              </DropdownMenuItem>
+            )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
@@ -346,6 +417,8 @@ export function MentoradoActions({
           if (o) {
             setInteresses(mentorado.interesses ?? []);
             setDisponibilidade(mentorado.disponibilidade ?? null);
+            setCidade(mentorado.cidade ?? "");
+            setUf(mentorado.uf ?? "");
           }
         }}
       >
@@ -353,13 +426,14 @@ export function MentoradoActions({
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
             <DialogDescription>
-              Os dados do cadastro em etapas: salve no fim.
+              Os dados do cadastro em etapas. Salve de qualquer uma.
             </DialogDescription>
           </DialogHeader>
-          <WizardFicha
+          <WizardPassos
             passos={passos}
             pending={pending}
             submitLabel="Salvar"
+            saveAnywhere
             onSubmit={submit}
           />
         </DialogContent>
@@ -383,9 +457,9 @@ export function MentoradoActions({
       <ConfirmDeleteButton
         open={delOpen}
         onOpenChange={setDelOpen}
-        titulo={`Excluir ${mentorado.nome}?`}
+        titulo={`Excluir ${mentorado.nome_social || mentorado.nome}?`}
         descricao="Remove o cadastro do mentorado. Só é possível excluir quem nunca teve dupla: o vínculo fica no histórico mesmo depois de encerrada."
-        sucesso={`Cadastro de ${mentorado.nome} excluído.`}
+        sucesso={`Cadastro de ${mentorado.nome_social || mentorado.nome} excluído.`}
         onConfirm={() => deleteMentorado(mentorado.id)}
       />
     </>

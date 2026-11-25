@@ -134,7 +134,7 @@ test.describe("agenda demo do mentor DPP — Sua semana / Do programa / Lembrar 
     await expect(trilha).toBeVisible();
     // o selo exato do mock v6 — o DPP não entra na sessão do especialista
     await expect(
-      trilha.getByText("Você acompanha, não participa")
+      trilha.getByText(/Trilha especialista · Sofia Nogueira/)
     ).toBeVisible();
 
     // nenhum controle de participação ou agenda dentro do bloco da trilha

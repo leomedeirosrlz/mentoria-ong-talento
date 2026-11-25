@@ -5,24 +5,44 @@ import {
   alvoAgendamento,
   cronogramaVigente,
   eventoDaSemana,
+  cobertosDaDupla,
+  encontroTemConteudo,
   eventosDoCronograma,
   formatDate,
   formatDateTime,
   jornadaDaDupla,
   linkSeguro,
   passosDaTrilha,
+  rotuloEncontro,
   saudadeDaDupla,
   toDateStr,
   totalDaTrilha,
 } from "@/lib/ciclo";
 import { limboFechado } from "@/lib/agenda-minha";
+import {
+  combinadoDaDupla,
+  quemCombinou,
+  suaSemana,
+} from "@/lib/sua-semana";
+import { propostoEmDoPlano } from "@/lib/plano-combinado";
+import { hrefMaterial, materiaisDoNumero } from "@/lib/materiais";
+import { getRoteirosPlanos } from "@/lib/queries";
+import { materiaisComRoteiroPlano } from "@/lib/plano-roteiros";
+import { PlanoContestarButton } from "@/components/plano-contestar";
+import { SuaSemanaPlano } from "@/components/sua-semana-plano";
+import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+} from "@/lib/dupla-desfecho";
 import { temPapel } from "@/lib/types";
 import type {
   CicloEvento,
   Cronograma,
   Dupla,
+  DuplaPlanoRoteiro,
   Encontro,
   EspecialistaEvento,
+  Material,
   Profile,
 } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,11 +59,12 @@ import { MarcoNotifier } from "@/components/marco-notifier";
 /** Ciclo que já não pede ação: sai da lista de ativas e vai pro bloco final. */
 const finalizada = (d: Dupla) => d.status === "concluida" || d.status === "encerrada";
 
-export function MentorHome({
+export async function MentorHome({
   duplas,
   eventos,
   espEventos = [],
   cronogramas = [],
+  materiais = [],
   me,
   termo,
 }: {
@@ -55,6 +76,9 @@ export function MentorHome({
   /** Cronogramas ativos/encerrados — resolve o vigente quando o mentor ainda
    *  não tem dupla DPP (o banner da semana continua fazendo sentido pra ele). */
   cronogramas?: Cronograma[];
+  /** Catálogo do papel (RLS) — o disclosure do próximo passo lista roteiro
+   *  e materiais do encontro sem nova query por dupla. */
+  materiais?: Material[];
   me: Profile;
   /** Faixa de pendência (ex.: termo de adesão) em largura total — entra logo
    *  abaixo do cabeçalho, antes dos cards de dupla, nunca dentro da grade. */
@@ -104,6 +128,23 @@ export function MentorHome({
     (d) => d.status === "ativa" && d.encontros.every((e) => !e.registro)
   );
 
+  // roteiros do plano (020): um batch por plano troca o link do corpus
+  // pelo vigente da dupla na disclosure da SuaSemana — só leitura
+  const planoIds = duplas
+    .map(
+      (d) =>
+        (d.planos ?? []).find(
+          (p) => p.status === "aceito" || p.status === "ativo"
+        )?.id
+    )
+    .filter((x): x is string => x != null);
+  const roteirosPorPlano = new Map<string, DuplaPlanoRoteiro[]>();
+  for (const r of await getRoteirosPlanos(planoIds)) {
+    const l = roteirosPorPlano.get(r.plano_id) ?? [];
+    l.push(r);
+    roteirosPorPlano.set(r.plano_id, l);
+  }
+
   return (
     // >1 dupla: em xl os cards abrem 2 colunas — a 1280px o card cheio deixa
     // os sub-painéis internos (sm:grid-cols-2) largos demais pra leitura.
@@ -129,7 +170,9 @@ export function MentorHome({
           )}
           {algumSemRegistro && (
             <p className="mt-1 text-sm text-muted-foreground">
-              Vocês marcam o encontro; depois registram aqui como foi.
+              {soEspecialista
+                ? "Vocês marcam a sessão; depois registram aqui como foi."
+                : "Vocês marcam o encontro; depois registram aqui como foi."}
             </p>
           )}
         </header>
@@ -178,6 +221,9 @@ export function MentorHome({
           passosDaTrilha(dupla.trilha, eventosDaDupla, espEventos),
           hoje
         );
+        // sessão combinada (018): o coberto já tem conteúdo via âncora —
+        // sem o mapa o card cobraria registro de um passo entregue
+        const cobertos = cobertosDaDupla(dupla.encontros);
         // pendência de registro mais antiga — realizado sem registro ou
         // limbo fechado: agendado/remarcado cujo horário previsto (início
         // + duração) já passou. Enquanto a chamada rola o encontro ainda
@@ -186,9 +232,9 @@ export function MentorHome({
           .sort((a, b) => a.numero - b.numero)
           .find(
             (e) =>
-              !e.registro &&
+              !encontroTemConteudo(e, cobertos) &&
               (e.status === "realizado" ||
-                limboFechado(e, hoje.getTime()))
+                limboFechado(e, hoje.getTime(), cobertos))
           );
         // chamada no ar: começou mas o fim previsto ainda não passou —
         // conta como "agendado agora" (Entrar), não como limbo
@@ -196,7 +242,7 @@ export function MentorHome({
           !!e &&
           e.data_hora != null &&
           new Date(e.data_hora) <= hoje &&
-          !limboFechado(e, hoje.getTime());
+          !limboFechado(e, hoje.getTime(), cobertos);
         const pendentes = dupla.encaminhamentos
           .filter((t) => t.status === "pendente")
           // vencido primeiro, depois o prazo mais próximo — a mesma ordem
@@ -205,6 +251,28 @@ export function MentorHome({
             (a.prazo ?? "9999").localeCompare(b.prazo ?? "9999")
           );
         const hojeStr = toDateStr(hoje);
+        const jovemNome = dupla.mentorado.nome_social ?? dupla.mentorado.nome;
+        // "Sua semana" (520): o plano vivo entra na seção da semana do
+        // card junto com o que fazer agora — mesma derivação do hero do
+        // jovem e da fila do staff (plano-combinado nunca mais é um
+        // banner separado)
+        const planoVivo = !ehEsp
+          ? ((dupla.planos ?? []).find((p) =>
+              ["proposto", "aceito", "ativo"].includes(p.status)
+            ) ?? null)
+          : null;
+        // "Sessão 3 com Bia" / "5º encontro com Bia" — o rótulo canônico
+        // (na trilha esp o nº é o passo do guia, nunca a tentativa da row)
+        const rotuloDe = (e: Encontro) =>
+          rotuloEncontro(e, dupla.encontros, {
+            esp: ehEsp,
+            com: jovemNome?.split(" ")[0] ?? null,
+          });
+        // "A sessão 3 com Bia…" / "O 5º encontro com Bia…" — sujeito com
+        // artigo: a flexão do participio (`agendada`/`atrasada`) decide
+        // em cada frase, o substantivo sai do helper
+        const comArtigo = (e: Encontro) =>
+          `${ehEsp ? "A" : "O"} ${rotuloDe(e).charAt(0).toLowerCase()}${rotuloDe(e).slice(1)}`;
 
         // máquina de estados do painel "O que fazer agora" — um primário por
         // dupla: pendência de registro vem antes de qualquer agendamento (a
@@ -267,6 +335,93 @@ export function MentorHome({
             : undefined;
         })();
 
+        // "Sua semana" (520): o combinado e a agenda na mesma seção — a
+        // derivação é a mesma do hero do jovem e da fila do staff
+        const realizadosNums = dupla.encontros
+          .filter((e) => e.status === "realizado")
+          .map((e) => e.numero);
+        const propostoEmPlano = planoVivo
+          ? propostoEmDoPlano(planoVivo)
+          : null;
+        const semanaPlano = planoVivo
+          ? suaSemana({
+              plano: combinadoDaDupla(planoVivo),
+              meuLado: "mentor",
+              realizados: realizadosNums,
+              realizadosAposProposta: propostoEmPlano
+                ? dupla.encontros
+                    .filter(
+                      (e) =>
+                        e.status === "realizado" &&
+                        e.realizado_em != null &&
+                        e.realizado_em > propostoEmPlano
+                    )
+                    .map((e) => e.numero)
+                : realizadosNums,
+              proximoNumero: agendado?.numero ?? null,
+            })
+          : null;
+        // "que Fulano combinou": mentor é "você"; supervisor e o próprio
+        // jovem resolvem por id; o resto é "a equipe"
+        const quemPlano = planoVivo
+          ? quemCombinou({
+              propostoPor: planoVivo.proposto_por,
+              propostoVia: planoVivo.proposto_via,
+              euId: me.id,
+              nomesPorId: new Map(
+                dupla.supervisor
+                  ? [
+                      [
+                        dupla.supervisor.id,
+                        (dupla.supervisor.nome_social ??
+                          dupla.supervisor.nome).split(" ")[0],
+                      ],
+                    ]
+                  : []
+              ),
+              nomesPorOutroId: new Map([
+                [dupla.mentorado.id, jovemNome.split(" ")[0]],
+              ]),
+            })
+          : "a equipe";
+        // disclosure do próximo passo: roteiro do encontro + materiais do
+        // número — o roteiro oficial do corpus vem dos docs que o encontro
+        // herda; com guia de ajustes vigente a ficha já avisa
+        const numeroDisclosure =
+          semanaPlano?.vinculo ?? semanaPlano?.resumo.proximo?.numero ?? null;
+        const roteiroVigente =
+          planoVivo && numeroDisclosure != null
+            ? ((roteirosPorPlano.get(planoVivo.id) ?? []).find(
+                (r) =>
+                  r.numero === numeroDisclosure &&
+                  r.status === "publicado" &&
+                  r.plano_versao === planoVivo.versao
+              ) ?? null)
+            : null;
+        const materiaisDoPasso = materiaisComRoteiroPlano(
+          numeroDisclosure != null
+            ? materiaisDoNumero({
+                materiais,
+                eventosDaDupla,
+                trilha: dupla.trilha,
+                numero: numeroDisclosure,
+              })
+                .map((m) => ({
+                  href: hrefMaterial(m, "/materiais/documento"),
+                  titulo: m.titulo,
+                }))
+                .filter(
+                  (m): m is { href: string; titulo: string } => m.href != null
+                )
+            : [],
+          roteiroVigente
+            ? {
+                numero: roteiroVigente.numero,
+                href: `/duplas/${dupla.id}/roteiro/${roteiroVigente.numero}`,
+              }
+            : null
+        );
+
         // --card-spacing=5 no sm+: padding uniforme p-4→sm:p-5 no card
         // inteiro via a var (header, content e gap vertical seguem juntos)
         const card = (
@@ -277,7 +432,17 @@ export function MentorHome({
             {/* -mt cobre o py do Card — o banner ink encosta no topo;
                 pt/pb devolvem o respiro interno; a keyline lime na base é
                 a única faixa de marca da tela (uma por tela) */}
-            <CardHeader className="-mt-(--card-spacing) border-b-2 border-[var(--brand-lime)] bg-[var(--brand-ink)] pb-(--card-spacing) pt-(--card-spacing) text-white">
+            <CardHeader className="relative -mt-(--card-spacing) border-b-2 border-[var(--brand-lime)] bg-[var(--brand-ink)] pb-(--card-spacing) pt-(--card-spacing) text-white">
+              {/* o banner inteiro navega pra ficha (REALIZA-526): stretched
+                  link cobre o header — o "Abrir dupla" fica por cima como
+                  affordance redundante (relative) e o resto é texto inerte.
+                  O stretch NÃO desce pro CardContent: lá dentro vivem CTAs */}
+              <Link
+                href={`/duplas/${dupla.id}`}
+                prefetch={false}
+                aria-label={`Abrir ficha da dupla de ${(dupla.mentorado.nome_social ?? dupla.mentorado.nome).split(" ")[0]}`}
+                className="absolute inset-0 transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand-lime)]"
+              />
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   {/* "Sua dupla" vira redundante com várias — o nome do
@@ -315,7 +480,7 @@ export function MentorHome({
                 <div className="flex flex-col items-end gap-0.5 text-right">
                   <span className="text-sm text-white">
                     <span className="font-mono tabular-nums">{feitos}/{totalDupla}</span>{" "}
-                    encontros
+                    {ehEsp ? "sessões" : "encontros"}
                   </span>
                   {ehEsp && (
                     <span className="text-xs uppercase tracking-wider text-white/50 sm:text-[11px]">
@@ -327,13 +492,14 @@ export function MentorHome({
                       Pausada
                     </span>
                   )}
-                  {/* o card todo não é link — a saída pra ficha precisa de
-                      affordance própria, visível mesmo sem pendência */}
+                  {/* affordance redundante sobre o stretched link — o
+                      sinal de "isso navega" fica visível mesmo sem pendência;
+                      o relative o mantém clicável acima do cobertor */}
                   <Link
                     href={`/duplas/${dupla.id}`}
                     className={cn(
                       buttonVariants({ variant: "ghost", size: "sm" }),
-                      "group text-white/80 hover:bg-white/10 hover:text-white focus-visible:ring-[var(--brand-lime)]"
+                      "group relative text-white/80 hover:bg-white/10 hover:text-white focus-visible:ring-[var(--brand-lime)]"
                     )}
                   >
                     Abrir dupla
@@ -368,13 +534,16 @@ export function MentorHome({
                 jornada={jornada}
                 statusDupla={dupla.status}
                 duplaId={dupla.id}
+                sessao={ehEsp}
               />
               <MarcoNotifier duplaId={dupla.id} feitos={jornada.feitos} total={jornada.total} />
 
-              {/* o que fazer agora: o próximo passo é o destaque da marca
-                  (amarelo), não alerta. Mesmo cartão, separado por divisória */}
+              {/* "Sua semana" (520): próximo encontro, combinado e o que
+                  fazer agora na MESMA seção — o PlanoBanner separado virou
+                  o bloco do plano aqui dentro. O destaque da marca
+                  (amarelo) segue sendo o próximo passo, não alerta */}
               <section
-                aria-labelledby={`fazer-${dupla.id}`}
+                aria-labelledby={`semana-${dupla.id}`}
                 className={cn(
                   "rounded-lg p-4",
                   ativa
@@ -382,8 +551,8 @@ export function MentorHome({
                     : "bg-muted/50"
                 )}
               >
-                <h3 id={`fazer-${dupla.id}`} className="text-sm font-semibold">
-                  O que fazer agora
+                <h3 id={`semana-${dupla.id}`} className="text-sm font-semibold">
+                  Sua semana
                 </h3>
                 <div className="mt-2">
                   {!ativa ? (
@@ -396,8 +565,8 @@ export function MentorHome({
                     <>
                       <p className="font-medium">
                         {semRegistro.status !== "realizado"
-                          ? `O ${semRegistro.numero}º encontro estava agendado e já passou.`
-                          : `O ${semRegistro.numero}º encontro aconteceu.`}
+                          ? `${comArtigo(semRegistro)} estava agendad${ehEsp ? "a" : "o"} e já passou.`
+                          : `${comArtigo(semRegistro)} aconteceu.`}
                       </p>
                       <p className="text-sm text-muted-foreground mt-0.5">
                         {semRegistro.status !== "realizado"
@@ -410,7 +579,7 @@ export function MentorHome({
                           registrar (se sim) ou remarcar (se não) */}
                       <div className="mt-3 flex flex-wrap justify-end gap-2">
                         <Link
-                          href={`/duplas/${dupla.id}?aba=encontros#registrar-${semRegistro.id}`}
+                          href={`/duplas/${dupla.id}/registrar/${semRegistro.id}`}
                           className={buttonVariants({ size: "sm" })}
                         >
                           <ClipboardText size={16} />
@@ -429,12 +598,14 @@ export function MentorHome({
                     </>
                   ) : cicloCompleto ? (
                     <p className="font-medium">
-                      {totalDupla} encontros concluídos.
+                      {ehEsp
+                        ? `${totalDupla} sessões concluídas.`
+                        : `${totalDupla} encontros concluídos.`}
                     </p>
                   ) : agendado ? (
                     <>
                       <p className="font-medium">
-                        {agendado.numero}º encontro agendado
+                        {rotuloDe(agendado)} agendad{ehEsp ? "a" : "o"}
                       </p>
                       <p className="text-sm text-muted-foreground mt-0.5">
                         {formatDateTime(agendado.data_hora)}
@@ -483,7 +654,7 @@ export function MentorHome({
                     // de alguém (até do jovem) — o texto aponta o desfazer
                     <>
                       <p className="font-medium">
-                        {encontroAlvo.numero}º encontro{" "}
+                        {rotuloDe(encontroAlvo)}{" "}
                         {encontroAlvo.status === "nao_aconteceu" ||
                         encontroAlvo.status === "cancelado"
                           ? "não aconteceu."
@@ -502,7 +673,7 @@ export function MentorHome({
                             é o registro — o salvarRegistro corrige o status */}
                         {encontroAlvo.status !== "nao_aconteceu" && (
                             <Link
-                              href={`/duplas/${dupla.id}?aba=encontros#registrar-${encontroAlvo.id}`}
+                              href={`/duplas/${dupla.id}/registrar/${encontroAlvo.id}`}
                               className={buttonVariants({ variant: "outline", size: "sm" })}
                             >
                               <ClipboardText size={16} />
@@ -575,6 +746,29 @@ export function MentorHome({
                     </p>
                   )}
                 </div>
+                {semanaPlano && planoVivo && (
+                  <SuaSemanaPlano
+                    semana={semanaPlano}
+                    perspectiva="mentor"
+                    outro={jovemNome.split(" ")[0] ?? "seu jovem"}
+                    quem={quemPlano}
+                    combinadoHref={`/duplas/${dupla.id}/combinado`}
+                    confirmarHref={
+                      semanaPlano.resumo.proximo
+                        ? `/duplas/${dupla.id}#acordos`
+                        : null
+                    }
+                    contestar={
+                      semanaPlano.contestavel ? (
+                        <PlanoContestarButton
+                          planoId={planoVivo.id}
+                          duplaId={dupla.id}
+                        />
+                      ) : null
+                    }
+                    materiais={materiaisDoPasso}
+                  />
+                )}
               </section>
 
               {/* combinados: mesma superfície, separados por divisória —
@@ -639,8 +833,16 @@ export function MentorHome({
             return (
               <div
                 key={dupla.id}
-                className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
+                className="relative rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
               >
+                {/* mesmo gesto do banner das duplas ativas: o card inteiro
+                    navega, o "Abrir dupla" sobe como affordance redundante */}
+                <Link
+                  href={`/duplas/${dupla.id}`}
+                  prefetch={false}
+                  aria-label={`Abrir ficha da dupla de ${(dupla.mentorado.nome_social ?? dupla.mentorado.nome).split(" ")[0]}`}
+                  className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">
@@ -650,18 +852,18 @@ export function MentorHome({
                       />
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {dupla.status === "concluida" ? "Concluída" : "Encerrada"} ·{" "}
+                      {SITUACAO_DUPLA_LABEL[situacaoDaDupla(dupla)]} ·{" "}
                       <span className="tabular-nums">
                         {saude.feitos}/{totalDupla}
                       </span>{" "}
-                      encontros
+                      {dupla.trilha === "especialista" ? "sessões" : "encontros"}
                     </p>
                   </div>
                   <Link
                     href={`/duplas/${dupla.id}`}
                     className={cn(
                       buttonVariants({ variant: "ghost", size: "sm" }),
-                      "group text-muted-foreground"
+                      "group relative text-muted-foreground"
                     )}
                   >
                     Abrir dupla

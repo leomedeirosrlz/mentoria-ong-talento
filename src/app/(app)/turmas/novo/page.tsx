@@ -5,7 +5,7 @@ import { getCicloEventos, getCronogramas, getMe } from "@/lib/queries";
 import { demoAtivo } from "@/lib/demo/mode";
 import { PageHeader } from "@/components/page-header";
 import { VoltarLink } from "@/components/voltar-link";
-import { CronogramaBuilder } from "@/components/cronograma-builder";
+import { NovaTurmaFlow } from "@/components/nova-turma-flow";
 
 export const metadata: Metadata = { title: "Nova turma" };
 
@@ -24,7 +24,7 @@ export default async function NovaTurmaPage() {
       <PageHeader
         kicker={<VoltarLink fallback="/turmas" />}
         title="Nova turma"
-        meta="Monte o calendário oficial: parâmetros primeiro, prévia editável antes de gravar"
+        meta="Monte o calendário oficial com parâmetros ou importe de arquivo. Prévia editável antes de gravar"
       />
 
       {demo ? (
@@ -39,7 +39,7 @@ export default async function NovaTurmaPage() {
           </p>
         </div>
       ) : (
-        <CronogramaBuilder cronogramas={cronogramas} eventos={eventos} />
+        <NovaTurmaFlow cronogramas={cronogramas} eventos={eventos} />
       )}
     </div>
   );

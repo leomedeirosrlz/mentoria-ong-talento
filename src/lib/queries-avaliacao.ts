@@ -9,6 +9,7 @@ import {
   demoEspecialistaAvaliacoes,
   demoJovemAvaliacoes,
   demoMediaDpp,
+  demoTemMediaDpp,
 } from "./demo/queries";
 import type {
   AvaliacaoEncontro,
@@ -90,13 +91,20 @@ export const avaliacaoPorToken = cache(
 export const linkAvaliacaoMeta = cache(
   async (
     token: string
-  ): Promise<{ encontro_id: string; dupla_id: string; trilha: string } | null> => {
+  ): Promise<{
+    encontro_id: string;
+    dupla_id: string;
+    trilha: string;
+    /** Números da sessão combinada que o link cobre, âncora inclusa (0228)
+     *  — >1 = "sessão dos encontros 5 e 6" no contexto do form público. */
+    cobertura?: number[] | null;
+  } | null> => {
     const demo = await demoRole();
     if (demo) return demoAvaliacaoLinkMeta(token);
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("avaliacao_links")
-      .select("encontro_id, dupla_id, dupla:duplas(trilha)")
+      .select("encontro_id, dupla_id, cobertura, dupla:duplas(trilha)")
       .eq("token", token)
       .maybeSingle();
     if (error) {
@@ -107,10 +115,38 @@ export const linkAvaliacaoMeta = cache(
     const d = data as {
       encontro_id: string;
       dupla_id: string;
+      cobertura: number[] | null;
       dupla: { trilha: string } | { trilha: string }[] | null;
     };
     const dupla = Array.isArray(d.dupla) ? (d.dupla[0] ?? null) : d.dupla;
-    return { encontro_id: d.encontro_id, dupla_id: d.dupla_id, trilha: dupla?.trilha ?? "dpp" };
+    return {
+      encontro_id: d.encontro_id,
+      dupla_id: d.dupla_id,
+      trilha: dupla?.trilha ?? "dpp",
+      cobertura: d.cobertura ?? null,
+    };
+  }
+);
+
+/** O lote da média já existe na dupla? (≥3 respostas — o mesmo k da RPC
+ *  avaliacao_media_dpp, que também conta as linhas ocultas pelo toggle).
+ *  Leitura service role porque quem chama é a página pública do token —
+ *  a copy de privacidade do form promete média só quando ela existe
+ *  (027/FR-003). null em falha = copy assume o lote (default antigo). */
+export const temMediaDpp = cache(
+  async (duplaId: string): Promise<boolean | null> => {
+    const demo = await demoRole();
+    if (demo) return demoTemMediaDpp(duplaId);
+    const admin = createAdminClient();
+    const { count, error } = await admin
+      .from("avaliacoes_encontro")
+      .select("*", { count: "exact", head: true })
+      .eq("dupla_id", duplaId);
+    if (error) {
+      console.error("temMediaDpp:", error);
+      return null;
+    }
+    return (count ?? 0) >= 3;
   }
 );
 
@@ -126,7 +162,7 @@ export type JovemAvaliacao = AvaliacaoEncontro & {
 const JOVEM_AVALIACAO_COLS = `
   id, dupla_id, encontro_id, estrelas, sentimento, avancei, temas,
   comentario, pedir_apoio, avaliacao_visivel_mentor,
-  respondido_por_profile_id, created_at,
+  respondido_por_profile_id, created_at, cobertura,
   encontro:encontros(numero, realizado_em)
 `;
 
@@ -162,7 +198,7 @@ export const getAvaliacaoLinks = cache(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("avaliacao_links")
-      .select("id, token, encontro_id, dupla_id, status, expira_em, respondido_em, respondido_por_profile_id, created_at")
+      .select("id, token, encontro_id, dupla_id, status, cobertura, expira_em, respondido_em, respondido_por_profile_id, created_at")
       .eq("dupla_id", duplaId)
       .order("created_at", { ascending: true });
     if (error) {

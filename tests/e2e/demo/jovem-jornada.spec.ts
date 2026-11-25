@@ -1,6 +1,6 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
-// WP7 (REALIZA-140) — "Minha jornada" em /jovem/materiais, espelhada no
+// WP7 (REALIZA-140) — o hub de materiais em /jovem/materiais, espelhado no
 // modo demo (specs demo não escrevem em backend nenhum). REALIZA-194
 // (v5c→v6a): a trilha é a estante "Meus instrumentos" — um card-produto
 // por instrumento da régua (capa desenhada, uma linha de estado, UM gesto
@@ -27,29 +27,59 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // saudável feita na janela, T2 começando, links pendentes e um expirado
 // fora da janela, uma dupla pausada).
 
-test.describe("demo — Minha jornada do mentorado", () => {
+const DUPLA_OK = "de000000-0000-4000-8000-000000001537"; // Ricardo × Ana (Bia)
+const DUPLA_MATHEUS = "de000000-0000-4000-8000-000000001549"; // Ricardo × Matheus
+
+test.describe("demo — Materiais do mentorado", () => {
   test("hero, trilha e estações feitas da Ana", async ({ page }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
     // hero slim — título, posição no ciclo e progresso de entregas
     await expect(
-      page.getByRole("heading", { name: "Minha jornada", level: 1 })
+      page.getByRole("heading", { name: "Materiais", level: 1 })
     ).toBeVisible();
-    await expect(page.getByText(/encontro 5 de 16/)).toBeVisible();
+    // posição corrente lê "você está no N" — a contagem de feitos ("N de
+    // M encontros feitos") é a régua das outras superfícies (REALIZA-498)
+    await expect(
+      page.getByText(/você está no encontro 5 de 16/)
+    ).toBeVisible();
     // a turma entra na forma narrativa ("Turma 1"), nunca o cru "T1 · 2026/2027"
-    await expect(page.getByText(/Turma 1 · encontro 5 de 16/)).toBeVisible();
+    await expect(
+      page.getByText(/Turma 1 · você está no encontro 5 de 16/)
+    ).toBeVisible();
     await expect(page.getByText(/Fase · /)).toBeVisible();
     await expect(
       page.getByRole("img", { name: "5 de 7 entregas feitas" })
     ).toBeVisible();
-    // próxima parada = primeira estação trancada (nenhuma a_fazer na
-    // fixture): a aplicação formal da roda, que abre no encontro 12
+    // REALIZA-528 — a linha "Próxima parada" morreu: a estante logo
+    // abaixo já mostra a estação trancada com a mesma data de liberação
+    // (a roda formal, que abre no encontro 12 — o teste de trancados
+    // cobre). Uma linha de próximo passo só: o "Próximo marco".
+    await expect(page.getByText(/Próxima parada:/)).toHaveCount(0);
+
+    // REALIZA-515 — a faixa virou "Próximo marco": SÓ o primeiro marco
+    // ainda não ganho aparece. A Ana tem 1º encontro + avaliações + PDM
+    // ganhos — eles não repetem aqui, moram na estante do perfil
+    const faixa = page.locator(
+      'section[aria-labelledby="proximo-marco-titulo"]'
+    );
     await expect(
-      page.getByText(
-        /Próxima parada: Roda da Vida · aplicação formal · libera no encontro 12/
-      )
+      faixa.getByRole("heading", { name: "Próximo marco" })
     ).toBeVisible();
+    await expect(faixa.getByText("Jornada completa")).toBeVisible();
+    await expect(
+      faixa.getByText("Faltam 12 encontros com seu mentor")
+    ).toBeVisible();
+    await expect(faixa.getByRole("progressbar")).toHaveCount(1);
+    await expect(faixa.getByText("Primeiro encontro")).toHaveCount(0);
+    await expect(faixa.getByText(/Avaliou/)).toHaveCount(0);
+    await expect(
+      faixa.getByRole("link", { name: "Ver conquistas" })
+    ).toHaveAttribute("href", "/jovem/perfil#conquistas");
+    // e nada inventa "nova rodada" — toda entrega da janela dela é a 1ª
+    await expect(page.getByText(/nova rodada/)).toHaveCount(0);
+    await expect(page.getByText(/o mentor enviou/)).toHaveCount(0);
 
     // a estante — os 4 instrumentos de entrega única da janela como
     // cards-produto, todos com a tag "Feito · <data>" na linha de estado
@@ -153,14 +183,14 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await expect(rodaFormal.getByRole("link")).toHaveCount(0);
   });
 
-  test("sub-nav Jornada → Acervo e o acervo com 'em breve'", async ({
+  test("sub-nav Meus instrumentos → Acervo e o acervo com 'em breve'", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
     const nav = page.getByRole("navigation", { name: "Nesta página" });
-    await expect(nav.getByRole("link", { name: "Jornada" })).toHaveAttribute(
+    await expect(nav.getByRole("link", { name: "Meus instrumentos" })).toHaveAttribute(
       "href",
       "#jornada"
     );
@@ -221,7 +251,7 @@ test.describe("demo — Minha jornada do mentorado", () => {
     const acervo = page.locator("section#acervo");
     const yHero = (
       await page
-        .getByRole("heading", { name: "Minha jornada", level: 1 })
+        .getByRole("heading", { name: "Materiais", level: 1 })
         .boundingBox()
     )?.y;
     const yNav = (await nav.boundingBox())?.y;
@@ -251,21 +281,37 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await expect(jornada.locator('a[href^="/f/"]')).toHaveCount(0);
   });
 
-  test("acervo em grade: 1 coluna no celular, 2 no tablet, 3 no desktop", async ({
+  test("acervo em grade: Cartões explícito → 1 coluna no celular, 2 no tablet, 3 no desktop", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
-    // a grade dos prontos — no dataset demo o grupo visível é "Links"
-    // (2 materiais); os demais entram nos mesmos contêineres de grid
     const acervo = page.locator("section#acervo");
+    // spec 029: o default do mobile virou Lista — a grade existe nas duas
+    // views, mas só é medida com Cartões escolhido de propósito (a escolha
+    // explícita vence o viewport em qualquer largura)
+    await acervo
+      .getByRole("group", { name: "Modo de visualização" })
+      .getByRole("button", { name: "Cartões" })
+      .click();
+    await expect(
+      acervo
+        .getByRole("group", { name: "Modo de visualização" })
+        .getByRole("button", { name: "Cartões" })
+    ).toHaveAttribute("aria-pressed", "true");
+
+    // a grade dos prontos — no dataset demo o grupo visível é "Links"
+    // (2 materiais); os demais entram nos mesmos contêineres de grid.
+    // 528: o heading do grupo é dobrável e carrega a contagem no nome
+    // ("Links 2 itens") — o match é por prefixo
     const grupoLinks = acervo.locator("section", {
-      has: page.getByRole("heading", { name: "Links", exact: true }),
+      has: page.getByRole("heading", { name: /^Links/ }),
     });
-    // :scope > — a capa do card de link (PreviewLink) também é div.grid;
-    // sem o filho direto o locator conta as 2 capas junto da grade
-    const grade = grupoLinks.locator(":scope > div.grid");
+    // a grade mora dentro do painel do collapse — e nenhuma capa é
+    // div.grid (as capas tipográficas do 528 são flex), então o
+    // descendente já é único
+    const grade = grupoLinks.locator("div.grid");
     await expect(grade).toHaveCount(1);
     const trilhos = () =>
       grade.evaluate(
@@ -328,7 +374,7 @@ test.describe("demo — Minha jornada do mentorado", () => {
     expect(parseFloat(dur)).toBeLessThan(0.05);
     expect(parseFloat(delay)).toBeLessThan(0.05);
     await expect(
-      page.getByRole("heading", { name: "Minha jornada", level: 1 })
+      page.getByRole("heading", { name: "Materiais", level: 1 })
     ).toBeVisible();
     await expect(
       page.locator("section#acervo").getByRole("heading", { name: "Links" })
@@ -444,7 +490,7 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
       hasText: "Avaliação Geral - 360º · mentorado(a)",
     });
     await expect(
-      cardForaDaJanela.getByText("janela não aberta")
+      cardForaDaJanela.getByText("ainda não disponível")
     ).toBeVisible();
     await expect(
       cardForaDaJanela.getByText(/abre no encontro 16/)
@@ -576,23 +622,56 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     );
     await expect(instrumentos).toBeVisible();
 
-    // cada card linka a ficha específica (âncora #instrumentos) — a
-    // fixture do Ricardo tem 2 duplas DPP vivas (Bia e Matheus), então
-    // cada card carrega um link por jovem, rotulado pelo nome social
+    // a régua do mentor abre no catálogo (REALIZA-512): com 2+ duplas o
+    // default é "Todas" — os nomes viram pills selecionáveis no lugar dos
+    // links miúdos por card; a fixture do Ricardo tem 2 duplas DPP vivas
+    // (Bia e Matheus)
+    const seletor = instrumentos.getByRole("navigation", {
+      name: "Filtrar por mentorado",
+    });
+    await expect(
+      seletor.getByRole("link", { name: "Todas", exact: true })
+    ).toHaveAttribute("aria-current", "page");
+    const bia = seletor.getByRole("link", { name: "Bia", exact: true });
+    await expect(bia).toBeVisible();
+    await expect(
+      seletor.getByRole("link", { name: "Matheus Gonçalves", exact: true })
+    ).toBeVisible();
+
+    // escolher o nome foca a dupla: os cards linkam a página do
+    // instrumento dela e a "Ficha" secundária aponta a ficha dela
+    // (âncora #instrumentos)
+    await bia.click();
+    await expect(page).toHaveURL(
+      `/materiais?aba=instrumentos&dupla=${DUPLA_OK}`
+    );
+    const primeiroCard = instrumentos.locator("article").first();
+    await expect(
+      primeiroCard.getByRole("link", { name: "Ficha", exact: true })
+    ).toHaveAttribute(
+      "href",
+      `/duplas/${DUPLA_OK}?aba=instrumentos#instrumentos`
+    );
+
+    // trocar o mentorado em foco reescreve ?dupla= e refaz a régua pra
+    // outra dupla — deep-linkável
+    await seletor
+      .getByRole("link", { name: "Matheus Gonçalves", exact: true })
+      .click();
+    await expect(page).toHaveURL(
+      `/materiais?aba=instrumentos&dupla=${DUPLA_MATHEUS}`
+    );
     await expect(
       instrumentos
-        .locator('a[href^="/duplas/"][href$="#instrumentos"]')
+        .locator("article")
         .first()
-    ).toHaveAttribute("href", /^\/duplas\/.+#instrumentos$/);
-    for (const jovem of ["Bia", "Matheus Gonçalves"]) {
-      await expect(
-        instrumentos
-          .locator("article")
-          .first()
-          .getByRole("link", { name: jovem })
-      ).toBeVisible();
-    }
-    // o rodapé lista a ficha de cada dupla dele
+        .getByRole("link", { name: "Ficha", exact: true })
+    ).toHaveAttribute(
+      "href",
+      `/duplas/${DUPLA_MATHEUS}?aba=instrumentos#instrumentos`
+    );
+
+    // o rodapé linka a ficha da dupla em foco
     await expect(
       instrumentos.getByText(/Estado e envio por dupla na ficha:/)
     ).toBeVisible();

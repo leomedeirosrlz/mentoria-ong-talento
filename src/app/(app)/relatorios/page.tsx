@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ChartBar } from "@phosphor-icons/react/dist/ssr";
 import {
   getContatos,
   getCronogramas,
@@ -12,9 +14,11 @@ import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "@/lib/demo/mode";
 import { demoDuplas, demoMentorados, demoPessoas } from "@/lib/demo/queries";
 import { PageHeader } from "@/components/page-header";
+import { buttonVariants } from "@/components/ui/button";
 import { turmaDaDupla } from "@/lib/turma";
 import { RelatorioBuilder } from "./relatorio-builder";
 import type { DuplaFonte, PessoaFonte } from "@/lib/relatorio";
+import type { AppRole } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Relatórios" };
 
@@ -26,6 +30,56 @@ export default async function RelatoriosPage({
   const me = await getMe();
   if (me?.role !== "coordenacao") redirect("/");
 
+  const sp = await searchParams;
+  const abaParam = typeof sp.aba === "string" ? sp.aba : undefined;
+  // deep-links do hub antigo (?aba=X): as seções operacionais migraram pra
+  // /relatorios/operacionais (REALIZA-375) e a grade virou a página — o
+  // redirect preserva turma/cronograma do recorte em vez de 404
+  if (abaParam) {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) {
+      if (k === "aba") continue;
+      for (const item of Array.isArray(v) ? v : v != null ? [v] : []) {
+        q.append(k, item);
+      }
+    }
+    const resto = q.size ? `&${q}` : "";
+    redirect(
+      abaParam === "grade"
+        ? `/relatorios${q.size ? `?${q}` : ""}`
+        : `/relatorios/operacionais?aba=${encodeURIComponent(abaParam)}${resto}`
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        kicker="Operação"
+        title="Relatórios"
+        meta="Grade livre por turma: filtre colunas, corrija cadastros e publique links públicos"
+        actions={
+          <Link
+            href="/relatorios/operacionais"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            <ChartBar aria-hidden />
+            Outros relatórios
+          </Link>
+        }
+      />
+      <GradeLivre
+        turmaParam={typeof sp.turma === "string" ? sp.turma : undefined}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Grade livre (REALIZA-201, promovida a página inteira na 375): builder,
+// links públicos e seletores ficam exatamente como eram.
+// ---------------------------------------------------------------------
+
+async function GradeLivre({ turmaParam }: { turmaParam?: string }) {
   let turmas: string[];
   let duplas: DuplaFonte[];
   let profs: PessoaFonte[];
@@ -50,6 +104,7 @@ export default async function RelatoriosPage({
       mentorado_id: d.mentorado.id,
       supervisor_id: d.supervisor?.id ?? null,
       status: d.status,
+      desfecho: d.desfecho,
       iniciada_em: d.iniciada_em,
       demanda: d.demanda,
     }));
@@ -57,18 +112,25 @@ export default async function RelatoriosPage({
       id: string;
       user_id?: string | null;
       nome: string | null;
+      nome_social?: string | null;
       email?: string | null;
       whatsapp?: string | null;
       cidade?: string | null;
       uf?: string | null;
+      // papéis efetivos alimentam a régua da fila "Sem dupla" (REALIZA-383)
+      role?: AppRole | null;
+      papeis?: AppRole[];
     }): PessoaFonte => ({
       id: p.id,
       user_id: p.user_id ?? null,
       nome: p.nome,
+      nome_social: p.nome_social ?? null,
       email: p.email ?? null,
       whatsapp: p.whatsapp ?? null,
       cidade: p.cidade ?? null,
       uf: p.uf ?? null,
+      role: p.role ?? null,
+      papeis: p.papeis ?? null,
     });
     profs = [
       ...dd.map((d) => pessoaFonte(d.mentor)),
@@ -77,6 +139,7 @@ export default async function RelatoriosPage({
     mentorados = dd.map((d) => ({
       id: d.mentorado.id,
       nome: d.mentorado.nome,
+      nome_social: d.mentorado.nome_social ?? null,
       email: d.mentorado.email ?? null,
       whatsapp: d.mentorado.whatsapp ?? null,
       cidade: d.mentorado.cidade ?? null,
@@ -108,20 +171,25 @@ export default async function RelatoriosPage({
     const [dRes, pRes, mRes, contatos] = await Promise.all([
       supabase
         .from("duplas")
-        .select("id, turma, cronograma_id, mentor_id, mentorado_id, supervisor_id, status, iniciada_em, demanda")
+        .select("id, turma, cronograma_id, mentor_id, mentorado_id, supervisor_id, status, desfecho, iniciada_em, demanda")
         .order("iniciada_em"),
       // user_id alimenta o gate do e-mail editável na grade (conta
-      // vinculada → e-mail só muda pelo sync do auth, 0060)
-      supabase.from("profiles").select("id, user_id, nome, cidade, uf"),
-      supabase.from("mentorados").select("id, nome, email, whatsapp, cidade, uf"),
+      // vinculada → e-mail só muda pelo sync do auth, 0060); role ∪
+      // profile_papeis alimentam a régua da fila "Sem dupla" (REALIZA-383 —
+      // especialista sem papel DPP não aguarda par)
+      supabase
+        .from("profiles")
+        .select("id, user_id, nome, nome_social, cidade, uf, role, profile_papeis(papel)"),
+      supabase.from("mentorados").select("id, nome, nome_social, email, whatsapp, cidade, uf"),
       getContatos(),
     ]);
     if (dRes.error || pRes.error || mRes.error) {
       throw new Error(dRes.error?.message ?? pRes.error?.message ?? mRes.error?.message);
     }
     duplas = dRes.data ?? [];
-    profs = (pRes.data ?? []).map((p) => ({
+    profs = (pRes.data ?? []).map(({ profile_papeis, ...p }) => ({
       ...p,
+      papeis: (profile_papeis ?? []).map((r) => r.papel),
       email: contatos.get(p.id)?.email ?? null,
       whatsapp: contatos.get(p.id)?.whatsapp ?? null,
     }));
@@ -143,7 +211,6 @@ export default async function RelatoriosPage({
 
   // deep-link ?turma=<valor cru> — só vira recorte se a turma existir;
   // valor estranho cai no default (turma mais recente) sem quebrar a URL
-  const { turma: turmaParam } = await searchParams;
   const turmaInicial =
     typeof turmaParam === "string" &&
     (turmaParam === "todas" || turmas.includes(turmaParam))
@@ -151,23 +218,16 @@ export default async function RelatoriosPage({
       : undefined;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        kicker="Operação"
-        title="Relatórios"
-        meta="Escolha turma, granularidade e colunas. A grade abaixo é livre: redimensione, ordene e exporte"
-      />
-      <RelatorioBuilder
-        turmas={turmas}
-        turmaInicial={turmaInicial}
-        duplas={duplas}
-        profs={profs}
-        mentorados={mentorados}
-        inscricoes={inscricoes}
-        cronogramas={cronogramas}
-        templates={templates}
-        links={links}
-      />
-    </div>
+    <RelatorioBuilder
+      turmas={turmas}
+      turmaInicial={turmaInicial}
+      duplas={duplas}
+      profs={profs}
+      mentorados={mentorados}
+      inscricoes={inscricoes}
+      cronogramas={cronogramas}
+      templates={templates}
+      links={links}
+    />
   );
 }

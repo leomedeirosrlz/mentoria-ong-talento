@@ -131,6 +131,10 @@ export function erroAmigavel(e: { message: string; code?: string }): string {
     if (/email/i.test(e.message)) return "Esse e-mail já está cadastrado.";
     if (/whatsapp/i.test(e.message))
       return "Esse WhatsApp já está cadastrado em outra pessoa.";
+    // unique (profile_id, papel, escopo_turma) — grant repetido ou rename
+    // de turma que uniu dois labels onde a pessoa tinha o mesmo papel
+    if (/profile_papeis_uniq/i.test(e.message))
+      return "Já existe um papel com esse escopo de turma.";
     return "Já existe um cadastro com esses dados.";
   }
   if (e.code === "42501" || /row-level security|row level security/i.test(e.message)) {

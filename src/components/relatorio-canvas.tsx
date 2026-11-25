@@ -11,8 +11,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import { Minus, Plus, WhatsappLogo } from "@phosphor-icons/react";
-import { toast } from "sonner";
-import { waLink } from "@/lib/ciclo";
+import { toast } from "@/lib/toast";
+import { waChatLink } from "@/lib/ciclo";
 import {
   textoCelula,
   type AlvoRelatorio,
@@ -499,18 +499,21 @@ export function RelatorioCanvas({
       );
     }
     if (c.id === "whatsapp") {
-      const wa = waLink(texto, "");
+      const wa = waChatLink(texto);
       return (
         <span className="inline-flex items-center gap-1">
           <span className="break-words">{texto}</span>
           {wa && (
+            // alvo real 44px (size-11) no mobile sem engordar a linha: a
+            // margem negativa come o excesso e o ícone fica no lugar —
+            // desktop encolhe pra size-8 (mesma régua dos icones size-11/8)
             <a
               href={wa}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`Chamar ${texto} no WhatsApp`}
+              aria-label={`Chamar ${textoCelula(l, "nome") || texto} no WhatsApp`}
               onClick={(e) => e.stopPropagation()}
-              className="shrink-0 rounded-sm p-0.5 text-muted-foreground/60 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="grid size-11 shrink-0 -m-3.5 place-items-center rounded-sm text-muted-foreground/60 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8 sm:-m-2"
             >
               <WhatsappLogo size={13} aria-hidden />
             </a>

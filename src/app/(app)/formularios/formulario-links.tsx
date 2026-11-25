@@ -8,8 +8,8 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { AnimatePresence, motion } from "motion/react";
+import { toast } from "@/lib/toast";
+import { FadeTroca } from "@/components/ui/etapa";
 import {
   ArrowClockwise,
   CircleNotch,
@@ -34,7 +34,7 @@ import {
   type LinkStatus,
 } from "@/lib/forms/schema";
 import type { LinkResolvido } from "@/lib/forms/queries";
-import { ehInstrumento } from "@/lib/forms/instrumentos";
+import { ehInstrumentoDeDupla } from "@/lib/forms/instrumentos";
 import { comparaNome, waLink } from "@/lib/ciclo";
 import type { AppRole } from "@/lib/types";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
@@ -53,9 +53,10 @@ import {
 } from "@/components/forms/link-shared";
 import { useOrigem } from "@/components/forms/use-origem";
 import { demoAtivoClient } from "@/lib/demo/shared";
-import { ExitItem, ExitList, fade, T } from "@/components/motion";
+import { ExitItem, ExitList } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,7 +64,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import {
   Select,
   SelectContent,
@@ -347,7 +348,7 @@ export function FormularioLinks({
   // trilha de especialista sai sozinha no encerramento (0104) — nos dois
   // casos o link manual daqui é rejeitado pela action: esconder é melhor
   // que falhar
-  const instrumento = ehInstrumento(formularioSistema);
+  const instrumento = ehInstrumentoDeDupla(formularioSistema);
   const avaliacaoTrilha = formularioSistema === "avaliacao_especialista";
   const [pending, start] = useTransition();
   // opções do "Vincular a um jovem" nos links genéricos legados (REALIZA-16)
@@ -586,21 +587,16 @@ export function FormularioLinks({
               </DialogDescription>
             </DialogHeader>
 
-            <AnimatePresence mode="wait" initial={false}>
+            {/* troca de estado do kit: o painel entrante recebe o foco —
+                o botão que gerou os links desmonta junto */}
+            <FadeTroca chave={prontos ? "prontos" : "form"} foco>
               {prontos ? (
-                <motion.div key="prontos" {...fade} transition={T.enter}>
-                  <LinksProntos
-                    itens={itensProntos}
-                    onOutros={() => setProntos(null)}
-                  />
-                </motion.div>
+                <LinksProntos
+                  itens={itensProntos}
+                  onOutros={() => setProntos(null)}
+                />
               ) : (
-                <motion.div
-                  key="form"
-                  {...fade}
-                  transition={T.enter}
-                  className="space-y-4"
-                >
+                <div className="space-y-4">
                   {!formularioAtivo && (
                     <p className="rounded-lg bg-[var(--warn)]/10 px-3 py-2 text-xs text-[var(--warn-text)]">
                       O formulário está encerrado: os links gerados só
@@ -641,15 +637,10 @@ export function FormularioLinks({
                         <fieldset key={g.key}>
                           <legend className="sr-only">{g.titulo}</legend>
                           <label className="flex min-h-9 cursor-pointer flex-wrap items-center gap-x-3 rounded-lg px-2 transition-colors hover:bg-muted">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={todos}
-                              ref={(el) => {
-                                if (el) el.indeterminate = alguns;
-                              }}
-                              onChange={() => toggleGrupo(g.itens, !todos)}
-                              aria-label={`Selecionar todos: ${g.titulo}`}
-                              className="size-4 shrink-0 accent-primary"
+                              indeterminate={alguns}
+                              onCheckedChange={() => toggleGrupo(g.itens, !todos)}
                             />
                             <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                               {g.titulo}
@@ -739,9 +730,9 @@ export function FormularioLinks({
                         : "Escolha os destinatários"}
                     </Button>
                   </DialogFooter>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
+            </FadeTroca>
           </DialogContent>
         </Dialog>
         )}
@@ -767,7 +758,7 @@ export function FormularioLinks({
         <div className="flex flex-wrap items-center gap-2">
           {/* chips de status — um gesto filtra a lista sem sair da página;
               a contagem junto do chip já diz se vale o clique */}
-          <ul className="flex flex-wrap items-center gap-1.5" aria-label="Filtrar links por status">
+          <FilterChipRow tag="ul" className="gap-1.5" aria-label="Filtrar links por status">
             <li>
               <button
                 type="button"
@@ -792,7 +783,7 @@ export function FormularioLinks({
                 </button>
               </li>
             ))}
-          </ul>
+          </FilterChipRow>
           <div className="relative min-w-40 flex-1 sm:max-w-56">
             <MagnifyingGlass
               size={14}

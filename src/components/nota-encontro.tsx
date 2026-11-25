@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { CaretDown } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { salvarNotaEncontro } from "@/lib/actions";
 import { demoAtivoClient } from "@/lib/demo/shared";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,12 +21,15 @@ const fmtHora = new Intl.DateTimeFormat("pt-BR", {
 export function NotaEncontro({
   duplaId,
   numero,
+  sessao = false,
   nota,
   rotulo,
   somenteLeitura,
 }: {
   duplaId: string;
   numero: number;
+  /** Trilha esp: o campo é o plano da sessão, não do encontro. */
+  sessao?: boolean;
   nota: string | null;
   /** contexto extra no summary — nome do mentorado (>1 dupla) ou "Nº encontro" */
   rotulo?: string;
@@ -133,8 +136,12 @@ export function NotaEncontro({
             onChange={(e) => agendar(e.target.value)}
             onBlur={flush}
             maxLength={10000}
-            placeholder="Plano do encontro, lembretes, links…"
-            aria-label={`Anotações do ${numero}º encontro`}
+            placeholder={
+              sessao
+                ? "Plano da sessão, lembretes, links…"
+                : "Plano do encontro, lembretes, links…"
+            }
+            aria-label={`Anotações ${sessao ? `da sessão ${numero}` : `do ${numero}º encontro`}`}
             className="border-0 bg-muted/40 px-3 py-2 shadow-none focus-visible:ring-1"
           />
           <p aria-live="polite" className="mt-1 h-4 px-1 text-xs text-muted-foreground">

@@ -6,9 +6,9 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import {
   CalendarDots,
+  FolderOpen,
   House,
   List,
-  Path,
   Question,
   Sparkle,
   UserCircle,
@@ -37,24 +37,26 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/jovem", label: "Início", icon: House },
   { href: "/jovem/agenda", label: "Agenda", icon: CalendarDots },
+  // FR-007 (010): o destino se chama Materiais — rótulo e ícone vestem
+  // o que a página entrega (a estante de instrumentos + o Acervo)
+  { href: "/jovem/materiais", label: "Materiais", icon: FolderOpen },
   { href: "/jovem/especialistas", label: "Especialistas", icon: Sparkle },
   { href: "/jovem/pessoas", label: "Pessoas", icon: Users },
-  // o rótulo segue o destino (/materiais, como no staff); "jornada" fica pro progresso dentro da página
-  { href: "/jovem/materiais", label: "Materiais", icon: Path },
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },
   // REALIZA-345: a Ajuda do jovem — fora do MOBILE_PRIMEIRO, mora no Menu
   { href: "/jovem/ajuda", label: "Ajuda", icon: Question },
 ] as const;
 
-/** Bottom nav: 4 destinos fixos + Menu (REALIZA-221). Primárias = o que
- *  ela mais usa: home, o catálogo de especialistas, a jornada (é onde
- *  moram os links dos forms e o acervo) e a agenda. Pessoas e Perfil
- *  ficam no menu lateral, que tem a navegação inteira. */
+/** Bottom nav: 4 destinos fixos + Menu (REALIZA-221), na mesma prioridade
+ *  da sidebar. Primárias = o que ela mais usa: home, a agenda, a jornada
+ *  (é onde moram os links dos forms e o acervo) e o catálogo de
+ *  especialistas. Pessoas e Perfil ficam no menu lateral, que tem a
+ *  navegação inteira. */
 const MOBILE_PRIMEIRO = [
   "/jovem",
-  "/jovem/especialistas",
-  "/jovem/materiais",
   "/jovem/agenda",
+  "/jovem/materiais",
+  "/jovem/especialistas",
 ] as const;
 
 function ativo(pathname: string, href: string) {
@@ -63,12 +65,18 @@ function ativo(pathname: string, href: string) {
 
 export function JovemShell({
   me,
+  fotoUrl,
+  gravatarUrl,
   notificacoes,
   demo,
   assistente,
   children,
 }: {
   me: Profile;
+  /** mentorados.avatar_path já resolvido pra URL pública — null cai nas
+   *  iniciais (com o gravatar do e-mail como degrau do meio) */
+  fotoUrl?: string | null;
+  gravatarUrl?: string | null;
   notificacoes: { itens: Notificacao[]; naoLidas: number };
   /** pill compacta da DemoBar dockada no header mobile (no lugar do nome —
    *  mesmo trade-off do AppShell, que docka sobre o rótulo de papel) */
@@ -201,9 +209,15 @@ export function JovemShell({
                 aria-current={ativo(pathname, "/jovem/perfil") ? "page" : undefined}
                 className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                {/* foto nunca: a decisão de produto é iniciais na v1 — o
-                    disco amarelo já é a marca do jovem no app inteiro */}
-                <Avatar nome={nomeTela} papel="mentorado" size={32} />
+                {/* o disco de iniciais amarelo segue o fallback — a foto
+                    que ele sobe no perfil (REALIZA-419) aparece aqui */}
+                <Avatar
+                  nome={nomeTela}
+                  papel="mentorado"
+                  src={fotoUrl}
+                  fallbackSrc={gravatarUrl}
+                  size={32}
+                />
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate" title={nomeTela}>
                     {nomeTela}
@@ -245,10 +259,11 @@ export function JovemShell({
                   href={item.href}
                   aria-current={at ? "page" : undefined}
                   className={cn(
-                    "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
+                    "relative flex flex-1 flex-col items-center gap-1 whitespace-nowrap py-2.5 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                     at
                       ? "font-semibold text-sidebar-foreground"
-                      : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
+                      : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground",
+                    "text-[11px]"
                   )}
                 >
                   {at && (
@@ -268,10 +283,11 @@ export function JovemShell({
               <SheetTrigger
                 aria-label={menuAtivo ? "Menu, seção atual fora da barra" : "Menu"}
                 className={cn(
-                  "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
+                  "relative flex flex-1 flex-col items-center gap-1 whitespace-nowrap py-2.5 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                   menuAtivo
                     ? "font-semibold text-sidebar-foreground"
-                    : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
+                    : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground",
+                  "text-[11px]"
                 )}
               >
                 {/* a rota atual mora no menu → o indicador viaja pra

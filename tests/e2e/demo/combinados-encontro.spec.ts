@@ -25,11 +25,13 @@ test.describe("demo — combinados do encontro (0157)", () => {
     await entrarNaDemo(page, "mentor_dpp");
     await page.goto(`/duplas/${DUPLA_OK}?aba=encontros`);
 
-    // a âncora #combinados-5 existe no card do 5º encontro e nasce aberta
-    // (tem itens); 3 pendentes = 1 do 5º + 2 de antes (3º e 4º)
+    // a âncora #combinados-5 existe no card do 5º encontro e nasce
+    // recolhida com o resumo no header; 3 pendentes = 1 do 5º + 2 de
+    // antes (3º e 4º)
     const bloco = page.locator("#combinados-5");
     const trigger = bloco.getByRole("button", { name: /^Combinados/ });
     await expect(trigger).toContainText("3 pendentes");
+    await trigger.click();
     await expect(bloco.getByText(PENDENTE)).toBeVisible();
 
     // itens do 5º: pendente desmarcado, feito riscado e com checked
@@ -52,8 +54,11 @@ test.describe("demo — combinados do encontro (0157)", () => {
     await expect(doRegistro).toContainText(/Bia · até \d{2}\/\d{2}\/\d{4}/);
 
     // criar com o mentorado como responsável e prazo: o item nasce com o
-    // nome dele e a data
+    // nome dele e a data. O form mora atrás do "+ Adicionar" (REALIZA-416)
     const novo = "E2E · trazer o boletim";
+    await bloco
+      .getByRole("button", { name: "Adicionar combinado", exact: true })
+      .click();
     await bloco
       .getByRole("textbox", { name: "Novo combinado do 5º encontro" })
       .fill(novo);
@@ -133,6 +138,7 @@ test.describe("demo — combinados do encontro (0157)", () => {
     await page.goto(`/duplas/${DUPLA_OK}?aba=encontros`);
 
     const bloco = page.locator("#combinados-5");
+    await bloco.getByRole("button", { name: /^Combinados/ }).click();
     await expect(bloco.getByText(PENDENTE)).toBeVisible();
     await expect(bloco.getByText(CARRY)).toBeVisible();
     // o responsável do mentor lê "Mentor" pra quem não é ele
@@ -142,6 +148,9 @@ test.describe("demo — combinados do encontro (0157)", () => {
     await expect(bloco.getByRole("checkbox").first()).toBeVisible();
     await expect(
       bloco.getByRole("textbox", { name: /Novo combinado/ })
+    ).toHaveCount(0);
+    await expect(
+      bloco.getByRole("button", { name: "Adicionar combinado", exact: true })
     ).toHaveCount(0);
     await expect(
       bloco.getByRole("button", { name: /Ações do combinado/ })

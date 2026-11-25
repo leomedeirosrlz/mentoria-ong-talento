@@ -489,21 +489,21 @@ export function normalizaLinhaReg(
 
   const { iso, anoSuspeito } = parseDataEncontro(l.data, hoje);
   if (l.data.trim() && !iso) {
-    push("data", "data", l.data, "", true, "data ilegível — descartada");
+    push("data", "data", l.data, "", true, "data ilegível: descartada");
   } else if (iso && anoSuspeito) {
-    push("data", "data", l.data, `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`, true, "ano improvável — conferir");
+    push("data", "data", l.data, `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`, true, "ano improvável: conferir");
   } else if (iso && l.data.trim() !== iso) {
     push("data", "data", l.data, `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`);
   }
 
   const duracaoMin = mapDuracao(l.duracao);
   if (l.duracao.trim() && duracaoMin == null) {
-    push("duracao", "duração", l.duracao, "", true, "duração não reconhecida — ficou 60 min");
+    push("duracao", "duração", l.duracao, "", true, "duração não reconhecida: ficou 60 min");
   }
 
   const avaliacao = mapAvaliacao(l.avaliacao);
   if (l.avaliacao.trim() && !avaliacao) {
-    push("avaliacao", "avaliação", l.avaliacao, "", true, "não reconhecida — ficou em branco");
+    push("avaliacao", "avaliação", l.avaliacao, "", true, "não reconhecida: ficou em branco");
   }
   const dif = mapDificuldade(l.dificuldade);
   const prox = mapProximoPasso(l.proximo);
@@ -520,7 +520,7 @@ export function normalizaLinhaReg(
     push("anexo", "anexo", l.anexo, "", true, "anexo ignorado (link externo)");
   }
   if (l.apoio.trim()) {
-    push("apoio", "apoio", l.apoio, "", true, "pedido de apoio não se importa — ele é feito pela plataforma");
+    push("apoio", "apoio", l.apoio, "", true, "pedido de apoio não se importa: ele é feito pela plataforma");
   }
 
   const txt = (s: string, cap: number, campo: string, label: string) => {
@@ -835,7 +835,7 @@ function scoreLado(
         ? [
             {
               icone: "question" as const,
-              texto: `"${normTexto(valor)}" não é nome — rótulo genérico`,
+              texto: `"${normTexto(valor)}" não é nome: rótulo genérico`,
               peso: 0,
               lado: papel,
             },
@@ -938,7 +938,7 @@ function scoreLado(
   let texto: string;
   switch (best.via) {
     case "exato":
-      texto = `"${normTexto(valor)}" — ${best.social ? "nome social exato" : "nome exato"}`;
+      texto = `"${normTexto(valor)}": ${best.social ? "nome social exato" : "nome exato"}`;
       break;
     case "subset":
       texto = `"${normTexto(valor)}" ⊆ "${nom}"`;
@@ -950,7 +950,7 @@ function scoreLado(
       texto = detalhe ? `${detalhe} ⊆ "${nom}"` : `"${normTexto(valor)}" ⊆ "${nom}"`;
       break;
     case "token":
-      texto = `"${normTexto(valor)}" — único(a) ${rotulo} com esse nome`;
+      texto = `"${normTexto(valor)}": único(a) ${rotulo} com esse nome`;
       break;
     case "apelido":
       texto = `"${normTexto(valor)}" ≈ apelido de "${nom}"`;
@@ -1065,7 +1065,7 @@ export function scoreLinha(
         score += b;
         ev.push({
           icone: "calendar",
-          texto: `${numero}º oficial era ${ddmm(oficial)} — data informada ${ddmm(dataIso)} (±${Math.round(dd)}d)`,
+          texto: `${numero}º oficial era ${ddmm(oficial)}. Data informada ${ddmm(dataIso)} (±${Math.round(dd)}d)`,
           peso: b,
           lado: "contexto",
         });
@@ -1257,7 +1257,7 @@ export function scoreLinha(
 
   const motivos: string[] = [];
   if (semPar) {
-    motivos.push("o par se resolve, mas não forma dupla cadastrada — escolha");
+    motivos.push("o par se resolve, mas não forma dupla cadastrada: escolha");
   } else {
     for (const [txt, lado, rot] of [
       [mentorTxt, ladoM, "mentor"],
@@ -1266,7 +1266,7 @@ export function scoreLinha(
       if (lado.placeholder) {
         motivos.push(
           txt.trim()
-            ? `${rot} "${normTexto(txt)}" não é nome — rótulo genérico`
+            ? `${rot} "${normTexto(txt)}" não é nome: rótulo genérico`
             : `${rot} em branco`
         );
       } else if (!lado.placeholder && lado.score === 0) {
@@ -1280,11 +1280,11 @@ export function scoreLinha(
         );
       }
     }
-    if (forcaManual) motivos.push("duplas plausíveis empatadas — escolha");
-    else if (ambig) motivos.push("mais de uma dupla plausível — escolha");
+    if (forcaManual) motivos.push("duplas plausíveis empatadas: escolha");
+    else if (ambig) motivos.push("mais de uma dupla plausível: escolha");
     else if (nivel === "provavel" && !motivos.length) {
       motivos.push(
-        `match provável (confiança ${Math.min(100, top!.score)}) — confira a sugestão`
+        `match provável (confiança ${Math.min(100, top!.score)}). Confira a sugestão`
       );
     }
   }
@@ -1293,7 +1293,7 @@ export function scoreLinha(
     top: top?.d ?? null,
     score: top ? Math.min(100, top.score) : 0,
     nivel,
-    motivo: motivos.join(" · ") || (nivel === "manual" ? "dupla não identificada — escolha" : null),
+    motivo: motivos.join(" · ") || (nivel === "manual" ? "dupla não identificada: escolha" : null),
     evidencias,
     candidatos,
     mentorNome: ladoM.pessoa && ladoM.score >= 55 ? ladoM.pessoa.nome : null,
@@ -1398,7 +1398,7 @@ export function processaLinhas(
       motivos.push(`linha ${dupClaim} já aponta essa dupla no ${r.numero}º encontro`);
     if (!r.dataIso && r.dataTxt) motivos.push("data ilegível");
     if (!r.dataTxt) motivos.push("sem data do encontro");
-    if (r.dataIso && r.dataIso > hojeIso) motivos.push("data no futuro — conferir");
+    if (r.dataIso && r.dataIso > hojeIso) motivos.push("data no futuro: conferir");
     if (r.diffs.some((d) => d.revisar) && m.top)
       motivos.push("campos marcados pra conferir");
     if (motivos.length) {

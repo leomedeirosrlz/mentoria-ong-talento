@@ -15,14 +15,14 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 function erroAmigavel(e: { message?: string; code?: string } | null): string {
   const msg = e?.message ?? "";
   if (msg.includes("máximo 10 metas"))
-    return "O PDM comporta no máximo 10 metas — descarte uma antes de criar outra.";
+    return "O PDM comporta no máximo 10 metas. Descarte uma antes de criar outra.";
   if (msg.includes("máximo 20 subitens"))
-    return "O PDM comporta no máximo 20 subitens no total — descarte ou conclua alguns antes de criar novos.";
+    return "O PDM comporta no máximo 20 subitens no total. Descarte ou conclua alguns antes de criar novos.";
   if (msg.includes("sem permissão"))
     return "Você não pode editar o PDM desta dupla.";
   if (msg.includes("mesmo nível"))
-    return "A ordem não pôde ser salva — a lista mudou em outra tela. Atualize a página.";
-  if (e?.code === "23514") return "Valor fora do permitido — revise os campos.";
+    return "A ordem não pôde ser salva: a lista mudou em outra tela. Atualize a página.";
+  if (e?.code === "23514") return "Valor fora do permitido. Revise os campos.";
   if (e?.code === "23503") return "Item pai não encontrado neste PDM.";
   return "Não foi possível salvar. Tente de novo.";
 }

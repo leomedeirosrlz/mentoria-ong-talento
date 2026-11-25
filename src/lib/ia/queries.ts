@@ -19,7 +19,11 @@ import type {
   AppRole,
   AvaliacaoEncontro,
   CicloEvento,
+  Cronograma,
+  DuplaPlano,
+  DuplaRecesso,
   DuplaStatus,
+  EncontroRemarcacao,
   Encaminhamento,
   Mentorado,
   MentorProfile,
@@ -27,9 +31,11 @@ import type {
   Registro,
   Trilha,
 } from "@/lib/types";
+import type { DuplaDesfecho } from "@/lib/dupla-desfecho";
 import type { InstrumentoDupla } from "@/lib/forms/queries";
 import { CacheTtl } from "./cache";
 import { perguntaFts } from "@/lib/ia/busca-guias";
+import { disponivelDesdePorId, type DuplaFecho } from "@/lib/fila";
 
 /** Papéis efetivos do dono do client — a mesma my_papeis() que o getMe usa
  *  (0085): a leitura sai de uma fonte só (o banco), nunca de claim
@@ -50,23 +56,30 @@ export const papeisDoUsuario = cache(
 // ---------- semáforo por dupla ----------
 
 /** Projeção com EXATAMENTE os campos que saudadeDaDupla consome
- *  (dupla.status/trilha/cronograma_id/iniciada_em; encontros→numero/status/
- *  datas; registro→precisa_apoio/avaliacao/dificuldade; avaliacao_jovem→
- *  pedir_apoio; encaminhamentos→status/prazo) + os nomes pra montar a
- *  resposta. reflexoes/observacoes/dificuldade_detalhe/proximo_passo_detalhe/
- *  tema ficam fora por construção — se o semáforo passar a ler outro campo,
- *  ampliar aqui junto (o type DuplaIa mostra o que a tool enxerga). */
+ *  (dupla.status/trilha/cronograma_id/iniciada_em; encontros→id/numero/
+ *  status/datas/sessao_id; registro→precisa_apoio/avaliacao/dificuldade +
+ *  tema/reflexoes/observacoes/atividades/cobertura, que a régua
+ *  `registroTemConteudo`/`cobertosDaDupla` lê pra decidir "tem conteúdo";
+ *  avaliacao_jovem→encontro_id/pedir_apoio/cobertura, que a régua
+ *  `avaliacaoCobreNumero` lê; encaminhamentos→status/prazo) + os nomes pra
+ *  montar a resposta. Os campos de conteúdo entram SÓ pro booleano — a
+ *  tool nunca os serializa pro modelo (ficha/resumo projetam campo a
+ *  campo). dificuldade_detalhe/proximo_passo_detalhe seguem fora por
+ *  construção — se o semáforo passar a ler outro campo, ampliar aqui junto
+ *  (o type DuplaIa mostra o que a tool enxerga). */
 export const IA_SAUDE_SELECT = `
-  id, turma, trilha, status, cronograma_id, iniciada_em, demanda,
+  id, turma, trilha, status, desfecho, cronograma_id, iniciada_em, demanda,
   mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
   mentorado:mentorados(nome, nome_social),
   supervisor:profiles!duplas_supervisor_id_fkey(nome, nome_social),
   encontros(
-    numero, status, data_hora, realizado_em,
-    registro:registros(precisa_apoio, avaliacao, dificuldade),
-    avaliacao_jovem:avaliacoes_encontro(pedir_apoio)
+    id, numero, status, data_hora, realizado_em, sessao_id,
+    registro:registros(precisa_apoio, avaliacao, dificuldade, tema, reflexoes, observacoes, atividades, cobertura),
+    avaliacao_jovem:avaliacoes_encontro(encontro_id, pedir_apoio, cobertura)
   ),
-  encaminhamentos(status, prazo)
+  encaminhamentos(status, prazo),
+  recessos:dupla_recessos(ciclo_evento_id, usa, declarado_em),
+  planos:dupla_planos(*)
 `;
 
 /** A dupla como a tool a recebe — projeção mínima e allowlisted (sem as
@@ -77,6 +90,9 @@ export type DuplaIa = {
   turma: string;
   trilha: Trilha;
   status: DuplaStatus;
+  /** Por que fechou — o ficha_dupla alcança dupla fechada e o card lê a
+   *  situação canônica (Desistente × Encerrada). */
+  desfecho?: DuplaDesfecho | null;
   cronograma_id: string | null;
   iniciada_em: string | null;
   demanda: string | null;
@@ -86,17 +102,42 @@ export type DuplaIa = {
   mentorado: { nome: string; nome_social: string | null; whatsapp?: string | null } | null;
   supervisor: { nome: string; nome_social: string | null; whatsapp?: string | null } | null;
   encontros: {
+    id: string;
     numero: number;
     status: string;
     data_hora: string | null;
     realizado_em: string | null;
+    /** Sessão combinada (018): marca o grupo — a régua lê via cobertosDaDupla. */
+    sessao_id: string | null;
     registro: Pick<
       Registro,
-      "precisa_apoio" | "avaliacao" | "dificuldade"
+      | "precisa_apoio"
+      | "avaliacao"
+      | "dificuldade"
+      | "tema"
+      | "reflexoes"
+      | "observacoes"
+      | "atividades"
+      | "cobertura"
     > | null;
-    avaliacao_jovem: Pick<AvaliacaoEncontro, "pedir_apoio"> | null;
+    avaliacao_jovem: Pick<
+      AvaliacaoEncontro,
+      "encontro_id" | "pedir_apoio" | "cobertura"
+    > | null;
   }[];
   encaminhamentos: Pick<Encaminhamento, "status" | "prazo">[];
+  /** Decisões de recesso declaradas (0218) — a linha ausente = usa o
+   *  recesso (default). O planner da tool lê daqui via cast pra Dupla. */
+  recessos?: Pick<
+    DuplaRecesso,
+    "ciclo_evento_id" | "usa" | "declarado_em"
+  >[];
+  /** Plano vivo/histórico (0219) — o semáforo lê o escopo do acordado;
+   *  a tool plano_em_dia devolve o estado persistido. */
+  planos?: Pick<
+    DuplaPlano,
+    "id" | "status" | "escopo" | "versao" | "aprovado_lado" | "aceito_mentor_em" | "aceito_mentorado_em" | "expira_em"
+  >[];
 };
 
 /** Duplas vivas (ativa/pausada) no escopo do papel — coord recebe todas,
@@ -107,6 +148,78 @@ export const getDuplasVivasIa = cache(
       .from("duplas")
       .select(IA_SAUDE_SELECT)
       .in("status", ["ativa", "pausada"]);
+    if (error) throw error;
+    return (data ?? []) as unknown as DuplaIa[];
+  }
+);
+
+/** Projeção da leitura operacional (REALIZA-465): a aderência precisa do
+ *  `created_at` do registro (atraso de entrega) e das remarcações do
+ *  encontro, que o semáforo não lê. Sai da mesma constante do semáforo pra
+ *  não divergir campo a campo. */
+export const IA_INSIGHTS_SELECT = IA_SAUDE_SELECT.replace(
+  "registro:registros(precisa_apoio, avaliacao, dificuldade, tema, reflexoes, observacoes, atividades, cobertura)",
+  "registro:registros(precisa_apoio, avaliacao, dificuldade, tema, reflexoes, observacoes, atividades, cobertura, created_at)"
+).replace(
+  "avaliacao_jovem:avaliacoes_encontro(encontro_id, pedir_apoio, cobertura)",
+  "avaliacao_jovem:avaliacoes_encontro(encontro_id, pedir_apoio, cobertura), remarcacoes:encontro_remarcacoes(data_anterior, data_nova, motivo, created_at)"
+);
+
+/** A dupla como a leitura operacional a recebe — o que `itemAderencia` e
+ *  `saudadeDaDupla` consomem, nada além. */
+export type DuplaIaInsight = Omit<DuplaIa, "encontros"> & {
+  encontros: (Omit<DuplaIa["encontros"][number], "registro"> & {
+    registro:
+      | (NonNullable<DuplaIa["encontros"][number]["registro"]> & {
+          created_at: string;
+        })
+      | null;
+    remarcacoes?: Pick<
+      EncontroRemarcacao,
+      "data_anterior" | "data_nova" | "motivo" | "created_at"
+    >[];
+  })[];
+};
+
+/** Duplas vivas com a projeção da leitura operacional, no escopo do papel
+ *  (RLS): coord recebe todas, supervisor as supervisionadas, mentor as suas.
+ *  É o recorte que o mentor vê na tool, nunca o programa inteiro. */
+export const getDuplasInsightsIa = cache(
+  async (supabase: SupabaseClient): Promise<DuplaIaInsight[]> => {
+    const { data, error } = await supabase
+      .from("duplas")
+      .select(IA_INSIGHTS_SELECT)
+      .in("status", ["ativa", "pausada"]);
+    if (error) throw error;
+    return (data ?? []) as unknown as DuplaIaInsight[];
+  }
+);
+
+/** Catálogo de cronogramas pro recorte (turma/nome) da aderência: leitura
+ *  aberta aos papéis adultos, a mesma das telas. */
+export const getCronogramasIa = cache(
+  async (
+    supabase: SupabaseClient
+  ): Promise<Pick<Cronograma, "id" | "nome" | "turma">[]> => {
+    const { data, error } = await supabase
+      .from("cronogramas")
+      .select("id, nome, turma");
+    if (error) throw error;
+    return (data ?? []) as Pick<Cronograma, "id" | "nome" | "turma">[];
+  }
+);
+
+/** Situação mínima das duplas fechadas no escopo: o resumo da semana as
+ *  conta na partição (Concluída/Desistente/Encerrada, a mesma das telas)
+ *  sem trafegar encontros nem contatos pro modelo. */
+export const getFechadasIa = cache(
+  async (supabase: SupabaseClient): Promise<DuplaIa[]> => {
+    const { data, error } = await supabase
+      .from("duplas")
+      .select(
+        "id, turma, trilha, status, desfecho, cronograma_id, iniciada_em, demanda"
+      )
+      .in("status", ["concluida", "encerrada"]);
     if (error) throw error;
     return (data ?? []) as unknown as DuplaIa[];
   }
@@ -160,6 +273,121 @@ export const getDuplaIa = cache(
       if (d.supervisor) d.supervisor.whatsapp = wa.get(d.supervisor_id!) ?? null;
     }
     return d;
+  }
+);
+
+/** Encontro solto com a dupla nomeada (026/FR-010) — o resumo de
+ *  confirmação diz "o 5º encontro de Ana e Ricardo", nunca o uuid. */
+export const getEncontroIa = cache(
+  async (supabase: SupabaseClient, id: string) => {
+    const { data, error } = await supabase
+      .from("encontros")
+      .select(
+        `numero,
+         dupla:duplas!inner(
+           id,
+           mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+           mentorado:mentorados(nome, nome_social)
+         )`
+      )
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return data as unknown as {
+      numero: number;
+      dupla: {
+        id: string;
+        mentor: { nome: string; nome_social: string | null } | null;
+        mentorado: { nome: string; nome_social: string | null } | null;
+      };
+    } | null;
+  }
+);
+
+/** Chamado solto pro resumo de confirmação (026/FR-010) — "o chamado #7
+ *  (app não abre)" em vez do uuid. */
+export const getChamadoIa = cache(
+  async (supabase: SupabaseClient, id: string) => {
+    const { data, error } = await supabase
+      .from("chamados")
+      .select("numero, assunto")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return (data ?? null) as {
+      numero: number;
+      assunto: string | null;
+    } | null;
+  }
+);
+
+/** Nome de uma pessoa qualquer pro resumo de confirmação (026/FR-010) —
+ *  pessoa_id/para/mentorado_id abrangem profiles e mentorados; a primeira
+ *  tabela que conhece o id responde. */
+export async function getPessoaNomeIa(supabase: SupabaseClient, id: string) {
+  const { data: p, error: ep } = await supabase
+    .from("profiles")
+    .select("nome, nome_social")
+    .eq("id", id)
+    .maybeSingle();
+  if (ep) throw ep;
+  if (p) return p as { nome: string; nome_social: string | null };
+  const { data: m, error: em } = await supabase
+    .from("mentorados")
+    .select("nome, nome_social")
+    .eq("id", id)
+    .maybeSingle();
+  if (em) throw em;
+  return (m ?? null) as { nome: string; nome_social: string | null } | null;
+}
+
+/** Pedido de especialista solto na view escopada (026/FR-010) — o nome
+ *  do mentorado (ou do especialista, pro jovem) nomeia o resumo. */
+export const getSolicitacaoMuralIa = cache(
+  async (supabase: SupabaseClient, id: string) => {
+    const { data, error } = await supabase
+      .from("solicitacoes_mural")
+      .select(
+        "id, mentorado_nome, mentorado_nome_social, especialista_nome, especialista_nome_social"
+      )
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return (data ?? null) as {
+      id: string;
+      mentorado_nome: string | null;
+      mentorado_nome_social: string | null;
+      especialista_nome: string | null;
+      especialista_nome_social: string | null;
+    } | null;
+  }
+);
+
+/** Combinado do jovem solto na view dele (026/FR-010) — o texto do
+ *  combinado nomeia o resumo de confirmação. */
+export const getCombinadoJovemIa = cache(
+  async (supabase: SupabaseClient, id: string) => {
+    const { data, error } = await supabase
+      .from("jovem_encaminhamentos")
+      .select("texto:descricao")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return (data ?? null) as { texto: string | null } | null;
+  }
+);
+
+/** Plano "ficar em dia" → dupla dona (026/FR-010) — responder ou aplicar
+ *  passo nomeia a dupla no resumo de confirmação. */
+export const getPlanoDuplaIa = cache(
+  async (supabase: SupabaseClient, id: string) => {
+    const { data, error } = await supabase
+      .from("dupla_planos")
+      .select("dupla_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return (data ?? null) as { dupla_id: string } | null;
   }
 );
 
@@ -322,8 +550,9 @@ export const getFilaInsumos = cache(
     ocupados: Set<string>;
     historico: Set<string>;
     contagemPorMentor: Record<string, number>;
+    disponivelDesde: Record<string, string>;
   }> => {
-    const [pessoas, mentorados, carimboP, carimboM, duplas, mps] =
+    const [pessoas, mentorados, carimboP, carimboM, duplas, mps, encs] =
       await Promise.all([
         supabase
           .from("profiles")
@@ -335,10 +564,17 @@ export const getFilaInsumos = cache(
           .select("id, nome, nome_social, ong_origem, origem, situacao, created_at"),
         getCarimboMap(supabase, "profiles_pessoal"),
         getCarimboMap(supabase, "mentorados_pessoal"),
-        supabase.from("duplas").select("mentor_id, mentorado_id, status, trilha"),
+        // carimbos de fechamento alimentam a disponibilidade da fila
+        // (REALIZA-393) — a tool responde a espera ATUAL como a página
+        supabase
+          .from("duplas")
+          .select(
+            "id, mentor_id, mentorado_id, status, trilha, created_at, encerrada_em, concluida_em, desfecho_em, remanejada_de"
+          ),
         supabase
           .from("mentor_profiles")
           .select("profile_id, tipo, capacidade, capacidade_especialista"),
+        supabase.from("encerramentos").select("dupla_id, created_at"),
       ]);
     if (pessoas.error) throw pessoas.error;
     if (mentorados.error) throw mentorados.error;
@@ -366,6 +602,12 @@ export const getFilaInsumos = cache(
     for (const mp of (mps.data ?? []) as MentorProfile[]) {
       mentorProfiles[mp.profile_id] = mp;
     }
+    // encerramentos falha-soft: sem o carimbo do rito a fila degrada
+    // pros outros selos do fechamento, não quebra a tool
+    const disponivelDesde = disponivelDesdePorId(
+      (duplas.data ?? []) as DuplaFecho[],
+      encs.error ? [] : (encs.data ?? [])
+    );
     return {
       pessoas: ((pessoas.data ?? []) as (PessoaFilaIa & {
         profile_papeis?: { papel: AppRole }[];
@@ -382,6 +624,7 @@ export const getFilaInsumos = cache(
         form_bruto: carimboM.get(m.id) ?? null,
       })),
       mentorProfiles,
+      disponivelDesde,
       ocupados,
       historico,
       contagemPorMentor,
@@ -552,6 +795,40 @@ export const getDuplasResumoIa = cache(
   }
 );
 
+/** Contatos da avaliação por terceiros de uma dupla — a tool
+ *  mensagem_template (REALIZA-388) personaliza o convite pras pessoas
+ *  indicadas e precisa do nome, vínculo, whatsapp e token do link de cada
+ *  uma. A resposta NUNCA entra no select (texto livre sobre o jovem fica
+ *  fora da allowlist, mesmo princípio dos registros). A RLS escopa: mentor
+ *  da dupla, supervisor e coordenação. */
+export type TerceiroIa = {
+  id: string;
+  nome: string;
+  vinculo: "amigo" | "familiar" | "colega" | "outro";
+  whatsapp: string | null;
+  token: string;
+  expira_em: string;
+  status: "pendente" | "respondido" | "expirado";
+  created_at: string;
+};
+
+export const getTerceirosIa = cache(
+  async (
+    supabase: SupabaseClient,
+    duplaId: string
+  ): Promise<TerceiroIa[]> => {
+    const { data, error } = await supabase
+      .from("terceiros_contatos")
+      .select(
+        "id, nome, vinculo, whatsapp, token, expira_em, status, created_at"
+      )
+      .eq("dupla_id", duplaId)
+      .order("created_at");
+    if (error) throw error;
+    return (data ?? []) as TerceiroIa[];
+  }
+);
+
 /** Encontros numa janela — visíveis pela RLS (mentor vê os das próprias
  *  duplas, supervisor as supervisionadas, coord tudo). O !inner na dupla
  *  filtra de novo pelo lado do embed: encontro de dupla invisível não
@@ -628,6 +905,62 @@ export const getHistoricoEncontrosIa = cache(
     }[];
   }
 );
+
+/** Um combinado (encaminhamento) com a dupla de contexto — a projeção é a
+ *  do select abaixo; `atrasado` não se lê aqui porque é derivado da data. */
+export type EncaminhamentoIa = {
+  id: string;
+  descricao: string;
+  responsavel: "mentor" | "mentorado";
+  prazo: string | null;
+  status: string;
+  numero: number | null;
+  feito_em: string | null;
+  created_at: string;
+  dupla: {
+    id: string;
+    trilha: string | null;
+    turma: string;
+    status: string;
+    mentor: { nome: string; nome_social: string | null } | null;
+    mentorado: { nome: string; nome_social: string | null } | null;
+  };
+};
+
+/** Combinados das duplas no escopo do papel (staff — a do jovem é
+ *  getJovemCombinadosIa via view). A policy encaminhamentos_select (0125)
+ *  faz o recorte: coord tudo, mentor a própria dupla, auxiliar as
+ *  supervisionadas — e o !inner na dupla garante que combinado de dupla
+ *  invisível não aparece nem órfão. Pendente com prazo vencido primeiro
+ *  (a ordenação padrão é "o que cobrar primeiro"); status='todos' traz os
+ *  feitos junto pra perguntas de histórico. */
+export async function getEncaminhamentosIa(
+  supabase: SupabaseClient,
+  op?: {
+    duplaId?: string;
+    status?: "pendente" | "feito" | "todos";
+    limite?: number;
+  }
+): Promise<EncaminhamentoIa[]> {
+  let q = supabase
+    .from("encaminhamentos")
+    .select(
+      `id, descricao, responsavel, prazo, status, numero, feito_em, created_at,
+       dupla:duplas!inner(
+         id, trilha, turma, status,
+         mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+         mentorado:mentorados(nome, nome_social)
+       )`
+    )
+    .order("prazo", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(op?.limite ?? 40);
+  if (op?.duplaId) q = q.eq("dupla_id", op.duplaId);
+  if (op?.status && op.status !== "todos") q = q.eq("status", op.status);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as unknown as EncaminhamentoIa[];
+}
 
 // ---------- instrumentos da dupla (RPC homônima, 0080) ----------
 
@@ -1052,4 +1385,119 @@ export async function getJovemPedidosIa(supabase: SupabaseClient, limite = 40) {
     especialista_nome_social: string | null;
     especialista_desejado_nome: string | null; created_at: string;
   }[];
+}
+
+/** O que o jovem pode declarar retroativo (461 / migration 0207-0208):
+ *  os passos do guia já vencidos na data oficial que ainda não têm row na
+ *  agenda dele (o jovem_registrar_retroativo escreve exatamente estes), e
+ *  os retroativos que ELE criou e ainda pode corrigir ou desfazer enquanto
+ *  o mentor não registra — o gate fino (autoria + registro do mentor) mora
+ *  nas RPCs definer, aqui o recorte é o das linhas da agenda do jovem. */
+export async function getJovemRetroativoIa(supabase: SupabaseClient) {
+  const d = await getMinhaDuplaIa(supabase);
+  // trilha de especialista não cobre retroativo — a RPC recusa e a agenda
+  // do jovem também não mostra o dialog lá
+  if (!d || d.trilha === "especialista" || d.status !== "ativa") return null;
+  const [jornadaRes, encRes, euRes] = await Promise.all([
+    supabase.rpc("jovem_jornada"),
+    supabase
+      .from("encontros")
+      .select("id, numero, status, realizado_em, created_by")
+      .eq("dupla_id", d.id),
+    supabase.rpc("my_profile_id"),
+  ]);
+  if (jornadaRes.error) throw jornadaRes.error;
+  if (encRes.error) throw encRes.error;
+  const cron = (
+    (
+      (jornadaRes.data as {
+        cronograma?: { numero?: number; data?: string; tipo?: string }[] | null;
+      } | null)?.cronograma ?? []
+    )
+  )
+    .filter(
+      (e): e is { numero: number; data: string; tipo: string } =>
+        e.tipo === "encontro" && e.numero != null && e.data != null
+    )
+    .sort((a, b) => a.numero - b.numero);
+  const maxNum = cron.length ? cron[cron.length - 1].numero : 0;
+  const hoje = new Date().toISOString().slice(0, 10);
+  const encs = (encRes.data ?? []) as {
+    id: string;
+    numero: number;
+    status: string;
+    realizado_em: string | null;
+    created_by: string | null;
+  }[];
+  const porNumero = new Set(encs.map((e) => e.numero));
+  const meuId = (euRes.data as string | null) ?? null;
+  return {
+    dupla_id: d.id,
+    // sem row e já vencido na data oficial — o último passo fica de fora
+    // (fechar a jornada segue registro do mentor, mesma régua da 0208)
+    elegiveis: cron
+      .filter((p) => p.numero < maxNum && p.data <= hoje && !porNumero.has(p.numero))
+      .map((p) => ({ numero: p.numero, data_oficial: p.data })),
+    criados_por_voce: encs
+      .filter(
+        (e) => e.status === "realizado" && meuId != null && e.created_by === meuId
+      )
+      .map((e) => ({
+        encontro_id: e.id,
+        numero: e.numero,
+        realizado_em: e.realizado_em,
+      })),
+  };
+}
+
+// ---------- adoção do produto (REALIZA-417, fase 2) ----------
+// As RPCs adocao_* (0198) devolvem o agregado na forma pronta — a tool
+// não refaz agregação em JS. Security invoker: a RLS de produto_eventos
+// já recorta (coordenação vê o programa todo; fora dela a tool nem abre).
+
+export type AdocaoResumoIa = {
+  ativas: number;
+  ativas_prev: number;
+  gestos: number;
+  gestos_prev: number;
+  sups_vivas: number;
+};
+
+export type AdocaoSuperficieIa = {
+  superficie: string;
+  gestos: number;
+  pessoas: number;
+  papeis: string[];
+  ultimo: string;
+};
+
+/** KPIs da régua da aba Adoção — janela × janela anterior equivalente. */
+export async function getAdocaoResumoIa(
+  supabase: SupabaseClient,
+  desdeIso: string,
+  papel: string | null = null
+): Promise<AdocaoResumoIa> {
+  const { data, error } = await supabase.rpc("adocao_resumo", {
+    p_desde: desdeIso,
+    p_papel: papel,
+  });
+  if (error) throw error;
+  return data as unknown as AdocaoResumoIa;
+}
+
+/** A lista de trabalho da aba Adoção — uma linha por superfície com
+ *  pessoas únicas (distinct no SQL, não soma por papel — o híbrido não
+ *  conta duas vezes), gestos, papéis que usaram e o último gesto.
+ *  `papel` = recorte da régua (null = todos). */
+export async function getAdocaoSuperficiesIa(
+  supabase: SupabaseClient,
+  desdeIso: string,
+  papel: string | null
+): Promise<AdocaoSuperficieIa[]> {
+  const { data, error } = await supabase.rpc("adocao_superficies", {
+    p_desde: desdeIso,
+    p_papel: papel,
+  });
+  if (error) throw error;
+  return (data ?? []) as AdocaoSuperficieIa[];
 }

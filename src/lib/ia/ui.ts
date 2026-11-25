@@ -12,9 +12,11 @@
  *  intermediário, não resposta. Tool negada/erro nunca vira card.
  *
  *  Mudou um kind aqui → muda o card (assistente-cards.tsx), o dataset da
- *  demo (lib/demo/ia-ui.ts) e a nota de cards em prompts.ts. */
+ *  demo (lib/demo/ia.ts) e a nota de cards em prompts.ts. */
 
 import type { Semaforo } from "@/lib/ciclo";
+import type { DuplaDesfecho } from "@/lib/dupla-desfecho";
+import type { DocBloco } from "@/lib/materiais-documentos";
 import type {
   AppRole,
   AvaliacaoJovem,
@@ -37,11 +39,25 @@ export type UiDuplaMini = {
   mentorado: string | null;
   trilha: Trilha;
   status: DuplaStatus;
+  desfecho?: DuplaDesfecho | null;
   semaforo: Semaforo;
   motivo: string | null;
   apoio: boolean;
   feitos: number;
   esperado: number;
+  /** próximo encontro marcado (026) — a fonte já calculava e o
+   *  projetor descartava; alimenta a linha "quando é o próximo?" */
+  proximo?: { numero: number; data_hora: string | null } | null;
+};
+
+/** Panorama "como estão minhas duplas?" (026): as mesmas linhas-mini do
+ *  destaque do resumo, com o total do escopo e truncado honestos. */
+export type UiDuplas = {
+  kind: "duplas";
+  /** até 6, na ordem da tool (apoio → risco → atenção → ok) */
+  itens: UiDuplaMini[];
+  total: number;
+  truncado: boolean;
 };
 
 export type UiSaude = {
@@ -53,6 +69,8 @@ export type UiSaude = {
     em_dia: number;
     apoio: number;
     pausadas: number;
+    concluidas: number;
+    encerradas: number;
   };
   /** até 5 duplas que pedem ação (apoio → risco → atenção), na ordem da tool */
   destaques: UiDuplaMini[];
@@ -68,6 +86,7 @@ export type UiDupla = {
   supervisor: string | null;
   trilha: Trilha;
   status: DuplaStatus;
+  desfecho?: DuplaDesfecho | null;
   turma: string | null;
   /** ausente pro jovem — o semáforo é instrumento da equipe */
   semaforo?: Semaforo;
@@ -145,6 +164,9 @@ export type UiChamados = {
   em_atendimento: number;
   /** até 5, mais recentes primeiro */
   chamados: {
+    /** uuid — o deep-link da linha (?c=); opcional por defesa a bloco
+     *  montado sem id */
+    id?: string;
     numero: string;
     categoria: ChamadoCategoria;
     assunto: string | null;
@@ -162,6 +184,109 @@ export type UiInstrumentos = {
     respondidos: number;
     pendentes: number;
   }[];
+};
+
+/** Plano "ficar em dia" (REALIZA-397): a sequência calculada pelo planner —
+ *  cada passo com a data sugerida e a ação (agendar, remarcar, já marcado).
+ *  O card aponta pra ficha, onde o mentor executa — o plano é proposta,
+ *  nunca cronograma gravado pela IA. */
+export type UiPlano = {
+  kind: "plano";
+  dupla_id: string;
+  /** a dupla nomeada (026) — o card diz de quem é o plano e linka a ficha */
+  mentor: string | null;
+  mentorado: string | null;
+  em_dia: boolean;
+  data_recuperacao: string | null;
+  /** a data "em dia" mesmo depois do encerramento — a evidência do
+   *  conversa: o card diz quando o plano fecha, nunca só que não fecha */
+  data_projetada: string | null;
+  /** no ritmo devolvido, quantos dos encontros que faltam cabem até o
+   *  encerramento — null quando o calendário não tem encerramento */
+  cabem_ate_encerramento: { cabem: number; faltam: number } | null;
+  encerramento: string | null;
+  /** encontros/semana da simulação devolvida — o card fala em palavras
+   *  (rotuloRitmo); deriva do nivel quando a tool não serializa o número */
+  ritmo: number | null;
+  passos: {
+    numero: number;
+    titulo: string;
+    acao: "agendar" | "remarcar" | "travado";
+    /** encontro a editar no remarcar/travado — viaja pro deep-link da
+     *  ficha, nunca vira texto do card */
+    encontro_id: string | null;
+    data: string;
+    /** data oficial do passo — o "oficial era" que mostra a divergência */
+    data_oficial: string;
+    /** oficial que vence durante a recuperação — a conta honesta do plano */
+    vence_no_caminho: boolean;
+    precondicao: string | null;
+    aviso: string | null;
+  }[];
+  /** limbo/registro pendente que vem antes do plano */
+  pendencias: { numero: number; estado: "limbo" | "pendente_registro" }[];
+  /** Recessos do cronograma ainda sem decisão da dupla (527) — travam a
+   *  proposta até a dupla responder (declarar_recesso / wizard). */
+  recessos_pendentes: {
+    ciclo_evento_id: string;
+    titulo: string;
+    inicio: string;
+    fim: string;
+  }[];
+  /** Grade semanal dos dois lados (518): quem já marcou e os dias em
+   *  comum — o card diz por que as datas preferem (ou não) certos dias. */
+  grade: {
+    mentor: boolean;
+    jovem: boolean;
+    dias_comuns: number;
+    sem_grade: boolean;
+  } | null;
+  /** Rascunho do documento do combinado (montarDocCombinado, o mesmo do
+   *  wizard da aba Agora) — o card deixa a dupla ler o que vai propor. */
+  doc: DocBloco[] | null;
+  avisos: string[];
+  /** Nível nomeado de flexibilização (FR-011) + ação sugerida. */
+  nivel:
+    | "ritmo_normal"
+    | "semana_dupla"
+    | "semana_tripla"
+    | "um_por_dia"
+    | "conversa_coord"
+    | null;
+  /** em_dia · recuperacao · conversa (513): conversa = nem 1 por dia
+   *  fecha antes do encerramento, o card não promete a data. */
+  estado: "em_dia" | "recuperacao" | "conversa" | null;
+  sugestao: string | null;
+  /** Plano persistido vivo (0219) — quando existe, o card mostra o
+   *  combinado (status/versão/quem aprovou) em vez de só a proposta. */
+  plano: {
+    id: string;
+    status: string;
+    versao: number;
+    aprovado_lado: "mentor" | "mentorado" | null;
+    /** ciência de cada lado (0225 — o aceite é ÚNICO, um carimbo basta) */
+    aceito_mentor: boolean;
+    aceito_mentorado: boolean;
+    /** quem falta aceitar (aceite ÚNICO, 0225) — "dupla" = nenhum lado
+     *  carimbou (proposta da equipe esperando a dupla) */
+    falta: "mentor" | "mentorado" | "dupla" | null;
+    expira_em: string;
+    ritmo: number | null;
+  } | null;
+};
+
+/** O combinado do plano como o JOVEM o vê (0219 — jovem_plano): sem
+ *  semáforo, motivo interno ou sinal — só status, ritmo, datas e passos
+ *  aplicados. Mesmo kind "plano_jovem" pro card próprio da agenda/chat. */
+export type UiPlanoJovem = {
+  kind: "plano_jovem";
+  status: string;
+  versao: number;
+  ritmo: number | null;
+  aprovado_lado: "mentor" | "mentorado" | null;
+  expira_em: string;
+  passos: { numero: number; data: string; acao: string | null }[];
+  passos_aplicados: { numero: number; data_nova: string; aplicado_em: string }[];
 };
 
 export type UiFontes = {
@@ -217,6 +342,24 @@ export type UiPedidos = {
   }[];
 };
 
+/** Prévia de escrita aguardando o "sim" humano (REALIZA-126): a rota
+ *  emite quando a tool devolve `pendente_confirmacao`. O `confirmacao_id`
+ *  mora AQUI — vai pro card do usuário, nunca pro histórico do modelo
+ *  (com ele na mão a tool se auto-aprovaria). `args` viaja junto porque
+ *  o Confirmar reposta o mesmo payload que gravou a prévia. */
+export type UiConfirmacao = {
+  kind: "confirmacao";
+  confirmacao_id: string;
+  tool: string;
+  args: Record<string, unknown>;
+  resumo: string;
+  expira_em_minutos: number;
+  /** request_id da reserva da mensagem que propôs — o card reposta no
+   *  Confirmar e o evento da execução sai com o MESMO id da prévia:
+   *  o par "proposto × aprovado" fica correlacionado em ia_eventos. */
+  request_id?: string | null;
+};
+
 export type UiBloco =
   | UiSaude
   | UiDupla
@@ -228,24 +371,46 @@ export type UiBloco =
   | UiChamados
   | UiInstrumentos
   | UiFontes
+  | UiDuplas
   | UiCombinados
   | UiJornada
-  | UiPedidos;
+  | UiPedidos
+  | UiPlano
+  | UiPlanoJovem
+  | UiConfirmacao;
 
 export type UiKind = UiBloco["kind"];
 
 /** Rótulo da linha "Consultou: …" e do status por tool. */
 export const STATUS_TOOL: Record<string, string> = {
   resumo_semana: "Lendo o resumo da semana…",
+  operacional_insights: "Lendo adesão, saúde e adoção…",
   ficha_dupla: "Abrindo a ficha da dupla…",
   registros_da_dupla: "Lendo os registros da dupla…",
+  plano_em_dia: "Montando o plano pra ficar em dia…",
+  plano_propor: "Preparando a proposta do plano…",
+  plano_responder: "Preparando a resposta do plano…",
+  plano_aplicar_passo: "Preparando o passo do plano…",
+  resumo_dupla: "Lendo o resumo consolidado da dupla…",
+  meu_plano: "Vendo o combinado do plano…",
+  intervencao_sugerir: "Preparando a sugestão de intervenção…",
+  guia_ajustar: "Preparando o ajuste do guia…",
+  guia_limpar: "Preparando pra voltar ao guia…",
   aguardando_par: "Olhando a fila de pareamento…",
   capacidade_mentores: "Conferindo as vagas dos mentores…",
+  adocao_por_superficie: "Lendo a adoção por superfície…",
+  adocao_por_dia: "Lendo a série diária de gestos…",
+  adocao_caminhos: "Lendo os caminhos de navegação…",
+  adocao_coorte: "Lendo a retenção por coorte…",
+  adocao_funil: "Lendo o funil de instrumentos…",
   duplas_do_usuario: "Procurando a dupla…",
+  duplas_panorama: "Lendo o panorama das duplas…",
   agenda_do_periodo: "Abrindo a agenda…",
   guia_consulta: "Buscando nos guias…",
   chamados_resumo: "Lendo os chamados…",
+  combinados_das_duplas: "Lendo os combinados…",
   pessoas_busca: "Procurando a pessoa…",
+  mensagem_template: "Pegando o template da mensagem…",
   instrumentos_da_dupla: "Abrindo os instrumentos…",
   minha_dupla: "Olhando sua dupla…",
   minha_agenda: "Abrindo sua agenda…",
@@ -253,6 +418,21 @@ export const STATUS_TOOL: Record<string, string> = {
   meu_progresso: "Olhando sua jornada…",
   meus_pedidos: "Vendo seus pedidos…",
   ajuda_faq: "Buscando na ajuda…",
+  encontros_retroativo: "Vendo o que dá pra registrar…",
+  jovem_registrar_retroativo: "Preparando o registro do encontro…",
+  jovem_desfazer_retroativo: "Preparando pra desfazer o registro…",
+  // escritas do domínio (126) — a 1ª chamada só prepara a prévia, então
+  // o status conta "preparando", não "executando"
+  registrar_interacao: "Preparando o registro de contato…",
+  marcar_situacao_mentorado: "Preparando a mudança de situação…",
+  emitir_link_instrumento: "Preparando o link do instrumento…",
+  agendar_encontro: "Preparando o agendamento…",
+  jovem_agendar_encontro: "Preparando o agendamento…",
+  jovem_registrar_encontro: "Preparando o registro do encontro…",
+  declarar_recesso: "Preparando a decisão do recesso…",
+  disponibilidade_semana: "Preparando sua grade semanal…",
+  jovem_pedir_especialista: "Preparando o pedido de especialista…",
+  editar_campo_pessoa: "Preparando a edição…",
 };
 
 // ---------- projetores (puros) ----------
@@ -267,6 +447,39 @@ const arr = (v: unknown): Obj[] =>
   Array.isArray(v) ? (v.filter((x) => obj(x)) as Obj[]) : [];
 const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+
+/** Linha-mini de dupla — os destaques do resumo e os itens do panorama
+ *  leem o mesmo recorte do projetarResumo (mesmo shape, mesma ordem). */
+function duplaMini(x: Obj): UiDuplaMini {
+  const prox = obj(x.proximo_encontro);
+  return {
+    id: String(x.dupla_id),
+    mentor: str(x.mentor),
+    mentorado: str(x.mentorado),
+    trilha: x.trilha as Trilha,
+    status: x.status as DuplaStatus,
+    desfecho: (str(x.desfecho) as DuplaDesfecho | null) ?? null,
+    semaforo: x.semaforo as Semaforo,
+    motivo: corta(str(x.motivo), 120),
+    apoio: obj(x.apoio)?.aberto === true,
+    feitos: num(x.feitos),
+    esperado: num(x.esperado),
+    proximo: prox
+      ? { numero: num(prox.numero), data_hora: str(prox.data_hora) }
+      : null,
+  };
+}
+
+/** Ritmo (encontros/semana) por trás de cada nível nomeado — o inverso
+ *  do NIVEL_DO_RITMO do planner; cobre payload sem o `ritmo` serializado. */
+const RITMO_DO_NIVEL: Record<NonNullable<UiPlano["nivel"]>, number> = {
+  ritmo_normal: 1,
+  semana_dupla: 2,
+  semana_tripla: 3,
+  um_por_dia: 7,
+  // o conversa mostra a melhor simulação — o degrau de 1 por dia
+  conversa_coord: 7,
+};
 
 /** Tool que respondeu → bloco do card, ou null quando não há o que
  *  mostrar (lista vazia, lookup intermediário, tool sem card). Recebe o
@@ -291,20 +504,23 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           em_dia: num(s.em_dia),
           apoio: num(s.apoio),
           pausadas: num(s.pausadas),
+          concluidas: num(s.concluidas),
+          encerradas: num(s.encerradas),
         },
         pedem_acao: pedem.length,
-        destaques: pedem.slice(0, 5).map((x) => ({
-          id: String(x.dupla_id),
-          mentor: str(x.mentor),
-          mentorado: str(x.mentorado),
-          trilha: x.trilha as Trilha,
-          status: x.status as DuplaStatus,
-          semaforo: x.semaforo as Semaforo,
-          motivo: corta(str(x.motivo), 120),
-          apoio: obj(x.apoio)?.aberto === true,
-          feitos: num(x.feitos),
-          esperado: num(x.esperado),
-        })),
+        destaques: pedem.slice(0, 5).map(duplaMini),
+      };
+    }
+    case "duplas_panorama": {
+      const itens = arr(d.duplas);
+      if (!itens.length) return null;
+      const total = num(d.total) || itens.length;
+      return {
+        kind: "duplas",
+        // a tool já capa em 6 — o slice é defesa pra payload maior
+        itens: itens.slice(0, 6).map(duplaMini),
+        total,
+        truncado: d.truncado === true || total > Math.min(itens.length, 6),
       };
     }
     case "ficha_dupla": {
@@ -324,6 +540,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
         supervisor: str(d.supervisor),
         trilha: d.trilha as Trilha,
         status: d.status as DuplaStatus,
+        desfecho: (str(d.desfecho) as DuplaDesfecho | null) ?? null,
         turma: str(d.turma),
         ...(temSemaforo
           ? {
@@ -358,6 +575,147 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           numero: num(e.numero),
           status: e.status as EncontroStatus,
           data_hora: str(e.data_hora),
+        })),
+      };
+    }
+    case "plano_em_dia": {
+      if (!str(d.dupla_id) || d.aplicavel !== true) return null;
+      const passos = arr(d.passos)
+        .map((p) => ({
+          numero: num(p.numero),
+          titulo: String(p.titulo ?? ""),
+          acao: p.acao as UiPlano["passos"][number]["acao"],
+          encontro_id: str(p.encontro_id),
+          data: String(p.data_sugerida ?? ""),
+          data_oficial: String(p.data_oficial ?? ""),
+          vence_no_caminho: p.vence_no_caminho === true,
+          precondicao: str(p.precondicao),
+          aviso: str(p.aviso),
+        }))
+        .filter((p) => p.numero > 0);
+      const pendencias = arr(d.pendencias_registro).map((p) => ({
+        numero: num(p.numero),
+        estado: (str(p.estado) === "limbo" ? "limbo" : "pendente_registro") as
+          | "limbo"
+          | "pendente_registro",
+      }));
+      // em dia sem passos nem pendência (convergência trivial, só
+      // travados): o veredito positivo ainda vira card — o silêncio lia
+      // como card quebrado (026)
+      if (
+        !passos.length &&
+        !pendencias.length &&
+        d.em_dia !== true &&
+        d.estado !== "em_dia"
+      )
+        return null;
+      const plano = obj(d.plano);
+      const nivelStr = str(d.nivel);
+      const nivel =
+        nivelStr === "ritmo_normal" ||
+        nivelStr === "semana_dupla" ||
+        nivelStr === "semana_tripla" ||
+        nivelStr === "um_por_dia" ||
+        nivelStr === "conversa_coord"
+          ? nivelStr
+          : null;
+      const cabem = obj(d.cabem_ate_encerramento);
+      return {
+        kind: "plano",
+        dupla_id: String(d.dupla_id),
+        mentor: str(d.mentor),
+        mentorado: str(d.mentorado),
+        em_dia: d.em_dia === true,
+        data_recuperacao: str(d.data_recuperacao),
+        data_projetada: str(d.data_projetada),
+        cabem_ate_encerramento: cabem
+          ? { cabem: num(cabem.cabem), faltam: num(cabem.faltam) }
+          : null,
+        encerramento: str(d.encerramento),
+        ritmo:
+          num(d.ritmo) ||
+          (nivel ? RITMO_DO_NIVEL[nivel] : 0) ||
+          (plano ? num(plano.ritmo) : 0) ||
+          null,
+        passos,
+        pendencias,
+        recessos_pendentes: arr(d.recessos_pendentes)
+          .map((r) => ({
+            ciclo_evento_id: String(r.ciclo_evento_id ?? ""),
+            titulo: String(r.titulo ?? ""),
+            inicio: String(r.inicio ?? ""),
+            fim: String(r.fim ?? ""),
+          }))
+          .filter((r) => r.ciclo_evento_id),
+        grade: obj(d.grade)
+          ? {
+              mentor: obj(d.grade)?.mentor === true,
+              jovem: obj(d.grade)?.jovem === true,
+              dias_comuns: num(obj(d.grade)?.dias_comuns),
+              sem_grade: obj(d.grade)?.sem_grade === true,
+            }
+          : null,
+        doc: Array.isArray(d.doc) ? (d.doc as UiPlano["doc"]) : null,
+        avisos: (Array.isArray(d.avisos) ? d.avisos : [])
+          .map((a) => str(a))
+          .filter((a): a is string => a != null),
+        nivel,
+        estado:
+          d.estado === "em_dia" ||
+          d.estado === "recuperacao" ||
+          d.estado === "conversa"
+            ? d.estado
+            : null,
+        sugestao: str(d.sugestao),
+        plano: plano
+          ? {
+              id: String(plano.id ?? ""),
+              status: String(plano.status ?? ""),
+              versao: num(plano.versao),
+              aprovado_lado: (str(plano.aprovado_lado) ?? null) as
+                | "mentor"
+                | "mentorado"
+                | null,
+              aceito_mentor: plano.aceito_mentor === true,
+              aceito_mentorado: plano.aceito_mentorado === true,
+              falta: (str(plano.falta) ?? null) as
+                | "mentor"
+                | "mentorado"
+                | "dupla"
+                | null,
+              expira_em: String(plano.expira_em ?? ""),
+              ritmo: plano.ritmo == null ? null : num(plano.ritmo),
+            }
+          : null,
+      };
+    }
+    case "meu_plano": {
+      // jovem_plano() já chega recortado (sem semáforo/motivos) — o card
+      // só repassa o combinado; null quando a dupla não tem plano
+      if (!str(d.status)) return null;
+      const passosJ = arr(d.passos)
+        .map((p) => ({
+          numero: num(p.numero),
+          data: String(p.data ?? ""),
+          acao: str(p.acao),
+        }))
+        .filter((p) => p.numero > 0);
+      return {
+        kind: "plano_jovem",
+        status: String(d.status),
+        versao: num(d.versao),
+        // a RPC devolve escopo->>'ritmo' — texto do jsonb
+        ritmo: d.ritmo == null ? null : num(Number(d.ritmo)),
+        aprovado_lado: (str(d.aprovado_lado) ?? null) as
+          | "mentor"
+          | "mentorado"
+          | null,
+        expira_em: String(d.expira_em ?? ""),
+        passos: passosJ,
+        passos_aplicados: arr(d.passos_aplicados).map((p) => ({
+          numero: num(p.numero),
+          data_nova: String(p.data_nova ?? ""),
+          aplicado_em: String(p.aplicado_em ?? ""),
         })),
       };
     }
@@ -412,7 +770,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           .slice(0, 10)
           .map((m) => ({
             id: String(m.mentor_id),
-            nome: String(m.nome ?? ""),
+            nome: String(m.nome_social ?? m.nome ?? ""),
             trilha: m.trilha === "especialista" ? "especialista" : "dpp",
             em_uso: num(m.em_uso),
             capacidade: num(m.capacidade),
@@ -426,7 +784,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
         kind: "pessoas",
         pessoas: ps.slice(0, 8).map((p) => ({
           id: String(p.profile_id),
-          nome: String(p.nome ?? ""),
+          nome: String(p.nome_social ?? p.nome ?? ""),
           papel: (str(p.papel) as AppRole | null) ?? null,
         })),
       };
@@ -442,6 +800,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           .sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)))
           .slice(0, 5)
           .map((c) => ({
+            id: str(c.id) || undefined,
             numero: String(c.numero),
             categoria: c.categoria as ChamadoCategoria,
             assunto: corta(str(c.assunto), 90),
@@ -490,6 +849,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
         supervisor: str(d.supervisor),
         trilha: d.trilha as Trilha,
         status: d.status as DuplaStatus,
+        desfecho: (str(d.desfecho) as DuplaDesfecho | null) ?? null,
         turma: str(d.turma),
         feitos: encontros.filter((e) => e.status === "realizado").length,
         encontros,
@@ -558,7 +918,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
       const ORDEM: Record<string, number> = {
         contra_proposta: 0,
         sugerida: 1,
-        aguardando_coord: 2,
+        aguardando_coord: 2, // legado da triagem (0158): mesmo lugar de aberta
         aberta: 2,
       };
       const ordenados = [...ps].sort(
@@ -616,7 +976,11 @@ export function uiDosInstrumentos(
 }
 
 /** Dedup por kind — o último bloco do mesmo tipo vence (o modelo pode
- *  chamar a mesma tool duas vezes ao refinar a busca). */
+ *  chamar a mesma tool duas vezes ao refinar a busca). `confirmacao` é
+ *  multi-instância: duas prévias de escrita coexistem na mesma resposta,
+ *  então a identidade é o confirmacao_id, não o kind. */
 export function juntarUi(lista: UiBloco[], novo: UiBloco): UiBloco[] {
-  return [...lista.filter((b) => b.kind !== novo.kind), novo];
+  const chave = (b: UiBloco) =>
+    b.kind === "confirmacao" ? `confirmacao:${b.confirmacao_id}` : b.kind;
+  return [...lista.filter((b) => chave(b) !== chave(novo)), novo];
 }

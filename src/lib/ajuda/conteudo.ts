@@ -123,12 +123,21 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     tema: "encontros",
     pergunta: "O encontro aconteceu, mas ninguém tinha marcado antes. E agora?",
     resposta:
-      "Sem problema: o mentor registra como encontro já realizado. Na ficha da dupla ou na Agenda ele marca a data que já passou e a plataforma já pede o registro na sequência.",
+      "Sem problema: qualquer um dos dois registra como já realizado (o mentor na ficha da dupla ou na Agenda, o jovem na agenda dele) e a plataforma já pede o registro do mentor na sequência.",
     links: [
       { rotulo: "Agenda", href: "/agenda", papeis: ["mentor_dpp"] },
       { rotulo: "Duplas", href: "/duplas", papeis: ["mentor_dpp"] },
     ],
     papeis: TRILHA_DPP,
+  },
+  {
+    id: "encontro-ja-foi-jovem",
+    tema: "encontros",
+    pergunta: "O encontro aconteceu, mas não estava marcado. E agora?",
+    resposta:
+      "Você mesmo registra: na sua página inicial ou na Agenda, toca em \"registre você aqui\" e conta quando foi. O encontro já entra como realizado e você avalia na hora. Seu mentor é avisado pra contar como foi no registro dele.",
+    links: [{ rotulo: "Agenda", href: "/jovem/agenda" }],
+    papeis: ["mentorado"],
   },
   {
     id: "encontro-nao-rolou",
@@ -900,6 +909,10 @@ export const MENU_DO_PAPEL: { papel: AppRole; itens: ItemComoFunciona[] }[] = [
           "Seus encontros marcados, o que já rolou e os horários de especialista.",
       },
       {
+        rotulo: "Materiais",
+        texto: "Seus instrumentos e o acervo de materiais de apoio.",
+      },
+      {
         rotulo: "Especialistas",
         texto:
           "O catálogo de mentores de temas específicos pra pedir uma sessão.",
@@ -907,10 +920,6 @@ export const MENU_DO_PAPEL: { papel: AppRole; itens: ItemComoFunciona[] }[] = [
       {
         rotulo: "Pessoas",
         texto: "Seu mentor, a coordenação e seus contatos.",
-      },
-      {
-        rotulo: "Materiais",
-        texto: "Seus instrumentos e o acervo de materiais de apoio.",
       },
       {
         rotulo: "Perfil",

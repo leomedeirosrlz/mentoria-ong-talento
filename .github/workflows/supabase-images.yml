@@ -1,0 +1,45 @@
+name: supabase-images
+
+# Espelha as imagens do Supabase no GHCR para o e2e-app não depender de pull
+# anônimo em public.ecr.aws (rate limit) nem do Docker Hub. Roda à mão quando
+# o CLI do Supabase sobe de versão e semanalmente como rede de segurança.
+on:
+  workflow_dispatch:
+  # roda no commit empurrado (não depende da default) quando a lista ou o
+  # próprio workflow mudam; é também como o espelho é populado num push
+  push:
+    paths:
+      - ".github/supabase-images.txt"
+      - ".github/workflows/supabase-images.yml"
+  schedule:
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: espelha cada imagem
+        run: |
+          set -euo pipefail
+          repo="${GITHUB_REPOSITORY,,}"
+          while read -r img; do
+            case "$img" in ""|\#*) continue;; esac
+            base="${img##*/}"; name="${base%%:*}"; tag="${base##*:}"
+            dest="ghcr.io/$repo/supabase-mirror/$name:$tag"
+            echo "::group::$img -> $dest"
+            docker pull "$img"
+            docker tag "$img" "$dest"
+            docker push "$dest"
+            echo "::endgroup::"
+          done < .github/supabase-images.txt

@@ -4,8 +4,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { comparaNome, registroTardio } from "./ciclo";
-import { audienciasDe, veMaterial } from "./materiais";
-import { demoLidas, demoOnboarded, demoRole } from "./demo/mode";
+import { relerPlanoPropostoDeMembro } from "./notificar";
+import { relerTitulosNotificacao } from "./notificacao-releitura";
+import type { DuplaDesfecho } from "./dupla-desfecho";
+import {
+  audienciasDe,
+  turmaDoMaterial,
+  veMaterial,
+  veMaterialDaTurma,
+} from "./materiais";
+import { turmaDaDupla, turmaNumero } from "./turma";
+import { demoLidas, demoLidosMateriais, demoOnboarded, demoRole } from "./demo/mode";
 import {
   demoAlertasRegistros,
   demoCicloEventos,
@@ -22,6 +31,7 @@ import {
   demoEncontrosPorDuplas,
   demoEspecialistaEventos,
   demoMateriais,
+  demoBaseMateriaisLidos,
   demoMe,
   demoMentorados,
   demoMentorProfiles,
@@ -31,14 +41,20 @@ import {
   demoNotificacoes,
   demoPessoalMap,
   demoPessoaPerfil,
+  demoPapeisEscopo,
+  demoMapaAcesso,
   demoPessoas,
   demoRegistros,
   demoRelatorioLinks,
+  demoRoteirosResumo,
   demoTurmaInscricoesAguardando,
+  demoTurmaInscricoesPessoas,
 } from "./demo/queries";
 import { getDemoData } from "./demo/data";
+import { demoEncerramentos } from "./demo/encerramento-data";
 import { demoPainelInstrumentosJornada } from "./demo/forms-data";
 import type { PainelJornadaLinha } from "./jornada";
+import type { InscricaoTurma, PapelEscopo } from "./pessoas-status";
 import type { InscricaoFilaTurma, RelatorioLinkItem } from "./relatorio";
 import {
   agregarTentativas,
@@ -51,7 +67,7 @@ import {
 } from "./registros";
 import { temPapel } from "./types";
 import { gravatarMapa, gravatarUrlDo } from "./gravatar";
-import type { AppRole, AvaliacaoEncontro, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, DocumentoTemplate, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
+import type { AppRole, AvaliacaoEncontro, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, DocumentoTemplate, Dupla, DuplaPlanoRoteiro, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
 /** mentor_profiles — re-export do tipo canônico (types.ts): os callers da
  *  página de pessoas/board importam daqui historicamente. */
@@ -66,8 +82,11 @@ export type { MentorProfile } from "./types";
  *  email/whatsapp/documento_path ficam de fora, assim como os sensíveis da
  *  0034 (data_nascimento/genero/pref_genero_par/motivacao): pedir qualquer
  *  um deles em profiles dá permission denied. */
+// `voluntario` (0142) só virou legível na 0192 — o grant por coluna é o
+// mesmo das vizinhas e o flag alimenta o status "termo pendente" do
+// /pessoas (e acorda os checks `=== false` que liam undefined)
 const PROFILE_COLS_PUBLICAS =
-  "id, user_id, nome, role, ativo, avatar_path, created_at, bio, linkedin, areas, voluntariado, onboarded_em, nome_social, cidade, uf, interesses, cargo, empresa, origem, consent_lgpd_em";
+  "id, user_id, nome, role, ativo, avatar_path, created_at, bio, linkedin, areas, voluntariado, voluntario, onboarded_em, nome_social, cidade, uf, interesses, cargo, empresa, origem, consent_lgpd_em";
 
 /** Versão com papéis efetivos embutidos (WP6b) — usada onde a lista decide
  *  por papel, não por role primário (fila, pools de dialog). A policy de
@@ -92,8 +111,10 @@ const comPapeis = <T extends object>(
 // profile_id (0066) ganhou grant só na 0112 — antes o select inteiro caía
 // em permission denied; com o grant ele fecha a história do vínculo
 // jovem↔conta na UI (promoção ex-mentorado → mentor)
+// `notas` (resíduo de anamnese, REALIZA-384) ficou de fora: nada mais a lê
+// e a coluna segue no banco só até o audit de dados permitir o drop
 const MENTORADO_COLS_PUBLICAS =
-  "id, nome, email, whatsapp, ong_origem, notas, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade, situacao, saiu_em, motivo_saida, profile_id";
+  "id, nome, email, whatsapp, ong_origem, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade, situacao, saiu_em, motivo_saida, profile_id, conta:profiles!mentorados_profile_id_fkey(onboarded_em)";
 
 /** Subconjunto do mentorado que vai no embed da dupla (0076): o que o par
  *  e a ficha consomem — notas e documento_path do jovem não saem no select
@@ -366,6 +387,33 @@ export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
   return buscaCicloEventos(await createClient());
 });
 
+/** Metas dos roteiros do plano num batch por plano (020): as homes trocam
+ *  o link do roteiro do corpus pelo vigente da dupla na disclosure da
+ *  SuaSemana — só leitura, nunca lazy (o nascimento mora na ficha/agenda
+ *  e na rota da semana). `conteudo` não vem — a home só precisa de status. */
+export const getRoteirosPlanos = cache(
+  async (planoIds: string[]): Promise<DuplaPlanoRoteiro[]> => {
+    const demo = await demoRole();
+    if (demo) return demoRoteirosResumo(demo, planoIds);
+    if (!planoIds.length) return [];
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("dupla_plano_roteiros")
+      .select(
+        "id, dupla_id, plano_id, numero, versao, plano_versao, status, gerado_por, gerado_via, gerado_em, editado_por, publicado_por, publicado_em, updated_at"
+      )
+      .in("plano_id", planoIds);
+    if (error) {
+      console.error("getRoteirosPlanos:", error);
+      return [];
+    }
+    return (data ?? []).map((r) => ({
+      ...(r as Omit<DuplaPlanoRoteiro, "conteudo">),
+      conteudo: null,
+    }));
+  }
+);
+
 /** Todos os cronogramas (0061) — papéis adultos leem o catálogo inteiro; o
  *  seletor de turma/calendário é a régua que escopa o recorte. */
 async function buscaCronogramas(db: SupabaseClient) {
@@ -393,14 +441,20 @@ export const getCronogramas = cache(async (): Promise<Cronograma[]> => {
 
 export const DUPLA_SELECT = `
   *,
-  mentor:profiles!duplas_mentor_id_fkey(${PROFILE_COLS_PUBLICAS}),
+  mentor:profiles!duplas_mentor_id_fkey(${PROFILE_COLS_COM_PAPEIS}),
   mentorado:mentorados(${MENTORADO_COLS_PAR}),
   supervisor:profiles!duplas_supervisor_id_fkey(${PROFILE_COLS_PUBLICAS}),
-  encontros(*, registro:registros(id, encontro_id, tema, atividades, avaliacao, dificuldade, dificuldade_detalhe, precisa_apoio, proximo_passo, proximo_passo_detalhe, reflexoes, observacoes, ferramenta, created_at, updated_at, created_by, autor:profiles!registros_created_by_fkey(nome, nome_social)),
+  encontros(*, registro:registros(id, encontro_id, tema, atividades, avaliacao, dificuldade, dificuldade_detalhe, precisa_apoio, proximo_passo, proximo_passo_detalhe, reflexoes, observacoes, ferramenta, cobertura, created_at, updated_at, created_by, autor:profiles!registros_created_by_fkey(nome, nome_social)),
     avaliacao_jovem:avaliacoes_encontro(*),
     remarcacoes:encontro_remarcacoes(id, data_anterior, data_nova, motivo, created_at)),
   encaminhamentos(*),
-  notas:encontro_notas(*)
+  notas:encontro_notas(*),
+  recessos:dupla_recessos(*, autor:profiles!dupla_recessos_declarado_por_fkey(nome, nome_social)),
+  planos:dupla_planos(*,
+    passos:dupla_plano_passos(*),
+    eventos:dupla_plano_eventos(*)),
+  intervencoes:dupla_intervencoes(*),
+  guia_ajustes:encontro_guia_ajustes(*)
 `;
 // avaliacao_jovem (0071): embed to-one (encontro_id é unique lá). O RLS da
 // tabela faz o recorte por papel SOZINHO — coord/sup recebem todas as
@@ -416,8 +470,10 @@ function mergeContatoDuplas(
 ): Dupla[] {
   return duplas.map((d) => ({
     ...d,
-    // embed to-one pode vir null se a row referenciada sumir — preserva
-    mentor: d.mentor ? comContato(d.mentor, contatos) : d.mentor,
+    // embed to-one pode vir null se a row referenciada sumir — preserva;
+    // comPapeis desenrola o embed profile_papeis do select (BACKLOG: a
+    // ficha avisa quando a dupla tem mentor "sem papel")
+    mentor: d.mentor ? comPapeis(comContato(d.mentor, contatos)) : d.mentor,
     supervisor: d.supervisor ? comContato(d.supervisor, contatos) : null,
   }));
 }
@@ -580,7 +636,7 @@ export const getDuplasResumo = cache(async (): Promise<DuplaResumo[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")
-    .select("id,mentor_id,mentorado_id,supervisor_id,trilha")
+    .select("id,mentor_id,mentorado_id,supervisor_id,trilha,turma,cronograma_id")
     // "está em dupla" = ocupa vaga — concluída e encerrada já liberaram
     .in("status", ["ativa", "pausada"]);
   if (error) throw error;
@@ -588,17 +644,39 @@ export const getDuplasResumo = cache(async (): Promise<DuplaResumo[]> => {
 });
 
 /** Vínculos de qualquer status (inclusive encerrada) — espelha a guarda de
- *  exclusão das actions, que bloqueia pessoa/mentorado com QUALQUER dupla. */
+ *  exclusão das actions, que bloqueia pessoa/mentorado com QUALQUER dupla.
+ *  Traz também status + carimbos de fechamento: a fila "Aguardando par"
+ *  deriva deles a disponibilidade de quem volta (REALIZA-393). */
 export const getDuplasResumoTodas = cache(async (): Promise<DuplaResumo[]> => {
   const demo = await demoRole();
   if (demo) return demoDuplasResumo(demo, true);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")
-    .select("id,mentor_id,mentorado_id,supervisor_id,trilha");
+    .select("id,mentor_id,mentorado_id,supervisor_id,trilha,turma,cronograma_id,status,created_at,encerrada_em,concluida_em,desfecho_em,remanejada_de");
   if (error) throw error;
   return data ?? [];
 });
+
+/** Carimbo do rito de encerramento por dupla (0037) — a "encerrada antes
+ *  do fim" decidida pelo rito grava a data aqui, não na dupla. Insumo da
+ *  disponibilidade da fila (REALIZA-393). Falha → [] com log, idem a
+ *  vizinha de inscrições: a fila degrada pro carimbo seguinte, não quebra. */
+export const getEncerramentosResumo = cache(
+  async (): Promise<{ dupla_id: string; created_at: string | null }[]> => {
+    const demo = await demoRole();
+    if (demo) return demoEncerramentos(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("encerramentos")
+      .select("dupla_id, created_at");
+    if (error) {
+      console.error("getEncerramentosResumo:", error);
+      return [];
+    }
+    return data ?? [];
+  }
+);
 
 /** Encontros mínimos de um conjunto de duplas — o passo do guia da trilha
  *  especialista é o rank entre realizados (0074), então derivá-lo exige o
@@ -691,6 +769,9 @@ export const getMentorados = cache(async (): Promise<Mentorado[]> => {
 export type DuplaPerfil = {
   id: string;
   status: DuplaStatus;
+  /** Por que fechou — separa "Encerrada" (remanejada/outro) de
+   *  "Desistente" (desistencia_*): a ficha lê a situação canônica. */
+  desfecho?: DuplaDesfecho | null;
   iniciada_em: string | null;
   /** Trilha da dupla (WP6b) — a ficha do mentor híbrido conta vagas por
    *  pool (DPP × especialista), sem ela o X/Y misturava as duas. */
@@ -703,11 +784,26 @@ export type PessoaPerfil =
   | { tipo: "profile"; pessoa: Profile; mentorProfile: MentorProfile | null }
   | { tipo: "mentorado"; pessoa: Mentorado };
 
+/** Ficha de jovem alcançável quando o id é de uma CONTA de jovem (profile
+ *  role='mentorado' vinculado por mentorados.profile_id) — a página mostra
+ *  o atalho pra ficha canônica. RLS-scoped como o resto do perfil: volta
+ *  null pra quem não lê a linha do mentorado. */
+export type FichaJovemPerfil = {
+  id: string;
+  nome: string;
+  nome_social: string | null;
+  whatsapp: string | null;
+} | null;
+
 /** Perfil público interno (/pessoas/[id]) — resolve profile OU mentorado pelo
  *  id, traz as duplas da pessoa e o mural de notas. O RLS já limita: mentor
  *  que consulta mentorado fora da própria dupla recebe null → notFound. */
 export const getPessoaPerfil = cache(async (id: string): Promise<
-  (PessoaPerfil & { duplas: DuplaPerfil[]; notas: PessoaNota[] }) | null
+  (PessoaPerfil & {
+    duplas: DuplaPerfil[];
+    notas: PessoaNota[];
+    fichaJovem: FichaJovemPerfil;
+  }) | null
 > => {
   // modo demo: fora do escopo do papel -> null -> a page dá notFound() igual
   const demo = await demoRole();
@@ -716,7 +812,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   // email não entra no embed de profiles (grant de coluna, 0026) — vem do
   // merge com a view quando o papel alcança; o gravatar cai nas iniciais senão
   const DUPLA_PERFIL_SELECT = `
-    id, status, iniciada_em, trilha,
+    id, status, desfecho, iniciada_em, trilha,
     mentor:profiles!duplas_mentor_id_fkey(id, nome, nome_social, avatar_path),
     mentorado:mentorados(id, nome, nome_social, avatar_path)
   `;
@@ -724,10 +820,13 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   // seria sempre eu mesmo, então não vale o join
   const NOTA_SELECT = `id, profile_id, mentorado_id, texto, created_by, created_at`;
 
-  const [{ data: p }, { data: m }, contatos, pessoalProf, pessoalMent, curriculo] =
+  const [{ data: p }, { data: m }, { data: ficha }, contatos, pessoalProf, pessoalMent, curriculo] =
     await Promise.all([
       supabase.from("profiles").select(PROFILE_COLS_COM_PAPEIS).eq("id", id).maybeSingle(),
       supabase.from("mentorados").select(MENTORADO_COLS_PUBLICAS).eq("id", id).maybeSingle(),
+      // conta de jovem → ficha canônica (o id aqui é de profile; pra ficha
+      // direta o lookup acima já resolve e este volta null)
+      supabase.from("mentorados").select("id, nome, nome_social, whatsapp").eq("profile_id", id).maybeSingle(),
       getContatos(),
       getPessoalMap("profiles_pessoal"),
       getPessoalMap("mentorados_pessoal"),
@@ -766,6 +865,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
         ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail)
       ),
       notas: (notas as unknown as PessoaNota[]) ?? [],
+      fichaJovem: ficha as FichaJovemPerfil,
     };
   }
   if (m) {
@@ -778,11 +878,14 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
     ]);
     return {
       tipo: "mentorado",
-      pessoa: comCurriculo(comPessoal(m, pessoalMent), curriculo) as Mentorado,
+      // supabase-js tipa o embed conta como array (isOneToOne: false na FK,
+      // mas a direção mentorado→profile devolve objeto ou null no runtime)
+      pessoa: comCurriculo(comPessoal(m, pessoalMent), curriculo) as unknown as Mentorado,
       duplas: await comGravatarMentores(
         ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail)
       ),
       notas: (notas as unknown as PessoaNota[]) ?? [],
+      fichaJovem: null,
     };
   }
   return null;
@@ -817,7 +920,47 @@ export const getMateriais = cache(async (): Promise<Material[]> => {
       : buscaMateriais(await createClient()),
     getMe(),
   ]);
-  return todos.filter((m) => veMaterial(audienciasDe(m), me));
+  const visiveis = todos.filter((m) => veMaterial(audienciasDe(m), me));
+  // material de turma ("Cronograma do programa — Turma N") só vale pra quem
+  // tem dupla nela: a RLS não tem coluna de turma, então o recorte é aqui.
+  // Sem material amarrado a turma o catálogo passa intacto, sem query extra;
+  // coordenação lê tudo sempre.
+  if (!visiveis.some((m) => turmaDoMaterial(m.titulo) != null)) {
+    return visiveis;
+  }
+  if (temPapel(me, "coordenacao")) return visiveis;
+  const [duplas, cronogramas] = await Promise.all([
+    getDuplasInfo(),
+    getCronogramas(),
+  ]);
+  const turmas = new Set(
+    duplas.map((d) => turmaNumero(turmaDaDupla(d, cronogramas) ?? ""))
+  );
+  return visiveis.filter((m) => veMaterialDaTurma(m, turmas));
+});
+
+/** Refs (0196 — doc:<slug> ou material.id) que a pessoa já abriu — alimenta
+ *  o indicador de leitura dos cards de materiais. Falha degrada pra set
+ *  vazio com log: os cards seguem sem marca, não a página inteira. */
+export const getMateriaisLidos = cache(async (): Promise<Set<string>> => {
+  const demo = await demoRole();
+  if (demo) {
+    const lidos = await demoLidosMateriais();
+    for (const r of demoBaseMateriaisLidos(demo)) lidos.add(r);
+    return lidos;
+  }
+  const me = await getMe();
+  if (!me) return new Set();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("material_leituras")
+    .select("ref")
+    .eq("profile_id", me.id);
+  if (error) {
+    console.error("getMateriaisLidos:", error);
+    return new Set();
+  }
+  return new Set((data ?? []).map((r) => r.ref as string));
 });
 
 /** mentor_profiles é table-level legível por autenticado (0001) — a lista
@@ -895,7 +1038,7 @@ export const getNotificacoes = cache(
     const [{ data, error }, { count, error: e2 }] = await Promise.all([
       supabase
         .from("notificacoes")
-        .select("id, tipo, titulo, corpo, href, lida_em, created_at")
+        .select("id, tipo, titulo, corpo, href, lida_em, created_at, created_by")
         .order("created_at", { ascending: false })
         .limit(15),
       supabase
@@ -909,7 +1052,15 @@ export const getNotificacoes = cache(
       console.error("getNotificacoes:", error ?? e2);
       return { itens: [], naoLidas: 0 };
     }
-    return { itens: (data ?? []) as Notificacao[], naoLidas: count ?? 0 };
+    const me = await getMe();
+    const itens = me
+      ? await relerPlanoPropostoDeMembro(
+          supabase,
+          me,
+          (data ?? []) as Notificacao[]
+        )
+      : ((data ?? []) as Notificacao[]);
+    return { itens: relerTitulosNotificacao(itens), naoLidas: count ?? 0 };
   }
 );
 
@@ -1443,6 +1594,88 @@ export const getTurmaInscricoesAguardando = cache(
         ];
       return [];
     });
+  }
+);
+
+// ---------- /pessoas por turma (REALIZA-39) ----------
+// Os três mapas que alimentam turmasDePessoa/statusDePessoa — a filiação
+// deriva de duplas.turma + turma_inscricoes + profile_papeis escopado; o
+// último acesso vem da view profiles_acesso (0192). Todos coord-only:
+// fora da coordenação a página é diretório e nem dispara.
+
+/** Todas as inscrições de turma (qualquer status — 'aguardando' marca o
+ *  papel "Aguardando par"; formada/desistiu seguem valendo como filiação).
+ *  Falha de leitura → [] com log, idem a vizinha de fila. */
+export const getTurmaInscricoesPessoas = cache(
+  async (): Promise<InscricaoTurma[]> => {
+    const demo = await demoRole();
+    if (demo) return demoTurmaInscricoesPessoas(demo);
+    const me = await getMe();
+    if (me?.role !== "coordenacao") return [];
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("turma_inscricoes")
+      .select("turma, profile_id, mentorado_id, papel_esperado, status");
+    if (error) {
+      console.error("getTurmaInscricoesPessoas:", error);
+      return [];
+    }
+    // status/papel_esperado são CHECK no banco — o tipo gerado é string
+    return (data ?? []) as InscricaoTurma[];
+  }
+);
+
+/** Grants escopados de profile_papeis (escopo_turma não-null) — staff que
+ *  pertence a uma turma sem passar por dupla (auxiliar/coord de turma). */
+export const getPapeisEscopo = cache(async (): Promise<PapelEscopo[]> => {
+  const demo = await demoRole();
+  if (demo) return demoPapeisEscopo(demo);
+  const me = await getMe();
+  if (me?.role !== "coordenacao") return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("profile_papeis")
+    .select("profile_id, papel, escopo_turma")
+    .not("escopo_turma", "is", null);
+  if (error) {
+    console.error("getPapeisEscopo:", error);
+    return [];
+  }
+  return (data ?? []).flatMap((r) =>
+    r.escopo_turma
+      ? [
+          {
+            profile_id: r.profile_id,
+            papel: r.papel,
+            escopo_turma: r.escopo_turma,
+          },
+        ]
+      : []
+  );
+});
+
+/** Último acesso por profile (view profiles_acesso, 0192) — insumo do
+ *  status "não acessou". Sem a view a lista cai no vocabulário sem esse
+ *  badge — o erro fica no log em vez de fabricar sinal. */
+export const getMapaAcesso = cache(
+  async (): Promise<Record<string, string | null>> => {
+    const demo = await demoRole();
+    if (demo) return demoMapaAcesso(demo);
+    const me = await getMe();
+    if (me?.role !== "coordenacao") return {};
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("profiles_acesso")
+      .select("id, ultimo_acesso_em");
+    if (error) {
+      console.error("getMapaAcesso:", error);
+      return {};
+    }
+    return Object.fromEntries(
+      (data ?? [])
+        .filter((r): r is typeof r & { id: string } => r.id != null)
+        .map((r) => [r.id, r.ultimo_acesso_em])
+    );
   }
 );
 

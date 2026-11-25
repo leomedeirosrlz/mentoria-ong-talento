@@ -105,12 +105,12 @@ export function RemanejoSugerido({
         <div>
           <p className="text-xs font-medium">
             Se o mentor sair, quem pode assumir{" "}
-            {primeiroNome(dupla.mentorado.nome)}:
+            {primeiroNome(dupla.mentorado.nome_social || dupla.mentorado.nome)}:
           </p>
           {mentores.length === 0 ? (
             <p className="mt-1.5 text-xs text-muted-foreground">
               Nenhum mentor {rotuloTrilha} ativo além de{" "}
-              {primeiroNome(dupla.mentor.nome)}.
+              {primeiroNome(dupla.mentor.nome_social || dupla.mentor.nome)}.
             </p>
           ) : (
             <ul className="mt-1.5 divide-y divide-border/50">
@@ -121,7 +121,7 @@ export function RemanejoSugerido({
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium">
-                      <span className="truncate">{c.profile.nome}</span>{" "}
+                      <span className="truncate">{c.profile.nome_social || c.profile.nome}</span>{" "}
                       <span className="font-mono text-xs tabular-nums text-muted-foreground">
                         {c.usadas}/{c.teto}
                       </span>
@@ -154,7 +154,7 @@ export function RemanejoSugerido({
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-muted-foreground">
-                      <span className="truncate">{c.profile.nome}</span>{" "}
+                      <span className="truncate">{c.profile.nome_social || c.profile.nome}</span>{" "}
                       <span className="font-mono text-xs tabular-nums">
                         {c.usadas}/{c.teto}
                       </span>{" "}
@@ -167,7 +167,7 @@ export function RemanejoSugerido({
                   </div>
                   <CapacidadeMentorDialog
                     mentorId={c.profile.id}
-                    nome={c.profile.nome}
+                    nome={c.profile.nome_social || c.profile.nome}
                     atual={c.teto}
                     emUso={c.usadas}
                     // pool da trilha da dupla — sem ela o server escreve
@@ -214,7 +214,7 @@ export function RemanejoSugerido({
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium">
-                      <span className="truncate">{c.mentorado.nome}</span>
+                      <span className="truncate">{c.mentorado.nome_social || c.mentorado.nome}</span>
                       {c.desde && (
                         <span className="text-xs font-normal text-muted-foreground">
                           {" "}
