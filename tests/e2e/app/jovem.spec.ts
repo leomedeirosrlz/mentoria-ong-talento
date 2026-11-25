@@ -665,24 +665,18 @@ test.describe("mentorado — shell /jovem", () => {
     await expect(
       page.getByRole("heading", { name: "Pessoas", level: 1 })
     ).toBeVisible();
-    // agrupado por cargo — uma seção por papel, a linha não repete o rótulo
-    const mentoria = page.locator(
-      'section[aria-labelledby="mentoria-titulo"]'
-    );
-    await expect(mentoria.getByText("Mentor E2E")).toBeVisible();
-    // a trilha esp da ficha (duplaEsp) entrega papel 'especialista' desde a
-    // 0076 — antes sumia como 'mentor' duplicado
-    const especialistas = page.locator(
-      'section[aria-labelledby="especialistas-titulo"]'
-    );
-    await expect(especialistas.getByText("Esp E2E")).toBeVisible();
-    // o diretório de colegas existe mesmo sem colega com conta — o vazio
-    // honesto é a resposta certa
+    // 023: o diretório único substituiu as seções por cargo. O mentor e o
+    // especialista da dupla continuam entrando pela rede, e os jovens com
+    // conta aparecem como "Jovem do programa".
     await expect(
-      page.locator('section[aria-labelledby="colegas-titulo"]')
+      page.getByRole("link", { name: "Abrir perfil de Mentor E2E", exact: true })
     ).toBeVisible();
     await expect(
-      page.getByText(/o seu você controla em/i)
+      page.getByRole("link", { name: "Abrir perfil de Esp E2E", exact: true })
     ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Abrir perfil de Ana Beatriz Souza" })
+    ).toBeVisible();
+    await expect(page.getByText("Sua rede").first()).toBeVisible();
   });
 });
