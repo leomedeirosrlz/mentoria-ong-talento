@@ -37,7 +37,7 @@ export function SeloNivel({ nivel }: { nivel: NiveisJornada }) {
         aria-label={`${atual ? "Seu nível" : "Primeiro nível"}: ${vitrine.titulo}${
           atual?.data ? `, desde ${formatDate(atual.data)}` : ""
         }. Abrir detalhe da faixa`}
-        className="nivel-chega group mb-0.5 ml-auto flex shrink-0 items-center gap-2.5 rounded-xl border border-border/70 bg-card py-2 pr-4 pl-2 text-left shadow-[var(--shadow-border)] outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
+        className="nivel-chega group mb-0.5 ml-auto flex min-w-0 items-center gap-2.5 rounded-xl border border-border/70 bg-card py-2 pr-4 pl-2 text-left shadow-[var(--shadow-border)] outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
       >
         <ConquistaEmblema
           glifo={vitrine.glifo}

@@ -402,8 +402,9 @@ D["nivel-veterania"] = (() => {
   const d = new Desenho();
   const y = dinamo(d, 366);
   // o anel de energia: faixa deitada orbitando a base (a gramática do 360)
+  // — n=20 já é liso no render e segura o arquivo no orçamento (~8 KB)
   d.slab(
-    arco(124, 148, Math.PI * 0.02, Math.PI * 1.98, 36),
+    arco(124, 148, Math.PI * 0.02, Math.PI * 1.98, 20),
     em(250, y, CHAO),
     "laranja",
     { prof: 0.4 }
@@ -420,7 +421,8 @@ D["nivel-completa"] = (() => {
   const y = dinamo(d, 376);
   const m = em(250, y - 4, FACE);
   // a coroa do ciclo fechado: leque de raios saindo do núcleo — o burst
-  // dela; o miolo amarelo tampa a junção dos pés
+  // dela; o miolo amarelo tampa a junção dos pés. Sem vinco nos raios
+  // finos (a marca de 1px some no render e estourava o orçamento ~8 KB)
   for (const [a, h, w, cor] of [
     [-48, 168, 54, "laranja"],
     [-24, 208, 62, "amarelo"],
@@ -428,8 +430,8 @@ D["nivel-completa"] = (() => {
     [24, 208, 62, "amarelo"],
     [48, 168, 54, "laranja"],
   ])
-    d.slab(raio(h, w), mul(m, gira(a)), cor, { prof: 0.5 });
-  d.slab(elipse(0, 0, 48), m, "amarelo", { prof: 0.55 });
+    d.slab(raio(h, w), mul(m, gira(a)), cor, { prof: 0.5, vinco: false });
+  d.chapa(elipse(0, 0, 48), m, "amarelo");
   return d.fim();
 })();
 

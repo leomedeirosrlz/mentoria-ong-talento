@@ -1,8 +1,8 @@
 # Spec — Nível em raios, conquistas por limiar e motion por faixa
 
-**Feature:** `specs/024-gamificacao-nivel-conquistas` · **Status:** Clarified
+**Feature:** `specs/024-gamificacao-nivel-conquistas` · **Status:** Approved
 
-> **Revisão pendente (24/11):** aguardando o lead aprovar faixas, nomes e os 12 limiares de conquista antes da implementação.
+> **Revisão fechada (24/11):** faixas, nomes e os 12 limiares aprovados; auditoria de fechamento verde (gates + e2e demo + prints 390/1440).
 **Fila:** gamificação rodada 2 — recon `docs/planos/issues/_recon/gamificacao-2026-11-24.md` (REALIZA a numerar) · **Dono:** Thiago · **Data:** 24/11/2026
 
 > **Amplia a spec 016 onde diverge:** a família visual `nivel-*` deixa de ser planta/canteiro e vira raios/energia progressivos; "Seu nível" sai de dentro do card e ganha um selo no header do perfil; conquista deixa de ter um gesto único (`badge-salta` em todas as peças) e o nível passa a ter assinatura de motion própria por faixa; o catálogo ganha conquistas por limiar (combinados, horas, metas, submetas) e gerais (perfil, termo). O resto da 016 segue valendo: derivação pura sem tabela nova, estante earned-only, futuras apagadas sem cadeado, mesma régua das 4 faixas.

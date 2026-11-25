@@ -160,6 +160,51 @@ test.describe("demo — conquistas do jovem", () => {
     await expect(peca).toContainText("Primeiro encontro");
   });
 
+  test("arte de faixa que falta cai no raio Phosphor, sem quebrar o selo", async ({
+    page,
+  }) => {
+    await page.route("**/badges/nivel-constancia.svg", (route) =>
+      route.fulfill({ status: 404, body: "" })
+    );
+    await page.goto("/jovem/perfil");
+    const selo = page
+      .locator("header")
+      .getByRole("button", { name: /^Seu nível: Constância/ });
+    await expect(selo).toBeVisible();
+    await expect(
+      selo.locator('img[src="/badges/nivel-constancia.svg"]')
+    ).toHaveCount(0);
+    // o squircle do Lightning (FR-004) assume no mesmo box
+    await expect(selo.locator("span[aria-hidden] svg").first()).toBeVisible();
+    await selo.click();
+    await expect(
+      page.getByRole("dialog").getByRole("heading", { name: "Constância" })
+    ).toBeVisible();
+  });
+
+  test("demo: nenhum toast de level-up, mesmo com a baseline zerada", async ({
+    page,
+  }) => {
+    // a baseline local persistiria entre visitantes da mesma máquina — o
+    // notifier sai antes de ler/escrever qualquer coisa em modo demo
+    await page.addInitScript(() => {
+      try {
+        for (const k of Object.keys(localStorage))
+          if (k.startsWith("realiza:nivel:")) localStorage.setItem(k, "-1");
+      } catch {
+        /* storage fora continua fora */
+      }
+    });
+    await page.goto("/jovem/perfil");
+    await expect(
+      page.locator("header").getByRole("button", { name: /^Seu nível: Constância/ })
+    ).toBeVisible();
+    // o efeito do notifier roda no mount — assert negativo pede um
+    // respiro pra não passar antes da hidratação
+    await page.waitForTimeout(1200);
+    await expect(page.getByText(/Subiu de nível/)).toHaveCount(0);
+  });
+
   test("selo 'Seu nível' no header abre o mesmo detalhe da faixa", async ({
     page,
   }) => {
