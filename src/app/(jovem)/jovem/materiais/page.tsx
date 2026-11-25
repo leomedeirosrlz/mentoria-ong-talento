@@ -6,7 +6,6 @@ import {
   CheckCircle,
   Flag,
   FolderOpen,
-  MapPin,
   UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
 import {
@@ -391,9 +390,11 @@ export default async function JovemMateriais() {
 
   return (
     <div className="space-y-6">
-      {/* ---------- hero slim (anti-extensão mobile): um card só ---------- */}
+      {/* ---------- hero slim (anti-extensão mobile): UM card só ----------
+          528: o "Próximo marco" virou zona embutida aqui dentro — hero +
+          faixa eram dois cards seguidos (~390px de dobra no mobile). */}
       <Card className="animate-enter">
-        <CardContent className="space-y-4 pt-5">
+        <CardContent className="space-y-3 pt-2 sm:space-y-4 sm:pt-5">
           <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
             <div className="min-w-0">
               <h1 className="text-2xl font-semibold tracking-tight">
@@ -411,7 +412,9 @@ export default async function JovemMateriais() {
                 </p>
               )}
             </div>
-            <div className="text-right">
+            {/* no mobile a contagem desce pra ponta da barra — o bloco
+                text-3xl só existe no desktop, onde ele nunca embrulha */}
+            <div className="hidden text-right sm:block">
               <p className="text-3xl font-bold leading-none tabular-nums">
                 {resumo.feitas}
                 <span className="text-lg font-semibold text-muted-foreground">
@@ -423,54 +426,32 @@ export default async function JovemMateriais() {
               </p>
             </div>
           </div>
-          <div
-            className="h-2.5 overflow-hidden rounded-full bg-muted"
-            role="img"
-            aria-label={`${resumo.feitas} de ${resumo.total} entregas feitas`}
-          >
+          <div className="flex items-center gap-3">
             <div
-              className="h-full rounded-full bg-[var(--brand-lime)]"
-              style={{ width: `${progresso}%` }}
-            />
+              className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted sm:h-2.5"
+              role="img"
+              aria-label={`${resumo.feitas} de ${resumo.total} entregas feitas`}
+            >
+              <div
+                className="h-full rounded-full bg-[var(--brand-lime)]"
+                style={{ width: `${progresso}%` }}
+              />
+            </div>
+            <p className="text-xs font-semibold tabular-nums text-muted-foreground sm:hidden">
+              {resumo.feitas}
+              <span className="font-normal">/{resumo.total}</span>
+            </p>
           </div>
-          {resumo.proxima ? (
-            <p className="flex items-start gap-2 border-t border-border/60 pt-3 text-sm text-muted-foreground">
-              <MapPin
-                size={16}
-                className="mt-0.5 shrink-0 text-[var(--ok)]"
-                aria-hidden
-              />
-              <span>
-                Próxima parada:{" "}
-                <strong className="font-semibold text-foreground">
-                  {resumo.proxima.titulo}
-                </strong>
-                {resumo.proxima.detalhe ? ` · ${resumo.proxima.detalhe}` : ""}
-              </span>
-            </p>
-          ) : (
-            <p className="flex items-start gap-2 border-t border-border/60 pt-3 text-sm text-muted-foreground">
-              <CheckCircle
-                size={16}
-                className="mt-0.5 shrink-0 text-[var(--ok)]"
-                aria-hidden
-              />
-              <span>
-                Você completou os {resumo.total} instrumentos da jornada.{" "}
-                <strong className="font-semibold text-foreground">
-                  Parabéns por chegar até aqui.
-                </strong>
-              </span>
-            </p>
-          )}
+          {/* ---------- "Próximo marco" (485/515 + 528 embutido) — só o
+              próximo marco de ação ainda não ganho; é a linha de próximo
+              passo do card (a "Próxima parada" morreu na 528: a estante
+              logo abaixo já mostra a estação trancada com a mesma data).
+              Os ganhos moram na estante do perfil e a faixa só aponta
+              pra ela. Sem gesto próprio: não compete com o
+              agendar/registrar da home. ---------- */}
+          <MarcosACaminho marcos={conq.marcos} embutido />
         </CardContent>
       </Card>
-
-      {/* ---------- "Próximo marco" (485/515) — só o próximo marco de
-          ação ainda não ganho, no topo da jornada. Os ganhos moram na
-          estante do perfil e a faixa só aponta pra ela. Sem gesto
-          próprio: não compete com o agendar/registrar da home. ---------- */}
-      <MarcosACaminho marcos={conq.marcos} />
 
       {/* ---------- sub-nav de página ---------- */}
       <nav

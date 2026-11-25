@@ -2,25 +2,51 @@ import Link from "next/link";
 import { CaretRight } from "@phosphor-icons/react/dist/ssr";
 import { ConquistaEmblema } from "@/components/conquista-emblema";
 import type { MarcoAcao } from "@/lib/conquistas";
+import { cn } from "@/lib/utils";
 
-/** "Próximo marco" no topo da jornada (REALIZA-485/515) — SÓ o primeiro
- *  marco de ação ainda não ganho (1º encontro, avaliação, PDM, jornada
- *  completa), com o que falta em texto e a barra quando conta. Os já
- *  conquistados moram na estante do perfil ("Ver conquistas"), nunca
- *  repetidos aqui — a faixa deixou de listar todos porque lia como
- *  "conquistas a caminho" o que já era dela. Com tudo ganho, vira o
- *  estado de conclusão. Server: sem gesto próprio — não compete com
- *  agendar/registrar. */
-export function MarcosACaminho({ marcos }: { marcos: MarcoAcao[] }) {
+/** "Próximo marco" no topo da jornada (REALIZA-485/515 + 528) — SÓ o
+ *  primeiro marco de ação ainda não ganho (1º encontro, avaliação, PDM,
+ *  jornada completa), com o que falta em texto e a barra quando conta.
+ *  Os já conquistados moram na estante do perfil ("Ver conquistas"),
+ *  nunca repetidos aqui — a faixa deixou de listar todos porque lia
+ *  como "conquistas a caminho" o que já era dela. Com tudo ganho, vira
+ *  o estado de conclusão. Server: sem gesto próprio — não compete com
+ *  agendar/registrar.
+ *
+ *  `embutido` (528): a faixa era um SEGUNDO card logo abaixo do hero —
+ *  dois cromos de card + o gap empurravam o acervo pra quase 400px de
+ *  dobra no mobile. No hero do Materiais ela entra embutida: perde o
+ *  cromo próprio (rounded/shadow/padding) e vira uma zona dividida por
+ *  border-t, como a linha "Próxima parada" acima dela. A landmark e o
+ *  heading ficam — a região continua nomeada. Nos fallbacks da página
+ *  (sem jornada/cronograma) ela segue cartão independente. */
+export function MarcosACaminho({
+  marcos,
+  embutido = false,
+}: {
+  marcos: MarcoAcao[];
+  /** dentro do card do hero: sem cromo próprio, compacto. */
+  embutido?: boolean;
+}) {
   if (!marcos.length) return null;
   const proximo = marcos.find((m) => m.proximo) ?? null;
   return (
     <section
       aria-labelledby="proximo-marco-titulo"
-      className="animate-enter rounded-xl bg-card p-5 shadow-[var(--shadow-border)] sm:p-6"
+      className={
+        embutido
+          ? "border-t border-border/60 pt-3"
+          : "animate-enter rounded-xl bg-card p-5 shadow-[var(--shadow-border)] sm:p-6"
+      }
     >
       <div className="flex items-baseline justify-between gap-3">
-        <h2 id="proximo-marco-titulo" className="text-base font-semibold">
+        <h2
+          id="proximo-marco-titulo"
+          className={cn(
+            "font-semibold",
+            embutido ? "text-sm" : "text-base"
+          )}
+        >
           {proximo ? "Próximo marco" : "Jornada completa"}
         </h2>
         <Link
@@ -32,11 +58,16 @@ export function MarcosACaminho({ marcos }: { marcos: MarcoAcao[] }) {
         </Link>
       </div>
       {proximo ? (
-        <div className="mt-4 flex min-w-0 items-start gap-3">
+        <div
+          className={cn(
+            "flex min-w-0 items-start",
+            embutido ? "mt-2 gap-2.5" : "mt-4 gap-3"
+          )}
+        >
           <ConquistaEmblema
             glifo={proximo.glifo}
             tom={proximo.tom}
-            size={40}
+            size={embutido ? 32 : 40}
             estado="proximo"
           />
           <div className="min-w-0 flex-1">
@@ -68,7 +99,12 @@ export function MarcosACaminho({ marcos }: { marcos: MarcoAcao[] }) {
           </div>
         </div>
       ) : (
-        <p className="mt-4 text-sm text-muted-foreground">
+        <p
+          className={cn(
+            "text-sm text-muted-foreground",
+            embutido ? "mt-2" : "mt-4"
+          )}
+        >
           Você fez todos os marcos da jornada. Suas conquistas estão no
           perfil.
         </p>

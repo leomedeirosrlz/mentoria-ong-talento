@@ -2,8 +2,10 @@
 
 import { useEffect, useId, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { Collapsible } from "@base-ui/react/collapsible";
 import {
   ArrowSquareOut,
+  CaretDown,
   Check,
   MagnifyingGlass,
 } from "@phosphor-icons/react";
@@ -59,8 +61,9 @@ function ordena(a: Material, b: Material): number {
 /** Contagem ao lado do título da seção: o dígito é decorativo (aria-hidden)
  *  e o leitor de tela ouve "N itens" — sem o sr-only o número colava no
  *  rótulo ("Guias2", "Todos os materiais de apoio33"). O espaço dentro do
- *  sr-only é o separador do nome acessível. */
-function ContagemTitulo({ n }: { n: number }) {
+ *  sr-only é o separador do nome acessível. Exportada: o acervo do jovem
+ *  usa a mesma contagem nos grupos colapsáveis (528). */
+export function ContagemTitulo({ n }: { n: number }) {
   return (
     <span className="ml-1.5 font-normal tabular-nums text-muted-foreground">
       <span aria-hidden>{n}</span>
@@ -289,6 +292,13 @@ export function Linha({
   );
 }
 
+/** Painel colapsável das seções (528) — o idioma do repo: altura anima
+ *  via --collapsible-panel-height (a exceção sancionada da spec 028) e
+ *  `hidden="until-found"` deixa o find-in-page do browser revelar item
+ *  dentro de seção fechada. */
+const PAINEL_COLAPSAVEL =
+  "h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden";
+
 export function BibliotecaLista({
   materiais,
   ehCoord = false,
@@ -309,6 +319,21 @@ export function BibliotecaLista({
   const [busca, setBusca] = useState("");
   const [view] = useViewBiblioteca("staff");
   const baseId = useId();
+  // seções colapsáveis (528): o estado mora AQUI, fora da subárvore
+  // re-keyed por `${qt}:${view}` — um Collapsible não-controlado dentro
+  // dela perderia o aberto/fechado a cada tecla da busca. Set de tipos
+  // FECHADOS: default aberto (status quo — a seção segue visível até o
+  // gesto dobrar) e a busca força aberto pra nenhum hit ficar invisível.
+  const [fechadas, setFechadas] = useState<ReadonlySet<Material["tipo"]>>(
+    () => new Set()
+  );
+  const alternaSecao = (tipo: Material["tipo"], aberta: boolean) =>
+    setFechadas((s) => {
+      const n = new Set(s);
+      if (aberta) n.delete(tipo);
+      else n.add(tipo);
+      return n;
+    });
   const buscaQ = busca.trim();
   // adoção (0197): emite o gesto depois de 800ms parado — cada tecla não é
   // uma busca; o texto nunca sai daqui (só o comprimento, zero conteúdo)
@@ -369,80 +394,100 @@ export function BibliotecaLista({
         </p>
       ) : (
         // re-key na busca e na view: as seções remontam e a entrada anima
-        // (convenção de movimento — troca de filtro nunca é repaint seco)
+        // (convenção de movimento — troca de filtro nunca é repaint seco).
+        // O estado do collapse NÃO mora aqui dentro — ver `fechadas` acima
         <div key={`${qt}:${view}`} className="space-y-5">
           {CATEGORIAS.map(({ tipo, rotulo }) => {
             const itens = visiveis.filter((m) => m.tipo === tipo);
             if (itens.length === 0) return null;
             return (
               <section key={tipo} aria-labelledby={`${baseId}-${tipo}`}>
-                <h3
-                  id={`${baseId}-${tipo}`}
-                  className="mb-2 text-sm font-semibold"
+                <Collapsible.Root
+                  open={!fechadas.has(tipo) || Boolean(qt)}
+                  onOpenChange={(o) => alternaSecao(tipo, o)}
                 >
-                  {rotulo}
-                  <ContagemTitulo n={itens.length} />
-                </h3>
-                {view === "list" ? (
-                  <ul className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card py-1 shadow-[var(--shadow-border)]">
-                    {itens.map((m, i) => (
-                      <Linha
-                        key={m.id}
-                        m={m}
-                        ehCoord={ehCoord}
-                        maxEncontro={maxEncontro}
-                        vigente={vigente}
-                        indice={i}
-                        marca={qt || undefined}
-                        lido={lidos?.has(refDoMaterial(m))}
-                        menu={<MaterialMenu material={m} />}
+                  {/* o trigger mora DENTRO do h3 — button é phrasing
+                      content, então a região segue nomeada por heading
+                      de verdade e o alvo de toque cobre a linha toda */}
+                  <h3 id={`${baseId}-${tipo}`} className="text-sm font-semibold">
+                    <Collapsible.Trigger className="group flex min-h-11 w-full items-center gap-1.5 rounded-lg px-2 -mx-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8">
+                      <span className="min-w-0 flex-1">
+                        {rotulo}
+                        <ContagemTitulo n={itens.length} />
+                      </span>
+                      <CaretDown
+                        size={14}
+                        aria-hidden
+                        className="shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
                       />
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {itens.map((m, i) => (
-                      <MaterialCard
-                        key={m.id}
-                        m={m}
-                        className="animate-enter"
-                        style={{ "--i": Math.min(i, 10) } as CSSProperties}
-                        marca={qt || undefined}
-                        rastrear
-                        lido={lidos?.has(refDoMaterial(m))}
-                        semDestino={ehCoord ? "sem conteúdo" : "em breve"}
-                        acoes={
-                          ehCoord ? (
-                            <MaterialActions
-                              material={m}
-                              maxEncontro={maxEncontro}
-                            />
-                          ) : (
-                            <MaterialMenu material={m} />
-                          )
-                        }
-                        acoesSempre={ehCoord}
-                        meta={
-                          <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                            {metaTexto(m)}
-                            <SelosMaterial
-                              m={m}
-                              vigente={vigente}
-                              lido={lidos?.has(refDoMaterial(m)) ?? false}
-                            />
-                            {ehCoord && (
-                              <SelosCoord
-                                m={m}
-                                temDestino={hrefMaterial(m) != null}
-                                mostrarDestino={false}
-                              />
-                            )}
-                          </span>
-                        }
-                      />
-                    ))}
-                  </div>
-                )}
+                    </Collapsible.Trigger>
+                  </h3>
+                  <Collapsible.Panel
+                    hiddenUntilFound
+                    className={`mt-2 ${PAINEL_COLAPSAVEL}`}
+                  >
+                    {view === "list" ? (
+                      <ul className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card py-1 shadow-[var(--shadow-border)]">
+                        {itens.map((m, i) => (
+                          <Linha
+                            key={m.id}
+                            m={m}
+                            ehCoord={ehCoord}
+                            maxEncontro={maxEncontro}
+                            vigente={vigente}
+                            indice={i}
+                            marca={qt || undefined}
+                            lido={lidos?.has(refDoMaterial(m))}
+                            menu={<MaterialMenu material={m} />}
+                          />
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        {itens.map((m, i) => (
+                          <MaterialCard
+                            key={m.id}
+                            m={m}
+                            className="animate-enter"
+                            style={{ "--i": Math.min(i, 10) } as CSSProperties}
+                            marca={qt || undefined}
+                            rastrear
+                            lido={lidos?.has(refDoMaterial(m))}
+                            semDestino={ehCoord ? "sem conteúdo" : "em breve"}
+                            acoes={
+                              ehCoord ? (
+                                <MaterialActions
+                                  material={m}
+                                  maxEncontro={maxEncontro}
+                                />
+                              ) : (
+                                <MaterialMenu material={m} />
+                              )
+                            }
+                            acoesSempre={ehCoord}
+                            meta={
+                              <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                {metaTexto(m)}
+                                <SelosMaterial
+                                  m={m}
+                                  vigente={vigente}
+                                  lido={lidos?.has(refDoMaterial(m)) ?? false}
+                                />
+                                {ehCoord && (
+                                  <SelosCoord
+                                    m={m}
+                                    temDestino={hrefMaterial(m) != null}
+                                    mostrarDestino={false}
+                                  />
+                                )}
+                              </span>
+                            }
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </Collapsible.Panel>
+                </Collapsible.Root>
               </section>
             );
           })}
