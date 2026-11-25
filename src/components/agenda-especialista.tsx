@@ -37,6 +37,7 @@ import type {
   GradeJanela,
 } from "@/lib/types";
 import { AgendaEspHorarios } from "@/components/agenda-especialista-horarios";
+import { SessaoEspAcoes } from "@/components/agenda-especialista-sessao-acoes";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { Avatar } from "@/components/avatar";
 import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
@@ -456,6 +457,11 @@ function LinhaSessao({
                     </Button>
                   }
                 />
+              )}
+              {/* QA 25/11: paridade com a sessão de mentor — trocar só o
+                  link mora no ⋯ */}
+              {(e.status === "agendado" || e.status === "remarcado") && (
+                <SessaoEspAcoes encontroId={e.id} linkAtual={e.link} />
               )}
             </div>
           )}
