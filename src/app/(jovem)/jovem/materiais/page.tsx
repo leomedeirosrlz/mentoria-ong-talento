@@ -1,20 +1,12 @@
 import type { Metadata } from "next";
-import type { CSSProperties } from "react";
 import Link from "next/link";
 import {
-  ArrowSquareOut,
   BookOpen,
-  CaretDown,
   CaretRight,
   CheckCircle,
-  File,
-  FileText,
   Flag,
   FolderOpen,
-  LinkSimple,
-  LockSimple,
   MapPin,
-  PuzzlePiece,
   UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
 import {
@@ -31,14 +23,13 @@ import { JornadaRascunho } from "@/components/jornada-rascunho";
 import { ReverRespostaDialog } from "@/components/jornada-rever";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatDate, linkSeguro, TRILHA_LEN } from "@/lib/ciclo";
+import { formatDate, diaMesCurto, TRILHA_LEN } from "@/lib/ciclo";
 import { turmaLonga } from "@/lib/turma";
 import { formularioPorToken } from "@/lib/forms/queries";
 import {
   datasOficiaisDe,
   encCorrenteDe,
   estacoesJornada,
-  materialLiberadoParaJovem,
   momentoRefazerRoda,
   parRoda,
   resumoJornada,
@@ -61,7 +52,6 @@ import {
   corpusServeJovem,
   listarDocsCorpus,
 } from "@/lib/materiais/corpus-doc";
-import { hrefMaterial } from "@/lib/materiais";
 import { getMateriais, getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import {
@@ -74,9 +64,8 @@ import { getPdmResumo } from "@/lib/queries-pdm";
 import { dadosRetrospectivaJovem } from "@/lib/retrospectiva";
 import { RetrospectivaJornada } from "@/components/retrospectiva-jornada";
 import { getConsolidadoTerceirosJovem } from "@/lib/terceiros/queries";
-import { MaterialMenu } from "@/components/material-actions";
-import { PreviewLink } from "@/components/material-preview-pdf";
-import { MaterialThumb } from "@/components/material-thumb";
+import { MateriaisLista } from "@/components/materiais-jovem-lista";
+import { BibliotecaViewToggle } from "@/components/biblioteca-view-toggle";
 import type { Material, Trilha } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -92,65 +81,10 @@ export const metadata: Metadata = { title: "Materiais" };
 // diferentes pro mesmo encontro. Fallback decidido no plano: RPC fora,
 // sem dupla ou cronograma vazio → a biblioteca plana renderiza intacta.
 
-const TIPO_ICONE = {
-  guia: BookOpen,
-  template: FileText,
-  conteudo: PuzzlePiece,
-  link: LinkSimple,
-} as const;
-
-const TIPO_LABEL = {
-  guia: "guia",
-  template: "modelo",
-  conteudo: "conteúdo",
-  link: "link",
-} as const;
-
-const GRUPO_TIPO = {
-  guia: "Guias",
-  template: "Modelos",
-  conteudo: "Conteúdos",
-  link: "Links",
-} as const;
-
 // estação → sistema do instrumento: SISTEMA_DA_ESTACAO canônico
 // (jornada.ts, 0080/0096) — avaliacao_encontro vive no fluxo próprio
 // (0071) e o 360º chega por `jornada.avaliacao_360`: os dois não têm
 // item em `instrumentos`.
-
-function agrupar(materiais: Material[]): [string, Material[]][] {
-  const mapa = new Map<string, Material[]>();
-  for (const m of materiais) {
-    const rotulo =
-      m.encontro_num != null ? `Encontro ${m.encontro_num}` : GRUPO_TIPO[m.tipo];
-    mapa.set(rotulo, [...(mapa.get(rotulo) ?? []), m]);
-  }
-  const peso = (r: string) =>
-    r === "Guias"
-      ? -1
-      : r.startsWith("Encontro")
-        ? Number(r.split(" ")[1])
-        : r === "Modelos"
-          ? 100
-          : r === "Conteúdos"
-            ? 101
-            : 102;
-  return [...mapa.entries()].sort(([a], [b]) => peso(a) - peso(b));
-}
-
-/** "4 de nov." — compacto pro summary do <details> das estações futuras. */
-function diaMesCurto(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso)
-    ? new Date(`${iso}T12:00:00`)
-    : new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("pt-BR", {
-    day: "numeric",
-    month: "short",
-    timeZone: "America/Sao_Paulo",
-  });
-}
 
 export default async function JovemMateriais() {
   const [
@@ -681,21 +615,24 @@ export default async function JovemMateriais() {
         aria-labelledby="acervo-titulo"
         className="scroll-mt-28 space-y-4 md:scroll-mt-14"
       >
-        <div>
-          <h2
-            id="acervo-titulo"
-            className="flex items-center gap-2 text-base font-semibold"
-          >
-            <FolderOpen
-              size={18}
-              className="text-muted-foreground"
-              aria-hidden
-            />
-            Acervo
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Para ler e consultar quando quiser. Não conta no seu progresso.
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2
+              id="acervo-titulo"
+              className="flex items-center gap-2 text-base font-semibold"
+            >
+              <FolderOpen
+                size={18}
+                className="text-muted-foreground"
+                aria-hidden
+              />
+              Acervo
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Para ler e consultar quando quiser. Não conta no seu progresso.
+            </p>
+          </div>
+          <BibliotecaViewToggle superficie="jovem" total={materiais.length} />
         </div>
         <MateriaisLista
           materiais={materiais}
@@ -988,294 +925,6 @@ function InstrumentoCard({
   );
 }
 
-// ---------- acervo (a página anterior, intacta como fallback e seção) ----------
-
-/** Card do acervo — a linha de sempre virada peça de grid: capa borda-a-
- *  borda no topo (1ª página do PDF lazy / imagem / faixa de link externo
- *  quando não há arquivo) e a linha embaixo. O card INTEIRO é o link
- *  quando há destino — a capa parece clicável e antes era zona morta (o
- *  iframe/img do preview já são pointer-events-none, não engolem o
- *  toque). O ⋯ das secundárias fica fora do <a>, flutuando no canto da
- *  capa — botão dentro de link seria HTML inválido e comeria o toque. */
-function MaterialCard({ m }: { m: Material }) {
-  const Icone = TIPO_ICONE[m.tipo];
-  const urlOk = linkSeguro(m.url);
-  // "doc:<slug>" é documento nativo — abre na casa do jovem (a rota do app
-  // expulsa o papel mentorado) e navega na mesma aba, sem ícone de saída
-  const ehDoc = m.path?.startsWith("doc:") ?? false;
-  const href = hrefMaterial(m, "/jovem/materiais/documento");
-  const interno = (
-    <>
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
-        <Icone size={17} aria-hidden />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{m.titulo}</p>
-        {m.descricao && (
-          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-            {m.descricao}
-          </p>
-        )}
-        <span className="sr-only">
-          {TIPO_LABEL[m.tipo]}
-          {m.path
-            ? ehDoc
-              ? " · documento"
-              : " · arquivo"
-            : urlOk && m.tipo !== "link"
-              ? " · link externo"
-              : ""}
-        </span>
-      </div>
-      {m.path ? (
-        <File
-          size={15}
-          className="shrink-0 text-muted-foreground"
-          aria-hidden
-        />
-      ) : urlOk ? (
-        <ArrowSquareOut
-          size={15}
-          className="shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
-          aria-hidden
-        />
-      ) : (
-        <Badge
-          variant="outline"
-          className="shrink-0 text-xs text-muted-foreground"
-        >
-          em breve
-        </Badge>
-      )}
-    </>
-  );
-  // a capa: arquivo → thumb curta (crop do topo da 1ª página, ≤96px —
-  // MaterialThumb é o contrato global; o preview grande h-36 é de
-  // leitura, não de estante); documento nativo → faixa na mesma régua com
-  // o ícone de documento; só url → faixa de link externo com o domínio;
-  // sem destino ("em breve") não chega aqui como card clicável — vive no
-  // grupo "A caminho" embaixo
-  const capa = ehDoc ? (
-    <div
-      aria-hidden
-      className="grid h-24 place-items-center bg-muted/60 text-muted-foreground"
-    >
-      <span className="flex flex-col items-center gap-1.5">
-        <FileText size={20} weight="duotone" aria-hidden />
-        <span className="text-[11px] font-medium">documento</span>
-      </span>
-    </div>
-  ) : m.path ? (
-    <MaterialThumb m={m} />
-  ) : (
-    <PreviewLink m={m} />
-  );
-  return (
-    <div className="relative overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-      {href ? (
-        <a
-          href={href}
-          {...(ehDoc ? {} : { target: "_blank", rel: "noopener noreferrer" })}
-          className="group flex h-full flex-col outline-none transition-colors hover:bg-muted/50 active:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-        >
-          {capa}
-          <div className="flex flex-1 items-center gap-x-4 px-5 py-3.5">
-            {interno}
-          </div>
-        </a>
-      ) : (
-        <div className="flex h-full flex-col">
-          {capa}
-          <div className="flex flex-1 items-center gap-x-4 px-5 py-3.5">
-            {interno}
-          </div>
-        </div>
-      )}
-      {/* ⋯ das secundárias — sibling do <a> (nada de botão dentro de
-          link): chip com backdrop pra ler sobre qualquer capa */}
-      {href && (
-        <div className="absolute right-2 top-2 z-10 rounded-lg bg-background/75 backdrop-blur-sm">
-          <MaterialMenu material={m} docBase="/jovem/materiais/documento" />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MateriaisLista({
-  materiais,
-  encCorrente = null,
-  datasEnc = null,
-}: {
-  materiais: Material[];
-  /** régua do acervo progressivo (REALIZA-160): nº do encontro corrente da
-   *  dupla viva. null = sem jornada em curso → tudo liberado. */
-  encCorrente?: number | null;
-  /** numero → data oficial da turma dela (cronograma), pro "libera em
-   *  dd/mm" dos trancados. null no fallback sem cronograma. */
-  datasEnc?: Map<number, string> | null;
-}) {
-  // REALIZA-162: o que já dá pra abrir vira grid; o "em breve" (sem path e
-  // sem url — material real que a coordenação ainda não subiu) sai da
-  // vitrine e fecha o acervo no grupo apagado "A caminho" — de-emphasized,
-  // nunca escondido.
-  // REALIZA-160: o material marcado com encontro futuro vira o terceiro
-  // bucket — recolhido no <details> "Mais adiante na jornada", mesmo
-  // tratamento das estações trancadas da trilha.
-  const prontos: Material[] = [];
-  const aCaminho: Material[] = [];
-  const trancados: Material[] = [];
-  for (const m of materiais) {
-    if (!materialLiberadoParaJovem(m, encCorrente)) trancados.push(m);
-    else if (m.path || linkSeguro(m.url)) prontos.push(m);
-    else aCaminho.push(m);
-  }
-  trancados.sort((a, b) => (a.encontro_num ?? 0) - (b.encontro_num ?? 0));
-  const grupos = agrupar(prontos);
-  if (grupos.length === 0 && aCaminho.length === 0 && trancados.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-1.5 rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
-        <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-          <FolderOpen size={18} aria-hidden />
-        </span>
-        <p className="text-sm font-medium">Nenhum material por aqui ainda</p>
-        <p className="text-sm text-muted-foreground">
-          Os guias e conteúdos do programa aparecem quando a coordenação
-          publicar.
-        </p>
-      </div>
-    );
-  }
-  return (
-    <>
-      {grupos.map(([rotulo, itens], i) => (
-        <section
-          key={rotulo}
-          className="animate-enter space-y-2"
-          style={{ "--i": Math.min(i, 10) } as CSSProperties}
-        >
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            {rotulo}
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {itens.map((m) => (
-              <MaterialCard key={m.id} m={m} />
-            ))}
-          </div>
-        </section>
-      ))}
-      {aCaminho.length > 0 && (
-        <section
-          className="animate-enter space-y-2"
-          style={{ "--i": Math.min(grupos.length, 10) } as CSSProperties}
-        >
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            A caminho
-          </h3>
-          <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-dashed border-border bg-card/60">
-            {aCaminho.map((m) => {
-              const Icone = TIPO_ICONE[m.tipo];
-              return (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-x-4 px-5 py-3 text-muted-foreground"
-                >
-                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70">
-                    <Icone size={17} aria-hidden />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground/80">
-                      {m.titulo}
-                    </p>
-                    <span className="sr-only">{TIPO_LABEL[m.tipo]}</span>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="shrink-0 text-xs text-muted-foreground"
-                  >
-                    em breve
-                  </Badge>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-      {trancados.length > 0 && (
-        <details
-          className="group animate-enter rounded-xl border border-dashed border-border bg-card/60"
-          style={
-            {
-              "--i": Math.min(grupos.length + (aCaminho.length ? 1 : 0), 10),
-            } as CSSProperties
-          }
-        >
-          {/* summary admite heading direto (phrasing + heading content) —
-              mesmo padrão das estações: o grupo inteiro lê como seção */}
-          <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 p-4 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:p-5 [&::-webkit-details-marker]:hidden">
-            <span className="min-w-0 flex-1">
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Mais adiante na jornada · {trancados.length}{" "}
-                {trancados.length === 1 ? "material" : "materiais"}
-              </h3>
-              <span className="mt-1 block text-sm font-medium">
-                {trancados
-                  .slice(0, 2)
-                  .map((m) => `${m.titulo} (enc. ${m.encontro_num})`)
-                  .join(" · ")}
-                {trancados.length > 2 && ` · +${trancados.length - 2}`}
-              </span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">
-                Cada um abre sozinho quando a jornada chega no encontro.
-              </span>
-            </span>
-            <CaretDown
-              size={16}
-              className="shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
-              aria-hidden
-            />
-          </summary>
-          <ul className="divide-y divide-border/60 border-t border-dashed border-border px-4 sm:px-5">
-            {trancados.map((m) => {
-              const Icone = TIPO_ICONE[m.tipo];
-              const data =
-                m.encontro_num != null
-                  ? diaMesCurto(datasEnc?.get(m.encontro_num))
-                  : "";
-              return (
-                <li
-                  key={m.id}
-                  className="flex items-center gap-x-4 py-3 text-muted-foreground"
-                >
-                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70">
-                    <Icone size={17} aria-hidden />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground/80">
-                      {m.titulo}
-                    </p>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-xs">
-                      <LockSimple
-                        size={13}
-                        aria-hidden
-                        className="shrink-0"
-                      />
-                      Libera no encontro {m.encontro_num}
-                      {/* diaMesCurto já fecha com ponto ("4 de nov.") —
-                          sem data a frase precisa dele */}
-                      {data ? ` (${data})` : "."}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </details>
-      )}
-    </>
-  );
-}
-
 /** Fallback §WP7 — biblioteca sem trilha: header "Materiais" + o
  *  acervo em grade (a trilha só existe com dupla + cronograma). Renderiza
  *  quando a RPC falha/vem vazia, quando o jovem não tem dupla ou quando a
@@ -1290,11 +939,14 @@ function BibliotecaJovem({
 }) {
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Materiais</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Os guias e conteúdos oficiais do programa.
-        </p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Materiais</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Os guias e conteúdos oficiais do programa.
+          </p>
+        </div>
+        <BibliotecaViewToggle superficie="jovem" total={materiais.length} />
       </header>
       <MateriaisLista materiais={materiais} encCorrente={encCorrente} />
     </div>

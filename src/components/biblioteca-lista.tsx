@@ -1,15 +1,11 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   ArrowSquareOut,
-  BookOpen,
   Check,
-  FileText,
-  LinkSimple,
   MagnifyingGlass,
-  PuzzlePiece,
 } from "@phosphor-icons/react";
 import { AUDIENCIA_LABEL, audienciasDe, hrefMaterial, refDoMaterial } from "@/lib/materiais";
 import { LinkComLeitura } from "@/components/material-leitura";
@@ -20,7 +16,12 @@ import { cn } from "@/lib/utils";
 import { fuzzyMatch } from "@/lib/fuzzy";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { MaterialActions } from "@/components/material-actions";
+import { MaterialActions, MaterialMenu } from "@/components/material-actions";
+import { MaterialCard, TIPO_ICONE } from "@/components/material-card";
+import {
+  BibliotecaViewToggle,
+  useViewBiblioteca,
+} from "@/components/biblioteca-view-toggle";
 import { HighlightText } from "@/components/highlight-text";
 
 // Biblioteca em seções por categoria (REALIZA-250): a lista única da
@@ -30,13 +31,9 @@ import { HighlightText } from "@/components/highlight-text";
 // das seções (a que ficar vazia some). Ordem dentro de cada seção:
 // encontro → ordem → título.
 
-const TIPO_ICONE = {
-  guia: BookOpen,
-  template: FileText,
-  conteudo: PuzzlePiece,
-  link: LinkSimple,
-} as const;
-
+// TIPO_ICONE vem do material-card (a mesma anatomia de ícone nas duas
+// views); o TIPO_LABEL daqui é a versão capitalizada da meta visível —
+// o do card é minúsculo porque só serve ao sr-only
 const TIPO_LABEL = {
   guia: "Guia",
   template: "Modelo",
@@ -72,7 +69,88 @@ function ContagemTitulo({ n }: { n: number }) {
   );
 }
 
-function Linha({
+/** "Guia · Encontro 3" — a meta tabular da linha e da linha do card. */
+function metaTexto(m: Material): string {
+  return [
+    TIPO_LABEL[m.tipo],
+    m.encontro_num != null ? `Encontro ${m.encontro_num}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** Selos da meta — "instrumento oficial" (doc de instrumento ao vivo,
+ *  REALIZA-386), "desta semana" (encontro vigente do mentor) e "lido"
+ *  (0196). Compartilhados entre a linha e a linha do card. */
+function SelosMaterial({
+  m,
+  vigente,
+  lido,
+}: {
+  m: Material;
+  vigente: number | null;
+  lido: boolean;
+}) {
+  const ehDoc = m.path?.startsWith("doc:") ?? false;
+  const ehInstrumento = ehDoc && sistemaDoDoc(m.path!.slice(4)) != null;
+  const desta = vigente != null && m.encontro_num === vigente;
+  return (
+    <>
+      {ehInstrumento && (
+        <Badge variant="outline" className="text-[11px]">
+          instrumento oficial
+        </Badge>
+      )}
+      {desta && (
+        <Badge variant="outline" className="text-[11px]">
+          desta semana
+        </Badge>
+      )}
+      {lido && (
+        <Badge variant="outline" className="gap-1 text-[11px]">
+          <Check size={10} aria-hidden />
+          lido
+        </Badge>
+      )}
+    </>
+  );
+}
+
+/** Selos da coordenação: audiência (quando não é "todos") e "sem
+ *  conteúdo" do material sem destino. Na linha ficam antes do ⋯; no
+ *  card a audiência entra na meta e o "sem conteúdo" já sai no badge
+ *  trailing do próprio card (semDestino) — mostrarDestino=false evita
+ *  o selo duplicado. */
+function SelosCoord({
+  m,
+  temDestino,
+  mostrarDestino = true,
+}: {
+  m: Material;
+  temDestino: boolean;
+  mostrarDestino?: boolean;
+}) {
+  const aud = audienciasDe(m);
+  return (
+    <>
+      {!aud.includes("todos") && (
+        <Badge
+          variant="outline"
+          className="hidden gap-1 text-xs sm:inline-flex"
+        >
+          {aud.map((a) => AUDIENCIA_LABEL[a]).join(" · ")}
+        </Badge>
+      )}
+      {mostrarDestino && !temDestino && (
+        <Badge variant="outline" className="text-xs text-muted-foreground">
+          sem conteúdo
+        </Badge>
+      )}
+    </>
+  );
+}
+
+export function Linha({
   m,
   ehCoord,
   maxEncontro,
@@ -80,34 +158,37 @@ function Linha({
   indice,
   marca,
   lido = false,
+  docBase = "/materiais/documento",
+  menu = null,
+  rastrear = true,
 }: {
   m: Material;
   ehCoord: boolean;
-  maxEncontro: number;
+  /** teto do select "vincular ao encontro" — só entra quando ehCoord; o
+   *  acervo do jovem reutiliza a linha sem régua de publicação. */
+  maxEncontro?: number;
   vigente: number | null;
   indice: number;
   /** busca ativa — marca os trechos casados no título e na descrição */
   marca?: string;
   /** leitura já registrada (0196) — estado do item inteiro + selo "lido" */
   lido?: boolean;
+  /** casa dos documentos nativos — a do acervo do jovem é outra rota. */
+  docBase?: string;
+  /** ⋯ de leitura (MaterialMenu) no fim da linha — simétrico ao canto do
+   *  card; pra coord o bloco ehCoord + MaterialActions segue valendo. */
+  menu?: ReactNode;
+  /** marca a leitura no clique (staff); a linha do jovem mantém a âncora
+   *  simples, como no card dele. */
+  rastrear?: boolean;
 }) {
   const Icone = TIPO_ICONE[m.tipo];
   // arquivo oficial ganha da url externa; "doc:<slug>" é documento nativo
   // (página do app); sem os três o material ainda não chegou ("em breve"
   // pro leitor, "sem conteúdo" pra coord que publica)
   const ehDoc = m.path?.startsWith("doc:") ?? false;
-  const href = hrefMaterial(m);
-  // REALIZA-386 — o doc que acompanha um instrumento ao vivo ganha o selo:
-  // o catálogo avisa que por trás dele existe a entrega na ficha
-  const ehInstrumento =
-    ehDoc && sistemaDoDoc(m.path!.slice(4)) != null;
-  const meta = [
-    TIPO_LABEL[m.tipo],
-    m.encontro_num != null ? `Encontro ${m.encontro_num}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  const desta = vigente != null && m.encontro_num === vigente;
+  const href = hrefMaterial(m, docBase);
+  const meta = metaTexto(m);
 
   const corpo = (
     <>
@@ -142,23 +223,23 @@ function Linha({
         )}
         <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           {meta}
-          {ehInstrumento && (
-            <Badge variant="outline" className="text-[11px]">
-              instrumento oficial
-            </Badge>
-          )}
-          {desta && <Badge variant="outline" className="text-[11px]">desta semana</Badge>}
-          {lido && (
-            <Badge variant="outline" className="gap-1 text-[11px]">
-              <Check size={10} aria-hidden />
-              lido
-            </Badge>
-          )}
+          <SelosMaterial m={m} vigente={vigente} lido={lido} />
         </span>
       </span>
     </>
   );
   const cls = "flex min-w-0 flex-1 items-center gap-x-3 px-4 py-3 sm:px-5";
+  const linkCls = cn(
+    cls,
+    "rounded-lg transition-colors hover:bg-muted/50 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+  );
+  const seta = !ehCoord && !ehDoc && (
+    <ArrowSquareOut
+      size={17}
+      aria-hidden
+      className="shrink-0 text-muted-foreground"
+    />
+  );
 
   return (
     <li
@@ -166,20 +247,28 @@ function Linha({
       style={{ "--i": Math.min(indice, 10) } as CSSProperties}
     >
       {href ? (
-        <LinkComLeitura
-          materialRef={refDoMaterial(m)}
-          href={href}
-          externo={!ehDoc}
-          className={cn(
-            cls,
-            "rounded-lg transition-colors hover:bg-muted/50 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-          )}
-        >
-          {corpo}
-          {!ehCoord && !ehDoc && (
-            <ArrowSquareOut size={17} aria-hidden className="shrink-0 text-muted-foreground" />
-          )}
-        </LinkComLeitura>
+        rastrear ? (
+          <LinkComLeitura
+            materialRef={refDoMaterial(m)}
+            href={href}
+            externo={!ehDoc}
+            className={linkCls}
+          >
+            {corpo}
+            {seta}
+          </LinkComLeitura>
+        ) : (
+          <a
+            href={href}
+            {...(!ehDoc
+              ? { target: "_blank", rel: "noopener noreferrer" }
+              : {})}
+            className={linkCls}
+          >
+            {corpo}
+            {seta}
+          </a>
+        )
       ) : (
         <div className={cls}>
           {corpo}
@@ -188,24 +277,13 @@ function Linha({
           )}
         </div>
       )}
-      {ehCoord && (
+      {ehCoord ? (
         <span className="flex shrink-0 items-center gap-2">
-          {(() => {
-            const aud = audienciasDe(m);
-            if (aud.includes("todos")) return null;
-            return (
-              <Badge variant="outline" className="hidden gap-1 text-xs sm:inline-flex">
-                {aud.map((a) => AUDIENCIA_LABEL[a]).join(" · ")}
-              </Badge>
-            );
-          })()}
-          {!href && (
-            <Badge variant="outline" className="text-xs text-muted-foreground">
-              sem conteúdo
-            </Badge>
-          )}
+          <SelosCoord m={m} temDestino={href != null} />
           <MaterialActions material={m} maxEncontro={maxEncontro} />
         </span>
+      ) : (
+        menu
       )}
     </li>
   );
@@ -229,6 +307,7 @@ export function BibliotecaLista({
   lidos?: Set<string>;
 }) {
   const [busca, setBusca] = useState("");
+  const [view] = useViewBiblioteca("staff");
   const baseId = useId();
   const buscaQ = busca.trim();
   // adoção (0197): emite o gesto depois de 800ms parado — cada tecla não é
@@ -263,32 +342,35 @@ export function BibliotecaLista({
           {titulo}
           <ContagemTitulo n={materiais.length} />
         </h2>
-        {materiais.length > 6 && (
-          <label className="relative w-full sm:w-72">
-            <span className="sr-only">Buscar material de apoio</span>
-            <MagnifyingGlass
-              size={15}
-              aria-hidden
-              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              type="search"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar material de apoio"
-              className="pl-8"
-            />
-          </label>
-        )}
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <BibliotecaViewToggle superficie="staff" total={materiais.length} />
+          {materiais.length > 6 && (
+            <label className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+              <span className="sr-only">Buscar material de apoio</span>
+              <MagnifyingGlass
+                size={15}
+                aria-hidden
+                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                type="search"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar material de apoio"
+                className="pl-8"
+              />
+            </label>
+          )}
+        </div>
       </div>
       {visiveis.length === 0 ? (
         <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
           Nenhum material com “{busca.trim()}”.
         </p>
       ) : (
-        // re-key na busca: as seções remontam e a entrada anima (convenção
-        // de movimento — troca de filtro nunca é repaint seco)
-        <div key={qt} className="space-y-5">
+        // re-key na busca e na view: as seções remontam e a entrada anima
+        // (convenção de movimento — troca de filtro nunca é repaint seco)
+        <div key={`${qt}:${view}`} className="space-y-5">
           {CATEGORIAS.map(({ tipo, rotulo }) => {
             const itens = visiveis.filter((m) => m.tipo === tipo);
             if (itens.length === 0) return null;
@@ -301,20 +383,66 @@ export function BibliotecaLista({
                   {rotulo}
                   <ContagemTitulo n={itens.length} />
                 </h3>
-                <ul className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card py-1 shadow-[var(--shadow-border)]">
-                  {itens.map((m, i) => (
-                    <Linha
-                      key={m.id}
-                      m={m}
-                      ehCoord={ehCoord}
-                      maxEncontro={maxEncontro}
-                      vigente={vigente}
-                      indice={i}
-                      marca={qt || undefined}
-                      lido={lidos?.has(refDoMaterial(m))}
-                    />
-                  ))}
-                </ul>
+                {view === "list" ? (
+                  <ul className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card py-1 shadow-[var(--shadow-border)]">
+                    {itens.map((m, i) => (
+                      <Linha
+                        key={m.id}
+                        m={m}
+                        ehCoord={ehCoord}
+                        maxEncontro={maxEncontro}
+                        vigente={vigente}
+                        indice={i}
+                        marca={qt || undefined}
+                        lido={lidos?.has(refDoMaterial(m))}
+                        menu={<MaterialMenu material={m} />}
+                      />
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {itens.map((m, i) => (
+                      <MaterialCard
+                        key={m.id}
+                        m={m}
+                        className="animate-enter"
+                        style={{ "--i": Math.min(i, 10) } as CSSProperties}
+                        marca={qt || undefined}
+                        rastrear
+                        lido={lidos?.has(refDoMaterial(m))}
+                        semDestino={ehCoord ? "sem conteúdo" : "em breve"}
+                        acoes={
+                          ehCoord ? (
+                            <MaterialActions
+                              material={m}
+                              maxEncontro={maxEncontro}
+                            />
+                          ) : (
+                            <MaterialMenu material={m} />
+                          )
+                        }
+                        acoesSempre={ehCoord}
+                        meta={
+                          <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                            {metaTexto(m)}
+                            <SelosMaterial
+                              m={m}
+                              vigente={vigente}
+                              lido={lidos?.has(refDoMaterial(m)) ?? false}
+                            />
+                            {ehCoord && (
+                              <SelosCoord
+                                m={m}
+                                temDestino={hrefMaterial(m) != null}
+                                mostrarDestino={false}
+                              />
+                            )}
+                          </span>
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
               </section>
             );
           })}
