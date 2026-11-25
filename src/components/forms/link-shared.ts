@@ -39,8 +39,33 @@ export function msgLinkWhatsApp(
   formularioTitulo: string,
   nome: string | null | undefined,
   token: string,
-  origem?: string | null
+  origem?: string | null,
+  /** Quando quem envia é o mentor da dupla (ficha, aba Instrumentos): a voz
+   *  institucional "a equipe" vinda do número dele lê errado — ele assina
+   *  como pessoa conhecida. Omitido = texto de equipe (coordenação). */
+  remetenteMentorNome?: string
 ): string {
   const p = primeiroNome(nome);
-  return `Olá${p ? `, ${p}` : ""}! A equipe Realiza.vc te convida pra responder "${formularioTitulo}". Leva poucos minutos: ${urlPublica(token, origem)}`;
+  const url = urlPublica(token, origem);
+  if (remetenteMentorNome !== undefined) {
+    const m = primeiroNome(remetenteMentorNome);
+    return `Olá${p ? `, ${p}` : ""}! ${m ? `Aqui é ${m}, seu mentor. ` : "Aqui é seu mentor. "}Pode responder "${formularioTitulo}" por aqui, leva poucos minutos: ${url}`;
+  }
+  return `Olá${p ? `, ${p}` : ""}! A equipe Realiza.vc te convida pra responder "${formularioTitulo}". Leva poucos minutos: ${url}`;
+}
+
+/** Fallback do lote: o WhatsApp do kit é do MENTOR porque o jovem não tem
+ *  — o convite genérico mandaria a pessoa errada responder. O repasse diz
+ *  de quem é o link e pede a ponte (paralelo ao emailInstrumentoRepasseMentor). */
+export function msgLinkWhatsAppRepasse(
+  formularioTitulo: string,
+  mentorNome: string | null | undefined,
+  jovemNome: string | null | undefined,
+  token: string,
+  origem?: string | null
+): string {
+  const m = primeiroNome(mentorNome);
+  const j = primeiroNome(jovemNome) || "sua jovem";
+  const url = urlPublica(token, origem);
+  return `Olá${m ? `, ${m}` : ""}! Aqui é a equipe do Realiza.vc. O link de "${formularioTitulo}" é pra ${j}, que não tem WhatsApp cadastrado. Pode repassar pra ${j}? ${url}`;
 }

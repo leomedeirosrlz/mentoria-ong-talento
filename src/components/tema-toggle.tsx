@@ -50,7 +50,7 @@ export function TemaToggle({ tema }: { tema: Tema }) {
             aria-checked={ativo}
             onClick={() => escolher(valor)}
             className={cn(
-              "inline-flex min-h-8 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              "inline-flex min-h-11 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:min-h-8",
               ativo
                 ? "bg-card text-foreground shadow-[var(--shadow-border)]"
                 : "text-muted-foreground hover:text-foreground"

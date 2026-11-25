@@ -195,8 +195,8 @@ export function JovemEspecialistaCard({
             <>
               <p className="text-xs leading-relaxed text-muted-foreground">
                 {variante === "sem_vagas"
-                  ? "Agenda cheia no momento. Seu pedido vai pro mural."
-                  : "Ainda não liberou horários. Seu pedido vai pro mural."}
+                  ? "Agenda cheia no momento. Seu pedido fica aberto para qualquer especialista."
+                  : "Ainda não abriu horários. Seu pedido fica aberto para qualquer especialista."}
               </p>
               <Button
                 size="sm"
@@ -205,7 +205,7 @@ export function JovemEspecialistaCard({
                 onClick={() => onPedir(null)}
               >
                 <Sparkle size={15} aria-hidden />
-                Pedir pro mural
+                Pedir a qualquer especialista
               </Button>
             </>
           ) : preferido ? (

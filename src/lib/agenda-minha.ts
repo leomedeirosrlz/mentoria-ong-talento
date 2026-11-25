@@ -265,18 +265,13 @@ function diaDoIso(iso: string | null): string | null {
   return iso ? toDateStr(new Date(iso)) : null;
 }
 
-/** Limbo "aberto" no recorte da agenda: além do `emLimbo` canônico
- *  (agendado vencido), cobre o status legado "remarcado" — a RPC atual só
- *  escreve "agendado", mas uma row remarcada vencida tem a mesma
- *  ambiguidade (rolou?). Sem isso ela sumiria da agenda sem virar aviso. */
+/** Limbo "aberto" no recorte da agenda: hoje é o próprio `emLimbo`
+ *  canônico — o status legado "remarcado" entrou na definição única quando
+ *  o semáforo foi unificado (antes um remarcado vencido virava "atraso" no
+ *  semáforo enquanto a agenda já o tratava como limbo). Alias mantida: o
+ *  nome aberto/fechado é o vocabulário da agenda. */
 export function limboAberto(e: Encontro, agoraMs: number): boolean {
-  if (emLimbo(e, agoraMs)) return true;
-  return (
-    e.status === "remarcado" &&
-    !e.registro &&
-    e.data_hora != null &&
-    new Date(e.data_hora).getTime() < agoraMs
-  );
+  return emLimbo(e, agoraMs);
 }
 
 /** Limbo "fechado": vencido E o horário previsto já acabou. Enquanto
@@ -321,7 +316,7 @@ function avisosDaDupla(d: Dupla, hoje: string, agoraMs: number): AvisoAgenda[] {
       titulo: `Registro do encontro ${e.numero} · ${nome1} · ${turmaLonga(d.turma)}`,
       detalhe: limbo
         ? `Marcado para ${formatDiaHora(e.data_hora)} e sem registro. Aconteceu? Confirme como foi ou remarque.`
-        : "Pendente. Preencha atividades, avaliação e próximo passo.",
+        : "Falta preencher o que foi feito, como foi e o próximo passo.",
       href: `/duplas/${d.id}#registrar-${e.id}`,
       cta: "Preencher registro",
       remarcar: limbo,
@@ -345,27 +340,44 @@ function avisosDaDupla(d: Dupla, hoje: string, agoraMs: number): AvisoAgenda[] {
       detalhe: `${enc.descricao}. O prazo era ${formatDiaMes(enc.prazo)}${
         enc.responsavel === "mentor" ? "" : " (combinado do mentorado)"
       }.`,
-      href: `/duplas/${d.id}#combinados`,
+      href: `/duplas/${d.id}#combinado-${enc.id}`,
       cta: "Ver combinado",
       remarcar: false,
     });
   }
 
-  // intenções em aberto (REALIZA-21): uma linha resumida, não um aviso por
-  // item — a contagem e o nº mais antigo bastam pra decidir abrir a ficha.
-  // O texto dos itens não sai da ficha (LGPD: é plano privado do mentor)
-  const intPendentes = (d.intencoes ?? []).filter((i) => !i.feito);
-  if (intPendentes.length > 0) {
-    const maisAntigo = Math.min(...intPendentes.map((i) => i.numero));
+  // combinados em aberto, dos dois lados (o antigo afazer, 0157 — o mentor
+  // acompanha também os do jovem): uma linha resumida, não um aviso por
+  // item — a contagem por lado e o nº mais antigo bastam pra decidir abrir
+  // a ficha. O vencido já saiu acima com aviso próprio; o texto dos itens
+  // não sai da ficha (LGPD: pode citar o jovem)
+  const emAberto = (d.encaminhamentos ?? []).filter(
+    (enc) =>
+      enc.numero != null &&
+      enc.status !== "feito" &&
+      !(enc.prazo != null && enc.prazo < hoje)
+  );
+  if (emAberto.length > 0) {
+    const maisAntigo = Math.min(...emAberto.map((enc) => enc.numero!));
+    const total = emAberto.length;
+    const seus = emAberto.filter((enc) => enc.responsavel === "mentor").length;
+    const doJovem = total - seus;
+    // "de {nome}" sem artigo — neutro de gênero como "agenda de {nome}"
+    const contagem =
+      seus > 0 && doJovem > 0
+        ? `${total} ${total === 1 ? "item" : "itens"} (${seus} ${seus === 1 ? "seu" : "seus"}, ${doJovem} de ${nome1})`
+        : seus > 0
+          ? `${total} ${total === 1 ? "item seu" : "itens seus"}`
+          : `${total} ${total === 1 ? `item de ${nome1}` : `itens de ${nome1}`}`;
     avisos.push({
       id: `int-${d.id}`,
       escopo,
       duplaId: d.id,
       encontro: null,
-      titulo: `Afazeres em aberto · ${nome1} · ${turmaLonga(d.turma)}`,
-      detalhe: `${intPendentes.length} ${intPendentes.length === 1 ? "item" : "itens"} · o mais antigo é do ${maisAntigo}º encontro.`,
-      href: `/duplas/${d.id}#intencoes-${maisAntigo}`,
-      cta: "Ver afazeres",
+      titulo: `Combinados em aberto · ${nome1} · ${turmaLonga(d.turma)}`,
+      detalhe: `${contagem} · o mais antigo é do ${maisAntigo}º encontro.`,
+      href: `/duplas/${d.id}#combinados-${maisAntigo}`,
+      cta: "Ver combinados",
       remarcar: false,
     });
   }
@@ -458,12 +470,17 @@ function itensDaDupla(
         acoes.push("remarcar");
       } else if (e.status === "realizado" && !e.registro) {
         acoes.push("registrar");
+      } else if (e.status === "nao_aconteceu" || e.status === "cancelado") {
+        // fechado mas com data futura (marcou não-aconteceu/cancelou antes
+        // da hora): a row existe e o dialog remarca ela — mesmo caminho do
+        // item "a agendar" abaixo, só que aqui o dia ainda está por vir
+        acoes.push("remarcar");
       }
     }
 
     const meta: string[] = [];
     if (e.motivo_reagendamento) meta.push(`Remarcado: ${e.motivo_reagendamento}`);
-    if (e.status === "realizado" && e.registro) meta.push("registro entregue");
+    if (e.status === "realizado" && e.registro) meta.push("registro feito");
     if (e.status === "realizado" && !e.registro)
       meta.push("registro ainda não preenchido");
 
@@ -519,6 +536,16 @@ function itensDaDupla(
     for (const f of alvo.faltantes)
       if (!previstos.has(f.numero))
         previstos.set(f.numero, { dia: f.dataSugerida, encontro: null });
+    // TODA row falha segue acionável, não só a do alvo: dois nao_aconteceu
+    // seguidos deixavam o segundo sem nenhum caminho aqui (a data já passou,
+    // então ele nem entra como item de dia) — a ficha já remarcava, a
+    // agenda não
+    for (const e of d.encontros)
+      if (
+        (e.status === "nao_aconteceu" || e.status === "cancelado") &&
+        !previstos.has(e.numero)
+      )
+        previstos.set(e.numero, { dia: null, encontro: e });
 
     for (const [numero, p] of [...previstos].sort((a, b) => a[0] - b[0])) {
       // data oficial já passada não senta no dia dela — cai no grupo "a
@@ -534,7 +561,7 @@ function itensDaDupla(
           ? `data oficial: ${capitalizar(formatDiaSemana(dia))} ${formatDiaMes(dia)}`
           : p.dia != null
             ? `a data oficial (${formatDiaMes(p.dia)}) já passou: combine um novo horário`
-            : "sem data oficial no calendário: a dupla agenda"
+            : "sem data oficial no calendário: a própria dupla marca"
       );
       itens.push({
         id: `prev-${d.id}-${numero}`,
@@ -576,7 +603,6 @@ function itensDaDupla(
           : null;
       const passo = passoEsp(s, trilha.sessoes);
       const meta: string[] = [];
-      if (trilha.especialista_nome) meta.push(`com ${trilha.especialista_nome}`);
       if (trilha.demanda) meta.push(trilha.demanda);
       if (s.status === "realizado" && s.registro) meta.push("registro entregue");
 

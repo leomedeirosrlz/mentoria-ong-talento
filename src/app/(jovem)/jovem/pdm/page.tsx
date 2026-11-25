@@ -57,9 +57,9 @@ export default async function JovemPdm() {
             Seu plano de desenvolvimento
           </h1>
           <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-            O PDM nasce na jornada com a sua mentora: Declaração de Visão,
-            metas e os passos até elas. Quando vocês começarem a construir,
-            ele aparece aqui pra vocês editarem juntos.
+            Seu plano nasce na jornada, junto com seu mentor ou mentora: o que você quer
+            construir, suas metas e os passos até elas. Quando vocês começarem,
+            ele aparece aqui para vocês editarem juntos.
           </p>
           <Link href="/jovem/materiais" className={buttonVariants({ variant: "outline", size: "sm" }) + " mt-2"}>
             Ver minha jornada

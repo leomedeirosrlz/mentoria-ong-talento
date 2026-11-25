@@ -16,7 +16,7 @@ const ICONE_MARCO: Record<MarcoJornada, typeof Flag> = {
 function textoMarco(marco: MarcoJornada, feitos: number, total: number) {
   switch (marco) {
     case "primeiro":
-      return { titulo: "Primeiro encontro realizado", descricao: "A jornada de vocês começou." };
+      return { titulo: "Primeiro encontro feito", descricao: "A jornada de vocês começou." };
     case "metade":
       return { titulo: "Metade do caminho", descricao: `${feitos} de ${total} encontros feitos.` };
     case "reta_final": {
@@ -31,7 +31,7 @@ function textoMarco(marco: MarcoJornada, feitos: number, total: number) {
     case "completo":
       return {
         titulo: "Jornada completa",
-        descricao: `${total} encontros realizados · jornada concluída.`,
+        descricao: `${total} encontros feitos. Jornada concluída.`,
       };
   }
 }

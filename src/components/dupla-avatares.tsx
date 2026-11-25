@@ -5,6 +5,7 @@ import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 type Pessoa = {
   id: string;
   nome: string;
+  nome_social?: string | null;
   avatar_path?: string | null;
   email?: string | null;
 };
@@ -30,7 +31,7 @@ export function DuplaAvatares({
       pessoa: mentor,
       el: (
         <Avatar
-          nome={mentor.nome}
+          nome={mentor.nome_social ?? mentor.nome}
           src={mentor.avatar_path ? avatarPublicUrl(mentor.avatar_path) : null}
           fallbackSrc={mentor.email ? gravatarUrl(mentor.email) : undefined}
           size={size}
@@ -43,7 +44,7 @@ export function DuplaAvatares({
       el: (
         <Avatar
           papel="mentorado"
-          nome={mentorado.nome}
+          nome={mentorado.nome_social ?? mentorado.nome}
           src={mentorado.avatar_path ? avatarPublicUrl(mentorado.avatar_path) : null}
           size={size}
           className={anel}
@@ -62,7 +63,7 @@ export function DuplaAvatares({
           <Link
             key={pessoa.id}
             href={`/pessoas/${pessoa.id}`}
-            aria-label={`Abrir perfil de ${pessoa.nome}`}
+            aria-label={`Abrir perfil de ${pessoa.nome_social ?? pessoa.nome}`}
             style={overlap}
             className="relative rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >

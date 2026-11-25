@@ -29,8 +29,13 @@ const QUALQUER = "qualquer";
 
 /** "Ana Souza — finanças, carreira": as áreas (0030) ajudam a escolher pra
  *  quem direcionar — sem áreas cadastradas fica só o nome. */
-function rotuloEspecialista(e: { nome: string; areas: string[] | null }) {
-  return e.areas?.length ? `${e.nome} · ${e.areas.join(", ")}` : e.nome;
+function rotuloEspecialista(e: {
+  nome: string;
+  nome_social?: string | null;
+  areas: string[] | null;
+}) {
+  const nome = e.nome_social ?? e.nome;
+  return e.areas?.length ? `${nome} · ${e.areas.join(", ")}` : nome;
 }
 
 /** Botão + dialog "Solicitar mentor especialista" — fica na ficha da dupla
@@ -44,7 +49,12 @@ export function SolicitarEspecialistaDialog({
   onOpenChange: onOpenChangeProp,
 }: {
   duplaId: string;
-  especialistas: { id: string; nome: string; areas: string[] | null }[];
+  especialistas: {
+    id: string;
+    nome: string;
+    nome_social?: string | null;
+    areas: string[] | null;
+  }[];
   /** Elemento do trigger — default é o botão padrão da casa. `null` suprime:
    *  o menu "Mais" da ficha abre o dialog controlado (REALIZA-157). */
   trigger?: React.ReactElement | null;

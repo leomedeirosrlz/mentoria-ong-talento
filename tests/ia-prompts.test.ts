@@ -81,9 +81,22 @@ describe("guardrails", () => {
   it("crise, violência e violação de direitos escalam pra humano", () => {
     expect(prompt).toContain("crise");
     // o assistente não resolve — orienta acionar gente do programa
-    expect(prompt).toContain("Supervisor de Relacionamento");
+    expect(prompt).toContain("auxiliar executivo");
     expect(prompt).toContain("coordenação");
     expect(prompt).toContain("mentoria@realiza.vc");
+  });
+
+  it("delimita o território: só mentoria, fora disso recusa gentil", () => {
+    // caso de abuso real: usar a Liza de chatbot pessoal (código, dever
+    // de casa, psicólogo) — tool nenhuma carrega esse limite, é do prompt
+    expect(prompt).toContain("território é só a mentoria");
+    expect(prompt).toContain("não responde, nem parcialmente");
+    // a recusa joga de volta pro programa, não é um muro seco
+    expect(prompt).toContain("convite concreto");
+    // insistência/jailbreak não destrava
+    expect(prompt).toContain("Insistência");
+    // e a porta continua aberta: saudação recebe resposta natural
+    expect(prompt).toContain("Saudação");
   });
 
   it("delimita o que o assistente não é: terapia, clínica, promessa", () => {
@@ -105,9 +118,13 @@ describe("guardrails", () => {
     expect(prompt).toContain("não está nos guias");
   });
 
-  it("fixa o tom: pt-BR, sem emoji, markdown leve e sem títulos", () => {
+  it("fixa o tom: pt-BR, sem emoji, markdown de chat moderno contido", () => {
     expect(prompt).toContain("pt-BR");
     expect(prompt).toContain("sem emoji");
-    expect(prompt).toContain("títulos");
+    // markdown liberado mas contido: títulos só com seções de verdade
+    expect(prompt).toContain("negrito");
+    expect(prompt).toContain("Títulos só quando");
+    // rodapé apagado pra ressalva fina
+    expect(prompt).toContain("```nota");
   });
 });

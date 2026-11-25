@@ -1659,9 +1659,12 @@ export type Database = {
       encaminhamentos: {
         Row: {
           created_at: string
+          created_by: string | null
           descricao: string
           dupla_id: string
+          feito_em: string | null
           id: string
+          numero: number | null
           prazo: string | null
           registro_id: string | null
           responsavel: string
@@ -1669,9 +1672,12 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           descricao: string
           dupla_id: string
+          feito_em?: string | null
           id?: string
+          numero?: number | null
           prazo?: string | null
           registro_id?: string | null
           responsavel?: string
@@ -1679,15 +1685,46 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           descricao?: string
           dupla_id?: string
+          feito_em?: string | null
           id?: string
+          numero?: number | null
           prazo?: string | null
           registro_id?: string | null
           responsavel?: string
           status?: Database["public"]["Enums"]["encaminhamento_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "encaminhamentos_dupla_id_fkey"
             columns: ["dupla_id"]
@@ -1719,7 +1756,7 @@ export type Database = {
           dupla_id: string
           id: string
           resumo_jornada: string | null
-          tipo: string | null
+          tipo: string
         }
         Insert: {
           checklist?: Json
@@ -1728,7 +1765,7 @@ export type Database = {
           dupla_id: string
           id?: string
           resumo_jornada?: string | null
-          tipo?: string | null
+          tipo: string
         }
         Update: {
           checklist?: Json
@@ -1737,7 +1774,7 @@ export type Database = {
           dupla_id?: string
           id?: string
           resumo_jornada?: string | null
-          tipo?: string | null
+          tipo?: string
         }
         Relationships: [
           {
@@ -1779,171 +1816,6 @@ export type Database = {
             foreignKeyName: "encerramentos_dupla_id_fkey"
             columns: ["dupla_id"]
             isOneToOne: true
-            referencedRelation: "jovem_duplas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      encontro_intencoes: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          dupla_id: string
-          feito: boolean
-          feito_em: string | null
-          id: string
-          numero: number
-          texto: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          dupla_id: string
-          feito?: boolean
-          feito_em?: string | null
-          id?: string
-          numero: number
-          texto: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          dupla_id?: string
-          feito?: boolean
-          feito_em?: string | null
-          id?: string
-          numero?: number
-          texto?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "encontro_intencoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "jovem_especialistas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_intencoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_intencoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_contato"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_intencoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_pessoal"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_intencoes_dupla_id_fkey"
-            columns: ["dupla_id"]
-            isOneToOne: false
-            referencedRelation: "duplas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_intencoes_dupla_id_fkey"
-            columns: ["dupla_id"]
-            isOneToOne: false
-            referencedRelation: "jovem_duplas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      encontro_remarcacoes: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          data_anterior: string
-          data_nova: string
-          dupla_id: string
-          encontro_id: string
-          id: string
-          motivo: string | null
-          numero: number
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          data_anterior: string
-          data_nova: string
-          dupla_id: string
-          encontro_id: string
-          id?: string
-          motivo?: string | null
-          numero: number
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          data_anterior?: string
-          data_nova?: string
-          dupla_id?: string
-          encontro_id?: string
-          id?: string
-          motivo?: string | null
-          numero?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "encontro_remarcacoes_encontro_id_fkey"
-            columns: ["encontro_id"]
-            isOneToOne: false
-            referencedRelation: "encontros"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "jovem_especialistas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_contato"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_pessoal"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_remarcacoes_dupla_id_fkey"
-            columns: ["dupla_id"]
-            isOneToOne: false
-            referencedRelation: "duplas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_remarcacoes_dupla_id_fkey"
-            columns: ["dupla_id"]
-            isOneToOne: false
             referencedRelation: "jovem_duplas"
             referencedColumns: ["id"]
           },
@@ -2018,6 +1890,92 @@ export type Database = {
             columns: ["dupla_id"]
             isOneToOne: false
             referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      encontro_remarcacoes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_anterior: string
+          data_nova: string
+          dupla_id: string
+          encontro_id: string
+          id: string
+          motivo: string | null
+          numero: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_anterior: string
+          data_nova: string
+          dupla_id: string
+          encontro_id: string
+          id?: string
+          motivo?: string | null
+          numero: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_anterior?: string
+          data_nova?: string
+          dupla_id?: string
+          encontro_id?: string
+          id?: string
+          motivo?: string | null
+          numero?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_encontro_id_fkey"
+            columns: ["encontro_id"]
+            isOneToOne: false
+            referencedRelation: "encontros"
             referencedColumns: ["id"]
           },
         ]
@@ -2646,8 +2604,10 @@ export type Database = {
           embedding_modelo: string | null
           guia: string
           id: string
+          material: string | null
           pagina: number | null
           secao: string | null
+          secao_anchor: string | null
           texto: string
           tsv: unknown
         }
@@ -2657,8 +2617,10 @@ export type Database = {
           embedding_modelo?: string | null
           guia: string
           id?: string
+          material?: string | null
           pagina?: number | null
           secao?: string | null
+          secao_anchor?: string | null
           texto: string
           tsv?: unknown
         }
@@ -2668,45 +2630,329 @@ export type Database = {
           embedding_modelo?: string | null
           guia?: string
           id?: string
+          material?: string | null
           pagina?: number | null
           secao?: string | null
+          secao_anchor?: string | null
           texto?: string
           tsv?: unknown
         }
         Relationships: []
       }
-      ia_eventos: {
+      ia_chunks_df: {
+        Row: {
+          lexema: string
+          n: number
+          origem: string
+        }
+        Insert: {
+          lexema: string
+          n: number
+          origem: string
+        }
+        Update: {
+          lexema?: string
+          n?: number
+          origem?: string
+        }
+        Relationships: []
+      }
+      ia_config: {
+        Row: {
+          atualizado_em: string
+          atualizado_por: string | null
+          chave: string
+          valor: Json
+        }
+        Insert: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          chave: string
+          valor: Json
+        }
+        Update: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          chave?: string
+          valor?: Json
+        }
+        Relationships: []
+      }
+      ia_confirmacoes: {
         Row: {
           args: Json
-          canal: string
-          created_at: string
-          duracao_ms: number | null
-          erro: string | null
+          args_hash: string
+          consumido_em: string | null
+          criado_em: string
+          expira_em: string
           id: string
-          ok: boolean
           profile_id: string
+          resumo: string
           tool: string
         }
         Insert: {
-          args?: Json
-          canal: string
-          created_at?: string
-          duracao_ms?: number | null
-          erro?: string | null
+          args: Json
+          args_hash: string
+          consumido_em?: string | null
+          criado_em?: string
+          expira_em?: string
           id?: string
-          ok: boolean
           profile_id: string
+          resumo: string
           tool: string
         }
         Update: {
           args?: Json
-          canal?: string
+          args_hash?: string
+          consumido_em?: string | null
+          criado_em?: string
+          expira_em?: string
+          id?: string
+          profile_id?: string
+          resumo?: string
+          tool?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ia_confirmacoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_confirmacoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_confirmacoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_confirmacoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ia_eval_itens: {
+        Row: {
+          caso_id: string
+          custo_usd: number | null
+          detalhe: string | null
+          executado_em: string | null
+          id: string
+          latencia_ms: number | null
+          modelo: string
+          modelo_usado: string | null
+          msg: string
+          pagina: string | null
+          repeticao: number
+          request_id: string | null
+          resposta_trecho: string | null
+          rubrica: Json | null
+          run_id: string
+          status: string
+          tokens_in: number | null
+          tokens_out: number | null
+          tools_usadas: string[] | null
+        }
+        Insert: {
+          caso_id: string
+          custo_usd?: number | null
+          detalhe?: string | null
+          executado_em?: string | null
+          id?: string
+          latencia_ms?: number | null
+          modelo: string
+          modelo_usado?: string | null
+          msg: string
+          pagina?: string | null
+          repeticao: number
+          request_id?: string | null
+          resposta_trecho?: string | null
+          rubrica?: Json | null
+          run_id: string
+          status?: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          tools_usadas?: string[] | null
+        }
+        Update: {
+          caso_id?: string
+          custo_usd?: number | null
+          detalhe?: string | null
+          executado_em?: string | null
+          id?: string
+          latencia_ms?: number | null
+          modelo?: string
+          modelo_usado?: string | null
+          msg?: string
+          pagina?: string | null
+          repeticao?: number
+          request_id?: string | null
+          resposta_trecho?: string | null
+          rubrica?: Json | null
+          run_id?: string
+          status?: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          tools_usadas?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ia_eval_itens_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ia_eval_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ia_eval_runs: {
+        Row: {
+          ambiente: string
+          casos: Json
+          created_at: string
+          created_by: string
+          erro: string | null
+          id: string
+          modelos: string[]
+          papel: string
+          repeticoes: number
+          resumo: Json | null
+          status: string
+        }
+        Insert: {
+          ambiente: string
+          casos: Json
           created_at?: string
+          created_by: string
+          erro?: string | null
+          id?: string
+          modelos: string[]
+          papel: string
+          repeticoes: number
+          resumo?: Json | null
+          status?: string
+        }
+        Update: {
+          ambiente?: string
+          casos?: Json
+          created_at?: string
+          created_by?: string
+          erro?: string | null
+          id?: string
+          modelos?: string[]
+          papel?: string
+          repeticoes?: number
+          resumo?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ia_eval_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_eval_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_eval_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_eval_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ia_eventos: {
+        Row: {
+          allowance_usd: number | null
+          args: Json
+          billing_source: string | null
+          cache_read: number | null
+          canal: string
+          created_at: string
+          custo_usd: number | null
+          duracao_ms: number | null
+          erro: string | null
+          id: string
+          iteracoes: number | null
+          modelo: string | null
+          ok: boolean
+          profile_id: string
+          request_id: string | null
+          tier: string | null
+          tokens_in: number | null
+          tokens_out: number | null
+          tokens_reasoning: number | null
+          tool: string
+        }
+        Insert: {
+          allowance_usd?: number | null
+          args?: Json
+          billing_source?: string | null
+          cache_read?: number | null
+          canal: string
+          created_at?: string
+          custo_usd?: number | null
           duracao_ms?: number | null
           erro?: string | null
           id?: string
+          iteracoes?: number | null
+          modelo?: string | null
+          ok: boolean
+          profile_id: string
+          request_id?: string | null
+          tier?: string | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          tokens_reasoning?: number | null
+          tool: string
+        }
+        Update: {
+          allowance_usd?: number | null
+          args?: Json
+          billing_source?: string | null
+          cache_read?: number | null
+          canal?: string
+          created_at?: string
+          custo_usd?: number | null
+          duracao_ms?: number | null
+          erro?: string | null
+          id?: string
+          iteracoes?: number | null
+          modelo?: string | null
           ok?: boolean
           profile_id?: string
+          request_id?: string | null
+          tier?: string | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          tokens_reasoning?: number | null
           tool?: string
         }
         Relationships: [
@@ -2733,6 +2979,68 @@ export type Database = {
           },
           {
             foreignKeyName: "ia_eventos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ia_mcp_tokens: {
+        Row: {
+          created_at: string
+          expira_em: string | null
+          id: string
+          profile_id: string
+          revogado_em: string | null
+          rotulo: string
+          token_hash: string
+          ultimo_uso_em: string | null
+        }
+        Insert: {
+          created_at?: string
+          expira_em?: string | null
+          id?: string
+          profile_id: string
+          revogado_em?: string | null
+          rotulo: string
+          token_hash: string
+          ultimo_uso_em?: string | null
+        }
+        Update: {
+          created_at?: string
+          expira_em?: string | null
+          id?: string
+          profile_id?: string
+          revogado_em?: string | null
+          rotulo?: string
+          token_hash?: string
+          ultimo_uso_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ia_mcp_tokens_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_mcp_tokens_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_mcp_tokens_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_mcp_tokens_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
@@ -3656,7 +3964,7 @@ export type Database = {
           uf: string | null
           user_id: string | null
           voluntariado: string | null
-          voluntario: boolean | null
+          voluntario: boolean
           whatsapp: string | null
         }
         Insert: {
@@ -3689,7 +3997,7 @@ export type Database = {
           uf?: string | null
           user_id?: string | null
           voluntariado?: string | null
-          voluntario?: boolean | null
+          voluntario?: boolean
           whatsapp?: string | null
         }
         Update: {
@@ -3722,7 +4030,7 @@ export type Database = {
           uf?: string | null
           user_id?: string | null
           voluntariado?: string | null
-          voluntario?: boolean | null
+          voluntario?: boolean
           whatsapp?: string | null
         }
         Relationships: []
@@ -4451,138 +4759,6 @@ export type Database = {
           },
         ]
       }
-      supervisoes: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          data: string
-          dupla_id: string | null
-          id: string
-          mentor_id: string
-          resumo: string
-          supervisor_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          data: string
-          dupla_id?: string | null
-          id?: string
-          mentor_id: string
-          resumo: string
-          supervisor_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          data?: string
-          dupla_id?: string | null
-          id?: string
-          mentor_id?: string
-          resumo?: string
-          supervisor_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "supervisoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "jovem_especialistas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_contato"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_pessoal"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_dupla_id_fkey"
-            columns: ["dupla_id"]
-            isOneToOne: false
-            referencedRelation: "duplas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_dupla_id_fkey"
-            columns: ["dupla_id"]
-            isOneToOne: false
-            referencedRelation: "jovem_duplas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_mentor_id_fkey"
-            columns: ["mentor_id"]
-            isOneToOne: false
-            referencedRelation: "jovem_especialistas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_mentor_id_fkey"
-            columns: ["mentor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_mentor_id_fkey"
-            columns: ["mentor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_contato"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_mentor_id_fkey"
-            columns: ["mentor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_pessoal"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_supervisor_id_fkey"
-            columns: ["supervisor_id"]
-            isOneToOne: false
-            referencedRelation: "jovem_especialistas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_supervisor_id_fkey"
-            columns: ["supervisor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_supervisor_id_fkey"
-            columns: ["supervisor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_contato"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_supervisor_id_fkey"
-            columns: ["supervisor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_pessoal"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       terceiros_consolidacao: {
         Row: {
           consolidado: string | null
@@ -5046,6 +5222,12 @@ export type Database = {
           },
         ]
       }
+      ia_guias_catalogo: {
+        Row: {
+          guia: string | null
+        }
+        Relationships: []
+      }
       jovem_assinaturas: {
         Row: {
           assinado_em: string | null
@@ -5488,12 +5670,15 @@ export type Database = {
           dupla_dpp_id: string | null
           dupla_id: string | null
           especialista_desejado_id: string | null
+          especialista_desejado_nome: string | null
           especialista_id: string | null
           especialista_nome: string | null
+          especialista_nome_social: string | null
           id: string | null
           justificativa_recusa: string | null
           mentorado_id: string | null
           mentorado_nome: string | null
+          mentorado_nome_social: string | null
           motivo: string | null
           origem: string | null
           respondida_em: string | null
@@ -5718,6 +5903,7 @@ export type Database = {
         Args: { p_id: string; p_para: string }
         Returns: undefined
       }
+      atualizar_ia_chunks_df: { Args: never; Returns: number }
       atualizar_tentativa_registro: {
         Args: { p_etapas?: Json; p_id: string }
         Returns: undefined
@@ -5774,6 +5960,14 @@ export type Database = {
       conflito_encontro: {
         Args: { p_data_hora: string; p_dupla: string }
         Returns: Json
+      }
+      consumir_limite_ia: {
+        Args: { p_args?: Json; p_canal?: string; p_limite?: number }
+        Returns: {
+          permitido: boolean
+          request_id: string
+          usados: number
+        }[]
       }
       contra_propor_solicitacao: {
         Args: { p_id: string; p_mensagem?: string; p_slot: string }
@@ -5906,6 +6100,67 @@ export type Database = {
             }
             Returns: boolean
           }
+      ia_confirmacao_consumir: {
+        Args: { p_args: Json; p_id: string; p_tool: string }
+        Returns: string
+      }
+      ia_confirmacao_criar: {
+        Args: { p_args: Json; p_resumo: string; p_tool: string }
+        Returns: string
+      }
+      ia_contexto_e_limite: {
+        Args: { p_args?: Json; p_canal?: string; p_limite?: number }
+        Returns: {
+          papeis: Database["public"]["Enums"]["app_role"][]
+          permitido: boolean
+          profile_id: string
+          request_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          usados: number
+        }[]
+      }
+      ia_eval_limpar: { Args: { p_run?: string }; Returns: number }
+      ia_eval_pegar_item: {
+        Args: { p_run: string }
+        Returns: {
+          caso_id: string
+          custo_usd: number | null
+          detalhe: string | null
+          executado_em: string | null
+          id: string
+          latencia_ms: number | null
+          modelo: string
+          modelo_usado: string | null
+          msg: string
+          pagina: string | null
+          repeticao: number
+          request_id: string | null
+          resposta_trecho: string | null
+          rubrica: Json | null
+          run_id: string
+          status: string
+          tokens_in: number | null
+          tokens_out: number | null
+          tools_usadas: string[] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "ia_eval_itens"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      ia_eventos_limpar: { Args: never; Returns: number }
+      ia_mcp_autorizar: {
+        Args: { p_token: string }
+        Returns: {
+          papeis: Database["public"]["Enums"]["app_role"][]
+          papel: Database["public"]["Enums"]["app_role"]
+          profile_id: string
+          user_id: string
+        }[]
+      }
+      ia_norm_query: { Args: { p: string }; Returns: string }
       importar_registros: { Args: { itens: Json }; Returns: Json }
       iniciar_tentativa_registro: {
         Args: {
@@ -5934,7 +6189,7 @@ export type Database = {
         Returns: Json
       }
       match_ia_chunks: {
-        Args: { p_limit?: number; p_query: string; p_embedding?: string | null }
+        Args: { p_embedding?: string; p_limit?: number; p_query: string }
         Returns: {
           guia: string
           pagina: number
@@ -5945,7 +6200,10 @@ export type Database = {
       }
       matching_ranquear: {
         Args: { p_id: string; p_outro_tipo: string; p_tipo: string }
-        Returns: { dono_id: string; similaridade: number }[]
+        Returns: {
+          dono_id: string
+          similaridade: number
+        }[]
       }
       meus_dados_civis: { Args: never; Returns: Json }
       meus_dados_pessoais: { Args: never; Returns: Json }
@@ -6066,15 +6324,28 @@ export type Database = {
       }
       registrar_ia_evento: {
         Args: {
+          p_allowance_usd?: number
           p_args: Json
+          p_billing_source?: string
+          p_cache_read?: number
           p_canal: string
+          p_custo_usd?: number
           p_duracao_ms?: number
           p_erro?: string
+          p_iteracoes?: number
+          p_modelo?: string
           p_ok: boolean
+          p_profile_id?: string
+          p_request_id?: string
+          p_tier?: string
+          p_tokens_in?: number
+          p_tokens_out?: number
+          p_tokens_reasoning?: number
           p_tool: string
         }
         Returns: string
       }
+      registrar_ia_eventos_lote: { Args: { p_eventos: Json }; Returns: number }
       registrar_login_handoff: {
         Args: { p_access: string; p_nonce: string; p_refresh: string }
         Returns: undefined

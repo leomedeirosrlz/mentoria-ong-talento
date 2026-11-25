@@ -29,7 +29,6 @@ import {
   comparaNome,
   foraDoPrograma,
   idade,
-  papelLabelComposto,
   SITUACAO_MENTORADO_LABEL,
 } from "@/lib/ciclo";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -592,8 +591,11 @@ export function PessoasListas({
               key={`${q}|${cat}|${ordem}|${verFora ? 1 : 0}|${verFila ? 1 : 0}|${g}`}
               // items-start: o Detalhes aberto cresce só o próprio card —
               // sem ele a linha do grid assume a altura do maior item e o
-              // card vizinho estica vazio junto
-              className="grid items-start gap-2 sm:grid-cols-2"
+              // card vizinho estica vazio junto. grid-cols-1 explícito: sem
+              // template abaixo de sm a coluna implícita dimensiona por
+              // max-content (474px com bio longa) e alarga a página —
+              // o FAB fixo ia parar fora da tela (mesma falha da agenda)
+              className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2"
             >
               {gp.map((p, i) => (
                 <PessoaRow
@@ -747,7 +749,7 @@ export function PessoasListas({
             className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden"
           >
             {/* levemente apagado — arquivo, não fila de trabalho */}
-            <div className="grid items-start gap-2 opacity-80 sm:grid-cols-2">
+            <div className="grid grid-cols-1 items-start gap-2 opacity-80 sm:grid-cols-2">
               {foraExibidos.map((m, i) => (
                 <MentoradoRow
                   key={m.id}
@@ -791,7 +793,7 @@ export function PessoasListas({
             keepMounted
             className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden"
           >
-            <div className="grid items-start gap-2 opacity-80 sm:grid-cols-2">
+            <div className="grid grid-cols-1 items-start gap-2 opacity-80 sm:grid-cols-2">
               {inativasExibidas.map((p, i) => (
                 <PessoaRow
                   key={p.id}
@@ -1012,6 +1014,16 @@ function PessoaRow({
       ? p.email
       : subtitulo || p.email;
   const semVagaDpp = temPapel(p, "mentor_dpp") && usadas.dpp >= capDpp;
+  // trilha do mentor no meta do não-coord: dentro de "Mentores" um DPP e
+  // um especialista seriam indistinguíveis sem ela (as seções separam por
+  // papel, não por trilha) — vocabulário curto do papelCurto
+  const trilha = mentor
+    ? temPapel(p, "mentor_dpp") && temPapel(p, "mentor_especialista")
+      ? "DPP + especialista"
+      : temPapel(p, "mentor_dpp")
+        ? "DPP"
+        : "Especialista"
+    : null;
   // anel do avatar por papel: híbrido conta como mentor (lima), equipe =
   // cinza neutro, sem papel fica sem anel — mesmo mapa do Badge de papel
   const papelAvatar =
@@ -1037,34 +1049,23 @@ function PessoaRow({
             "Nome email +55…" (o Avatar já é aria-hidden) */}
         <Link
           href={`/pessoas/${p.id}`}
-          aria-label={`Abrir perfil de ${p.nome}`}
+          aria-label={`Abrir perfil de ${p.nome_social ?? p.nome}`}
           className="group -my-1 flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Avatar
-            nome={p.nome}
+            nome={p.nome_social ?? p.nome}
             src={p.avatar_path ? avatarPublicUrl(p.avatar_path) : null}
             papel={papelAvatar}
             size={40}
           />
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium underline-offset-4 transition-colors group-hover:underline">
-              {p.nome}
-              {!souCoord && p.nome_social && (
-                <span className="font-normal text-muted-foreground">
-                  {" "}
-                  ({p.nome_social})
-                </span>
-              )}
+              {p.nome_social ?? p.nome}
             </span>
             <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-              {souCoord && p.role && (
-                <Badge
-                  variant="outline"
-                  className="shrink-0 px-1.5 py-0 text-[11px] font-normal text-muted-foreground"
-                >
-                  {papelLabelComposto(p)}
-                </Badge>
-              )}
+              {/* badge de papel saiu da linha: os grupos já separam por
+                  papel e o meta carrega a trilha ("DPP 1/2 · Esp 0/1") —
+                  o espaço vai pro contexto/bio da pessoa */}
               <span className="truncate">
                 {souCoord ? (
                   <>
@@ -1076,7 +1077,7 @@ function PessoaRow({
                     )}
                   </>
                 ) : (
-                  subtitulo || "\u00A0"
+                  [trilha, subtitulo].filter(Boolean).join(" · ") || "\u00A0"
                 )}
               </span>
             </span>
@@ -1100,11 +1101,9 @@ function PessoaRow({
             )}
           </span>
         </Link>
-        {!souCoord && p.role && (
-          <Badge variant="outline" className="ml-auto shrink-0 text-xs font-normal">
-            {papelLabelComposto(p)}
-          </Badge>
-        )}
+        {/* idem pro não-coord: sem badge de papel à direita — a seção já
+            nomeia o grupo e o subtítulo (cargo · empresa / cidade · UF)
+            vale mais que repetir o rótulo */}
         {souCoord && !p.ativo && !emInativos && (
           <Badge variant="outline" className="text-xs shrink-0 border-[var(--danger)]/50 text-[var(--danger)]">
             inativa
@@ -1123,12 +1122,13 @@ function PessoaRow({
         )}
         {/* capacidade X/Y e e-mail saíram da linha — ocupação vai no meta,
             contato e pendências em "Detalhes" (rodada out/2026) */}
-        {souCoord && <DetalhesTrigger temPendencia={temPendencia} />}
         {/* a troca de papel mora no ⋮ ("Alterar papel" — ação rara, não é
             do dia a dia): a linha fica só com o ⋮ no cluster e o espaço do
-            select vira respiro pro meta */}
+            select vira respiro pro meta. Detalhes + ⋮ num cluster só pra
+            quebrarem juntos — badge extra empurrava o ⋮ órfão pra linha 2 */}
         {souCoord && (
           <div className="flex w-full items-center justify-end gap-2 sm:ml-auto sm:w-auto">
+            <DetalhesTrigger temPendencia={temPendencia} />
             <PessoaActions
               pessoa={p}
               // mesma guarda do server: qualquer dupla (até encerrada) bloqueia excluir
@@ -1138,7 +1138,7 @@ function PessoaRow({
         )}
       </div>
       {souCoord && mentor && (
-        <DetalhesRegiao id={detalhesId} nome={p.nome}>
+        <DetalhesRegiao id={detalhesId} nome={p.nome_social ?? p.nome}>
           <ItemDetalhe icone={Users}>
             {/* X/Y explícito (REALIZA-116): ativas + pausadas contra o teto
                 da pool — o "sem vaga" avisa que o próximo par pede ajuste.
@@ -1159,7 +1159,7 @@ function PessoaRow({
                 {" · "}
                 <CapacidadeMentorDialog
                   mentorId={p.id}
-                  nome={p.nome}
+                  nome={p.nome_social ?? p.nome}
                   atual={capacidade}
                   emUso={usoPrimario}
                   trilha={trilhaPrimaria}
@@ -1200,7 +1200,7 @@ function PessoaRow({
                         {" · "}
                         <CapacidadeMentorDialog
                           mentorId={p.id}
-                          nome={p.nome}
+                          nome={p.nome_social ?? p.nome}
                           atual={cap2}
                           emUso={uso2}
                           trilha={trilha2}
@@ -1278,7 +1278,7 @@ function PessoaRow({
       {/* equipe sem papel de mentor (coordenação, supervisor, auxiliar,
           pré-cadastro): pendências + contato — mesma gramática do mentor */}
       {souCoord && !mentor && (
-        <DetalhesRegiao id={detalhesId} nome={p.nome}>
+        <DetalhesRegiao id={detalhesId} nome={p.nome_social ?? p.nome}>
           {p.voluntario !== false &&
             !papelEhMentorado &&
             (termoOk ? (
@@ -1398,11 +1398,11 @@ function MentoradoRow({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <Link
           href={`/pessoas/${m.id}`}
-          aria-label={`Abrir perfil de ${m.nome}`}
+          aria-label={`Abrir perfil de ${m.nome_social ?? m.nome}`}
           className="group -my-1 flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Avatar
-            nome={m.nome}
+            nome={m.nome_social ?? m.nome}
             src={m.avatar_path ? avatarPublicUrl(m.avatar_path) : null}
             papel="mentorado"
             size={40}
@@ -1415,7 +1415,7 @@ function MentoradoRow({
                   fora && "text-muted-foreground"
                 )}
               >
-                {m.nome}
+                {m.nome_social ?? m.nome}
               </span>
             </span>
             <span className="mt-0.5 block truncate text-xs text-muted-foreground">
@@ -1455,11 +1455,11 @@ function MentoradoRow({
                 : "termo pendente"}
           </Badge>
         )}
-        {souCoord && temDocs && (
-          <DetalhesTrigger temPendencia={temPendencia} />
-        )}
+        {/* Detalhes + ⋮ no mesmo cluster — quebram juntos pra linha 2, sem
+            ⋮ órfão quando o badge de termo empurra a linha */}
         {souCoord && (
           <div className="flex items-center gap-2 ml-auto">
+            {temDocs && <DetalhesTrigger temPendencia={temPendencia} />}
             <MentoradoActions
               mentorado={m}
               temDupla={temDupla}
@@ -1469,7 +1469,7 @@ function MentoradoRow({
         )}
       </div>
       {souCoord && temDocs && (
-        <DetalhesRegiao id={detalhesId} nome={m.nome}>
+        <DetalhesRegiao id={detalhesId} nome={m.nome_social ?? m.nome}>
           {/* whatsapp saiu do meta (rodada out/2026) — contato fica aqui */}
           {m.whatsapp && (
             <ItemDetalhe icone={WhatsappLogo}>

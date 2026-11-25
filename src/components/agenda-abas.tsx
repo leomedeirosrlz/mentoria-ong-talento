@@ -4,12 +4,8 @@ import type { KeyboardEvent } from "react";
 import { useRef } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import {
-  PAINEL_AGENDA,
-  idDaAba,
-  type AbaAgendaId,
-  type AbaAgendaItem,
-} from "@/lib/agenda-abas";
+import { useFadeX } from "@/lib/use-fade-x";
+import { PAINEL_AGENDA } from "@/lib/agenda-abas";
 
 /** O alternador de visão da agenda — UM por página, no header.
  *
@@ -25,11 +21,18 @@ import {
 export function AbasAgenda({
   abas,
   ativa,
+  painelId = PAINEL_AGENDA,
+  idPrefix = "aba-agenda",
+  ariaLabel = "Modos da agenda",
 }: {
-  abas: AbaAgendaItem[];
-  ativa: AbaAgendaId;
+  abas: { id: string; rotulo: string; href: string }[];
+  ativa: string;
+  painelId?: string;
+  idPrefix?: string;
+  ariaLabel?: string;
 }) {
   const refs = useRef<Record<string, HTMLAnchorElement | null>>({});
+  const { ref, maskStyle } = useFadeX<HTMLDivElement>();
   if (abas.length < 2) return null;
 
   // a aba ativa é a única parada de Tab; se o id não estiver na lista (param
@@ -56,8 +59,10 @@ export function AbasAgenda({
   return (
     <div
       role="tablist"
-      aria-label="Modos da agenda"
-      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto overscroll-x-contain rounded-lg bg-muted p-1"
+      aria-label={ariaLabel}
+      ref={ref}
+      style={maskStyle}
+      className="flex w-fit max-w-full items-center gap-1 overflow-x-auto overscroll-x-contain rounded-lg bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {abas.map((aba, i) => {
         const selecionada = aba.id === ativa;
@@ -67,10 +72,10 @@ export function AbasAgenda({
             ref={(el) => {
               refs.current[aba.id] = el;
             }}
-            id={idDaAba(aba.id)}
+            id={`${idPrefix}-${aba.id}`}
             role="tab"
             aria-selected={selecionada}
-            aria-controls={PAINEL_AGENDA}
+            aria-controls={painelId}
             tabIndex={i === indiceAtivo ? 0 : -1}
             href={aba.href}
             scroll={false}

@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { AudienciasPicker } from "@/components/audiencias-picker";
 import type { Audiencia } from "@/lib/materiais";
+import { novoUuid } from "@/lib/uuid";
 
 // labels registradas nos Selects — sem elas o trigger fechado mostra o valor
 // cru do enum ("dpp", "coordenacao")
@@ -113,7 +114,7 @@ export function NovoMaterialDialog({
       }
       // path antes do submit: a row de materiais precisa nascer com ele — a
       // policy de INSERT do storage só aceita objeto com path = name na row
-      fd.set("path", `materiais/${crypto.randomUUID()}-${saneiaNome(file.name)}`);
+      fd.set("path", `materiais/${novoUuid()}-${saneiaNome(file.name)}`);
     }
 
     start(async () => {

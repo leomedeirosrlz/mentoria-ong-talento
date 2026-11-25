@@ -141,7 +141,7 @@ export function SugestaoEspecialistaCard({
           <DialogHeader>
             <DialogTitle>Confirmar pedido de especialista</DialogTitle>
             <DialogDescription>
-              A sugestão é do seu mentor, mas a demanda é sua. Ajuste o que
+              A sugestão é do seu mentor, mas o pedido é seu. Ajuste o que
               quiser antes de enviar.
             </DialogDescription>
           </DialogHeader>

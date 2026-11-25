@@ -142,7 +142,7 @@ test.describe("coordenação — instrumentos da jornada em /materiais", () => {
     await expect(rodaFormal).toBeVisible();
     if (
       await rodaFormal
-        .getByText("janela não aberta")
+        .getByText("ainda não abriu")
         .first()
         .isVisible()
         .catch(() => false)

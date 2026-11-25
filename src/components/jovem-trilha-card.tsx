@@ -181,7 +181,7 @@ export function JovemTrilhaCard({
     const quando = passoVivo.encontro?.data_hora;
     frase = `Sessão ${proximoPasso} marcada${quando ? ` pra ${rotuloSlot(quando)}` : ""}.`;
   } else if (passoVivo?.estado === "a_confirmar") {
-    frase = `A sessão ${proximoPasso} aguarda o registro de ${primeiro}.`;
+    frase = `A sessão ${proximoPasso} já passou. Falta confirmar como foi com ${primeiro}.`;
   } else if (passoVivo?.estado === "furou") {
     frase = `A sessão ${proximoPasso} não aconteceu.`;
     acao = (

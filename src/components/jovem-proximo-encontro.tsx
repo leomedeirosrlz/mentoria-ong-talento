@@ -1,6 +1,13 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { PencilSimple, Sparkle, VideoCamera } from "@phosphor-icons/react/dist/ssr";
+import {
+  CalendarBlank,
+  CalendarCheck,
+  CalendarPlus,
+  PencilSimple,
+  Sparkle,
+  VideoCamera,
+} from "@phosphor-icons/react/dist/ssr";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -55,11 +62,11 @@ export function ProximoEncontro({
     const quando = quandoCurto(proximo.data_hora!, eHoje);
     const remarcado = proximo.status === "remarcado" ? " · remarcado" : "";
     return (
-      <Casca {...cabecalho} titulo="Seu próximo encontro">
-        <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
+      <Casca {...cabecalho} titulo="Seu próximo encontro" icone={eHoje && link ? VideoCamera : CalendarCheck}>
+        <p className="mt-3 text-xl font-semibold tracking-tight text-balance">
           {rotulo ?? `${proximo.numero}º encontro`}
         </p>
-        <p className="mt-1 text-sm">
+        <p className="mt-1 text-base font-medium">
           {quando}
           {remarcado}
         </p>
@@ -91,7 +98,7 @@ export function ProximoEncontro({
               encontroId={proximo.id}
               linkAtual={proximo.link}
               trigger={
-                <Button variant="ghost" size="sm" className="text-sm">
+                <Button variant="ghost" size="sm" className="h-11 w-full text-sm sm:h-8 sm:w-auto">
                   <PencilSimple size={16} aria-hidden />
                   Trocar link da chamada
                 </Button>
@@ -105,8 +112,8 @@ export function ProximoEncontro({
 
   if (concluida) {
     return (
-      <Casca {...cabecalho} titulo="Sua jornada">
-        <p className="mt-2 flex items-center gap-2 text-xl font-semibold tracking-tight">
+      <Casca {...cabecalho} titulo="Sua jornada" icone={Sparkle}>
+        <p className="mt-3 flex items-center gap-2 text-xl font-semibold tracking-tight">
           <Sparkle size={22} weight="fill" aria-hidden />
           Jornada concluída
         </p>
@@ -119,8 +126,8 @@ export function ProximoEncontro({
 
   if (agendar) {
     return (
-      <Casca {...cabecalho} titulo="Seu próximo encontro">
-        <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
+      <Casca {...cabecalho} titulo="Seu próximo encontro" icone={CalendarPlus}>
+        <p className="mt-3 text-xl font-semibold tracking-tight text-balance">
           O {agendar.numero}º encontro ainda não tem data
         </p>
         <p className="mt-1 text-sm">Escolham juntos o dia e a hora.</p>
@@ -142,8 +149,8 @@ export function ProximoEncontro({
 
   if (emCurso) {
     return (
-      <Casca {...cabecalho} titulo="Seu próximo encontro">
-        <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
+      <Casca {...cabecalho} titulo="Seu próximo encontro" icone={CalendarBlank}>
+        <p className="mt-3 text-xl font-semibold tracking-tight text-balance">
           Nenhum encontro marcado
         </p>
         <p className="mt-1 text-sm">
@@ -165,8 +172,8 @@ export function ProximoEncontro({
   }
 
   return (
-    <Casca {...cabecalho} titulo="Seu próximo encontro">
-      <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
+    <Casca {...cabecalho} titulo="Seu próximo encontro" icone={CalendarBlank}>
+      <p className="mt-3 text-xl font-semibold tracking-tight text-balance">
         Sua mentoria começa em breve
       </p>
       <p className="mt-1 text-sm">
@@ -178,10 +185,12 @@ export function ProximoEncontro({
 
 function Casca({
   titulo,
+  icone: Icone,
   style,
   children,
 }: {
   titulo: string;
+  icone: typeof CalendarBlank;
   style: CSSProperties;
   children: React.ReactNode;
 }) {
@@ -193,8 +202,14 @@ function Casca({
     >
       <h2
         id="proximo-titulo"
-        className="text-xs font-semibold uppercase tracking-[0.08em]"
+        className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.08em]"
       >
+        <span
+          aria-hidden
+          className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--destaque)] text-[var(--destaque-foreground)]"
+        >
+          <Icone size={20} weight="bold" />
+        </span>
         {titulo}
       </h2>
       {children}
@@ -204,7 +219,7 @@ function Casca({
 
 function Acoes({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-2">{children}</div>
+    <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">{children}</div>
   );
 }
 

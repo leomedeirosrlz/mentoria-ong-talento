@@ -3,6 +3,7 @@ import { passosDaTrilha } from "@/lib/ciclo";
 import {
   CHECKLIST_ENCERRAMENTO,
   dadosResumoJornada,
+  encerramentoDecidido,
   mediaAvaliacaoLabel,
   prazoTrilhaEspecialista,
   textoResumoJornada,
@@ -132,6 +133,20 @@ describe("dadosResumoJornada", () => {
     expect(r.ultimosRegistros.map((u) => u.numero)).toEqual([4, 3, 2]);
     // sem realizado_em a data cai na data_hora agendada
     expect(r.ultimosRegistros[0].data).toBe("2025-10-04T19:00:00-03:00");
+  });
+});
+
+describe("encerramentoDecidido", () => {
+  it("'pendente' (row do último encontro, 0156) não é decisão", () => {
+    expect(encerramentoDecidido({ tipo: "pendente" })).toBe(false);
+  });
+  it("sem row não é decisão", () => {
+    expect(encerramentoDecidido(null)).toBe(false);
+    expect(encerramentoDecidido(undefined)).toBe(false);
+  });
+  it("concluida e encerrada são decisão", () => {
+    expect(encerramentoDecidido({ tipo: "concluida" })).toBe(true);
+    expect(encerramentoDecidido({ tipo: "encerrada" })).toBe(true);
   });
 });
 

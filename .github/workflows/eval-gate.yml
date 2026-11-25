@@ -1,0 +1,192 @@
+name: eval-gate
+
+# Live evals of Liza on FREE models, gated to PRs that touch the assistant
+# surface (corpus, tools, prompts, route, bubble components, migrations —
+# plus the eval runner itself and this file). The deterministic contract
+# half of the corpus already runs inside `pnpm test` on ci.yml for every
+# push; this gate exists for the half that only a real provider catches:
+# tool choice, refusals, injection and cross-tenant probing.
+#
+# The app runs against a FREE-tier model on purpose: the gate measures
+# product behavior, not model quality, and free slugs don't spend plan
+# quota. The slugs come from the provider catalog (GET /models filtered
+# by *-free) instead of a hardcoded name — the catalog cycles and a pinned
+# slug would silently 404 months from now.
+#
+# Secret guard: IA_API_BASE/IA_API_KEY may not exist in this repo yet.
+# Until they're set, the `segredos` job emits a ::notice:: and the eval
+# job is skipped — the gate stays informative instead of red. Once the
+# secrets exist, the eval runs for real.
+
+on:
+  pull_request:
+    paths:
+      - "tests/evals/**"
+      - "src/lib/ia/**"
+      - "src/app/api/ia/**"
+      - "src/components/assistente-*.tsx"
+      - "supabase/migrations/**"
+      - "scripts/eval-ia.mjs"
+      - ".github/workflows/eval-gate.yml"
+  workflow_dispatch:
+    inputs:
+      modelos:
+        description: "model slugs, comma-separated (default: first *-free slug in the provider catalog)"
+        required: false
+        default: ""
+
+concurrency:
+  group: eval-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Same pattern as e2e-app's `modo`: one job resolves whether the run can
+  # happen, the heavy job keys off its output — so a missing secret is a
+  # green skip, not ten skipped steps pretending to be a gate.
+  segredos:
+    runs-on: ubuntu-latest
+    outputs:
+      ok: ${{ steps.g.outputs.ok }}
+    steps:
+      - name: IA_API_BASE + IA_API_KEY present?
+        id: g
+        env:
+          IA_API_BASE: ${{ secrets.IA_API_BASE }}
+          IA_API_KEY: ${{ secrets.IA_API_KEY }}
+        run: |
+          if [ -n "$IA_API_BASE" ] && [ -n "$IA_API_KEY" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::eval gate skipped — set the IA_API_BASE and IA_API_KEY repo secrets (Zen gateway) to enable live evals on free models. Until then this gate is informative only."
+          fi
+
+  eval:
+    needs: segredos
+    if: needs.segredos.outputs.ok == 'true'
+    runs-on: ubuntu-latest
+    # supabase pull + install + build ~8min; each papel run is ~20
+    # sequential chat requests against a free model, paced by the 20
+    # msg/60s rate limit — the 429 retry in eval-ia.mjs makes it slow,
+    # not flaky
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm comes from package.json's packageManager — pinning a version
+      # here conflicts ("Multiple versions of pnpm specified")
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # same local stack as e2e-app.yml: migrations + seed.sql fresh per
+      # run, no staging dependency, no free-tier 504
+      - name: supabase local
+        run: >-
+          pnpm exec supabase start
+          -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+      - name: capture local supabase envs
+        # status -o env emits values WITH quotes (API_URL="http://...")
+        # and $GITHUB_ENV doesn't unquote — same fix as e2e-app
+        run: |
+          pnpm exec supabase status -o env \
+            | grep -E '^\w+=".*"$' \
+            | sed -E 's/^(\w+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"
+      - name: e2e fixtures + RAG corpus
+        # seed-e2e creates the accounts the eval logs in as
+        # (e2e-coord@realiza.test staff side, jovem-e2e@realiza.test
+        # mentorado side). ingerir-guias fills ia_chunks so guia_consulta
+        # has the guides — without it the guia case would be vacuous.
+        run: |
+          node scripts/seed-e2e-staging.mjs
+          node scripts/ingerir-guias.mjs --apply
+        env:
+          E2E_SUPABASE_URL: ${{ env.API_URL }}
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
+          E2E_MENTOR_PASSWORD: e2e-senha-teste
+          # optional secret — without it the seed falls back to the
+          # mentor password, same as e2e-app
+          E2E_COORD_PASSWORD: ${{ secrets.E2E_COORD_PASSWORD || 'e2e-senha-teste' }}
+          # env names ingerir-guias reads
+          SUPABASE_URL: ${{ env.API_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
+      - name: build + start
+        # NEXT_PUBLIC_* are baked into the bundle at build time — they
+        # must be set on the same step as `pnpm build`, not only on start.
+        # IA_EVAL_KEY is an internal door key (the x-ia-eval-key header
+        # must match it for the `modelo` override to apply), not a real
+        # secret — fixed value is fine. IA_MODEL just has to be non-empty
+        # for providerConfigurado(); every eval request overrides it.
+        run: |
+          pnpm build
+          nohup pnpm start > /tmp/app.log 2>&1 &
+          npx wait-on http://localhost:3000/login -t 120000
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.API_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
+          IA_BOLHA: "1"
+          IA_API_BASE: ${{ secrets.IA_API_BASE }}
+          IA_API_KEY: ${{ secrets.IA_API_KEY }}
+          IA_MODEL: beam-free
+          IA_EVAL_KEY: eval-ci-key
+          RESEND_API_KEY: re_placeholder
+          EMAIL_FROM: noreply@realiza.vc
+      - name: free models from the provider catalog
+        # *-free slugs aren't in TETOS_GO_USD (that table only covers paid
+        # models — the comment there calls the free ones out by absence).
+        # We take ONE slug: each extra model replays the whole corpus and
+        # the run is already at the edge of the chat rate limit; model
+        # breadth belongs to the /ia panel, not the gate.
+        id: modelos
+        env:
+          IA_API_BASE: ${{ secrets.IA_API_BASE }}
+          IA_API_KEY: ${{ secrets.IA_API_KEY }}
+        run: |
+          LISTA=$(node scripts/eval-modelos-free.mjs || true)
+          if [ -z "$LISTA" ]; then
+            echo "::warning::catalog returned no *-free slug — falling back to beam-free"
+            LISTA="beam-free"
+          fi
+          echo "lista=$LISTA" >> "$GITHUB_OUTPUT"
+          echo "modelos free: $LISTA"
+      - name: eval live — staff
+        if: steps.modelos.outcome == 'success'
+        env:
+          EVAL_BASE_URL: http://localhost:3000
+          EVAL_PAPEL: staff
+          EVAL_EMAIL: e2e-coord@realiza.test
+          EVAL_SENHA: ${{ secrets.E2E_COORD_PASSWORD || 'e2e-senha-teste' }}
+          EVAL_SUPABASE_URL: ${{ env.API_URL }}
+          EVAL_SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
+          EVAL_MODELOS: ${{ inputs.modelos || steps.modelos.outputs.lista }}
+          IA_EVAL_KEY: eval-ci-key
+          # low floor on purpose: free models miss more on tool choice and
+          # fine rubric, so a high floor would flake every PR. The gate
+          # catches catastrophic regression (infra errors or the rate
+          # collapsing to ~0) — nuance stays in the manual /ia run.
+          EVAL_GATE_PISO: "0.6"
+        run: node scripts/eval-ia.mjs --live --gate
+      - name: eval live — mentorado
+        # not `success()`: the mentorado corpus still runs when the staff
+        # step failed — infra setup (the part that can break) is behind
+        # the modelos step, and a red staff step shouldn't hide the rest
+        if: steps.modelos.outcome == 'success'
+        env:
+          EVAL_BASE_URL: http://localhost:3000
+          EVAL_PAPEL: mentorado
+          EVAL_EMAIL_JOVEM: jovem-e2e@realiza.test
+          EVAL_SENHA_JOVEM: e2e-senha-teste
+          EVAL_SUPABASE_URL: ${{ env.API_URL }}
+          EVAL_SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
+          EVAL_MODELOS: ${{ inputs.modelos || steps.modelos.outputs.lista }}
+          IA_EVAL_KEY: eval-ci-key
+          EVAL_GATE_PISO: "0.6"
+        run: node scripts/eval-ia.mjs --live --gate
+      - name: app log on failure
+        if: failure()
+        run: tail -200 /tmp/app.log || true

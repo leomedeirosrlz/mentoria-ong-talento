@@ -57,7 +57,11 @@ export function NumerosSemanaSecao({
           <div
             role="group"
             aria-label="Recortar os números por turma"
-            className="flex items-center gap-2"
+            // w-full no mobile: a fileira pula pra linha própria e os
+            // chips quebram dentro dela — o grupo sem wrap (562px com 4+
+            // turmas) estourava o flex-wrap do pai e alargava a página
+            // inteira, levando o FAB fixo pra fora da tela
+            className="flex flex-wrap items-center gap-2 w-full sm:w-auto"
           >
             {opcoes.map((o) => (
               <button

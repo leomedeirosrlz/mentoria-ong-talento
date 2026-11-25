@@ -3,8 +3,13 @@ import {
   ANEXO_I_PARAGRAFOS,
   ANEXO_I_TITULO,
   civisPreview,
+  CLAUSULAS_MENTORANDO,
   CLAUSULAS_TERMO,
+  dataPorExtenso,
+  FECHO_MENTORANDO,
   FECHO_TERMO,
+  MENTORANDO_TITULO,
+  preambuloMentorando,
   preambuloTermo,
   TERMO_TITULO,
 } from "@/lib/documentos/texto";
@@ -83,6 +88,67 @@ export function TermoVoluntarioDoc({
               ))}
             </div>
           </details>
+        </div>
+        {continuar && (
+          <p className="mt-6 border-t border-border pt-5 text-center font-sans">
+            <a
+              href={continuar.href}
+              className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
+            >
+              {continuar.rotulo}
+            </a>
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** Documento integral do termo de adesão e participação do(a) mentorado(a)
+ *  — o jovem assina. Mesma gramática visual do TermoVoluntarioDoc (serif,
+ *  cláusulas, fecho + data por extenso, link de continuar): um doc só, duas
+ *  portas de entrada (/assinar/[token] e o passo de termo do onboarding do
+ *  jovem). A autorização do responsável não entra aqui — ela é assinada por
+ *  fora, no link público. */
+export function TermoMentorandoDoc({
+  civis,
+  id,
+  continuar,
+}: {
+  civis?: Partial<DadosCivis> | null;
+  id?: string;
+  continuar?: { href: string; rotulo: string };
+}) {
+  return (
+    <section
+      id={id}
+      aria-label="Texto completo do termo"
+      className="scroll-mt-4 rounded-xl bg-card shadow-[var(--shadow-border)]"
+    >
+      <div className="px-5 py-6 sm:px-8">
+        <div className="space-y-4 font-serif text-[15px] leading-relaxed">
+          <h2 className="text-center font-bold uppercase tracking-wide">
+            {MENTORANDO_TITULO}
+          </h2>
+          {preambuloMentorando(civisPreview(civis)).map((p, i) => (
+            <p key={i} className="text-left sm:text-justify">
+              {p}
+            </p>
+          ))}
+          {CLAUSULAS_MENTORANDO.map(([titulo, paragrafos]) => (
+            <div key={titulo} className="space-y-2">
+              <h3 className="font-bold uppercase">{titulo}</h3>
+              {paragrafos.map((p, i) => (
+                <p key={i} className="text-left sm:text-justify">
+                  {p}
+                </p>
+              ))}
+            </div>
+          ))}
+          <p className="text-left sm:text-justify">{FECHO_MENTORANDO}</p>
+          <p className="text-left sm:text-justify">
+            {dataPorExtenso(new Date())}
+          </p>
         </div>
         {continuar && (
           <p className="mt-6 border-t border-border pt-5 text-center font-sans">

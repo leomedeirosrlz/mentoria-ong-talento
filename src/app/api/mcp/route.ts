@@ -5,13 +5,13 @@
 // cookie) e o envelope (JSON-RPC no lugar de SSE).
 //
 // Auth: `Authorization: Bearer rlz_mcp_…` — a RPC ia_mcp_autorizar
-// resolve sha256 → profile + papéis. Fase 1 é staff: coord + supervisor
-// (gate abaixo — Thiago confirmou supervisor dentro); expandir papel =
-// incluir no check + revisar o allowlist de tools.
-// Execução: client service-role + papéis forçados — como só staff entra
-// na fase 1, o escopo que a RLS daria é o mesmo que o service vê
-// (coord/supervisor enxergam tudo por desenho). Quando outros papéis
-// entrarem, o client vira JWT-impersonado — registrar nesse comentário.
+// resolve sha256 → profile + papéis. Todos os papéis conectam (fase
+// escrita): o gate PAPEIS_MCP cobre o programa inteiro e o allowlist
+// fino mora no `roles` de cada tool.
+// Execução: JWT-impersonado do dono do PAT (clientImpersonado) — a RLS
+// decide o escopo exatamente como no chat; service-role só autentica o
+// token. Tools `escreve` passam pelo envelope pendente_confirmacao (0163):
+// a 1ª chamada devolve prévia sem efeito, a 2ª consome e executa.
 //
 // A rota fica FORA da auth do proxy: o middleware só protege páginas;
 // /api/* passa direto e quem barra é o Bearer aqui.
@@ -20,16 +20,25 @@ import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { executarTool, IA_TOOL_CATALOGO } from "@/lib/ia/tools";
-import { checarLimiteIa } from "@/lib/ia/rate-limit";
+import { MCP_INSTRUCOES } from "@/lib/ia/mcp-prompt";
+import { consumirLimiteIa } from "@/lib/ia/rate-limit";
+import { clientImpersonado } from "@/lib/ia/impersonar";
 import type { AppRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-// papéis que conectam via MCP na fase 1 — o allowlist de tools foi
-// revisado pro escopo staff (coord/supervisor enxergam tudo; quando um
-// papel de mentor entrar, revisar tools antes de abrir)
-const PAPEIS_MCP: readonly AppRole[] = ["coordenacao", "supervisor"];
+// todos os papéis conectam via MCP (fase escrita): a execução roda sob o
+// JWT real do dono — RLS + allowlist `roles` de cada tool + o envelope
+// pendente_confirmacao pra qualquer escrita; este gate passou a ser só
+// "tem papel no programa", não mais staff-only
+const PAPEIS_MCP: readonly AppRole[] = [
+  "coordenacao",
+  "supervisor",
+  "mentor_dpp",
+  "mentor_especialista",
+  "mentorado",
+];
 
 const Rpc = z.object({
   jsonrpc: z.literal("2.0"),
@@ -51,9 +60,11 @@ function rpcErro(id: unknown, code: number, message: string) {
   });
 }
 
-/** Service client pra execução das tools — o PAT não vira JWT, então as
- *  queries rodam como service; o escopo certo vem do gate de papel (fase
- *  1 = só staff, que já enxerga tudo) + dos papéis forçados no registry. */
+/** Service client SÓ pra autenticar o PAT (ia_mcp_autorizar roda antes de
+ *  sabermos quem é o dono). A execução das tools usa clientImpersonado —
+ *  JWT real do dono, RLS decide o escopo (sdd D1). Service-role bypassaria
+ *  a RLS: um PAT de supervisor leria como coordenador — priv-esc por canal
+ *  externo com credencial de longa duração. */
 function clientServico() {
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,7 +74,7 @@ function clientServico() {
 }
 
 export async function POST(req: Request) {
-  // ---- auth: Bearer PAT → profile + papéis (gate coord/staff) ----
+  // ---- auth: Bearer PAT → profile + papéis (papel no programa) ----
   const token = /^Bearer\s+(.+)$/.exec(req.headers.get("authorization") ?? "")
     ?.[1]?.trim();
   if (!token) {
@@ -77,7 +88,12 @@ export async function POST(req: Request) {
     p_token: token,
   });
   const autorizado = authRows?.[0] as
-    | { profile_id: string; papel: AppRole | null; papeis: AppRole[] }
+    | {
+        profile_id: string;
+        user_id: string | null;
+        papel: AppRole | null;
+        papeis: AppRole[];
+      }
     | undefined;
   if (!autorizado) {
     return NextResponse.json(
@@ -114,6 +130,7 @@ export async function POST(req: Request) {
         protocolVersion: PROTOCOLO,
         capabilities: { tools: {} },
         serverInfo: { name: "realiza-mcp", version: "1.0.0" },
+        instructions: MCP_INSTRUCOES,
       });
     case "ping":
       return rpcResult(id, {});
@@ -133,9 +150,36 @@ export async function POST(req: Request) {
       if (typeof nome !== "string") {
         return rpcErro(id, -32602, "params.name ausente.");
       }
+      // execução com o JWT real do dono do PAT (sdd D1): RLS escopa as
+      // queries — supervisor vê só o supervisionado, como no chat.
+      // Fail-closed: sem sessão mintada a rota não cai de volta pro
+      // service-role (seria o priv-esc que estamos fechando)
+      if (!autorizado.user_id) {
+        return rpcErro(id, -32000, "Conta sem usuário vinculado.");
+      }
+      const clientExec = await clientImpersonado(autorizado.user_id);
+      if (!clientExec) {
+        return rpcErro(
+          id,
+          -32000,
+          "Não consegui autenticar a execução — tente de novo."
+        );
+      }
+      // gate por papel ANTES de reservar o slot do rate-limit — chamada
+      // negada não pode queimar a cota do dono
+      const tool = IA_TOOL_CATALOGO.find((t) => t.nome === nome);
+      if (!tool) return rpcErro(id, -32602, "Tool desconhecida.");
+      if (!tool.roles.some((r) => papeis.includes(r))) {
+        return rpcErro(
+          id,
+          -32000,
+          "Esta consulta não está disponível pro seu papel."
+        );
+      }
       // mesmo limite do chat (20/min por pessoa) — a PAT é da pessoa, o
-      // dono responde pelo uso dela
-      if (await checarLimiteIa(supabase, autorizado.profile_id)) {
+      // dono responde pelo uso dela; a reserva é atômica sob lock
+      const limite = await consumirLimiteIa(clientExec, { tool: nome }, "mcp");
+      if (!limite.permitido) {
         return rpcErro(
           id,
           -32000,
@@ -145,10 +189,11 @@ export async function POST(req: Request) {
       const r = await executarTool(
         nome,
         args,
-        supabase,
+        clientExec,
         "mcp",
         papeis,
-        autorizado.profile_id
+        undefined,
+        limite.requestId
       );
       if (!r.ok) {
         return rpcResult(id, {

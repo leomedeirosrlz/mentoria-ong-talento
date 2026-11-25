@@ -25,13 +25,18 @@ import {
   Plus,
   X,
 } from "@phosphor-icons/react";
+import { usePathname } from "next/navigation";
 import { AssistenteConfig } from "@/components/assistente-config";
-import { AssistenteConversa } from "@/components/assistente-conversa";
-// conceito escolhido: Balão — os três protótipos dividem o contrato
-// ReaProps (rea/tipos.ts), então trocar de conceito é trocar o import
-import { ReaBalao } from "@/components/rea/rea-balao";
-import type { ReaEstado } from "@/components/rea/tipos";
-import { useMomento } from "@/components/rea/use-olhar";
+import {
+  AssistenteConversa,
+  sugestoes,
+} from "@/components/assistente-conversa";
+// conceito escolhido: Blob — os três protótipos dividem o contrato
+// LizaProps (liza/tipos.ts), então trocar de conceito é trocar o import
+import { LizaBlob } from "@/components/liza/liza-blob";
+import { LizaFala, LizaRotulo } from "@/components/liza/liza-fala";
+import type { LizaEstado } from "@/components/liza/tipos";
+import { useMomento } from "@/components/liza/use-olhar";
 import {
   Popover,
   PopoverContent,
@@ -40,6 +45,14 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+  APRESENTACOES_MAX,
+  DURACAO_FALA,
+  FALA_PRONTO,
+  proximaFala,
+  type FalaLiza,
+  type MemoriaFalas,
+} from "@/lib/liza-falas";
 import type { AppRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -50,7 +63,7 @@ const FAB_POS =
   "fixed z-40 right-[max(1rem,env(safe-area-inset-right))] bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6";
 
 const FAB_CLS =
-  "grid size-12 md:size-14 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)] outline-none transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 hover:shadow-[var(--shadow-modal)] active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-offset-2";
+  "group/fab grid size-12 md:size-14 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)] outline-none transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 hover:shadow-[var(--shadow-modal)] active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-offset-2";
 
 // tamanho vem de --painel-w/--painel-h (inline, redimensionável); o min()
 // segura viewport estreita e o --available-height do positioner segura
@@ -66,18 +79,23 @@ const PAINEL_CLS =
 const TAM_PADRAO = { w: 384, h: 640 };
 
 // mascote da conversa — a bolha é dona do componente; o estado chega por
-// render-prop porque a conversa é quem conhece a rodada (stream/erro)
-const AvatarRea = (p: { tamanho: number; estado: ReaEstado }) => (
-  <ReaBalao tamanho={p.tamanho} estado={p.estado} />
+// render-prop porque a conversa é quem conhece a rodada (stream/erro).
+// "escrevendo" (stream saindo) o rosto mostra como "falando": a boca
+// tagarela enquanto ela despeja a resposta
+const falando = (e: LizaEstado): LizaEstado =>
+  e === "escrevendo" ? "falando" : e;
+const AvatarLiza = (p: { tamanho: number; estado: LizaEstado }) => (
+  <LizaBlob tamanho={p.tamanho} estado={falando(p.estado)} />
 );
 const TAM_EXPANDIDO = { w: 640, h: 820 };
 const TAM_MIN = { w: 352, h: 440 };
 const TAM_MAX = { w: 960, h: 1000 };
 const STORAGE_TAM = "assistente:tamanho";
 const ehExpandido = (t: { w: number }) => t.w >= 560;
-// ociosa demais com o painel fechado, a Rea cochila ("sonolento") —
-// qualquer gesto acorda. A janela é generosa: soninho é charme, não timer
-const SONO_MS = 45_000;
+// ociosa demais com o painel fechado, a Liza cochila ("sonolento") —
+// qualquer gesto acorda. Soninho é charme, mas o wait não pode virar
+// queda de atenção: ~20s parada já bastam pra ela começar a pesar
+const SONO_MS = 20_000;
 
 const limitar = (t: { w: number; h: number }) => ({
   w: Math.round(Math.min(TAM_MAX.w, Math.max(TAM_MIN.w, t.w))),
@@ -209,6 +227,7 @@ function Cabecalho({
   expandido,
   onExpandir,
   estado,
+  jovem,
 }: {
   onFechar: () => void;
   onNovaConversa?: () => void;
@@ -217,13 +236,15 @@ function Cabecalho({
   /** só desktop — o painel mobile já é a sheet quase cheia */
   expandido?: boolean;
   onExpandir?: () => void;
-  /** a Rea mora no header: saúda na abertura e acompanha a rodada */
-  estado: ReaEstado;
+  /** a Liza mora no header: saúda na abertura e acompanha a rodada */
+  estado: LizaEstado;
+  /** voz do subtítulo: "operação" é vocabulário de equipe, não de jovem */
+  jovem?: boolean;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-4 py-3">
       <span className="grid size-8 shrink-0 place-items-center">
-        <ReaBalao tamanho={34} estado={estado} />
+        <LizaBlob tamanho={34} estado={estado} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 text-sm font-semibold">
@@ -234,7 +255,7 @@ function Cabecalho({
           />
         </p>
         <p className="text-[11px] text-muted-foreground">
-          Operação e guias do programa
+          {jovem ? "Sua mentoria e os guias" : "Operação e guias do programa"}
         </p>
       </div>
       {onHistorico && (
@@ -299,6 +320,39 @@ function Cabecalho({
   );
 }
 
+// memória dos balões de fala (lib/liza-falas.ts): aparelho no localStorage,
+// "já falou nesta aba" no sessionStorage. Storage indisponível (modo
+// privado) → a Liza se apresenta e pronto; nunca quebra o FAB
+const FALAS_LS = "liza:falas";
+const FALAS_SS = "liza:falou";
+// a fala espera a página assentar antes de aparecer (não disputa a
+// atenção com o carregamento nem com o onboarding que abre por cima)
+const FALA_ATRASO_MS = 1800;
+// a boca tagarela só enquanto o balão "sai" — depois ela fica atenta
+const FALA_BOCA_MS = 1400;
+
+type MemoriaAparelho = Omit<MemoriaFalas, "falouNaSessao">;
+
+function lerMemoria(): MemoriaFalas {
+  const vazia = { apresentacoes: 0, abriu: false, dicasDispensadas: 0 };
+  try {
+    const m = { ...vazia, ...JSON.parse(localStorage.getItem(FALAS_LS) ?? "{}") };
+    return { ...m, falouNaSessao: sessionStorage.getItem(FALAS_SS) === "1" };
+  } catch {
+    return { ...vazia, falouNaSessao: false };
+  }
+}
+
+function gravarMemoria(muda: (m: MemoriaAparelho) => MemoriaAparelho) {
+  try {
+    const { apresentacoes, abriu, dicasDispensadas } = lerMemoria();
+    localStorage.setItem(
+      FALAS_LS,
+      JSON.stringify(muda({ apresentacoes, abriu, dicasDispensadas }))
+    );
+  } catch {}
+}
+
 export function AssistenteBolha({
   papeis,
   demo,
@@ -318,24 +372,38 @@ export function AssistenteBolha({
     () => true
   );
   const [aberto, setAberto] = useState(false);
+  // voz do jovem: só mentorado troca "operação" por "mentoria" no header
+  const soJovem = papeis.length > 0 && papeis.every((p) => p === "mentorado");
+  // aberto "agora", fora do ciclo de render: o chip do balão abre e envia
+  // no mesmo gesto, e a resposta (rápida na demo) pode fechar antes do
+  // re-render — o callback leria o `aberto` velho e acenderia o aviso
+  const abertoRef = useRef(false);
   const [pronto, setPronto] = useState(false);
 
-  // mascote Rea: a conversa reporta a rodada (onEstado) e o fim de
+  // mascote Liza: a conversa reporta a rodada (onEstado) e o fim de
   // resposta (onRespostaPronta) — com o painel fechado isso vira o pulo
   // de "pronto" + o ponto de aviso no FAB; hover/foco no FAB acende
   // "atento" e o cochilo vira "sonolento" depois de SONO_MS quieta
-  const [estadoRea, setEstadoRea] = useState<ReaEstado>("parado");
+  const [estadoLiza, setEstadoLiza] = useState<LizaEstado>("parado");
   const [respostaPronta, setRespostaPronta] = useState(false);
   const [aviso, setAviso] = useState(false);
   const [atento, setAtento] = useState(false);
   const [sonolento, setSonolento] = useState(false);
 
-  // a Rea só dorme quieta: painel fechado, sem rodada, sem aviso e sem o
+  // balão de fala com o painel fechado (apresentação, dica da página,
+  // "respondi") — `falandoBoca` é o instante em que o balão sai e a boca
+  // mexe; `pausada` segura o relógio enquanto o ponteiro/foco está nele
+  const pagina = usePathname();
+  const [fala, setFala] = useState<FalaLiza | null>(null);
+  const [falandoBoca, setFalandoBoca] = useState(false);
+  const [pausada, setPausada] = useState(false);
+
+  // a Liza só dorme quieta: painel fechado, sem rodada, sem aviso e sem o
   // dedo/foco em cima. Mudou qualquer condição → acorda; a flag limpa na
   // própria render (padrão "estado derivado da anterior") sem setState
   // em effect
   const ociosa =
-    !aberto && !atento && !respostaPronta && estadoRea === "parado";
+    !aberto && !atento && !respostaPronta && !fala && estadoLiza === "parado";
   const [eraOciosa, setEraOciosa] = useState(ociosa);
   if (eraOciosa !== ociosa) {
     setEraOciosa(ociosa);
@@ -394,7 +462,10 @@ export function AssistenteBolha({
   useEffect(() => {
     const id = requestAnimationFrame(() => {
       try {
-        if (sessionStorage.getItem("assistente:aberto") === "1") setAberto(true);
+        if (sessionStorage.getItem("assistente:aberto") === "1") {
+          abertoRef.current = true;
+          setAberto(true);
+        }
         const t = JSON.parse(localStorage.getItem(STORAGE_TAM) ?? "null");
         if (t && typeof t.w === "number" && typeof t.h === "number")
           setTamanho(limitar(t));
@@ -409,11 +480,15 @@ export function AssistenteBolha({
   // offset do teclado iOS — declarado antes de mudar (que o zera ao fechar)
   const [kb, setKb] = useState(0);
   const mudar = useCallback((v: boolean) => {
+    abertoRef.current = v;
     setAberto(v);
     // abrir consome os avisos — a resposta já está visível no painel
     if (v) {
       setRespostaPronta(false);
       setAviso(false);
+      // abriu uma vez: ela já se apresentou de verdade
+      setFala(null);
+      gravarMemoria((m) => ({ ...m, abriu: true }));
     }
     // fecha com offset zerado — sem isso uma reabertura herda o último kb
     // por um frame (flash de bottom: N antes da primeira medição)
@@ -430,18 +505,77 @@ export function AssistenteBolha({
     return () => clearTimeout(t);
   }, [respostaPronta]);
 
+  // decide a fala da página depois que ela assenta. Uma por aba: a
+  // apresentação (até abrir a Liza uma vez) ou uma dica de página; troca
+  // de rota re-avalia enquanto a aba ainda não falou
+  useEffect(() => {
+    if (!pronto || aberto) return;
+    const t = setTimeout(() => {
+      const memoria = lerMemoria();
+      const nova = proximaFala({
+        memoria,
+        pagina,
+        papeis,
+        nome,
+        perguntaPadrao: sugestoes(papeis, pagina)[0],
+      });
+      if (!nova) return;
+      try {
+        sessionStorage.setItem(FALAS_SS, "1");
+      } catch {}
+      if (nova.tipo === "apresentacao")
+        gravarMemoria((m) => ({ ...m, apresentacoes: m.apresentacoes + 1 }));
+      setFala((atual) => atual ?? nova);
+      setFalandoBoca(true);
+    }, FALA_ATRASO_MS);
+    return () => clearTimeout(t);
+  }, [pronto, aberto, pagina, papeis, nome]);
+
+  // a boca mexe só na saída do balão (liga junto com a fala, em
+  // mostrarFala; aqui só o relógio que desliga)
+  useEffect(() => {
+    if (!falandoBoca) return;
+    const t = setTimeout(() => setFalandoBoca(false), FALA_BOCA_MS);
+    return () => clearTimeout(t);
+  }, [falandoBoca]);
+
+  // some sozinho (menos o "Respondi"); ponteiro/foco em cima segura
+  useEffect(() => {
+    const ms = fala ? DURACAO_FALA[fala.tipo] : null;
+    if (!ms || pausada) return;
+    const t = setTimeout(() => setFala(null), ms);
+    return () => clearTimeout(t);
+  }, [fala, pausada]);
+
+  const dispensarFala = () => {
+    if (fala?.tipo === "apresentacao")
+      gravarMemoria((m) => ({ ...m, apresentacoes: APRESENTACOES_MAX }));
+    if (fala?.tipo === "dica")
+      gravarMemoria((m) => ({ ...m, dicasDispensadas: m.dicasDispensadas + 1 }));
+    setFala(null);
+    setPausada(false);
+  };
+
   // voltar do sistema (gesto/botão Android) fecha a sheet: empurra um
   // state na abertura e escuta popstate. Fechando por X/backdrop/arrasto,
   // o cleanup desfaz o state empurrado (history.back sem listener é
   // silencioso). Só no mobile — desktop fecha por Esc/outside do Popover.
+  // fechamento por link interno NÃO pode desfazer o state: o router.push
+  // do Next ainda não commitou quando o cleanup roda — um history.back()
+  // aqui estouraria a entrada recém-navegada e o link "só fecharia" a
+  // sheet (bug mobile). O marker fica pra trás na pilha e o voltar do
+  // browser segue funcionando — a página dele é a mesma do sheet fechado.
+  const navInternaRef = useRef(false);
   useEffect(() => {
     if (desktop || !aberto) return;
+    navInternaRef.current = false;
     history.pushState({ assistenteSheet: true }, "");
     const aoVoltar = () => mudar(false);
     window.addEventListener("popstate", aoVoltar);
     return () => {
       window.removeEventListener("popstate", aoVoltar);
-      if (history.state?.assistenteSheet) history.back();
+      if (history.state?.assistenteSheet && !navInternaRef.current)
+        history.back();
     };
   }, [desktop, aberto, mudar]);
 
@@ -449,6 +583,7 @@ export function AssistenteBolha({
   // ações são registradas aqui pros botões do header alcançarem
   const novaConversaRef = useRef<(() => void) | null>(null);
   const historicoRef = useRef<(() => void) | null>(null);
+  const enviarRef = useRef<((pergunta: string) => void) | null>(null);
   const conversa = (
     <AssistenteConversa
       papeis={papeis}
@@ -470,21 +605,37 @@ export function AssistenteBolha({
       registrarHistorico={(fn) => {
         historicoRef.current = fn;
       }}
-      onNavegarInterno={() => mudar(false)}
-      onEstado={setEstadoRea}
+      registrarEnviar={(fn) => {
+        enviarRef.current = fn;
+      }}
+      onNavegarInterno={() => {
+        navInternaRef.current = true;
+        mudar(false);
+      }}
+      onEstado={setEstadoLiza}
       onRespostaPronta={() => {
         // só avisa no FAB quando o painel está fora de vista — aberto,
         // a resposta já se anuncia sozinha (e a mascote da mensagem
         // comemora lá dentro)
-        if (!aberto) {
+        if (!abertoRef.current) {
           setRespostaPronta(true);
           setAviso(true);
+          // o balão "Respondi" toma o lugar de qualquer outra fala (é o
+          // único que espera a abertura)
+          setFala(FALA_PRONTO);
+          setFalandoBoca(true);
         }
       }}
-      Avatar={AvatarRea}
+      Avatar={AvatarLiza}
     />
   );
   const novaConversa = () => novaConversaRef.current?.();
+  // chip do balão: abre e pergunta (a conversa fica montada fechada —
+  // keepMounted — então o envio já tem pra onde ir)
+  const perguntarDoBalao = (pergunta: string) => {
+    mudar(true);
+    enviarRef.current?.(pergunta);
+  };
   const alternarHistorico = () => historicoRef.current?.();
 
   // aba de ajustes (REALIZA-328): view-stack aqui na bolha — a conversa
@@ -573,30 +724,52 @@ export function AssistenteBolha({
     };
   }, [desktop, aberto]);
 
-  // o FAB é a Rea em si. Com o painel aberto ela atende — alerta e de
+  // o FAB é a Liza em si. Com o painel aberto ela atende — alerta e de
   // olho no cursor (e a rodada sobe pro rosto do FAB também:
   // consultando/escrevendo/erro); fechada, o pulo de "pronto" com o
   // ponto de aviso, o hover/foco de "atento" e o cochilo do "sonolento"
-  // se revezam. O X de fechar mora no cabeçalho do painel
-  const estadoFab: ReaEstado = aberto
-    ? estadoRea === "parado"
+  // se revezam. Aberto, o FAB troca a mascote por um X de fechar
+  const estadoFab: LizaEstado = aberto
+    ? estadoLiza === "parado"
       ? "atento"
-      : estadoRea
+      : estadoLiza
     : respostaPronta
       ? "pronto"
-      : atento
+      : fala && falandoBoca
+        ? "falando"
+        : atento
         ? "atento"
         : sonolento
           ? "sonolento"
-          : estadoRea;
+          : estadoLiza;
+  // painel aberto: a Liza do FAB vira um X — fecha a bolha no mesmo lugar
+  // onde ela abriu e evita três mascotes simultâneas na tela (o X do
+  // cabeçalho continua pra quem já está com a mão dentro do painel). O
+  // press amassa só o conteúdo — a bolha de fundo segue o scale-95 do FAB
   const icons = (
-    <ReaBalao tamanho={44} estado={estadoFab} className="pointer-events-none" />
+    <span className="pointer-events-none grid place-items-center transition-transform duration-150 group-active/fab:scale-x-110 group-active/fab:scale-y-[.8] [transform-origin:50%_100%]">
+      {aberto ? (
+        <X
+          size={24}
+          weight="bold"
+          className="animate-in zoom-in-50 spin-in-45 duration-200"
+        />
+      ) : (
+        // mobile enche o botão (a bolha é da mesma lima do FAB — só a
+        // cara cresce); desktop fica com o respiro de 44 dentro de 56
+        <LizaBlob
+          tamanho={desktop ? 44 : 48}
+          estado={falando(estadoFab)}
+          className="animate-in zoom-in-50 spin-in-[-45deg] duration-200"
+        />
+      )}
+    </span>
   );
 
-  // a Rea do header saúda na abertura (o momento "aberto" do mascote) e
+  // a Liza do header saúda na abertura (o momento "aberto" do mascote) e
   // depois acompanha a rodada — a mesma persona do FAB, agora no painel
   const recemAberto = useMomento(aberto ? "aberto" : "parado");
-  const estadoCab: ReaEstado = recemAberto ? "aberto" : estadoRea;
+  const estadoCab: LizaEstado = recemAberto ? "aberto" : estadoLiza;
 
   // ponto de resposta pronta no canto do FAB: halo ping-once na chegada,
   // depois o sólido espera a abertura (amarelo da marca = próximo passo)
@@ -609,10 +782,22 @@ export function AssistenteBolha({
       <span className="block size-3 animate-in zoom-in-50 rounded-full bg-[var(--destaque)] shadow-[0_0_0_2px_var(--background)] duration-150" />
     </span>
   );
+  // balão de fala e rótulo do hover moram no container fixo do FAB
+  const balao = !aberto && fala ? (
+    <LizaFala
+      key={fala.tipo}
+      fala={fala}
+      onPergunta={perguntarDoBalao}
+      onAbrir={() => mudar(true)}
+      onDispensar={dispensarFala}
+      onPausar={setPausada}
+    />
+  ) : null;
+  const rotuloHover = desktop && atento && !aberto && !fala ? <LizaRotulo /> : null;
   const rotuloFab = aberto
     ? "Fechar assistente"
     : aviso
-      ? "Abrir assistente, a Rea respondeu"
+      ? "Abrir assistente, a Liza respondeu"
       : "Abrir assistente";
 
   if (desktop) {
@@ -633,6 +818,8 @@ export function AssistenteBolha({
             {icons}
           </PopoverTrigger>
           {pontoAviso}
+          {balao}
+          {rotuloHover}
         </div>
         <PopoverContent
           id="painel-assistente"
@@ -659,12 +846,13 @@ export function AssistenteBolha({
           />
           <Cabecalho
             onFechar={() => mudar(false)}
+            jovem={soJovem}
             onNovaConversa={novaConversa}
             onHistorico={alternarHistorico}
             onConfig={onConfig}
             expandido={ehExpandido(tamanho)}
             onExpandir={alternarExpandido}
-            estado={estadoCab}
+            estado={falando(estadoCab)}
           />
           <PopoverTitle className="sr-only">Assistente</PopoverTitle>
           {corpo}
@@ -690,6 +878,7 @@ export function AssistenteBolha({
           {icons}
         </Button>
         {pontoAviso}
+        {balao}
       </div>
       <Sheet open={aberto} onOpenChange={mudar}>
         <SheetContent
@@ -726,10 +915,11 @@ export function AssistenteBolha({
           </div>
           <Cabecalho
             onFechar={() => mudar(false)}
+            jovem={soJovem}
             onNovaConversa={novaConversa}
             onHistorico={alternarHistorico}
             onConfig={onConfig}
-            estado={estadoCab}
+            estado={falando(estadoCab)}
           />
           {corpo}
         </SheetContent>

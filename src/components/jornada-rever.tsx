@@ -1,8 +1,10 @@
 "use client";
 
 import type { ReactElement } from "react";
+import Link from "next/link";
 import { Eye } from "@phosphor-icons/react";
 import { InstrumentoResultado } from "@/components/instrumento-resultado";
+import { RespostaLista } from "@/components/resposta-lista";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,12 +16,10 @@ import {
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/ciclo";
 import { ehInstrumento } from "@/lib/forms/instrumentos";
-import {
-  camposPerguntas,
-  respostaFormatada,
-  type FormularioCampo,
-  type FormularioSistema,
-  type RespostaValor,
+import type {
+  FormularioCampo,
+  FormularioSistema,
+  RespostaValor,
 } from "@/lib/forms/schema";
 
 /** WP7 — "Rever resposta" da estação feita (mesmo padrão da ficha da dupla,
@@ -35,6 +35,7 @@ export function ReverRespostaDialog({
   respostas,
   label = "Rever resposta",
   trigger,
+  acao,
 }: {
   titulo: string;
   respondidoEm: string | null;
@@ -46,7 +47,10 @@ export function ReverRespostaDialog({
    *  `nativeButton={false}` (role=button + tabstop pela base); sem ele,
    *  o botão "Rever resposta" de sempre. */
   trigger?: ReactElement;
+  /** saída contextual no rodapé ("Abrir o plano" no PDM) */
+  acao?: { rotulo: string; href: string };
 }) {
+  const estruturado = ehInstrumento(sistema);
   return (
     <Dialog>
       <DialogTrigger
@@ -60,9 +64,10 @@ export function ReverRespostaDialog({
           )
         }
       />
-      {/* xl, não 2xl: a resposta estruturada (roda + áreas, metas) é
-          conteúdo de leitura, não prévia tabular; o scroll vem da base */}
-      <DialogContent size="xl">
+      {/* xl na leitura estruturada (roda + áreas, metas) — conteúdo de
+          leitura; 2xl na lista genérica pergunta a pergunta, que é prévia
+          tabular e pede largura. O scroll vem da base */}
+      <DialogContent size={estruturado ? "xl" : "2xl"}>
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>
@@ -70,75 +75,27 @@ export function ReverRespostaDialog({
             {respondidoEm ? ` · enviada em ${formatDate(respondidoEm)}` : ""}.
           </DialogDescription>
         </DialogHeader>
-        {ehInstrumento(sistema) ? (
+        {estruturado ? (
           <InstrumentoResultado
             sistema={sistema}
             campos={campos}
             respostas={respostas}
           />
         ) : (
-          <ListaRespostas campos={campos} respostas={respostas} />
+          <RespostaLista campos={campos} respostas={respostas} />
+        )}
+        {acao && (
+          <div className="flex justify-end border-t border-border/60 pt-3">
+            <Button
+              variant="outline"
+              render={<Link href={acao.href} />}
+              nativeButton={false}
+            >
+              {acao.rotulo}
+            </Button>
+          </div>
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-/** Lista pergunta a pergunta pro form genérico (360º e qualquer sistema sem
- *  leitura estruturada). Sem `campos` — resposta de instrumento cujo form
- *  não veio no payload — cai no recorte cru do que ela preencheu. */
-function ListaRespostas({
-  campos,
-  respostas,
-}: {
-  campos: FormularioCampo[];
-  respostas: Record<string, RespostaValor>;
-}) {
-  const linhas = camposPerguntas(campos)
-    .map((c) => ({
-      id: c.id,
-      label: c.label,
-      valor: respostaFormatada(c, respostas[c.id]),
-    }))
-    .filter((l) => l.valor !== "—" && l.valor.trim() !== "");
-
-  if (!linhas.length) {
-    const cruas = Object.entries(respostas).filter(
-      ([, v]) => v != null && String(v).trim() !== ""
-    );
-    if (!cruas.length) {
-      return (
-        <p className="text-sm text-muted-foreground">
-          Não foi possível carregar o detalhe desta resposta.
-        </p>
-      );
-    }
-    return (
-      <dl className="space-y-3">
-        {cruas.map(([id, v]) => (
-          <div key={id}>
-            <dt className="text-xs font-medium text-muted-foreground">
-              {id.replace(/_/g, " ")}
-            </dt>
-            <dd className="mt-0.5 whitespace-pre-wrap text-sm">
-              {respostaFormatada(undefined, v)}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    );
-  }
-
-  return (
-    <dl className="space-y-3">
-      {linhas.map((l) => (
-        <div key={l.id}>
-          <dt className="text-xs font-medium text-muted-foreground">
-            {l.label}
-          </dt>
-          <dd className="mt-0.5 whitespace-pre-wrap text-sm">{l.valor}</dd>
-        </div>
-      ))}
-    </dl>
   );
 }

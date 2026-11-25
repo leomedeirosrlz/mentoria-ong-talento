@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { comparaNome } from "./ciclo";
-import { demoRole } from "./demo/mode";
+import { demoRole, demoTermoSimulado } from "./demo/mode";
 import {
   demoDevolutivas,
   demoTrilhaEsp,
@@ -162,7 +162,7 @@ export const getJovemEncaminhamentos = cache(
 export const getJovemAssinaturas = cache(
   async (): Promise<JovemAssinatura[]> => {
     const demo = await demoRole();
-    if (demo) return demoJovemAssinaturas(demo);
+    if (demo) return demoJovemAssinaturas(demo, await demoTermoSimulado());
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("jovem_assinaturas")

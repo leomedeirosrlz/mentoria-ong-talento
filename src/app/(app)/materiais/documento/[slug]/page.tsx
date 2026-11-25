@@ -1,19 +1,43 @@
 import { notFound } from "next/navigation";
-import { materialDocumento } from "@/lib/materiais-documentos";
+import type { Metadata } from "next";
+import {
+  MATERIAIS_DOCUMENTOS,
+  materialDocumento,
+} from "@/lib/materiais-documentos";
+import {
+  carregarDocCorpus,
+  corpusServePapel,
+  listarDocsCorpus,
+} from "@/lib/materiais/corpus-doc";
+import { getMe } from "@/lib/queries";
 import { MaterialDocumento } from "@/components/material-documento";
+import { CorpusDocumento } from "@/components/corpus-documento";
 
 // Documento nativo de /materiais — casa do staff e do mentor; o jovem tem a
 // rota própria em /jovem/materiais/documento (o layout (app) o redireciona
-// pra /jovem). O renderer é compartilhado (MaterialDocumento).
+// pra /jovem). Slug de corpus (docs/rag/*.md, material do frontmatter)
+// renderiza o guia nativo com âncoras por seção (CorpusDocumento); slug dos
+// templates do cap. 14 segue no renderer original (MaterialDocumento).
+// dynamicParams=false: slug fora dos dois conjuntos 404 sem tocar o fs.
+// A audiência do frontmatter vale aqui também (corpusServePapel = mesma
+// regra do catálogo): doc de coordenação não abre pra mentor.
 
-export function generateStaticParams() {
-  return [
-    { slug: "checklist-competencias" },
-    { slug: "feedback-construtivo" },
-    { slug: "mensagem-preparacao" },
-    { slug: "mensagem-indicadas" },
-    { slug: "mensagem-encaminhamento" },
-  ];
+export const dynamicParams = false;
+
+export async function generateStaticParams() {
+  const slugs = new Set<string>(Object.keys(MATERIAIS_DOCUMENTOS));
+  for (const d of await listarDocsCorpus()) slugs.add(d.slug);
+  return [...slugs].map((slug) => ({ slug }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const doc = (await carregarDocCorpus(slug)) ?? materialDocumento(slug);
+  return doc ? { title: doc.titulo } : {};
 }
 
 export default async function DocumentoPage({
@@ -22,6 +46,17 @@ export default async function DocumentoPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const corpus = await carregarDocCorpus(slug);
+  if (corpus) {
+    // getMe é React.cache — o layout já a chamou neste request (cache hit)
+    if (!corpusServePapel(corpus, await getMe())) notFound();
+    return (
+      <CorpusDocumento
+        doc={corpus}
+        voltar={{ href: "/materiais?aba=biblioteca", rotulo: "Materiais de apoio" }}
+      />
+    );
+  }
   if (!materialDocumento(slug)) notFound();
 
   return (

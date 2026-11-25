@@ -448,6 +448,9 @@ export function PessoaActions({
           />
           {pessoa.role !== "mentorado" && (
             <label className="flex items-center gap-2 text-sm cursor-pointer">
+              {/* checkbox desmarcado não posta — a sentinela diz que o campo
+                  estava na tela, senão a desmarcação nunca chega ao banco */}
+              <input type="hidden" name="decl_voluntario" value="1" />
               <input
                 type="checkbox"
                 name="voluntario"

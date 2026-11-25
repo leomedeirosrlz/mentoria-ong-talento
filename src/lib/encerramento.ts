@@ -12,10 +12,19 @@ import type {
   CicloEvento,
   Dupla,
   Encaminhamento,
+  Encerramento,
   EncerramentoChecklist,
   Encontro,
   Trilha,
 } from "./types";
+
+/** 'pendente' é não-nulo desde a 0156 — truthiness de `tipo` não diz mais
+ *  se o rito foi decidido. */
+export function encerramentoDecidido(
+  enc: Pick<Encerramento, "tipo"> | null | undefined
+): enc is Pick<Encerramento, "tipo"> & { tipo: "concluida" | "encerrada" } {
+  return enc != null && enc.tipo !== "pendente";
+}
 
 // ---------- checklist do fechamento (guia DPP, cap. encerramento) ----------
 

@@ -4,7 +4,9 @@ name: e2e-nightly
 # regressão mesmo em dia sem push. Sem secrets.
 on:
   schedule:
-    - cron: "0 12 * * *" # 09:00 BRT
+    # semanal (segunda 09:00 BRT): cota de CPU da Vercel no limite — cada
+    # run é a suíte demo inteira contra produção. Rodar à mão quando quiser
+    - cron: "0 12 * * 1"
   workflow_dispatch:
 
 concurrency:

@@ -39,27 +39,36 @@ const SOLICITACAO_SELECT = `
   justificativa_recusa,
   created_by, created_at, respondida_em, mentorado_nome, especialista_nome,
   devolutiva_pdm, trilha_encerrada_em,
-  solicitante:profiles!solicitacoes_especialista_created_by_fkey(nome),
-  especialista:profiles!solicitacoes_especialista_especialista_id_fkey(nome),
-  desejado:profiles!solicitacoes_especialista_especialista_desejado_id_fkey(nome)
+  solicitante:profiles!solicitacoes_especialista_created_by_fkey(nome, nome_social),
+  especialista:profiles!solicitacoes_especialista_especialista_id_fkey(nome, nome_social),
+  desejado:profiles!solicitacoes_especialista_especialista_desejado_id_fkey(nome, nome_social),
+  mentorado:mentorados!solicitacoes_especialista_mentorado_id_fkey(nome, nome_social)
 `;
 
 /** Embed to-one pode voltar como array no tipo do supabase-js. */
-function norm(v: unknown): { nome: string } | null {
+function norm(
+  v: unknown
+): { nome: string; nome_social?: string | null } | null {
   const o = Array.isArray(v) ? v[0] : v;
-  return (o as { nome: string } | null) ?? null;
+  return (
+    (o as { nome: string; nome_social?: string | null } | null) ?? null
+  );
 }
 
 function normalize(row: Record<string, unknown>): SolicitacaoEspecialista {
   // mentorado_nome/especialista_nome são colunas planas da view — a UI
-  // consome `mentorado.nome`/`especialista.nome` nos dois caminhos
+  // consome `mentorado.nome`/`especialista.nome` nos dois caminhos. O embed
+  // `mentorado:` traz o nome_social quando a RLS de mentorados alcança o
+  // leitor (staff); pra quem ela não alcança (ex.: especialista no mural) o
+  // embed volta null e fica o nome plano da view
   const { mentorado_nome, especialista_nome, ...rest } = row;
   return {
     ...(rest as unknown as SolicitacaoEspecialista),
     mentorado:
-      typeof mentorado_nome === "string" && mentorado_nome
+      norm(row.mentorado) ??
+      (typeof mentorado_nome === "string" && mentorado_nome
         ? { nome: mentorado_nome }
-        : null,
+        : null),
     solicitante:
       norm(row.solicitante) ??
       // o embed do criador volta null quando o leitor não alcança o profile
@@ -192,7 +201,7 @@ export const getSolicitacoesVisiveis = cache(
 
 const PROPOSTA_SELECT = `
   id, solicitacao_id, autor_id, slot_proposto, mensagem, created_at,
-  autor:profiles!solicitacao_propostas_autor_id_fkey(nome)
+  autor:profiles!solicitacao_propostas_autor_id_fkey(nome, nome_social)
 `;
 
 function normProposta(row: Record<string, unknown>): SolicitacaoProposta {
@@ -257,13 +266,15 @@ export async function getPropostasMap(
  *  0087: o papel é relação — o !inner em profile_papeis pega também o
  *  híbrido cujo primário é mentor_dpp. */
 export const getEspecialistas = cache(
-  async (): Promise<{ id: string; nome: string; areas: string[] | null }[]> => {
+  async (): Promise<
+    { id: string; nome: string; nome_social?: string | null; areas: string[] | null }[]
+  > => {
     const demo = await demoRole();
     if (demo) return demoEspecialistas();
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, nome, areas, profile_papeis!inner(papel)")
+      .select("id, nome, nome_social, areas, profile_papeis!inner(papel)")
       .eq("profile_papeis.papel", "mentor_especialista")
       .eq("ativo", true)
       .order("nome");
@@ -276,15 +287,21 @@ export const getEspecialistas = cache(
     // O embed não volta pro client: a linha dedupada carrega só os 3 campos
     const unicos = new Map<
       string,
-      { id: string; nome: string; areas: string[] | null }
+      { id: string; nome: string; nome_social?: string | null; areas: string[] | null }
     >();
     for (const p of (data ?? []) as {
       id: string;
       nome: string;
+      nome_social?: string | null;
       areas: string[] | null;
     }[]) {
       if (!unicos.has(p.id)) {
-        unicos.set(p.id, { id: p.id, nome: p.nome, areas: p.areas });
+        unicos.set(p.id, {
+          id: p.id,
+          nome: p.nome,
+          nome_social: p.nome_social,
+          areas: p.areas,
+        });
       }
     }
     // a collation do banco ordena acentos depois de Z — pt-BR no app
@@ -379,7 +396,7 @@ export const getDevolutivasDupla = cache(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("devolutivas")
-      .select("id, dupla_id, autor_id, texto, created_at, autor:profiles(nome)")
+      .select("id, dupla_id, autor_id, texto, created_at, autor:profiles(nome, nome_social)")
       .eq("dupla_id", duplaId)
       .order("created_at", { ascending: true });
     if (error) {

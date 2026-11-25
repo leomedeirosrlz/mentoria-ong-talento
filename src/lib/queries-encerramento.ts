@@ -23,7 +23,7 @@ export const getEncerramentoDaDupla = cache(
       .from("encerramentos")
       .select(
         `id, dupla_id, tipo, checklist, resumo_jornada, decidido_por,
-         created_at, decidido:profiles!encerramentos_decidido_por_fkey(nome)`
+         created_at, decidido:profiles!encerramentos_decidido_por_fkey(nome, nome_social)`
       )
       .eq("dupla_id", duplaId)
       .maybeSingle();
@@ -37,7 +37,8 @@ export const getEncerramentoDaDupla = cache(
     const emb = Array.isArray(row.decidido) ? row.decidido[0] : row.decidido;
     return {
       ...(row as unknown as Encerramento),
-      decidido: (emb as { nome: string } | null) ?? null,
+      decidido:
+        (emb as { nome: string; nome_social?: string | null } | null) ?? null,
     };
   }
 );
@@ -59,7 +60,7 @@ export const getEncerramentosPendentes = cache(
     const { data, error } = await supabase
       .from("encerramentos")
       .select("dupla_id")
-      .is("tipo", null);
+      .eq("tipo", "pendente");
     if (error) {
       console.error("getEncerramentosPendentes:", error);
       return [];

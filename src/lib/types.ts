@@ -351,6 +351,12 @@ export type Encaminhamento = {
   responsavel: "mentor" | "mentorado";
   prazo: string | null;
   status: EncaminhamentoStatus;
+  /** nº do passo do guia a que o combinado pertence (0157) — o do encontro
+   *  do registro, ou o do card onde o mentor anotou no preparo. Null só em
+   *  combinado antigo sem registro: fica na aba Combinados da ficha. */
+  numero: number | null;
+  feito_em: string | null;
+  created_by: string | null;
   created_at: string;
 };
 
@@ -371,7 +377,7 @@ export type Registro = {
   created_by: string | null;
   created_at: string;
   /** Autor do registro — só vem no embed `autor:profiles!registros_created_by_fkey(nome)` da dupla. */
-  autor?: { nome: string } | null;
+  autor?: { nome: string; nome_social?: string | null } | null;
 };
 
 // ---------- avaliação do encontro FEITA PELO JOVEM (0071 / D4) ----------
@@ -445,7 +451,7 @@ export type RegistroAnexo = {
   created_by: string | null;
   created_at: string;
   /** Autor do anexo — só vem no embed `autor:profiles!registro_anexos_created_by_fkey(nome)`. */
-  autor?: { nome: string } | null;
+  autor?: { nome: string; nome_social?: string | null } | null;
 };
 
 export type Encontro = {
@@ -504,18 +510,6 @@ export type EncontroNota = {
 /** Intenção do mentor pro encontro N (REALIZA-21) — chave (dupla_id, numero)
  *  como a nota: precede o agendamento e segue o nº do guia na remarcação.
  *  Pendente = feito=false; feito_em é carimbo de trigger, nunca do caller. */
-export type EncontroIntencao = {
-  id: string;
-  dupla_id: string;
-  numero: number;
-  texto: string;
-  feito: boolean;
-  feito_em: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
 export type Dupla = {
   id: string;
   /** Label da turma (ex-coluna `ciclo`, renomeada na 0061) — derivada do
@@ -561,7 +555,6 @@ export type Dupla = {
   encontros: Encontro[];
   encaminhamentos: Encaminhamento[];
   notas?: EncontroNota[];
-  intencoes?: EncontroIntencao[];
 };
 
 /** Versão enxuta de Dupla — só os ids de vínculo, sem a árvore de encontros. */
@@ -608,7 +601,7 @@ export type Comunicado = {
   prioridade: ComunicadoPrioridade;
   created_by: string;
   created_at: string;
-  autor?: { nome: string } | null;
+  autor?: { nome: string; nome_social?: string | null } | null;
 };
 
 export type Notificacao = {
@@ -731,6 +724,9 @@ export type ChamadoFilaItem = ChamadoFila & {
   autor_papel: string | null;
   atribuido_nome: string | null;
   contexto: string | null; // "Encontro 4 · Ana" — origem+dupla resumidos
+  /** Nome do mentorado da dupla vinculada (chamados.dupla_id) — null sem
+   *  dupla, quando restrito, ou quando a RLS não entrega a dupla. */
+  mentorado_nome: string | null;
 };
 
 export type ChamadoAtualizacao = {
@@ -830,12 +826,12 @@ export type SolicitacaoEspecialista = {
   created_at: string;
   respondida_em: string | null;
   // embeds quando selecionados:
-  mentorado?: { nome: string } | null;
-  solicitante?: { nome: string } | null;
-  especialista?: { nome: string } | null;
+  mentorado?: { nome: string; nome_social?: string | null } | null;
+  solicitante?: { nome: string; nome_social?: string | null } | null;
+  especialista?: { nome: string; nome_social?: string | null } | null;
   /** Nome de quem recebeu o pedido direcionado — embed de profiles via
    *  especialista_desejado_id (null = broadcast pra todo especialista). */
-  desejado?: { nome: string } | null;
+  desejado?: { nome: string; nome_social?: string | null } | null;
   /** Nome do especialista engajado — coluna plana da view (0074); fallback
    *  quando o embed de profiles não resolve. */
   especialista_nome?: string | null;
@@ -857,7 +853,7 @@ export type SolicitacaoProposta = {
   mensagem: string | null;
   created_at: string;
   /** embed de profiles via autor_id — quem falou por último na negociação. */
-  autor?: { nome: string } | null;
+  autor?: { nome: string; nome_social?: string | null } | null;
 };
 
 // ---------- agenda real do especialista (0073) ----------
@@ -902,15 +898,16 @@ export type Encerramento = {
   id: string;
   dupla_id: string;
   /** 'concluida' = jornada completa · 'encerrada' = fechamento antecipado ·
-   *  null = rito aberto (último encontro já concluiu, decisão pendente). */
-  tipo: "concluida" | "encerrada" | null;
+   *  'pendente' = rito aberto (último encontro já concluiu, decisão pendente;
+   *  0156 trocou o NULL por valor explícito). */
+  tipo: "concluida" | "encerrada" | "pendente";
   checklist: EncerramentoChecklist;
   /** Snapshot gerado dos dados da jornada no momento do fechamento. */
   resumo_jornada: string | null;
   decidido_por: string | null;
   created_at: string;
   /** embed `decidido:profiles!encerramentos_decidido_por_fkey(nome)`. */
-  decidido?: { nome: string } | null;
+  decidido?: { nome: string; nome_social?: string | null } | null;
 };
 
 // ---------- documentos & assinaturas (0033) ----------
@@ -1109,7 +1106,7 @@ export type Devolutiva = {
   id: string;
   dupla_id: string;
   autor_id: string;
-  autor?: { nome: string } | null;
+  autor?: { nome: string; nome_social?: string | null } | null;
   texto: string;
   created_at: string;
 };

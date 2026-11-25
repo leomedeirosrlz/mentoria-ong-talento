@@ -95,13 +95,12 @@ test.describe("jornada — auto-emissão de instrumentos (REALIZA-152)", () => {
         trilha.locator('a[href^="/f/"]', { hasText: titulo })
       ).toBeVisible();
     }
-    // trancado é card dessaturado com a tag "Ainda não liberado" + a data
-    // de liberação — não details
+    // trancado é card com a liberação em texto (v6a — sem tag nem
+    // cadeado, a data é a resposta) — não details
     const metas = trilha.locator("article", {
       hasText: "Definindo minhas metas",
     });
     await expect(metas).toBeVisible();
-    await expect(metas.getByText("Ainda não liberado")).toBeVisible();
     await expect(metas.getByText(/libera no encontro \d+/)).toBeVisible();
     await expect(metas.locator('a[href^="/f/"]')).toHaveCount(0);
 

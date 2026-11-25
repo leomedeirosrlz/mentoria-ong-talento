@@ -112,19 +112,28 @@ function parseCsvText(text) {
   return rows;
 }
 
-// '2026/10/06 6:50:33 PM GMT-3' → ISO
+// '2026/10/06 6:50:33 PM GMT-3' (export antigo) ou '06/10/2026 18:50:33'
+// (dd/mm/aaaa 24h, export novo do Forms) → ISO. O novo formato não traz
+// fuso; assume BRT como o fallback do antigo.
 function parseTs(s) {
-  const m = /^(\d{4})\/(\d{2})\/(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)?\s*GMT([+-]\d{1,2})?/i.exec(s.trim());
-  if (!m) return null;
-  let h = Number(m[4]);
-  if (m[8]) {
-    const pm = m[8].toUpperCase() === "PM";
-    if (pm && h < 12) h += 12;
-    if (!pm && h === 12) h = 0;
+  const t = s.trim();
+  let m = /^(\d{4})\/(\d{2})\/(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)?\s*GMT([+-]\d{1,2})?/i.exec(t);
+  if (m) {
+    let h = Number(m[4]);
+    if (m[8]) {
+      const pm = m[8].toUpperCase() === "PM";
+      if (pm && h < 12) h += 12;
+      if (!pm && h === 12) h = 0;
+    }
+    const off = m[9] ? `${m[9].padStart(3, "+0")}:00` : "-03:00";
+    const offFix = off.length === 6 ? off : `${off.slice(0, 3)}${off.slice(3)}`;
+    return `${m[1]}-${m[2]}-${m[3]}T${String(h).padStart(2, "0")}:${m[5]}:${m[6]}${offFix}`;
   }
-  const off = m[9] ? `${m[9].padStart(3, "+0")}:00` : "-03:00";
-  const offFix = off.length === 6 ? off : `${off.slice(0, 3)}${off.slice(3)}`;
-  return `${m[1]}-${m[2]}-${m[3]}T${String(h).padStart(2, "0")}:${m[5]}:${m[6]}${offFix}`;
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(t);
+  if (m) {
+    return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}T${m[4].padStart(2, "0")}:${m[5]}:${m[6] ?? "00"}-03:00`;
+  }
+  return null;
 }
 
 // ---------- normalização de nomes ----------
@@ -158,6 +167,7 @@ const ALIAS_MENTOR = {
 };
 const ALIAS_MENTORADO = {
   "leila gomes des souza": "leila gomes de souza",
+  "andressa venancio": "andressa silva oliveira",
 };
 
 // ---------- campos do form ----------
@@ -272,8 +282,13 @@ for (let i = 0; i < data.length; i++) {
   const numero = Number(/(\d+)/.exec(r[idx.numero] ?? "")?.[1]);
   const nota = MAP_ESTRELAS[norm(r[idx.nota]).trim()];
   // data do form só é confiável com ano do programa — várias linhas trazem
-  // a data de nascimento do jovem (2003-08-10 etc.) digitada no campo
-  const dataForm = (r[idx.data] ?? "").trim();
+  // a data de nascimento do jovem (2003-08-10 etc.) digitada no campo.
+  // Aceita ISO (export antigo) e dd/mm/aaaa (export novo) normalizando pra ISO.
+  const rawData = (r[idx.data] ?? "").trim();
+  const brM = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(rawData);
+  const dataForm = brM
+    ? `${brM[3]}-${brM[2].padStart(2, "0")}-${brM[1].padStart(2, "0")}`
+    : rawData;
   const dataOk = /^\d{4}-\d{2}-\d{2}$/.test(dataForm) && (dataForm.startsWith("2025") || dataForm.startsWith("2026"));
 
   const l = {
@@ -355,6 +370,27 @@ for (let i = 0; i < data.length; i++) {
   l.duplaId = dupla.id;
   const mdo = (mentorados ?? []).find((m) => m.id === dupla.mentorado_id);
 
+  // ----- payload montado cedo: linhas em 'revisar' por nº extrapolado
+  // também precisam dele quando o --resolve as anexa a um encontro -----
+  const partesComentario = [];
+  const ajudouTxt = (r[idx.ajudou] ?? "").trim();
+  const obsTxt = (r[idx.obs] ?? "").trim();
+  if (ajudouTxt && !AFIRMACAO_CURTA.has(norm(ajudouTxt).trim())) partesComentario.push(ajudouTxt);
+  if (obsTxt) partesComentario.push(obsTxt);
+  l.avaliacao = {
+    dupla_id: dupla.id,
+    encontro_id: null, // preenchido após casar/criar o encontro
+    estrelas: nota,
+    sentimento: null,
+    avancei: mapAvancei(ajudouTxt),
+    temas: null,
+    comentario: partesComentario.join("\n\n") || null,
+    pedir_apoio: false,
+    avaliacao_visivel_mentor: false,
+    respondido_por_profile_id: mdo?.profile_id ?? null,
+    created_at: ts,
+  };
+
   // ----- encontro: (dupla, numero) → data confiável → criar → revisar -----
   const encsDupla = encPorDupla.get(dupla.id) ?? [];
   const porNumero = encsDupla.find((e) => e.numero === numero);
@@ -427,26 +463,7 @@ for (let i = 0; i < data.length; i++) {
   }
   vistos.set(alvoId, n);
 
-  // ----- payload -----
-  const partesComentario = [];
-  const ajudouTxt = (r[idx.ajudou] ?? "").trim();
-  const obsTxt = (r[idx.obs] ?? "").trim();
-  if (ajudouTxt && !AFIRMACAO_CURTA.has(norm(ajudouTxt).trim())) partesComentario.push(ajudouTxt);
-  if (obsTxt) partesComentario.push(obsTxt);
-
-  l.avaliacao = {
-    dupla_id: dupla.id,
-    encontro_id: l.encontroId, // preenchido após criar encontro quando novo
-    estrelas: nota,
-    sentimento: null,
-    avancei: mapAvancei(ajudouTxt),
-    temas: null,
-    comentario: partesComentario.join("\n\n") || null,
-    pedir_apoio: false,
-    avaliacao_visivel_mentor: false,
-    respondido_por_profile_id: mdo?.profile_id ?? null,
-    created_at: ts,
-  };
+  l.avaliacao.encontro_id = l.encontroId; // preenchido após criar encontro quando novo
   l.status = "ok";
   aImportar.push(l);
 }

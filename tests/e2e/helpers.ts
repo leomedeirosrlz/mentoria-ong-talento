@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
 // --- test fixture: bypass do Vercel escopado à origem sob teste ---
 // extraHTTPHeaders mandaria o token em TODA request — inclusive chamadas
@@ -63,12 +63,12 @@ export function apiGetApp(page: Page, url: string) {
   });
 }
 
-/** Wizard de primeiro acesso: "Pular tudo e começar" só renderiza em passos
+/** Wizard de primeiro acesso: "Concluir agora" só renderiza em passos
  *  com formulário (step>=2) — o(s) primeiro(s) são só "Continuar".
  *  Clique pré-hidratação é no-op silencioso (RSC demora a ligar handlers em
  *  dev/preview frio), então cada clique confirma o avanço no progressbar. */
 export async function pularOnboarding(page: Page) {
-  const pular = page.getByRole("button", { name: /Pular tudo e começar/ });
+  const pular = page.getByRole("button", { name: /Concluir agora/ });
   const progress = page.getByRole("progressbar");
   for (let i = 0; i < 12; i++) {
     if (await pular.isVisible().catch(() => false)) break;
@@ -274,7 +274,7 @@ export async function limparEncontrosDaDupla(duplaId: string): Promise<void> {
  *  e2e: inseri-lo dispara o auto-encerramento da 0102 — duplas.status →
  *  'concluida', uma row pendente em encerramentos e os sinos
  *  dupla_formada/dupla_reta_final. Uma dupla concluída derruba tudo que
- *  assume o piso de sempre (PDM read-only, agenda sem "Agendar encontro",
+ *  assume o piso de sempre (PDM read-only, agenda sem "Marcar encontro",
  *  ficha com selo "mentoria concluída", jornada sem "encontro N de 16").
  *  Todo piso que recria a âncora — e todo spec que depende da dupla —
  *  chama isto no final: devolve o status e desfaz o que o trigger mintou. */
@@ -484,4 +484,22 @@ export async function restComoUsuario(
     },
     ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
   });
+}
+
+/** Confirma o AgendarEncontroDialog do mentor. Quando o horário cai fora da
+ *  grade de disponibilidade de alguém, o primeiro clique só mostra o aviso
+ *  ("Quer agendar mesmo assim?") e o botão vira "… mesmo assim" — o segundo
+ *  clique grava. Fixtures sem grade não disparam o aviso; com grade, o
+ *  horário do spec pode cair fora dela, então o helper cobre os dois. */
+export async function confirmarNoDialogAgendar(
+  dialog: Locator,
+  rotulo: "Marcar o encontro" | "Salvar nova data"
+) {
+  await dialog.getByRole("button", { name: rotulo }).click();
+  const mesmoAssim = dialog.getByRole("button", { name: /mesmo assim$/ });
+  const avisou = await mesmoAssim
+    .waitFor({ state: "visible", timeout: 2_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (avisou) await mesmoAssim.click();
 }

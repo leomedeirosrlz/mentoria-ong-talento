@@ -69,6 +69,7 @@ import { cn, maskWhatsApp, sessaoFresca } from "@/lib/utils";
 import { temPapel } from "@/lib/types";
 import type { Assinatura, Disponibilidade, MentorProfile, Profile } from "@/lib/types";
 import Link from "next/link";
+import { novoUuid } from "@/lib/uuid";
 
 /** Chip "pendente" nas linhas do preview — a contagem do summary é a soma
  *  destes badges (completude se lê nos dados, não no modo). */
@@ -764,6 +765,18 @@ export function DialogoSenha({ email }: { email: string }) {
                   value={senhaAtual}
                   onChange={(e) => setSenhaAtual(e.target.value)}
                 />
+                {/* quem não lembra a atual não preenche o campo — o caminho
+                    do recovery fica aqui, não no rodapé onde ninguém olha */}
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto px-0 underline"
+                  onClick={() => void esqueci()}
+                  disabled={salvando}
+                >
+                  Esqueci minha senha: enviar link por e-mail
+                </Button>
               </div>
             ) : (
               <p className="text-xs leading-relaxed text-muted-foreground">
@@ -794,17 +807,6 @@ export function DialogoSenha({ email }: { email: string }) {
               />
             </div>
             <DialogFooter>
-              {temSenha && (
-                <Button
-                  type="button"
-                  variant="link"
-                  className="sm:me-auto"
-                  onClick={() => void esqueci()}
-                  disabled={salvando}
-                >
-                  Esqueci minha senha: enviar link por e-mail
-                </Button>
-              )}
               <Button
                 type="button"
                 variant="outline"
@@ -1172,7 +1174,7 @@ export function PerfilForm({
     setUploading(true);
     try {
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
-      const path = `${me.id}/${crypto.randomUUID()}.${ext}`;
+      const path = `${me.id}/${novoUuid()}.${ext}`;
       const { error } = await supabase.storage
         .from("avatares")
         .upload(path, file, { contentType: file.type });

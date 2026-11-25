@@ -10,6 +10,7 @@ import {
   loginComSenha,
   relogar,
   test,
+  confirmarNoDialogAgendar,
 } from "../helpers";
 
 // Backend real (staging ou supabase local do CI): a fixture vem de
@@ -106,7 +107,7 @@ test.describe("mentor DPP — fluxos reais", () => {
     // encontro" do teste abaixo sumiria — a limpeza prévia parte do zero
     if (DUPLA_ID) await limparEncontrosDaDupla(DUPLA_ID);
     // quem recriou o encontro 16 'realizado' (a âncora de outros specs)
-    // disparou a 0102 → dupla 'concluida': o CTA "Agendar encontro" some
+    // disparou a 0102 → dupla 'concluida': o CTA "Marcar encontro" some
     // e as RPCs de agenda recusam. O piso deste spec é dupla ativa.
     if (DUPLA_ID) await convergirDuplaAtiva(DUPLA_ID);
     await loginComSenha(page, EMAIL, SENHA);
@@ -136,7 +137,7 @@ test.describe("mentor DPP — fluxos reais", () => {
 
   test("agendar encontro pela home persiste de verdade", async ({ page }) => {
     // CTA da home do mentor — o dialog abre com a data oficial sugerida.
-    await page.getByRole("button", { name: "Agendar encontro" }).first().click();
+    await page.getByRole("button", { name: "Marcar encontro" }).first().click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
 
@@ -147,9 +148,7 @@ test.describe("mentor DPP — fluxos reais", () => {
     const ymd = `${futuro.getFullYear()}-${String(futuro.getMonth() + 1).padStart(2, "0")}-${String(futuro.getDate()).padStart(2, "0")}`;
     await dialog.locator("#data_hora").fill(`${ymd}T19:00`);
 
-    await dialog
-      .getByRole("button", { name: "Confirmar agendamento" })
-      .click();
+    await confirmarNoDialogAgendar(dialog, "Marcar o encontro");
 
     // toast de sucesso e o dialog fecha — o refresh traz o card novo.
     // O card da home fala "Nº encontro agendado" — o toast novo é
@@ -292,12 +291,12 @@ test.describe("mentor DPP — fluxos reais", () => {
       await expect(linha).toBeVisible();
       await linha.getByRole("button", { name: "Remarcar" }).click();
       const dialog = page.getByRole("dialog");
-      // modo remarcação: o título é o encontro e o submit é "Confirmar remarcação"
+      // modo remarcação: o título é o encontro e o submit é "Salvar nova data"
       await expect(
         dialog.getByRole("heading", { name: "4º encontro" })
       ).toBeVisible();
       await expect(
-        dialog.getByRole("button", { name: "Confirmar remarcação" })
+        dialog.getByRole("button", { name: "Salvar nova data" })
       ).toBeVisible();
 
       const alvo = emDias(6);
@@ -308,9 +307,7 @@ test.describe("mentor DPP — fluxos reais", () => {
       ).toHaveCount(0);
       await dialog.locator("#motivo-select").click();
       await page.getByRole("option", { name: "Conflito de agenda" }).click();
-      await dialog
-        .getByRole("button", { name: "Confirmar remarcação" })
-        .click();
+      await confirmarNoDialogAgendar(dialog, "Salvar nova data");
 
       await expect(
         page.getByText("Remarcação confirmada: 4º encontro.")

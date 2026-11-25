@@ -228,18 +228,26 @@ function NoPdm({
               {no.porque}
             </p>
           )}
-          <span className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground sm:gap-x-3">
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground sm:gap-x-3 sm:text-[11px]">
             {no.areaVida && (
               <Badge variant="outline" className="text-[10px] font-medium">
                 {no.areaVida}
               </Badge>
             )}
             {no.indicador && (
-              <span className="inline-flex items-center gap-1">
+              <span className="inline-flex min-w-0 max-w-full items-center gap-1">
                 <Target size={12} aria-hidden className="shrink-0" />
                 {/* cresce com a tela e em lg para de truncar — o IS é a
-                    prova da meta, não decoração */}
-                <span className="max-w-64 truncate sm:max-w-80 lg:max-w-none lg:whitespace-normal">
+                    prova da meta, não decoração. min-w-0 + max-w-full: a
+                    linha indentada do mobile cabe ~250px e o truncate sem
+                    eles estourava o viewport (scrollWidth 406). line-clamp-2
+                    em vez de truncate: sem hover no toque e sem ficha pro
+                    leitor read-only (coord/supervisor), 2 linhas são o
+                    caminho de leitura */}
+                <span
+                  title={no.indicador}
+                  className="min-w-0 max-w-64 line-clamp-2 sm:max-w-80 lg:max-w-none lg:line-clamp-none"
+                >
                   {no.indicador}
                 </span>
               </span>

@@ -238,8 +238,9 @@ export function DemandasEspecialista({
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium">
                             {/* nome vem sempre — a view solicitacoes_mural dá
-                                mentorado_nome no escopo do papel */}
-                            {s.mentorado?.nome}
+                                mentorado_nome no escopo do papel; o embed
+                                traz o nome_social quando a RLS alcança */}
+                            {s.mentorado?.nome_social ?? s.mentorado?.nome}
                           </span>
                           {praMim && (
                             <Badge
@@ -260,7 +261,9 @@ export function DemandasEspecialista({
                           <p className="text-sm">{s.demanda ?? s.motivo}</p>
                         )}
                         <p className="text-xs text-muted-foreground">
-                          Solicitado por {s.solicitante?.nome ?? "—"} ·{" "}
+                          Solicitado por{" "}
+                          {s.solicitante?.nome_social ?? s.solicitante?.nome ?? "—"}{" "}
+                          ·{" "}
                           {formatDate(s.created_at)}
                         </p>
                       </div>
@@ -312,7 +315,8 @@ export function DemandasEspecialista({
                         className="shrink-0 text-[var(--ok-text)]"
                       />
                       <span className="min-w-0 flex-1">
-                        Sessão com {s.mentorado?.nome ?? "o jovem"}
+                        Sessão com{" "}
+                        {s.mentorado?.nome_social ?? s.mentorado?.nome ?? "o jovem"}
                         {s.slot_proposto
                           ? ` · ${rotuloSlot(s.slot_proposto)}`
                           : ""}

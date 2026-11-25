@@ -14,6 +14,7 @@ import type {
   AvaliacaoLink,
   EspecialistaAvaliacao,
 } from "@/lib/types";
+import { autoria } from "@/lib/whatsapp-msgs";
 import type { AvaliacaoMediaDpp } from "@/lib/queries-avaliacao";
 import {
   CopiarLinkAvaliacao,
@@ -96,7 +97,7 @@ export function AvaliacaoJovemCard({
       )}
 
       {temDetalhe && (
-        <dl className="mt-2 space-y-1.5 text-sm">
+        <dl className="mt-2 space-y-2.5 text-sm">
           {avaliacao.sentimento && (
             <Linha rotulo="Sentiu-se">
               {SENTIMENTO_AVALIACAO_LABEL[avaliacao.sentimento] ??
@@ -149,9 +150,11 @@ function Linha({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex gap-3">
-      <dt className="w-20 shrink-0 text-xs text-muted-foreground">{rotulo}</dt>
-      <dd className="min-w-0 flex-1">{children}</dd>
+    <div>
+      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+        {rotulo}
+      </dt>
+      <dd className="mt-0.5">{children}</dd>
     </div>
   );
 }
@@ -169,6 +172,7 @@ export function AvaliacaoPendenteLinha({
   souCoord,
   duplaId,
   jornadaViva = true,
+  autorNome,
 }: {
   link: AvaliacaoLink | null;
   urlBase: string;
@@ -182,12 +186,15 @@ export function AvaliacaoPendenteLinha({
   /** Dupla fechada (concluida/encerrada): a pendência fica como fato —
    *  copiar/enviar link morre junto com as demais ações de emissão. */
   jornadaViva?: boolean;
+  /** Nome de quem envia — assina o convite (o número da coordenação não é
+   *  contato salvo do jovem; "a equipe" é o fallback quando não há nome). */
+  autorNome?: string;
 }) {
   const url = link ? `${urlBase}/avaliar/${link.token}` : null;
   const wa =
     url && waLink(
       jovemWhatsapp,
-      `Oi ${jovemNome.split(" ")[0]}! Como foi o ${numero}º encontro de vocês? Conta aqui rapidinho (1 min): ${url}`
+      `Oi ${jovemNome.split(" ")[0]}! ${autoria(autorNome)}. Como foi o ${numero}º encontro de vocês? Conta aqui rapidinho (1 min): ${url}`
     );
 
   return (

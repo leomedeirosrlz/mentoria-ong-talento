@@ -8,7 +8,6 @@ import {
 import {
   agregaRespostas,
   INSTRUMENTOS_SISTEMA,
-  respostaFormatada,
   TIPOS_LISTA_RESPOSTA,
   type FormularioCampo,
   type FormularioSistema,
@@ -19,6 +18,7 @@ import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { primeiroNome } from "@/components/forms/link-shared";
 import { InstrumentoResultado } from "@/components/instrumento-resultado";
+import { RespostaLista } from "@/components/resposta-lista";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -174,11 +174,6 @@ export function RespostasSection({
   const listas = agregados.filter(
     (ag) => TIPOS_LISTA_RESPOSTA.includes(ag.campo.tipo) && ag.itens.length > 0
   );
-  const campoPorId = new Map(campos.map((c) => [c.id, c]));
-  // posição do campo no form — respostas exibidas na ordem das perguntas;
-  // órfãs (pergunta removida) caem por último
-  const ordemCampos = new Map(campos.map((c, i) => [c.id, i]));
-
   if (respondidos.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
@@ -380,31 +375,12 @@ export function RespostasSection({
                     />
                   </div>
                 ) : (
-                <dl className="space-y-3 border-t border-border px-4 py-3 sm:px-5">
-                  {Object.entries(l.resposta!.respostas)
-                    .sort(
-                      ([a], [b]) =>
-                        (ordemCampos.get(a) ?? Number.MAX_SAFE_INTEGER) -
-                        (ordemCampos.get(b) ?? Number.MAX_SAFE_INTEGER)
-                    )
-                    .map(([campoId, valor]) => {
-                      const campo = campoPorId.get(campoId);
-                      return (
-                        <div key={campoId}>
-                          <dt className="text-xs font-medium text-muted-foreground">
-                            {campo?.label ?? (
-                              <span className="italic">
-                                pergunta removida do formulário
-                              </span>
-                            )}
-                          </dt>
-                          <dd className="mt-0.5 text-sm leading-relaxed whitespace-pre-wrap">
-                            {respostaFormatada(campo, valor)}
-                          </dd>
-                        </div>
-                      );
-                    })}
-                </dl>
+                <div className="border-t border-border px-4 py-3 sm:px-5">
+                  <RespostaLista
+                    campos={campos}
+                    respostas={l.resposta!.respostas}
+                  />
+                </div>
                 )}
                 {/* a ficha abre fora do trigger (link dentro de button é
                     duplo acionamento) — rodapé quieto: ficha da pessoa, ou

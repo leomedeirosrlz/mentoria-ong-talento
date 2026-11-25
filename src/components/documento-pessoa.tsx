@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { novoUuid } from "@/lib/uuid";
 
 const LIMITE_BYTES = 20 * 1024 * 1024;
 const BUCKET = "documentos";
@@ -140,7 +141,7 @@ export function DocumentoPessoa({
     start(async () => {
       try {
         const supabase = createClient();
-        const path = `documentos/${crypto.randomUUID()}-${saneiaNome(file.name)}`;
+        const path = `documentos/${novoUuid()}-${saneiaNome(file.name)}`;
 
         // 1) o path entra na row ANTES do upload — a policy de INSERT do storage
         //    só aceita objeto cujo name já exista como documento_path de alguém

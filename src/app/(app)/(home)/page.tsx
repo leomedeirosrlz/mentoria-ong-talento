@@ -20,6 +20,7 @@ import {
 import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { getEncerramentosPendentes } from "@/lib/queries-encerramento";
 import { getChamados } from "@/lib/queries-chamados";
+import { duplasOpcoesChamado } from "@/lib/ciclo";
 import { temPapel } from "@/lib/types";
 import {
   resolveTurmaFoco,
@@ -113,8 +114,7 @@ export default async function HomePage({
           avisos={avisos}
           solicitacoes={solicitacoes}
           encerramentos={new Set(encerramentos)}
-          turmas={[...new Set(cronogramas.map((c) => c.turma))]}
-          meuNome={me?.nome.split(" ")[0]}
+          meuNome={(me?.nome_social ?? me?.nome)?.split(" ")[0]}
           termo={termoPendente ? <TermoBanner /> : null}
           turmaFoco={foco.turma}
           seletorContexto={
@@ -218,7 +218,7 @@ export default async function HomePage({
           interacoes={interacoes}
           supervisor
           avisos={avisos}
-          meuNome={me?.nome.split(" ")[0]}
+          meuNome={(me?.nome_social ?? me?.nome)?.split(" ")[0]}
           termo={termoPendente ? <TermoBanner /> : null}
           turmaFoco={focoSup.turma}
           seletorContexto={
@@ -296,12 +296,7 @@ export default async function HomePage({
       ? getSlotsLivres(me!.id)
       : Promise.resolve([]),
   ]);
-  const duplasOpcoes = duplas
-    .filter((d) => d.status === "ativa" || d.status === "pausada")
-    .map((d) => ({
-      id: d.id,
-      label: `${d.mentorado?.nome ?? "Mentorado(a)"} · ${d.trilha === "especialista" ? "Especialista" : "DPP"}`,
-    }));
+  const duplasOpcoes = duplasOpcoesChamado(duplas, me!.id);
   return (
     <div className="space-y-8">
       {/* contexto próprio → fila de pedidos → avisos: a saudação abre a

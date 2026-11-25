@@ -2,7 +2,7 @@
 
 import { type CSSProperties, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CaretLeft, CaretRight, Plus, Trash } from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, Paperclip, Plus, Trash, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { salvarRegistro } from "@/lib/actions";
 import { demoAtivoClient } from "@/lib/demo/shared";
@@ -15,6 +15,7 @@ import {
 import {
   ATIVIDADES_ENCONTRO,
   formatDiaMes,
+  formatTamanho,
   PROXIMO_PASSO_LABEL,
   toDateStr,
   type PassoGuia,
@@ -28,12 +29,18 @@ import type {
   Trilha,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AnexosRegistro } from "@/components/anexos-registro";
+import {
+  ACCEPT_ANEXO,
+  AnexosRegistro,
+  enviarAnexo,
+  recusaDoAnexo,
+} from "@/components/anexos-registro";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { novoUuid } from "@/lib/uuid";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -66,11 +73,6 @@ const DURACAO_OPCOES: Record<string, string> = {
 };
 
 const ETAPAS = ["Como foi", "Sinais de atenção", "Combinados"] as const;
-
-// identidade estável pro `anexos` da etapa pós-save — a lista mostrada no
-// AnexosRegistro deriva da prop + deltas otimistas, e uma referência fixa
-// mantém o useMemo dele barato a cada re-render do form
-const SEM_ANEXOS: RegistroAnexo[] = [];
 
 /** Rascunho local do form — autosave no localStorage pra refresh não perder tudo. */
 type RegistroDraft = {
@@ -180,7 +182,17 @@ export function RegistroForm({
     registroId: string;
     autorId: string;
     aviso?: string;
+    /** o que já subiu do passo 3 — identidade estável enquanto a etapa
+     *  vive (o AnexosRegistro deriva a lista da prop + deltas otimistas) */
+    anexos: RegistroAnexo[];
+    /** arquivos do passo 3 que não subiram — o uploader fica logo abaixo */
+    falhas: number;
   } | null>(null);
+  // evidências escolhidas no passo 3 do registro NOVO — ficam no navegador
+  // até o save: o FK do anexo exige a row do registro, então elas sobem
+  // logo depois dele, no mesmo gesto de "Salvar registro"
+  const [arquivos, setArquivos] = useState<File[]>([]);
+  const arquivoRef = useRef<HTMLInputElement>(null);
   // "Concluir" num host sem onSaved (ficha) recolhe num "salvo" mínimo —
   // o refresh que vem em seguida troca o card; voltar pro form vazio leria
   // como registro perdido
@@ -583,10 +595,22 @@ export function RegistroForm({
             // duração vale mais que o link pro registro
             concluirTentativa(tentativaId.current, reg?.id ?? null, duracaoMs);
             if (reg?.id && reg.created_by) {
+              // as evidências do passo 3 sobem em série — o registro já
+              // está salvo, falha aqui só vira aviso com o uploader à mão
+              const enviados: RegistroAnexo[] = [];
+              let falhas = 0;
+              for (const file of arquivos) {
+                const up = await enviarAnexo(reg.id, reg.created_by, file);
+                if ("row" in up) enviados.push(up.row);
+                else falhas++;
+              }
+              setArquivos([]);
               setPosSave({
                 registroId: reg.id,
                 autorId: reg.created_by,
                 aviso: res?.aviso,
+                anexos: enviados,
+                falhas,
               });
             } else {
               // sem a row à mão não dá pra montar o uploader — cai no fluxo
@@ -626,6 +650,8 @@ export function RegistroForm({
         duplaId={duplaId}
         autorId={posSave.autorId}
         aviso={posSave.aviso}
+        anexos={posSave.anexos}
+        falhas={posSave.falhas}
         onFechar={fecharPosSave}
         embutido={embutido}
       />
@@ -670,7 +696,7 @@ export function RegistroForm({
 
       {restored && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
-          <span>Rascunho de {formatDiaMes(restored.savedAt)} restaurado.</span>
+          <span>Recuperamos o rascunho de {formatDiaMes(restored.savedAt)}.</span>
           <button
             type="button"
             onClick={discardDraft}
@@ -713,7 +739,7 @@ export function RegistroForm({
         <div className="space-y-5">
           {combinadosPendentes && combinadosPendentes.length > 0 && (
             <fieldset className="min-w-0 space-y-2">
-              <legend className="text-sm font-medium">Da última vez: marcar como feito?</legend>
+              <legend className="text-sm font-medium">Dos combinados anteriores, quais já foram feitos?</legend>
               {combinadosPendentes.map((c) => {
                 const vencido = c.prazo != null && c.prazo < hojeStr;
                 return (
@@ -746,7 +772,7 @@ export function RegistroForm({
           )}
 
           <fieldset className="min-w-0 space-y-2">
-            <legend className="text-sm font-medium">O que foi realizado neste encontro</legend>
+            <legend className="text-sm font-medium">O que aconteceu neste encontro</legend>
             <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
               {ATIVIDADES_ENCONTRO.map((a) => (
                 <label key={a} className="flex min-h-11 items-center gap-2 py-2 text-sm cursor-pointer md:min-h-0 md:py-0">
@@ -781,7 +807,7 @@ export function RegistroForm({
               />
             </div>
             <div className="space-y-2">
-              <Label id="ferramenta-label">Instrumento utilizado</Label>
+              <Label id="ferramenta-label">Instrumento usado</Label>
               {/* key remonta o select quando o rascunho chega (defaultValue novo) */}
               <Select
                 key={restored ? "restored" : "base"}
@@ -826,18 +852,18 @@ export function RegistroForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reflexoes">Principais reflexões</Label>
+            <Label htmlFor="reflexoes">O que você percebeu</Label>
             <Textarea
               id="reflexoes"
               name="reflexoes"
               rows={3}
               defaultValue={registro?.reflexoes ?? ""}
-              placeholder="Suas observações sobre o encontro, combinados e próximos passos."
+              placeholder="Conte com suas palavras como foi o encontro e o que vem a seguir."
             />
           </div>
 
           <fieldset className="min-w-0 space-y-2">
-            <legend className="text-sm font-medium">Desempenho e participação do mentorado</legend>
+            <legend className="text-sm font-medium">Como o mentorado foi no encontro</legend>
             <div
               role="radiogroup"
               aria-invalid={erroAvaliacao || undefined}
@@ -880,7 +906,7 @@ export function RegistroForm({
       >
         <div className="space-y-4">
           <div className="space-y-2 sm:max-w-sm">
-            <Label id="dificuldade-label">Dificuldade que precisa de atenção</Label>
+            <Label id="dificuldade-label">Teve alguma dificuldade?</Label>
             <Select name="dificuldade" value={dificuldade} items={DIFICULDADE_OPCOES} onValueChange={(v) => setDificuldade(v ?? "nenhuma")}>
               <SelectTrigger id="dificuldade-select" aria-labelledby="dificuldade-label dificuldade-select"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -913,7 +939,7 @@ export function RegistroForm({
             />
             <span>
               <span className="font-medium">Preciso de apoio</span> · sinalizar a coordenação ou o
-              auxiliar executivo (situação que extrapola o papel do mentor).
+              auxiliar executivo (quando o caso passa do que cabe ao mentor).
             </span>
           </label>
         </div>
@@ -961,7 +987,7 @@ export function RegistroForm({
                 variant="outline"
                 size="sm"
                 ref={addEncRef}
-                onClick={() => setEncaminhamentos([...encaminhamentos, { id: crypto.randomUUID(), descricao: "", responsavel: "mentorado", prazo: "" }])}
+                onClick={() => setEncaminhamentos([...encaminhamentos, { id: novoUuid(), descricao: "", responsavel: "mentorado", prazo: "" }])}
               >
                 <Plus size={14} /> Adicionar
               </Button>
@@ -1018,9 +1044,91 @@ export function RegistroForm({
               name="observacoes"
               rows={2}
               defaultValue={registro?.observacoes ?? ""}
-              placeholder="Avanços, dificuldades e pontos de atenção a acompanhar."
+              placeholder="O que deu certo, o que travou e o que vale acompanhar."
             />
           </div>
+
+          {/* evidência no próprio fluxo (feedback da mentora): quem chega ao
+              fim do registro já vê onde anexar. Só no registro novo — na
+              edição as evidências moram no bloco do registro, no card */}
+          {!registro && (
+            <div className="space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Evidências</p>
+                  <p className="text-xs text-muted-foreground">
+                    Foto do encontro, print ou atividade feita: PDF ou imagem
+                    até 10&nbsp;MB. Opcional.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={pending}
+                  onClick={() => arquivoRef.current?.click()}
+                >
+                  <Paperclip size={14} aria-hidden /> Anexar
+                </Button>
+                <input
+                  ref={arquivoRef}
+                  type="file"
+                  accept={ACCEPT_ANEXO}
+                  multiple
+                  hidden
+                  aria-label="Escolher arquivos de evidência"
+                  onChange={(e) => {
+                    const escolhidos = Array.from(e.target.files ?? []);
+                    // limpa pra escolher o mesmo arquivo de novo disparar onChange
+                    e.target.value = "";
+                    const aceitos: File[] = [];
+                    for (const f of escolhidos) {
+                      const recusa = recusaDoAnexo(f);
+                      if (recusa) toast.error(`${f.name}: ${recusa}`);
+                      else aceitos.push(f);
+                    }
+                    if (aceitos.length) setArquivos((l) => [...l, ...aceitos]);
+                  }}
+                />
+              </div>
+              {arquivos.length > 0 && (
+                <ul className="divide-y divide-border/60 rounded-lg border">
+                  {arquivos.map((f, i) => (
+                    <li
+                      key={`${f.name}-${f.size}-${i}`}
+                      className="flex items-center gap-2 py-1 pl-3 pr-1 text-sm"
+                    >
+                      <Paperclip
+                        size={13}
+                        aria-hidden
+                        className="shrink-0 text-muted-foreground"
+                      />
+                      <span className="min-w-0 flex-1 truncate" title={f.name}>
+                        {f.name}
+                      </span>
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {formatTamanho(f.size)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Tirar ${f.name}`}
+                        disabled={pending}
+                        className="size-8 shrink-0 text-muted-foreground"
+                        onClick={() =>
+                          setArquivos((l) => l.filter((_, j) => j !== i))
+                        }
+                      >
+                        <X size={14} aria-hidden />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1084,6 +1192,8 @@ function PosSaveRegistro({
   duplaId,
   autorId,
   aviso,
+  anexos,
+  falhas,
   onFechar,
   embutido = false,
 }: {
@@ -1091,6 +1201,10 @@ function PosSaveRegistro({
   duplaId: string;
   autorId: string;
   aviso?: string;
+  /** evidências que já subiram do passo 3 */
+  anexos: RegistroAnexo[];
+  /** quantas do passo 3 não subiram */
+  falhas: number;
   onFechar: () => void;
   /** dentro de dialog o rodapé é o DialogFooter compartilhado; inline ele
       segue a barrinha própria do card */
@@ -1102,12 +1216,22 @@ function PosSaveRegistro({
     <div className="space-y-4">
       <div className="space-y-1">
         <p className="text-sm font-medium">
-          Registro salvo: anexe as evidências
+          {anexos.length > 0
+            ? `Registro salvo com ${anexos.length} ${anexos.length === 1 ? "arquivo" : "arquivos"}`
+            : "Registro salvo. Quer anexar uma foto ou arquivo?"}
         </p>
-        <p className="text-xs text-muted-foreground">
-          Foto do encontro, print, atividade feita: PDF ou imagem até
-          10&nbsp;MB. Dá pra anexar depois na ficha da dupla também.
-        </p>
+        {falhas > 0 ? (
+          <p className="text-xs text-[var(--warn-text)]">
+            {falhas === 1
+              ? "1 arquivo não subiu. Anexe de novo abaixo."
+              : `${falhas} arquivos não subiram. Anexe de novo abaixo.`}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Foto do encontro, print, atividade feita: PDF ou imagem até
+            10&nbsp;MB. Dá pra anexar depois na ficha da dupla também.
+          </p>
+        )}
         {aviso && <p className="text-xs text-muted-foreground">{aviso}</p>}
       </div>
       <AnexosRegistro
@@ -1116,7 +1240,7 @@ function PosSaveRegistro({
         autorId={autorId}
         podeAnexar
         podeRemover
-        anexos={SEM_ANEXOS}
+        anexos={anexos}
       />
       {embutido ? (
         <DialogFooter>

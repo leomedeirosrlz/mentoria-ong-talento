@@ -54,11 +54,12 @@ import {
 } from "@/components/ui/select";
 import { EventoCronogramaDialog } from "@/components/evento-cronograma-dialog";
 import { cn } from "@/lib/utils";
+import { novoUuid } from "@/lib/uuid";
 
 /** Linha da prévia — rascunho + chave React estável (não é o id do banco). */
 type Linha = EventoRascunho & { key: string };
 
-const novaChave = () => crypto.randomUUID();
+const novaChave = () => novoUuid();
 
 const STATUS_OPCOES = {
   rascunho: "Rascunho: ainda não é o calendário de nenhuma dupla",

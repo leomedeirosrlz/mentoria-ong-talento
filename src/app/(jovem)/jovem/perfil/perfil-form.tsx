@@ -228,7 +228,7 @@ export function DisponibilidadeCard({
               <DialogTitle>Sua disponibilidade</DialogTitle>
               <DialogDescription>
                 Toque nos dias e períodos em que costuma ter tempo livre.
-                Com a sua grade e a do seu mentor, a agenda acha horários
+                Com a sua disponibilidade e a do seu mentor, a agenda acha horários
                 em comum pros encontros.
               </DialogDescription>
             </DialogHeader>

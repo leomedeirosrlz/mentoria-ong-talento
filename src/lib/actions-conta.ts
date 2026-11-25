@@ -93,7 +93,7 @@ export async function trocarEmail(input: {
     mensagens: [
       {
         to: user.email,
-        subject: "Seu e-mail de acesso mudou — Realiza.vc",
+        subject: "Mentoria Social: seu e-mail de acesso mudou",
         html: emailEmailAlterado({ antigo: user.email, novo }),
       },
     ],
@@ -118,7 +118,7 @@ export async function avisarSenhaAlterada(): Promise<{ ok: true }> {
       mensagens: [
         {
           to: user.email,
-          subject: "Sua senha foi alterada — Realiza.vc",
+          subject: "Mentoria Social: sua senha foi alterada",
           html: emailSenhaAlterada({ email: user.email }),
         },
       ],

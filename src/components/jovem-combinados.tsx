@@ -34,7 +34,7 @@ export function JovemCombinados({
         <span className="grid size-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
           <ListChecks size={18} aria-hidden />
         </span>
-        Nenhum combinado por aqui ainda: eles saem do papo com seu mentor em
+        Nenhum combinado ainda. Eles surgem nas conversas com seu mentor a
         cada encontro.
       </p>
     );
@@ -91,14 +91,14 @@ export function JovemCombinados({
           <span
             aria-hidden="true"
             className={cn(
-              "mt-0.5 grid size-4.5 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
+              "grid size-6 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
               feito
                 ? "border-[var(--ok-text)] bg-[var(--ok-text)] text-[var(--status-foreground)]"
                 : "border-muted-foreground/40 group-hover:border-foreground"
             )}
           >
             {feito && (
-              <svg viewBox="0 0 10 8" className="size-2.5 fill-none stroke-current stroke-2">
+              <svg viewBox="0 0 10 8" className="size-3.5 fill-none stroke-current stroke-2">
                 <path d="M1 4l2.5 2.5L9 1" />
               </svg>
             )}

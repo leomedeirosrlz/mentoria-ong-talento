@@ -41,6 +41,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { novoUuid } from "@/lib/uuid";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -193,7 +194,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
       try {
         const supabase = createClient();
         const pathAntigo = material.path;
-        const path = `materiais/${crypto.randomUUID()}-${saneiaNome(file.name)}`;
+        const path = `materiais/${novoUuid()}-${saneiaNome(file.name)}`;
 
         // 1) o path entra na row ANTES do upload — a policy de INSERT do storage
         //    só aceita objeto cujo name já exista como path em materiais

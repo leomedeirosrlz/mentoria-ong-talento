@@ -1,6 +1,7 @@
 import {
   BookOpen,
   CalendarBlank,
+  CalendarPlus,
   CaretDown,
   HandHeart,
   VideoCamera,
@@ -9,7 +10,6 @@ import type {
   AvaliacaoLink,
   Encaminhamento,
   Encontro,
-  EncontroIntencao,
   Material,
   RegistroAnexo,
 } from "@/lib/types";
@@ -27,7 +27,7 @@ import { WhatsAppRapido } from "@/components/whatsapp-rapido";
 import { AvaliacaoBadge } from "@/components/semaforo";
 import { CopiarChamada } from "@/components/copiar-chamada";
 import { NotaEncontro } from "@/components/nota-encontro";
-import { IntencoesEncontro } from "@/components/intencoes-encontro";
+import { CombinadosEncontro } from "@/components/combinados-encontro";
 import {
   AvaliacaoJovemCard,
   AvaliacaoPendenteLinha,
@@ -74,8 +74,8 @@ export function EncontroRow({
   combinados,
   combinadosPendentes,
   nota,
-  intencoes,
-  intencoesPendentes,
+  combinadosDoNumero,
+  combinadosAnteriores,
   registroAberto,
   apoioDestinos,
   linkAvaliacao,
@@ -86,6 +86,8 @@ export function EncontroRow({
   jovemNome,
   jovemWhatsapp,
   jornadaViva,
+  lacunaAnterior,
+  autorNome,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
   passo: PassoGuia;
@@ -114,10 +116,11 @@ export function EncontroRow({
   combinadosPendentes: Encaminhamento[];
   /** Anotação/plano do mentor pra esse nº do ciclo — null = sem nota. */
   nota: string | null;
-  /** Checklist do mentor neste nº do guia (REALIZA-21) — itens próprios. */
-  intencoes: EncontroIntencao[];
+  /** Combinados deste nº do guia (0157: registro + preparo, os dois
+   *  responsáveis). */
+  combinadosDoNumero: Encaminhamento[];
   /** Pendentes de nºs anteriores — carry-over taggeado "do Nº encontro". */
-  intencoesPendentes: EncontroIntencao[];
+  combinadosAnteriores: Encaminhamento[];
   /** Encontro atual ou pendente de registro — nasce com o registro expandido;
    *  os demais viram linha-resumo sob disclosure (o deep link `#registrar-{id}` abre). */
   registroAberto: boolean;
@@ -141,6 +144,12 @@ export function EncontroRow({
   /** Dupla viva (ativa|pausada) — destrava as ações de link da pendência
    *  de avaliação; fechada deixa só o aviso como fato. */
   jornadaViva: boolean;
+  /** Nº do primeiro passo ainda pendente, quando anterior a este — gera a
+   *  explicação da lacuna no "Agendar" de um passo fora de ordem (o híbrido:
+   *  não restringe, mas sempre diz o que está aberto antes). */
+  lacunaAnterior?: number | null;
+  /** Nome de quem vê — assina o convite de avaliação pro jovem. */
+  autorNome?: string;
 }) {
   const feito = encontro?.status === "realizado";
   const naoAconteceu = encontro?.status === "nao_aconteceu";
@@ -174,7 +183,7 @@ export function EncontroRow({
     ? new Date(encontro.data_hora).getTime() - new Date().getTime()
     : null;
   const chamadaAgora =
-    encontro?.status === "agendado" &&
+    (encontro?.status === "agendado" || encontro?.status === "remarcado") &&
     msAteInicio != null &&
     msAteInicio <= 15 * 60000 &&
     msAteInicio >= -2 * 3600000;
@@ -190,15 +199,30 @@ export function EncontroRow({
         ? <RevelarApos from={encontro.data_hora}>{node}</RevelarApos>
         : null;
   const podeRegistrar = !!(encontro && !reg && podeEditar);
-  // remarcar e trocar o link são gestos do encontro agendado — mentor de
-  // dupla ativa; a coord (e o sup) copia o link, nunca edita
-  const podeRemarcar = encontro?.status === "agendado" && podeEditar;
+  // remarcar e trocar o link são gestos do encontro em aberto — o servidor
+  // aceita reagendar remarcado/nao_aconteceu/cancelado via `atual` (só
+  // realizado é barrado), então a linha oferece o mesmo caminho da agenda;
+  // a coord (e o sup) copia o link, nunca edita
+  const emAberto =
+    encontro?.status === "agendado" ||
+    encontro?.status === "remarcado" ||
+    encontro?.status === "nao_aconteceu" ||
+    encontro?.status === "cancelado";
+  const podeRemarcar = emAberto && podeEditar;
+  // passo ainda sem row: a linha também oferece o agendamento (o dialog
+  // cobre os dois sentidos — data futura agenda, passada vira retroativo)
+  // e avisa quando um passo anterior segue pendente. Antes a linha ficava
+  // muda e o único caminho era o cabeçalho, que só opera o alvo
+  const podeAgendarPasso = encontro == null && souMentor && ativa;
   // ≤3 ações por linha: status à esquerda, primária da pendência, o resto ghost
   const temAcoes =
     registroPendente ||
     podeRegistrar ||
     podeRemarcar ||
-    (encontro?.status === "agendado" && podeMarcar && !!encontro.data_hora) ||
+    podeAgendarPasso ||
+    ((encontro?.status === "agendado" || encontro?.status === "remarcado") &&
+      podeMarcar &&
+      !!encontro.data_hora) ||
     (naoAconteceu && podeMarcar) ||
     !!reg?.precisa_apoio;
   // linha 1 (data + situação): a 1ª cláusula é a semana que o guia sugere,
@@ -216,7 +240,7 @@ export function EncontroRow({
       semanaSugerida &&
       `semana sugerida ${diaMesCurto(semanaSugerida.seg)} a ${diaMesCurto(semanaSugerida.dom)}`,
     encontro?.data_hora &&
-      `${feito && !diverge ? "realizado" : "agendado"} ${formatDateTime(encontro.data_hora)}`,
+      `${feito && !diverge ? "realizado" : encontro.status === "cancelado" ? "cancelado" : "agendado"} ${formatDateTime(encontro.data_hora)}`,
     naoAconteceu && "não aconteceu",
   ]
     .filter(Boolean)
@@ -225,8 +249,8 @@ export function EncontroRow({
   // encontro — divergência de data, origem externa, motivo da remarcação,
   // material sem destino e o foco do passo (trilha especialista)
   const linha2 = [
-    diverge && `de fato em ${formatDate(encontro?.realizado_em)}`,
-    encontro?.origem === "externo" && "marcado fora da plataforma",
+    diverge && `aconteceu em ${formatDate(encontro?.realizado_em)}`,
+    encontro?.origem === "externo" && "marcado por fora do app",
     encontro?.motivo_reagendamento && `remarcado: ${encontro.motivo_reagendamento}`,
     tentativasFalhas > 0 &&
       `${tentativasFalhas === 1 ? "1 tentativa anterior não aconteceu" : `${tentativasFalhas} tentativas anteriores não aconteceram`}`,
@@ -275,12 +299,18 @@ export function EncontroRow({
       )}
     >
       <div
+        // #encontro-<id>: âncora de leitura (só rola — usada pelos CTAs
+        // "Remarcar na ficha"); #registrar-<id> no card abre o form além
+        // de rolar, por isso são dois ids em elementos distintos
+        id={encontro ? `encontro-${encontro.id}` : undefined}
         className={cn(
-          "flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5",
+          "flex scroll-mt-20 flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5",
           registroPendente && "bg-[var(--warn)]/5"
         )}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-4">
+        {/* piso de largura: com min-w-0 o título encolhia até uma palavra
+            por linha no celular em vez de mandar as ações pra baixo */}
+        <div className="flex min-w-[min(100%,16rem)] flex-1 items-center gap-4">
           <span
             className={cn(
               // disco do nº do encontro — lime cheio = aconteceu; lime de
@@ -391,7 +421,7 @@ export function EncontroRow({
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {registroPendente && (
               <Badge variant="outline" className="border-[var(--warn)] text-[var(--warn-text)] shrink-0">
-                registro pendente
+                falta o registro
               </Badge>
             )}
             {encontro && !reg && podeEditar &&
@@ -419,7 +449,9 @@ export function EncontroRow({
             )}
             {/* o botão só vale depois do horário — RevelarApos faz ele aparecer
                 pra quem ficou com a aba aberta atravessando o encontro */}
-            {encontro?.status === "agendado" && podeMarcar && encontro.data_hora && (
+            {(encontro?.status === "agendado" || encontro?.status === "remarcado") &&
+              podeMarcar &&
+              encontro.data_hora && (
               <RevelarApos from={encontro.data_hora}>
                 <NaoAconteceuButton encontroId={encontro.id} duplaId={duplaId} />
               </RevelarApos>
@@ -427,12 +459,37 @@ export function EncontroRow({
             {naoAconteceu && podeMarcar && (
               <DesfazerNaoAconteceuButton encontroId={encontro.id} duplaId={duplaId} />
             )}
+            {podeAgendarPasso && (
+              <span className="flex flex-col items-end gap-1">
+                <AgendarEncontroDialog
+                  duplaId={duplaId}
+                  numero={passo.numero}
+                  atual={null}
+                  sugerido={passo.data ?? undefined}
+                  piso={piso}
+                  jovemNome={jovemNome}
+                  rotulo={ehEsp ? "sessão de especialista" : undefined}
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <CalendarPlus size={16} />
+                      Agendar
+                    </Button>
+                  }
+                />
+                {lacunaAnterior != null && (
+                  <span className="max-w-56 text-right text-[11px] leading-snug text-muted-foreground">
+                    o {lacunaAnterior}º ainda está pendente. Você pode agendar
+                    este mesmo assim
+                  </span>
+                )}
+              </span>
+            )}
             {reg?.precisa_apoio && souCoord && (
               <ResolverApoioButton registroId={reg.id} duplaId={duplaId} />
             )}
             {reg?.precisa_apoio && !souCoord && (
               <Badge variant="outline" className="border-[var(--danger)] text-[var(--danger)] shrink-0">
-                <HandHeart size={13} /> apoio solicitado
+                <HandHeart size={13} /> pediu apoio
               </Badge>
             )}
             {/* o pedido partiu do mentor — a resposta de coord/sup é chamar
@@ -491,7 +548,6 @@ export function EncontroRow({
                   <RegistroView
                     reg={reg}
                     tardio={tardio}
-                    combinados={combinadosDoRegistro}
                     anexos={
                       <AnexosRegistro
                         registroId={reg.id}
@@ -537,36 +593,41 @@ export function EncontroRow({
                   souCoord={souCoord}
                   duplaId={duplaId}
                   jornadaViva={jornadaViva}
+                  autorNome={autorNome}
                 />
               ) : (
                 <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-                  Sem avaliação do jovem para este encontro.
+                  O jovem não avaliou este encontro.
                 </div>
               )}
             </div>
           )}
         </div>
       ) : null}
-      {/* preparo do mentor — vem DEPOIS do registro: quem volta a um
-          encontro procura primeiro o que foi registrado (REALIZA-343). Nota
-          livre + checklist de afazeres, nesta ordem: a nota responde "como quero conduzir", os afazeres "o que
-          não posso esquecer". Pra quem não edita (coord/sup, dupla inativa)
-          o que existe vira leitura */}
-      {(podeEditar || nota || intencoes.length > 0 || intencoesPendentes.length > 0) && (
-        <div className="space-y-1.5 border-t border-border/60 px-4 py-3">
-          {(podeEditar || nota) && (
-            <NotaEncontro
-              duplaId={duplaId}
-              numero={passo.numero}
-              nota={nota}
-              somenteLeitura={!podeEditar}
-            />
-          )}
-          <IntencoesEncontro
+      {/* combinados logo abaixo do registro (0157): uma lista só, a do
+          registro e a do preparo, marcável aqui mesmo — quem acabou de ler
+          o registro não precisa ir à aba Combinados pra dar baixa */}
+      <div className="border-t border-border/60 px-4 py-3 empty:hidden">
+        <CombinadosEncontro
+          duplaId={duplaId}
+          numero={passo.numero}
+          itens={combinadosDoNumero}
+          pendentesAnteriores={combinadosAnteriores}
+          jovemNome={jovemNome.split(" ")[0] || "Mentorado"}
+          podeEditar={podeEditar}
+          podeMarcar={podeMarcar}
+        />
+      </div>
+      {/* anotação do mentor — DEPOIS do registro e dos combinados: quem
+          volta a um encontro procura primeiro o que foi registrado
+          (REALIZA-343). Pra quem não edita (coord/sup, dupla inativa) a
+          nota existente vira leitura */}
+      {(podeEditar || nota) && (
+        <div className="border-t border-border/60 px-4 py-3">
+          <NotaEncontro
             duplaId={duplaId}
             numero={passo.numero}
-            itens={intencoes}
-            pendentesAnteriores={intencoesPendentes}
+            nota={nota}
             somenteLeitura={!podeEditar}
           />
         </div>

@@ -123,7 +123,7 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
     await expect(
       page.getByRole("heading", { name: "Mentor E2E", level: 1 })
     ).toBeVisible();
-    await expect(page.getByText("Seu mentor DPP")).toBeVisible();
+    await expect(page.getByText("Seu mentor")).toBeVisible();
     await expect(
       page.getByRole("link", { name: /e2e-mentor@realiza\.test/ })
     ).toBeVisible();

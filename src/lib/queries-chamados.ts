@@ -9,7 +9,7 @@ import {
   demoChamadosSemDono,
   demoEquipeChamados,
 } from "./demo/queries";
-import { comparaNome } from "./ciclo";
+import { anexarMentorado, comparaNome } from "./ciclo";
 import type {
   ChamadoAnexo,
   ChamadoFilaItem,
@@ -23,6 +23,35 @@ import type {
 // interno. Nada cruza com dupla_id — dividir a dupla não abre o chamado.
 // Os labels CHAMADO_*_LABEL moram em ./ciclo (puro) — este arquivo é
 // server-only e não pode ser importado por client components.
+
+/** `mentorado:mentorados!duplas_mentorado_id_fkey(nome, nome_social)` — embed
+ *  to-one, mas o PostgREST pode serializar como array dependendo do schema
+ *  cache. O nome exibido é o social quando existe (mesma régua do resto). */
+function nomeMentoradoEmbed(v: unknown): string | null {
+  if (!v) return null;
+  const m = Array.isArray(v) ? v[0] : v;
+  const o = m as { nome?: string | null; nome_social?: string | null } | null;
+  return o ? o.nome_social || o.nome || null : null;
+}
+
+/** Colunas de `ChamadoFila` (sem os derivados) — explícitas em vez de `*`
+ *  pra coluna nova na tabela/view não engordar o payload da fila, que vai
+ *  inteiro pro client a cada clique. `mensagem` fica: o detalhe reaproveita
+ *  a linha da fila em vez de reler o chamado. */
+// literal único: o parser de tipos do supabase-js não lê string concatenada
+const CHAMADO_COLS =
+  "id, numero, autor_id, autor_mentorado_id, dupla_id, categoria, descricao_outro, assunto, mensagem, status, atribuido_a, origem, registro_id, avaliacao_id, created_at, updated_at, resolvido_em, resolvido_por, resolucao_resumo";
+
+type LinhaChamado = Record<string, unknown> & {
+  id: string;
+  autor_id: string | null;
+  autor_mentorado_id: string | null;
+  atribuido_a: string | null;
+  dupla_id: string | null;
+  registro_id: string | null;
+  avaliacao_id: string | null;
+  categoria: string;
+};
 
 /** Fila pro papel: staff → todos (auxiliar com plataforma mascarada); autor
  *  → os próprios. Ordem: abertos primeiro, em atendimento depois, resolvidos
@@ -42,23 +71,14 @@ export const getChamados = cache(
     if (staff) {
       const { data, error } = await supabase
         .from("chamados_fila")
-        .select("*")
+        .select(CHAMADO_COLS)
         .order("status", { ascending: true }) // aberto < em_atendimento < resolvido
         .order("created_at", { ascending: false });
       if (error) {
         console.error("getChamados:", error);
         return { papel: me.role, itens: [] };
       }
-      const rows = (data ?? []) as unknown as (Record<string, unknown> & {
-        id: string;
-        autor_id: string | null;
-        autor_mentorado_id: string | null;
-        atribuido_a: string | null;
-        dupla_id: string | null;
-        registro_id: string | null;
-        avaliacao_id: string | null;
-        categoria: string;
-      })[];
+      const rows = (data ?? []) as unknown as LinhaChamado[];
       const itens = await enriqueceItens(supabase, rows, me.role === "supervisor");
       return { papel: me.role, itens };
     }
@@ -66,32 +86,55 @@ export const getChamados = cache(
     // autor (mentor/especialista/jovem logado): os próprios chamados
     const { data, error } = await supabase
       .from("chamados")
-      .select("*")
+      .select(CHAMADO_COLS)
       .order("created_at", { ascending: false });
     if (error) {
       console.error("getChamados(autor):", error);
       return { papel: me.role, itens: [] };
     }
-    // o autor vê o nome do responsável ("Responsável: Marina" no mock)
+    // o autor vê o nome do responsável ("Responsável: Marina" no mock) e o
+    // mentorado da dupla vinculada — duas leituras em lote, sem N+1
     const atribIds = [...new Set(
       (data ?? []).map((c) => c.atribuido_a).filter(Boolean) as string[]
     )];
+    const duplaIds = [...new Set(
+      (data ?? []).map((c) => c.dupla_id).filter(Boolean) as string[]
+    )];
     const nomes = new Map<string, string>();
-    if (atribIds.length) {
-      const { data: ps } = await supabase
-        .from("profiles")
-        .select("id, nome, nome_social")
-        .in("id", atribIds);
-      for (const p of ps ?? []) nomes.set(p.id, p.nome_social || p.nome);
+    const mentoradoPorDupla = new Map<string, string | null>();
+    if (atribIds.length || duplaIds.length) {
+      const [psRes, dsRes] = await Promise.all([
+        atribIds.length
+          ? supabase
+              .from("profiles")
+              .select("id, nome, nome_social")
+              .in("id", atribIds)
+          : Promise.resolve({ data: [] }),
+        duplaIds.length
+          ? supabase
+              .from("duplas")
+              .select("id, mentorado:mentorados!duplas_mentorado_id_fkey(nome, nome_social)")
+              .in("id", duplaIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+      for (const p of psRes.data ?? [])
+        nomes.set(p.id, p.nome_social || p.nome);
+      for (const d of dsRes.data ?? [])
+        mentoradoPorDupla.set(d.id, nomeMentoradoEmbed(d.mentorado));
     }
-    const itens = (data ?? []).map((c) => ({
-      ...c,
-      restrito: false,
-      autor_nome: null,
-      autor_papel: null,
-      atribuido_nome: c.atribuido_a ? (nomes.get(c.atribuido_a) ?? null) : null,
-      contexto: null,
-    })) as ChamadoFilaItem[];
+    const itens = anexarMentorado(
+      (data ?? []).map((c) => ({
+        ...c,
+        restrito: false,
+        autor_nome: null,
+        autor_papel: null,
+        atribuido_nome: c.atribuido_a
+          ? (nomes.get(c.atribuido_a) ?? null)
+          : null,
+        contexto: null,
+      })),
+      mentoradoPorDupla
+    ) as ChamadoFilaItem[];
     return { papel: me.role, itens };
   }
 );
@@ -99,16 +142,7 @@ export const getChamados = cache(
 /** Resolve nomes/contexto pra lista — batched, sem N+1. */
 async function enriqueceItens(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  rows: (Record<string, unknown> & {
-    id: string;
-    autor_id: string | null;
-    autor_mentorado_id: string | null;
-    atribuido_a: string | null;
-    dupla_id: string | null;
-    registro_id: string | null;
-    avaliacao_id: string | null;
-    categoria: string;
-  })[],
+  rows: LinhaChamado[],
   mascaradoSupervisor: boolean
 ): Promise<ChamadoFilaItem[]> {
   const profileIds = new Set<string>();
@@ -130,10 +164,10 @@ async function enriqueceItens(
         ? supabase.from("profiles").select("id, nome, nome_social, role").in("id", [...profileIds])
         : Promise.resolve({ data: [] }),
       mentoradoIds.size
-        ? supabase.from("mentorados").select("id, nome").in("id", [...mentoradoIds])
+        ? supabase.from("mentorados").select("id, nome, nome_social").in("id", [...mentoradoIds])
         : Promise.resolve({ data: [] }),
       duplaIds.size
-        ? supabase.from("duplas").select("id, mentorado:mentorados!duplas_mentorado_id_fkey(nome)").in("id", [...duplaIds])
+        ? supabase.from("duplas").select("id, mentorado:mentorados!duplas_mentorado_id_fkey(nome, nome_social)").in("id", [...duplaIds])
         : Promise.resolve({ data: [] }),
       registroIds.size
         ? supabase.from("registros").select("id, encontro:encontros!registros_encontro_id_fkey(numero)").in("id", [...registroIds])
@@ -149,22 +183,14 @@ async function enriqueceItens(
     ])
   );
   const mentorados = new Map(
-    (mentoradosRes.data ?? []).map((m) => [m.id, m.nome])
+    (mentoradosRes.data ?? []).map((m) => [m.id, m.nome_social || m.nome])
   );
   const duplaMentorado = new Map(
     (duplasRes.data ?? []).map((d) => [
       d.id,
-      (d as unknown as { mentorado?: { nome: string } | { nome: string }[] | null })
-        .mentorado
-        ? Array.isArray(
-            (d as unknown as { mentorado: { nome: string } | { nome: string }[] })
-              .mentorado
-          )
-          ? ((d as unknown as { mentorado: { nome: string }[] }).mentorado[0]
-              ?.nome ?? null)
-          : ((d as unknown as { mentorado: { nome: string } }).mentorado?.nome ??
-            null)
-        : null,
+      nomeMentoradoEmbed(
+        (d as unknown as { mentorado?: unknown }).mentorado
+      ),
     ])
   );
   const registroEncontro = new Map(
@@ -228,6 +254,10 @@ async function enriqueceItens(
         ? (profiles.get(r.atribuido_a)?.nome ?? null)
         : null,
       contexto,
+      mentorado_nome:
+        !restrito && r.dupla_id
+          ? (duplaMentorado.get(r.dupla_id) ?? null)
+          : null,
     };
   });
 }
@@ -268,77 +298,65 @@ export const getChamadoDetalhe = cache(
       return { chamado: null, timeline: [], equipe: [], papel: null, meuId: null };
     const staff = me.role === "coordenacao" || me.role === "supervisor";
 
-    const { data: row, error } = staff
-      ? await supabase.from("chamados_fila").select("*").eq("id", id).maybeSingle()
-      : await supabase.from("chamados").select("*").eq("id", id).maybeSingle();
-    if (error) console.error("getChamadoDetalhe:", error);
-    if (!row)
+    // A trilha não depende da linha do chamado: sai junto com a fila (o page
+    // já pediu getChamados — o React.cache devolve a mesma promise) em vez de
+    // esperar a linha. A RLS dessas tabelas filtra sozinha; se o chamado não
+    // estiver visível o resultado é descartado abaixo.
+    const [{ itens: fila }, [atualRes, comentRes, anexoRes, equipe]] =
+      await Promise.all([
+        getChamados(),
+        Promise.all([
+          supabase
+            .from("chamado_atualizacoes")
+            .select("id, chamado_id, autor_id, tipo, texto, created_at")
+            .eq("chamado_id", id)
+            .order("created_at", { ascending: true }),
+          staff
+            ? supabase
+                .from("chamado_comentarios")
+                .select("id, chamado_id, autor_id, texto, created_at")
+                .eq("chamado_id", id)
+                .order("created_at", { ascending: true })
+            : Promise.resolve({ data: [] }),
+          supabase
+            .from("chamado_anexos")
+            .select("id, chamado_id, path, nome, tamanho, mime, interno, created_by, created_at")
+            .eq("chamado_id", id)
+            .order("created_at", { ascending: true }),
+          staff ? getEquipeChamados() : Promise.resolve([]),
+        ]),
+      ]);
+
+    // a fila já traz a linha enriquecida pelo mesmo client/RLS; a leitura
+    // avulsa só cobre fila que falhou
+    const chamado =
+      fila.find((c) => c.id === id) ??
+      (await leChamadoAvulso(supabase, id, staff, me.role === "supervisor"));
+    if (!chamado)
       return { chamado: null, timeline: [], equipe: [], papel: me.role, meuId: me.id };
 
-    let atribuidoNome: string | null = null;
-    if (!staff && (row as { atribuido_a?: string | null }).atribuido_a) {
-      const { data: pr } = await supabase
-        .from("profiles")
-        .select("nome, nome_social")
-        .eq("id", (row as { atribuido_a: string }).atribuido_a)
-        .maybeSingle();
-      atribuidoNome = pr ? pr.nome_social || pr.nome : null;
-    }
-    const [itens] = staff
-      ? await enriqueceItens(
-          supabase,
-          [row as never],
-          me.role === "supervisor"
-        )
-      : [
-          {
-            ...(row as object),
-            restrito: false,
-            autor_nome: null,
-            autor_papel: null,
-            atribuido_nome: atribuidoNome,
-            contexto: null,
-          } as ChamadoFilaItem,
-        ];
-
-    const [atualRes, comentRes, anexoRes, equipeRes] = await Promise.all([
-      supabase
-        .from("chamado_atualizacoes")
-        .select("id, chamado_id, autor_id, tipo, texto, created_at")
-        .eq("chamado_id", id)
-        .order("created_at", { ascending: true }),
-      staff
-        ? supabase
-            .from("chamado_comentarios")
-            .select("id, chamado_id, autor_id, texto, created_at")
-            .eq("chamado_id", id)
-            .order("created_at", { ascending: true })
-        : Promise.resolve({ data: [] }),
-      supabase
-        .from("chamado_anexos")
-        .select("id, chamado_id, path, nome, tamanho, mime, interno, created_by, created_at")
-        .eq("chamado_id", id)
-        .order("created_at", { ascending: true }),
-      staff
-        ? supabase
-            .from("profiles")
-            .select("id, nome, nome_social, role")
-            .in("role", ["coordenacao", "supervisor"])
-            .eq("ativo", true)
-        : Promise.resolve({ data: [] }),
-    ]);
-
-    // nomes dos autores da trilha numa batida
-    const autorIds = new Set<string>();
-    for (const a of atualRes.data ?? []) if (a.autor_id) autorIds.add(a.autor_id);
-    for (const c of comentRes.data ?? []) if (c.autor_id) autorIds.add(c.autor_id);
-    for (const x of anexoRes.data ?? []) if (x.created_by) autorIds.add(x.created_by);
+    // nomes que já estão em mãos (equipe, eu, autor, responsável) não voltam
+    // ao banco — sobra quem não está nesses grupos (ex.: jovem autor,
+    // ex-equipe inativa), lido sob a mesma RLS de antes
     const nomes = new Map<string, string>();
-    if (autorIds.size) {
+    for (const p of equipe) nomes.set(p.id, p.nome_social || p.nome);
+    nomes.set(me.id, me.nome_social || me.nome);
+    if (chamado.autor_id && chamado.autor_nome)
+      nomes.set(chamado.autor_id, chamado.autor_nome);
+    if (chamado.atribuido_a && chamado.atribuido_nome)
+      nomes.set(chamado.atribuido_a, chamado.atribuido_nome);
+    const faltam = new Set<string>();
+    for (const a of atualRes.data ?? [])
+      if (a.autor_id && !nomes.has(a.autor_id)) faltam.add(a.autor_id);
+    for (const c of comentRes.data ?? [])
+      if (c.autor_id && !nomes.has(c.autor_id)) faltam.add(c.autor_id);
+    for (const x of anexoRes.data ?? [])
+      if (x.created_by && !nomes.has(x.created_by)) faltam.add(x.created_by);
+    if (faltam.size) {
       const { data: ps } = await supabase
         .from("profiles")
         .select("id, nome, nome_social")
-        .in("id", [...autorIds]);
+        .in("id", [...faltam]);
       for (const p of ps ?? []) nomes.set(p.id, p.nome_social || p.nome);
     }
 
@@ -364,20 +382,75 @@ export const getChamadoDetalhe = cache(
         new Date(b.item.created_at).getTime()
     );
 
-    return {
-      chamado: itens ?? null,
-      timeline,
-      equipe: ((equipeRes.data ?? []) as Pick<
-        Profile,
-        "id" | "nome" | "nome_social" | "role"
-      >[]).sort((a, b) =>
-        comparaNome(a.nome_social || a.nome, b.nome_social || b.nome)
-      ),
-      papel: me.role,
-      meuId: me.id,
-    };
+    return { chamado, timeline, equipe, papel: me.role, meuId: me.id };
   }
 );
+
+type MembroEquipe = Pick<Profile, "id" | "nome" | "nome_social" | "role">;
+
+/** Equipe ativa (coordenação + auxiliar) — autocomplete "@" e "Atribuir".
+ *  Por request (React.cache), nunca entre usuários: é leitura sob RLS. */
+const getEquipeChamados = cache(async (): Promise<MembroEquipe[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, nome, nome_social, role")
+    .in("role", ["coordenacao", "supervisor"])
+    .eq("ativo", true);
+  if (error) console.error("getEquipeChamados:", error);
+  return ((data ?? []) as MembroEquipe[]).sort((a, b) =>
+    comparaNome(a.nome_social || a.nome, b.nome_social || b.nome)
+  );
+});
+
+/** Linha do chamado fora da fila — mesmo enriquecimento da fila. */
+async function leChamadoAvulso(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string,
+  staff: boolean,
+  mascaradoSupervisor: boolean
+): Promise<ChamadoFilaItem | null> {
+  const { data: row, error } = await supabase
+    .from(staff ? "chamados_fila" : "chamados")
+    .select(CHAMADO_COLS)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) console.error("getChamadoDetalhe:", error);
+  if (!row) return null;
+  const linha = row as unknown as LinhaChamado;
+  if (staff) {
+    const [item] = await enriqueceItens(supabase, [linha], mascaradoSupervisor);
+    return item ?? null;
+  }
+  // o autor vê o nome do responsável e o mentorado da dupla vinculada
+  const [prRes, dRes] = await Promise.all([
+    linha.atribuido_a
+      ? supabase
+          .from("profiles")
+          .select("nome, nome_social")
+          .eq("id", linha.atribuido_a)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    linha.dupla_id
+      ? supabase
+          .from("duplas")
+          .select("id, mentorado:mentorados!duplas_mentorado_id_fkey(nome, nome_social)")
+          .eq("id", linha.dupla_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  return {
+    ...(linha as unknown as ChamadoFilaItem),
+    restrito: false,
+    autor_nome: null,
+    autor_papel: null,
+    atribuido_nome: prRes.data
+      ? prRes.data.nome_social || prRes.data.nome
+      : null,
+    contexto: null,
+    mentorado_nome: nomeMentoradoEmbed(dRes.data?.mentorado),
+  };
+}
 
 /** Badge da nav: chamados na fila (aberto sem dono), escopo RLS — pro
  *  auxiliar a contagem exclui plataforma automaticamente. */

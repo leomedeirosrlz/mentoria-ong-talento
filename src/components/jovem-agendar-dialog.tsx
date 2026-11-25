@@ -30,8 +30,8 @@ function paraInputLocal(d: Date): string {
 /** Rótulo da sessão que encosta — a trilha vem da RPC conflito_encontro. */
 function rotuloConflito(c: ConflitoEncontro): string {
   return c.trilha === "especialista"
-    ? "sessão de especialista"
-    : "encontro de mentoria";
+    ? "uma sessão de especialista"
+    : "um encontro de mentoria";
 }
 
 /**
@@ -135,7 +135,7 @@ export function JovemAgendarDialog({
 
   const avisoConflito =
     conflitos.length > 0
-      ? `Você tem ${rotuloConflito(conflitos[0])} marcada pra ${formatDiaHora(
+      ? `Você já tem ${rotuloConflito(conflitos[0])} em ${formatDiaHora(
           conflitos[0].data_hora
         )}${conflitos.length > 1 ? ` (e mais ${conflitos.length - 1})` : ""}. Confirme antes de seguir.`
       : null;
@@ -168,7 +168,7 @@ export function JovemAgendarDialog({
             {atual || numero ? `${numeroFinal ?? numero}º encontro` : "Agendar encontro"}
           </DialogTitle>
           <DialogDescription>
-            Escolha o encontro e marque a data e o horário com seu mentor.
+            Marque a data e o horário com seu mentor.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">

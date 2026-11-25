@@ -370,11 +370,6 @@ export default async function JovemHome() {
     );
   };
 
-  const waCoord = waLink(
-    coordenacao[0]?.whatsapp,
-    `Olá! Sou ${nomeTela}, mentorado(a) do programa, e preciso falar com a equipe.`
-  );
-
   // lembrete permanente do "Preencher depois" (REALIZA-114): sem grade o
   // cruzamento da agenda não tem com o que cruzar — a faixa fica até a
   // pessoa preencher no Perfil (quem "pulou" no wizard cai no mesmo estado)
@@ -452,11 +447,6 @@ export default async function JovemHome() {
         <h1 className="text-2xl font-semibold tracking-tight">
           Olá, {primeiroNome}
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {duplaEmCurso
-            ? `Sua mentoria ${duplaAtual.trilha === "especialista" ? "com o especialista" : "do programa"} está em curso.`
-            : "Sua jornada de mentoria por aqui."}
-        </p>
       </header>
 
       {/* o próximo encontro é o motivo de abrir o app: vem logo depois da
@@ -485,7 +475,7 @@ export default async function JovemHome() {
 
       {/* canal de segurança sempre à mão, sem competir com o encontro: uma
           linha discreta logo abaixo do que fazer agora */}
-      <PedirAjudaLinha waCoord={waCoord} />
+      <PedirAjudaLinha equipe={coordenacao} nomeJovem={primeiroNome} />
 
       {(temDpp || feitosEsp > 0) && (
         <section
@@ -586,7 +576,7 @@ export default async function JovemHome() {
                   <ContatoLinha
                     key={`${c.papel}-${c.id ?? c.nome}`}
                     c={c}
-                    papel="Auxiliar executivo(a) da dupla"
+                    papel="Apoio da sua dupla"
                     nomeJovem={nomeTela}
                   />
                 ))}
@@ -901,7 +891,7 @@ export default async function JovemHome() {
       {!perfil && (
         <p className="rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/8 px-4 py-3 text-sm">
           <span className="font-medium">Seu cadastro está sendo conectado.</span>{" "}
-          A coordenação ainda não vinculou sua conta à ficha de mentorado. Se
+          A coordenação ainda não ligou sua conta ao cadastro de mentorado. Se
           isso não se resolver em alguns dias, use o “Precisa de ajuda?” acima.
         </p>
       )}

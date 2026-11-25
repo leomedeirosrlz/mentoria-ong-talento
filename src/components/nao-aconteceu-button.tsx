@@ -32,7 +32,7 @@ export function NaoAconteceuButton({
           <DialogTitle>O encontro não aconteceu?</DialogTitle>
         </DialogHeader>
         <DialogDescription className="leading-relaxed">
-          O encontro ficará marcado como não realizado. Se foi um engano, você pode desfazer depois.
+          O encontro fica marcado como não feito. Se foi engano, é só desfazer depois.
         </DialogDescription>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
@@ -47,7 +47,7 @@ export function NaoAconteceuButton({
                   const res = await marcarNaoAconteceu(encontroId, duplaId);
                   if (res?.error) toast.error(res.error);
                   else {
-                    toast.success("Encontro marcado como não realizado.");
+                    toast.success("Encontro marcado como não aconteceu.");
                     setOpen(false);
                     router.refresh();
                   }
@@ -85,10 +85,10 @@ export function DesfazerNaoAconteceuButton({
       } />
       <DialogContent size="sm">
         <DialogHeader>
-          <DialogTitle>Desfazer &ldquo;não realizado&rdquo;?</DialogTitle>
+          <DialogTitle>Desfazer a marcação?</DialogTitle>
         </DialogHeader>
         <DialogDescription className="leading-relaxed">
-          O encontro voltará a ficar agendado na data original.
+          O encontro volta para a data que estava marcada.
         </DialogDescription>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
@@ -102,7 +102,7 @@ export function DesfazerNaoAconteceuButton({
                   const res = await desfazerNaoAconteceu(encontroId, duplaId);
                   if (res?.error) toast.error(res.error);
                   else {
-                    toast.success("O encontro voltou a ficar agendado.");
+                    toast.success("Pronto. O encontro voltou para a data marcada.");
                     setOpen(false);
                     router.refresh();
                   }
@@ -112,7 +112,7 @@ export function DesfazerNaoAconteceuButton({
               })
             }
           >
-            {pending ? "Salvando…" : "Voltar para agendado"}
+            {pending ? "Salvando…" : "Sim, desfazer"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -184,7 +184,7 @@ describe("painelTrilhasCoord — alertas de pedido parado", () => {
     expect(kpis.pedidosParados).toBe(2);
   });
 
-  it("aguardando_coord também é pedido parado — a triagem é parte da espera", () => {
+  it("aguardando_coord legado também é pedido parado — lê como mural (0158)", () => {
     const { alertas } = painelTrilhasCoord({
       duplas: [],
       solicitacoes: [
@@ -226,7 +226,7 @@ describe("painelTrilhasCoord — alertas de pedido parado", () => {
     expect(alertas.map((a) => a.onde).sort()).toEqual([
       "expirada",
       "mural",
-      "triagem",
+      "mural",
     ]);
   });
 

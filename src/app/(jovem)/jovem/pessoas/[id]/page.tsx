@@ -150,11 +150,11 @@ export default async function JovemPessoaPerfil({
 function rotuloContato(c: JovemContato): string {
   switch (c.papel) {
     case "mentor":
-      return "Seu mentor DPP";
+      return "Seu mentor";
     case "especialista":
       return "Seu especialista";
     case "supervisor":
-      return "Auxiliar executivo da sua dupla";
+      return "Apoio da sua dupla";
     case "coordenacao":
       return papelLabel("coordenacao");
     default:

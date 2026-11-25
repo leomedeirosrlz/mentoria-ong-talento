@@ -78,7 +78,7 @@ export function PrivacidadeCard({
             </span>{" "}
             <span className="text-muted-foreground">
               {temWhatsapp
-                ? "Ligado, os colegas da sua turma que têm conta na plataforma veem o número do seu cadastro em Pessoas; desligado, ninguém vê."
+                ? "Ligado: colegas da sua turma com conta na plataforma veem seu WhatsApp em Pessoas. Desligado: ninguém vê."
                 : "Seu cadastro no programa ainda não tem WhatsApp (a coordenação mantém a ficha). Quando ele estiver lá, ligar aqui compartilha com os colegas."}
             </span>
           </span>

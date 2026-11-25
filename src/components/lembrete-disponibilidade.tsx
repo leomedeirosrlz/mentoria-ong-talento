@@ -10,19 +10,17 @@ export function LembreteDisponibilidade() {
   return (
     <Link
       href="/jovem/perfil"
-      className="flex items-center gap-3 rounded-xl border border-[var(--warn)]/50 bg-[var(--warn)]/8 px-4 py-3 text-sm transition-colors hover:bg-[var(--warn)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)] transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <CalendarDots
         size={18}
         aria-hidden
-        className="shrink-0 text-[var(--warn-text)]"
+        className="shrink-0 text-muted-foreground"
       />
       <span className="min-w-0 flex-1">
-        <span className="font-medium">Conta quando você pode</span>
-        <span className="text-muted-foreground">
-          {" "}
-          · seus dias e horários livres ajudam a achar um horário em comum
-          com seu mentor.
+        <span className="block font-medium">Conte quando você pode</span>
+        <span className="block text-xs text-muted-foreground">
+          Ajuda a achar um horário em comum com seu mentor.
         </span>
       </span>
       <ArrowRight

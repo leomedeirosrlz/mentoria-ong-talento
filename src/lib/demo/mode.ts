@@ -3,8 +3,10 @@ import type { AppRole } from "@/lib/types";
 import {
   DEMO_ROLE_COOKIE,
   DEMO_ROLES,
+  DEMO_TERMO_COOKIE,
   demoObCookie,
   papelDemoValido,
+  type TermoSimulado,
 } from "./shared";
 
 // Helpers server-only do modo demo. A leitura é por cookie — as queries
@@ -90,9 +92,30 @@ export async function limparDemoLidas() {
   (await cookies()).delete(DEMO_LIDAS_COOKIE);
 }
 
+/** Assinatura simulada do termo nesta sessão demo (o writer client é
+ *  gravarTermoSimulado, shared.ts). Os espelhos leem daqui pra virar a
+ *  pendência da persona em "assinado" com o snapshot que ela digitou. */
+export async function demoTermoSimulado(): Promise<TermoSimulado | null> {
+  const raw = (await cookies()).get(DEMO_TERMO_COOKIE)?.value;
+  if (!raw) return null;
+  try {
+    const t = JSON.parse(decodeURIComponent(raw)) as TermoSimulado;
+    return t?.papel && t?.nome && t?.civis && t?.em ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Estado de sessão como as lidas: zerada na entrada da demo e na saída —
+ *  trocar de papel mantém (a assinatura é da persona, não do papel ativo). */
+export async function limparTermoSimulado() {
+  (await cookies()).delete(DEMO_TERMO_COOKIE);
+}
+
 export async function limparDemo() {
   const store = await cookies();
   store.delete(DEMO_ROLE_COOKIE);
   store.delete(DEMO_LIDAS_COOKIE);
+  store.delete(DEMO_TERMO_COOKIE);
   await resetarOnboardingDemo();
 }

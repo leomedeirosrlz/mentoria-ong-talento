@@ -163,10 +163,10 @@ test.describe("coordenação — fluxos operacionais", () => {
     // — combinada com restore+login+dialog isso passa dos 60s do projeto
     test.setTimeout(90_000);
     await page.goto(`/duplas/${DUPLA2_ID}`);
-    // REALIZA-343: "Remanejar dupla" é botão em linha no header no desktop
+    // REALIZA-343: "Trocar mentor ou mentorado" é botão em linha no header no desktop
     // (no celular segue no "Mais"). Quando a dupla está em risco a sugestão
     // da 115 também cria botões "Remanejar" por candidato — o exact separa
-    await page.getByRole("button", { name: "Remanejar dupla", exact: true }).click();
+    await page.getByRole("button", { name: "Trocar mentor ou mentorado", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
 

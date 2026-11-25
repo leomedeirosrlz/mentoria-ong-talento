@@ -31,9 +31,9 @@ export type AlertaPedido = {
   diasParado: number;
   /** nome do especialista preferido no pedido, se dirigido */
   preferenciaNome: string | null;
-  /** onde o pedido está parado — dita o rótulo ("no mural" / "em triagem"
-   *  / "horário expirado") */
-  onde: "mural" | "triagem" | "expirada";
+  /** onde o pedido está parado — dita o rótulo ("no mural" / "horário
+   *  expirado"). Sem triagem desde a 0158: aguardando_coord legado lê mural */
+  onde: "mural" | "expirada";
 };
 
 export type PainelTrilhas = {
@@ -115,7 +115,7 @@ export function painelTrilhasCoord({
   const alertas = solicitacoes
     .map((s): AlertaPedido | null => {
       const e = efetivoDe(s);
-      // parada = esperando aceite/triagem além do limite, OU expirada lazy
+      // parada = esperando aceite além do limite, OU expirada lazy
       // (slot vencido: não aceita mais nada, segura dedup e teto até alguém
       // cancelar — é o pedido mais parado de todos). sugerida nem entrou
       // no mural (espera o jovem confirmar) e contra_proposta é negociação
@@ -129,18 +129,13 @@ export function painelTrilhasCoord({
         solicitacaoId: s.id,
         // a view achata mentorado_nome → mentorado.nome (o embed de
         // profiles não resolve pra todo leitor)
-        jovemNome: s.mentorado?.nome ?? "Jovem",
+        jovemNome: s.mentorado?.nome_social ?? s.mentorado?.nome ?? "Jovem",
         turma: s.turma,
         demanda: s.demanda ?? s.motivo ?? "",
         diasParado: dias,
         // a preferência é o desejado; sem o embed (RLS), honesto é null
-        preferenciaNome: s.desejado?.nome ?? null,
-        onde:
-          e === "expirada"
-            ? "expirada"
-            : e === "aguardando_coord"
-              ? "triagem"
-              : "mural",
+        preferenciaNome: s.desejado?.nome_social ?? s.desejado?.nome ?? null,
+        onde: e === "expirada" ? "expirada" : "mural",
       };
     })
     .filter((a): a is AlertaPedido => a != null)

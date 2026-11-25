@@ -11,6 +11,7 @@ import type {
   Disponibilidade,
   DocumentoPessoa,
   Dupla,
+  DuplaStatus,
   Encontro,
   Escolaridade,
   EspecialistaEvento,
@@ -120,8 +121,8 @@ export const DIFICULDADE_LABEL: Record<Dificuldade, string> = {
   aprendizagem: "aprendizagem",
   participacao: "participação",
   comportamental: "comportamental",
-  organizacao: "organização/rotina",
-  outro: "outra",
+  organizacao: "organização e rotina",
+  outro: "outro tipo",
 };
 
 export const PROXIMO_PASSO_LABEL: Record<string, string> = {
@@ -756,6 +757,79 @@ export function cruzamentoDisponibilidadeHora(
   return "nenhum";
 }
 
+/** Quem NÃO cobre o horário escolhido — o insumo do aviso do dialog de
+ *  agendar: o mentor vê antes de confirmar se a grade dele ou a do jovem
+ *  não marca aquela célula. */
+export type AvisoDisponibilidade = {
+  mentorLivre: boolean;
+  jovemLivre: boolean;
+};
+
+/** As grades dos dois lados cobrem o dia/hora LOCAIS de `quando` (o
+ *  datetime-local do dialog é naïve, já no fuso de quem agenda)? Um lado
+ *  sem grade — null/undefined ou zero células — conta como livre: não
+ *  sabemos, não alertamos. Os dois livres → null, sem aviso. */
+export function avisoDisponibilidade(
+  mentor: Disponibilidade | null | undefined,
+  jovem: Disponibilidade | null | undefined,
+  quando: Date
+): AvisoDisponibilidade | null {
+  // getDay() 0=dom — DIAS_SEMANA é seg=0, mesma realinhação de diaSemanaDe
+  const dow = DIAS_SEMANA[(quando.getDay() + 6) % 7];
+  const hora = quando.getHours();
+  const mentorLivre =
+    disponibilidadeVazia(mentor) || disponibilidadeNaHora(mentor, dow, hora);
+  const jovemLivre =
+    disponibilidadeVazia(jovem) || disponibilidadeNaHora(jovem, dow, hora);
+  return mentorLivre && jovemLivre ? null : { mentorLivre, jovemLivre };
+}
+
+/** Preposição que acompanha cada período — a manhã não leva crase no uso do
+ *  programa ("de manhã", mas "à tarde", "à noite"). */
+const PERIODO_COM_PREPOSICAO: Record<Periodo, string> = {
+  manha: "de manhã",
+  tarde: "à tarde",
+  noite: "à noite",
+};
+
+/** "na quarta à tarde" / "no sábado de manhã" — dia por extenso minúsculo + período de `quando`.
+ *  Hora fora das três faixas da grade (JANELA_PERIODO) vira "nesse horário":
+ *  nenhuma célula cobre, então nomear um período seria mentira. */
+function ondeNaGrade(quando: Date): string {
+  const dow = DIAS_SEMANA[(quando.getDay() + 6) % 7];
+  const hora = quando.getHours();
+  const periodo = PERIODOS.find((p) => {
+    const [ini, fim] = JANELA_PERIODO[p];
+    return hora >= ini && hora < fim;
+  });
+  const dia = DIAS_SEMANA_LABELS[dow].toLocaleLowerCase("pt-BR");
+  // sábado e domingo são masculinos: "no sábado", não "na sábado"
+  const artigo = dow === "sab" || dow === "dom" ? "no" : "na";
+  return `${artigo} ${dia} ${periodo ? PERIODO_COM_PREPOSICAO[periodo] : "nesse horário"}`;
+}
+
+/** A frase do aviso, lida pelo mentor — "Você não marcou…", "Ana não
+ *  marcou…", "Nem você nem Ana marcaram…". `jovemNome` é o primeiro nome de
+ *  uso; sem ele, o papel genérico ("o mentorado"). Aviso nulo ou os dois
+ *  livres → "" (o caller só chama com aviso real). */
+export function textoAvisoDisponibilidade(
+  aviso: AvisoDisponibilidade | null,
+  jovemNome: string | undefined,
+  quando: Date
+): string {
+  if (!aviso || (aviso.mentorLivre && aviso.jovemLivre)) return "";
+  const onde = ondeNaGrade(quando);
+  const jovem = jovemNome?.trim() || "o mentorado";
+  if (!aviso.mentorLivre && !aviso.jovemLivre) {
+    return `Nem você nem ${jovem} marcaram disponibilidade ${onde}.`;
+  }
+  if (!aviso.mentorLivre) {
+    return `Você não marcou disponibilidade ${onde}.`;
+  }
+  const nome = jovem.charAt(0).toUpperCase() + jovem.slice(1);
+  return `${nome} não marcou disponibilidade ${onde}.`;
+}
+
 /** Idade em anos a partir de "YYYY-MM-DD" — âncora no meio-dia pra não voltar
  *  um dia no fuso; null quando a data é inválida. */
 export function idade(iso: string | null | undefined): number | null {
@@ -958,6 +1032,34 @@ export function encontroEsperado(eventos: CicloEvento[], hoje: Date, desde?: str
   ).length;
 }
 
+/** Cadência de recuperação dos passos defasados — a dupla que entra depois
+ *  do início do ciclo refaz os encontros oficiais anteriores à entrada em
+ *  ritmo acelerado (~2-3 por semana) em vez de pulá-los. */
+const CATCHUP_POR_SEMANA = 2.5;
+
+/** Passos oficiais anteriores à entrada da dupla cuja vez na fila de
+ *  recuperação já venceu: o k-ésimo (0-based, em ordem de data) vence
+ *  `iniciada_em + floor(k*7/2.5)` dias — os primeiros cobram rápido e o
+ *  backlog escoa em ~N/2.5 semanas. */
+function defasadosVencidos(
+  eventos: CicloEvento[],
+  iniciadaEm: string,
+  hojeStr: string
+): EventoDatado[] {
+  const fila = eventos
+    .filter(
+      (e): e is EventoDatado =>
+        encontroDatado(e) && e.numero != null && e.data < iniciadaEm
+    )
+    .sort((a, b) => a.data.localeCompare(b.data));
+  const inicio = new Date(`${iniciadaEm}T12:00:00`);
+  return fila.filter((_, i) => {
+    const venc = new Date(inicio);
+    venc.setDate(venc.getDate() + Math.floor((i * 7) / CATCHUP_POR_SEMANA));
+    return toDateStr(venc) <= hojeStr;
+  });
+}
+
 /** Número do 1º encontro esperado (data <= hoje, >= início da dupla) sem `realizado`
  *  correspondente em dupla.encontros — é o encontro que "ainda não aconteceu".
  *  `limbo` exclui numeros agendados vencidos: eles são pendência de registro,
@@ -977,8 +1079,7 @@ function primeiroEncontroFaltante(
       (e): e is EventoDatado =>
         encontroDatado(e) &&
         e.numero != null &&
-        e.data <= hojeStr &&
-        (!dupla.iniciada_em || e.data >= dupla.iniciada_em)
+        e.data <= hojeStr
     )
     .sort((a, b) => a.data.localeCompare(b.data))
     .find((e) => e.numero != null && !feitos.has(e.numero) && !limbo.has(e.numero));
@@ -1125,13 +1226,15 @@ export function resumoSemana(
  *  consomem (um encontro pertence a uma dupla, mas a leitura é por encontro). */
 export type ItemEncontroDupla = { encontro: Encontro; dupla: Dupla };
 
-/** "Limbo": agendado cuja data já passou e ainda não tem registro — pode ter
- *  rolado ou não; a ambiguidade exige ação do mentor (registrar, remarcar ou
- *  marcar não-aconteceu), então conta como pendência de registro, não atraso.
- *  Única definição — semáforo, trilha e agenda liam a mesma regra duplicada. */
+/** "Limbo": encontro em aberto (agendado ou remarcado — status legado que
+ *  nenhum fluxo grava mais, mas row importada existe) cuja data já passou e
+ *  ainda não tem registro — pode ter rolado ou não; a ambiguidade exige ação
+ *  do mentor (registrar, remarcar ou marcar não-aconteceu), então conta como
+ *  pendência de registro, não atraso. Única definição — semáforo, trilha,
+ *  agenda e ficha liam a mesma regra. */
 export function emLimbo(e: Encontro, agoraMs: number): boolean {
   return (
-    e.status === "agendado" &&
+    (e.status === "agendado" || e.status === "remarcado") &&
     !e.registro &&
     e.data_hora != null &&
     new Date(e.data_hora).getTime() < agoraMs
@@ -1267,10 +1370,17 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   const feitos = dupla.encontros.filter((e) => e.status === "realizado").length;
   // um encontro em limbo cobre o evento esperado do seu número — sai da conta
   // de atraso enquanto a pendência estiver aberta
+  // passos oficiais anteriores à entrada da dupla: a trilha os refaz
+  // retroativamente — entram no esperado quando a vez na fila de
+  // recuperação vence (~2-3/semana desde a entrada)
+  const defasados =
+    ehEspecialista || !dupla.iniciada_em
+      ? []
+      : defasadosVencidos(eventos, dupla.iniciada_em, hojeStr);
   const numerosEsperados = ehEspecialista
     ? new Set<number>()
-    : new Set(
-        eventos
+    : new Set([
+        ...eventos
           .filter(
             (e) =>
               encontroDatado(e) &&
@@ -1278,15 +1388,22 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
               e.data <= hojeStr &&
               (!dupla.iniciada_em || e.data >= dupla.iniciada_em)
           )
-          .map((e) => e.numero)
-      );
+          .map((e) => e.numero),
+        ...defasados.map((e) => e.numero!),
+      ]);
   const esperado = ehEspecialista
     ? feitos
-    : encontroEsperado(eventos, hoje, dupla.iniciada_em) -
+    : encontroEsperado(eventos, hoje, dupla.iniciada_em) +
+      defasados.length -
       [...limbo].filter((n) => numerosEsperados.has(n)).length;
   const proximo =
     dupla.encontros
-      .filter((e) => e.status === "agendado" && e.data_hora && new Date(e.data_hora) >= hoje)
+      .filter(
+        (e) =>
+          (e.status === "agendado" || e.status === "remarcado") &&
+          e.data_hora &&
+          new Date(e.data_hora) >= hoje
+      )
       .sort((a, b) => new Date(a.data_hora!).getTime() - new Date(b.data_hora!).getTime())[0] ??
     null;
 
@@ -1419,7 +1536,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
         : {
             tipo: "atraso",
             tom: "atencao",
-            texto: `Encontro ${primeiroEncontroFaltante(dupla, eventos, hoje, limbo) ?? esperado} ainda não aconteceu (reposição na mesma semana)`,
+            texto: `Encontro ${primeiroEncontroFaltante(dupla, eventos, hoje, limbo) ?? esperado} ainda não aconteceu (pode ser feito na mesma semana)`,
           }
     );
   }
@@ -1454,23 +1571,23 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
       sinais.push({
         tipo: "preventivo",
         tom: "atencao",
-        texto: `O ${oficial.numero}º encontro é ${formatDiaSemanaMes(oficial.data)} e ainda não foi agendado`,
+        texto: `O ${oficial.numero}º encontro é ${formatDiaSemanaMes(oficial.data)} e ainda não tem data marcada`,
       });
   }
   if (pendencia) {
     const quando = pendencia.realizado_em ?? pendencia.data_hora;
     sinais.push(
-      pendencia.status === "agendado"
+      pendencia.status === "agendado" || pendencia.status === "remarcado"
         ? {
             tipo: "limbo",
             tom: "atencao",
-            texto: `${pendencia.numero}º encontro agendado já passou. Falta o registro`,
+            texto: `${pendencia.numero}º encontro já passou e ainda falta registrar como foi`,
             ...(haDias(quando) ? { detalhe: haDias(quando) } : {}),
           }
         : {
             tipo: "registro_pendente",
             tom: "atencao",
-            texto: "Encontro realizado sem registro",
+            texto: "Encontro feito, mas sem registro",
             ...(haDias(quando) ? { detalhe: haDias(quando) } : {}),
           }
     );
@@ -1483,7 +1600,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
     sinais.push({
       tipo: "encaminhamento_vencido",
       tom: "atencao",
-      texto: "Combinado com prazo vencido",
+      texto: "Um combinado passou do prazo",
       ...(haDias(maisAntigo) ? { detalhe: haDias(maisAntigo) } : {}),
     });
   }
@@ -1513,7 +1630,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
     sinais.push({
       tipo: "estagnacao",
       tom: "atencao",
-      texto: "Trilha com 3 meses sem sessão nova. Vale checar se ainda faz sentido",
+      texto: "Faz 3 meses sem sessão nova na trilha. Vale conferir se ainda faz sentido",
     });
 
   // o veredito é a pior faixa acesa — e o motivo o primeiro texto, como
@@ -1633,7 +1750,12 @@ export function alvoAgendamento(
     const numerosFeitos = new Set(
       dupla.encontros.filter((e) => e.status === "realizado").map((e) => e.numero)
     );
-    let primeiroFaltante = 1;
+    // a fila recomeça no 1º passo oficial — os defasados anteriores à
+    // entrada da dupla são os primeiros a entrar no catch-up retroativo
+    let primeiroFaltante =
+      encontroEventos
+        .filter((e) => e.numero != null)
+        .sort((a, b) => a.data.localeCompare(b.data))[0]?.numero ?? 1;
     while (numerosFeitos.has(primeiroFaltante)) primeiroFaltante++;
     proximoNumero = saude.proximo?.numero ?? Math.min(primeiroFaltante, total);
     // a row real desse número é o que o dialog edita; saude.proximo só cobre
@@ -1643,11 +1765,19 @@ export function alvoAgendamento(
   // sem calendário oficial não há data a sugerir — o dialog abre em branco.
   // A data oficial é a do PDF como ela é — quinta-feira numa semana de
   // encontro duplo sugere quinta, não terça.
+  const hojeStr = toDateStr(hoje);
+  // defasado tem data oficial anterior à entrada da dupla — sugerir ela
+  // agendaria no passado; o dialog abre em branco e a dupla escolhe a
+  // reposição. Passo pós-entrada sugere a data oficial mesmo vencida:
+  // é o caso do faltante retroativo ("rolou sem agendar").
   const sugeridoProximo = ehEspecialista
     ? undefined
-    : encontroEventos.find((e) => e.numero === proximoNumero)?.data ?? undefined;
-
-  const hojeStr = toDateStr(hoje);
+    : (() => {
+        const ev = encontroEventos.find((e) => e.numero === proximoNumero);
+        return ev && (!dupla.iniciada_em || ev.data >= dupla.iniciada_em)
+          ? ev.data
+          : undefined;
+      })();
   const comEncontro = new Set(dupla.encontros.map((e) => e.numero));
   // passo com tentativa ainda em aberto (agendada/remarcada) não é faltante:
   // "rolou mesmo assim" se resolve marcando ESSA row, não criando outra
@@ -1671,7 +1801,6 @@ export function alvoAgendamento(
     : encontroEventos.flatMap((e) =>
         e.numero != null &&
         e.data <= hojeStr &&
-        (!dupla.iniciada_em || e.data >= dupla.iniciada_em) &&
         !comEncontro.has(e.numero)
           ? [{ numero: e.numero, dataSugerida: e.data }]
           : []
@@ -1761,9 +1890,10 @@ export function jornadaDaDupla(
   hoje = new Date()
 ): JornadaDupla {
   const oficiais = [...passos].sort((a, b) => a.numero - b.numero);
-  const janela = dupla.iniciada_em
-    ? oficiais.filter((e) => e.data == null || e.data >= dupla.iniciada_em!)
-    : oficiais;
+  // a trilha mostra o guia inteiro: passos anteriores à entrada da dupla
+  // ficam visíveis como pendentes — são os defasados do catch-up
+  // retroativo (~2-3/semana, ver defasadosVencidos)
+  const janela = oficiais;
   const total = janela.length;
   // DPP: numero é a identidade do passo. Especialista (0074): numero é a
   // tentativa — o passo é o rank entre realizados; várias tentativas miram o
@@ -1827,7 +1957,7 @@ export function jornadaDaDupla(
     proximoNumero: noAtual?.numero ?? null,
     faseAtual,
     completa: total > 0 && feitos >= total,
-    janelaCortada: janela.length < oficiais.length,
+    janelaCortada: false,
   };
 }
 
@@ -2242,3 +2372,46 @@ export const CHAMADO_ORIGEM_LABEL: Record<string, string> = {
   registro: "Registro de encontro",
   avaliacao_jovem: "Avaliação do jovem",
 };
+
+/** Select "Dupla relacionada" do NovoChamadoDialog — só as duplas em que
+ *  a pessoa é mentora, ativas ou pausadas. A home e a /chamados montam a
+ *  lista pela mesma régua (getMinhasDuplas → este filtro); lista vazia
+ *  esconde o campo. */
+export function duplasOpcoesChamado(
+  duplas: readonly {
+    id: string;
+    status: DuplaStatus;
+    trilha: Trilha;
+    mentor?: { id: string } | null;
+    mentorado?: { nome: string | null } | null;
+  }[],
+  meuId: string
+): { id: string; label: string }[] {
+  return duplas
+    .filter(
+      (d) =>
+        (d.status === "ativa" || d.status === "pausada") &&
+        d.mentor?.id === meuId
+    )
+    .map((d) => ({
+      id: d.id,
+      label: `${d.mentorado?.nome ?? "Mentorado(a)"} · ${
+        d.trilha === "especialista" ? "Especialista" : "DPP"
+      }`,
+    }));
+}
+
+/** Junta `mentorado_nome` aos chamados — o mapa vem duma leitura em lote
+ *  (dupla_id → mentorado.nome), nunca N+1. Chamado sem dupla (ou cuja
+ *  dupla a RLS não entrega) fica null e a interface omite o dado. */
+export function anexarMentorado<T extends { dupla_id: string | null }>(
+  itens: readonly T[],
+  mentoradoPorDupla: ReadonlyMap<string, string | null>
+): (T & { mentorado_nome: string | null })[] {
+  return itens.map((c) => ({
+    ...c,
+    mentorado_nome: c.dupla_id
+      ? (mentoradoPorDupla.get(c.dupla_id) ?? null)
+      : null,
+  }));
+}

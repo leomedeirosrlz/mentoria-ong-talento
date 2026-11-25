@@ -34,7 +34,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type Opt = { id: string; nome: string; role?: string | null; papeis?: AppRole[] };
+type Opt = {
+  id: string;
+  nome: string;
+  nome_social?: string | null;
+  role?: string | null;
+  papeis?: AppRole[];
+};
 
 /** Papéis efetivos com fallback no primário — embed `profile_papeis` vazio
  *  ou ausente cai no `role` (a policy pode negar a linha alheia). O papel
@@ -129,7 +135,7 @@ export function RemanejarDuplaDialog({
         const [perfis, ments, ds, mps] = await Promise.all([
           supabase
             .from("profiles")
-            .select("id, nome, role, profile_papeis(papel)")
+            .select("id, nome, nome_social, role, profile_papeis(papel)")
             // 4 primários, como no nova/editar: quem tem papel de mentor
             // só em profile_papeis (primário sup/coord) não pode ficar de
             // fora do fetch — o pool filtra por papel efetivo abaixo
@@ -138,7 +144,7 @@ export function RemanejarDuplaDialog({
             .order("nome"),
           supabase
             .from("mentorados")
-            .select("id, nome, situacao")
+            .select("id, nome, nome_social, situacao")
             .order("nome"),
           // sem filtro de status: a ocupação filtra em JS. A própria dupla
           // sai pelo .neq — quem tá nela não conta vaga contra si mesmo
@@ -242,9 +248,13 @@ export function RemanejarDuplaDialog({
   );
 
   const poolAtual = lado === "mentor" ? mentoresOrd : mentoradosOrd;
-  const novoNome = poolAtual.find((o) => o.id === novoId)?.nome ?? null;
+  const novoOpt = poolAtual.find((o) => o.id === novoId) ?? null;
+  const novoNome = novoOpt ? (novoOpt.nome_social ?? novoOpt.nome) : null;
   const resumo = resumoRemanejo(
-    { mentor: dupla.mentor.nome, mentorado: dupla.mentorado.nome },
+    {
+      mentor: dupla.mentor.nome_social ?? dupla.mentor.nome,
+      mentorado: dupla.mentorado.nome_social ?? dupla.mentorado.nome,
+    },
     lado,
     novoNome
   );
@@ -323,11 +333,11 @@ export function RemanejarDuplaDialog({
     v === "mentor"
       ? {
           titulo: "Trocar o mentor",
-          detalhe: `${dupla.mentor.nome} sai da dupla.`,
+          detalhe: `${dupla.mentor.nome_social ?? dupla.mentor.nome} sai da dupla.`,
         }
       : {
           titulo: "Trocar o mentorado",
-          detalhe: `${dupla.mentorado.nome} sai da dupla.`,
+          detalhe: `${dupla.mentorado.nome_social ?? dupla.mentorado.nome} sai da dupla.`,
         };
 
   return (
@@ -437,8 +447,8 @@ export function RemanejarDuplaDialog({
                     poolAtual.map((o) => [
                       o.id,
                       lado === "mentor"
-                        ? `${o.nome} · ${emUso[o.id] ?? 0}/${capacidade[o.id] ?? 1}`
-                        : o.nome,
+                        ? `${o.nome_social ?? o.nome} · ${emUso[o.id] ?? 0}/${capacidade[o.id] ?? 1}`
+                        : (o.nome_social ?? o.nome),
                     ])
                   )}
                   onValueChange={(v) => {
@@ -468,8 +478,8 @@ export function RemanejarDuplaDialog({
                       return (
                         <SelectItem key={o.id} value={o.id} disabled={ocupado}>
                           {lado === "mentor"
-                            ? `${o.nome} · ${emUso[o.id] ?? 0}/${capacidade[o.id] ?? 1}${ocupado ? " · lotado" : ""}`
-                            : `${o.nome}${ocupado ? ` (em dupla ${ehEsp ? "especialista" : "DPP"})` : ""}`}
+                            ? `${o.nome_social ?? o.nome} · ${emUso[o.id] ?? 0}/${capacidade[o.id] ?? 1}${ocupado ? " · lotado" : ""}`
+                            : `${o.nome_social ?? o.nome}${ocupado ? ` (em dupla ${ehEsp ? "especialista" : "DPP"})` : ""}`}
                         </SelectItem>
                       );
                     })}

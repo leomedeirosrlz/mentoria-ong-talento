@@ -48,16 +48,14 @@ export type EnvioLoteResult = {
   error?: string;
 };
 
-/** TODO(pendente): kill-switch do envio de e-mail — false segura a saída
- *  de NOTIFICAÇÃO (avisos, materiais, chamados, assinaturas) até o
- *  produto estar pronto pro envio real. O early return devolve `error`
- *  coerente e os callers já tratam como falha de transporte (toast
- *  honesto, nunca falso sucesso). Não cobre auth/conta: magic link passa
- *  por fora (SMTP auth@ do Supabase) e os e-mails de segurança da conta
- *  (senha/e-mail alterado) furam o bloqueio com `critico: true` — são
- *  on-demand, disparados pelo próprio usuário. Virar `true` quando
- *  liberar de verdade. */
-export const EMAIL_ENVIO_LIBERADO = false;
+/** Kill-switch do envio de e-mail — liberado desde nov/2026. Segue como
+ *  escape hatch: voltar pra `false` segura a saída de NOTIFICAÇÃO
+ *  (avisos, materiais, chamados, assinaturas) devolvendo `error` coerente
+ *  que os callers tratam como falha de transporte (toast honesto, nunca
+ *  falso sucesso). Não cobre auth/conta: magic link passa por fora (SMTP
+ *  auth@ do Supabase) e os e-mails de segurança da conta furam o bloqueio
+ *  com `critico: true` — são on-demand, disparados pelo próprio usuário. */
+export const EMAIL_ENVIO_LIBERADO = true;
 
 /** Dispara o mesmo e-mail pra uma lista de destinatários — um envelope por
  *  pessoa (batch, nunca `to:` múltiplo: ninguém vê o e-mail de ninguém).

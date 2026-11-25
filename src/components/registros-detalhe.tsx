@@ -38,7 +38,10 @@ export function RegistroDetalhe({
   const aconteceuEm = enc?.realizado_em ?? enc?.data_hora ?? null;
   const tardio = registroTardio(r, enc);
   const diasAtraso = tardio ? diasAtrasoRegistro(r, enc) : 0;
-  const href = dupla && enc ? `/duplas/${dupla.id}#registrar-${enc.id}` : null;
+  const href =
+    dupla && enc
+      ? `/duplas/${dupla.id}?aba=encontros#registrar-${enc.id}`
+      : null;
   const numero =
     passoEsp != null
       ? `${passoEsp}º passo`
@@ -68,7 +71,10 @@ export function RegistroDetalhe({
               mentorado={dupla.mentorado}
               size={32}
             />
-            <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
+            <DuplaNomes
+              mentor={dupla.mentor.nome_social ?? dupla.mentor.nome}
+              mentorado={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+            />
           </>
         ) : (
           "Dupla removida"
@@ -89,7 +95,7 @@ export function RegistroDetalhe({
       <p className="mt-2 text-xs text-muted-foreground">
         {aconteceuEm ? `Encontro em ${formatDate(aconteceuEm)}` : "Data a definir"}
         {` · registrado em ${formatDate(r.created_at)}`}
-        {r.autor?.nome ? ` por ${r.autor.nome}` : ""}
+        {r.autor?.nome ? ` por ${r.autor.nome_social ?? r.autor.nome}` : ""}
         {diasAtraso > 0 && (
           <span className="font-medium text-[var(--warn-text)]">
             {` · ${diasAtraso} ${diasAtraso === 1 ? "dia" : "dias"} de atraso`}

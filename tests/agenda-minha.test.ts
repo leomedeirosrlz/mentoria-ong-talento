@@ -15,7 +15,6 @@ import type {
   Dupla,
   Encaminhamento,
   Encontro,
-  EncontroIntencao,
   MentoradoPar,
   Profile,
   TrilhaJovem,
@@ -89,24 +88,22 @@ function mkEncaminhamento(over: Partial<Encaminhamento>): Encaminhamento {
     responsavel: "mentor",
     prazo: null,
     status: "pendente",
+    numero: null,
+    feito_em: null,
+    created_by: null,
     created_at: "2026-10-01T00:00:00Z",
     ...over,
   };
 }
 
-function mkIntencao(over: Partial<EncontroIntencao>): EncontroIntencao {
-  return {
-    id: `int-${Math.random().toString(36).slice(2, 8)}`,
-    dupla_id: "d1",
+/** Combinado do preparo (o antigo afazer, 0157) — do mentor, com nº. */
+function mkDoPreparo(over: Partial<Encaminhamento>): Encaminhamento {
+  return mkEncaminhamento({
     numero: 5,
-    texto: "Enviar o vídeo depois do encontro",
-    feito: false,
-    feito_em: null,
+    descricao: "Enviar o vídeo depois do encontro",
     created_by: "pm",
-    created_at: "2026-10-01T00:00:00Z",
-    updated_at: "2026-10-01T00:00:00Z",
     ...over,
-  };
+  });
 }
 
 function mkDupla(over: Partial<Dupla> = {}): Dupla {
@@ -374,7 +371,7 @@ describe("pendências — warnrows do topo do Hoje", () => {
     expect(item!.acoes).toContain("entrar");
   });
 
-  it("combinado pendente com prazo vencido vira aviso pro #combinados", () => {
+  it("combinado pendente com prazo vencido vira aviso pro item na ficha", () => {
     const d = mkDupla({
       encaminhamentos: [
         mkEncaminhamento({ id: "c-venc", prazo: "2026-10-05" }),
@@ -385,46 +382,88 @@ describe("pendências — warnrows do topo do Hoje", () => {
     const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
     expect(a.avisos).toHaveLength(1);
     expect(a.avisos[0].titulo).toBe("Combinado vencido · Ana · 2026/2027");
-    expect(a.avisos[0].href).toBe("/duplas/d1#combinados");
+    expect(a.avisos[0].href).toBe("/duplas/d1#combinado-c-venc");
   });
 });
 
-describe("intenções em aberto (REALIZA-21)", () => {
-  it("uma linha só por dupla: contagem + nº mais antigo, sem texto de item", () => {
+describe("combinados do mentor em aberto (0157)", () => {
+  it("uma linha só por dupla: contagem por lado + nº mais antigo, sem texto de item", () => {
     const d = mkDupla({
-      intencoes: [
-        mkIntencao({ numero: 7, texto: "Perguntar do ENEM" }),
-        mkIntencao({ numero: 3, texto: "Levar o guia de rotina" }),
-        mkIntencao({ numero: 5, texto: "Enviar vídeo depois" }),
-        mkIntencao({ numero: 2, feito: true, feito_em: "2026-10-02T10:00:00Z" }),
+      encaminhamentos: [
+        mkDoPreparo({ numero: 7, descricao: "Perguntar do ENEM" }),
+        mkDoPreparo({ numero: 3, descricao: "Levar o guia de rotina" }),
+        mkDoPreparo({ numero: 5, descricao: "Enviar vídeo depois", responsavel: "mentorado" }),
+        mkDoPreparo({ numero: 2, status: "feito", feito_em: "2026-10-02T10:00:00Z" }),
+        // sem nº não ancora nem conta — combinado antigo sem registro
+        mkEncaminhamento({ descricao: "Combinado de antes dos números" }),
       ],
     });
     const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
     expect(a.avisos).toHaveLength(1);
     const av = a.avisos[0];
     expect(av.id).toBe("int-d1");
-    expect(av.titulo).toBe("Afazeres em aberto · Ana · 2026/2027");
-    expect(av.detalhe).toBe("3 itens · o mais antigo é do 3º encontro.");
-    expect(av.href).toBe("/duplas/d1#intencoes-3");
-    expect(av.cta).toBe("Ver afazeres");
+    expect(av.titulo).toBe("Combinados em aberto · Ana · 2026/2027");
+    expect(av.detalhe).toBe("3 itens (2 seus, 1 de Ana) · o mais antigo é do 3º encontro.");
+    expect(av.href).toBe("/duplas/d1#combinados-3");
+    expect(av.cta).toBe("Ver combinados");
     expect(av.remarcar).toBe(false);
     // o texto dos itens é plano privado do mentor — não sai da ficha
     expect(av.detalhe).not.toContain("ENEM");
     expect(av.detalhe).not.toContain("vídeo");
   });
 
-  it("um único pendente lê 'item' no singular e ancora no próprio nº", () => {
-    const d = mkDupla({ intencoes: [mkIntencao({ numero: 6 })] });
+  it("só do mentor lê 'itens seus', sem nomear o jovem", () => {
+    const d = mkDupla({
+      encaminhamentos: [
+        mkDoPreparo({ numero: 6 }),
+        mkDoPreparo({ numero: 4 }),
+      ],
+    });
     const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
-    expect(a.avisos[0].detalhe).toBe("1 item · o mais antigo é do 6º encontro.");
-    expect(a.avisos[0].href).toBe("/duplas/d1#intencoes-6");
+    expect(a.avisos[0].detalhe).toBe("2 itens seus · o mais antigo é do 4º encontro.");
+    expect(a.avisos[0].href).toBe("/duplas/d1#combinados-4");
+  });
+
+  it("um único pendente lê 'item' no singular e ancora no próprio nº", () => {
+    const d = mkDupla({ encaminhamentos: [mkDoPreparo({ numero: 6 })] });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
+    expect(a.avisos[0].detalhe).toBe("1 item seu · o mais antigo é do 6º encontro.");
+    expect(a.avisos[0].href).toBe("/duplas/d1#combinados-6");
+  });
+
+  it("só do mentorado lê 'itens de <nome>' — o mentor acompanha sem ver o texto", () => {
+    const d = mkDupla({
+      encaminhamentos: [
+        mkDoPreparo({ numero: 5, responsavel: "mentorado", descricao: "Revisar as submetas" }),
+        mkDoPreparo({ numero: 2, responsavel: "mentorado", descricao: "Falar com a coordenação" }),
+      ],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
+    expect(a.avisos[0].detalhe).toBe("2 itens de Ana · o mais antigo é do 2º encontro.");
+    expect(a.avisos[0].detalhe).not.toContain("submetas");
+    expect(a.avisos[0].href).toBe("/duplas/d1#combinados-2");
+  });
+
+  it("vencido não entra na conta — já tem aviso próprio (Combinado vencido)", () => {
+    const d = mkDupla({
+      encaminhamentos: [
+        // vencido do mentorado: sai no aviso de cima, não duplica aqui
+        mkDoPreparo({ numero: 3, prazo: "2026-10-05", responsavel: "mentorado" }),
+        mkDoPreparo({ numero: 5 }),
+      ],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
+    expect(a.avisos).toHaveLength(2);
+    expect(a.avisos[0].titulo).toBe("Combinado vencido · Ana · 2026/2027");
+    expect(a.avisos[1].titulo).toBe("Combinados em aberto · Ana · 2026/2027");
+    expect(a.avisos[1].detalhe).toBe("1 item seu · o mais antigo é do 5º encontro.");
   });
 
   it("tudo feito some — item riscado não é pendência", () => {
     const d = mkDupla({
-      intencoes: [
-        mkIntencao({ numero: 3, feito: true, feito_em: "2026-10-02T10:00:00Z" }),
-        mkIntencao({ numero: 5, feito: true, feito_em: "2026-10-04T10:00:00Z" }),
+      encaminhamentos: [
+        mkDoPreparo({ numero: 3, status: "feito", feito_em: "2026-10-02T10:00:00Z" }),
+        mkDoPreparo({ numero: 5, responsavel: "mentorado", status: "feito", feito_em: "2026-10-04T10:00:00Z" }),
       ],
     });
     const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
@@ -434,7 +473,7 @@ describe("intenções em aberto (REALIZA-21)", () => {
   it("dupla pausada não cobra — o checklist congela com a dupla", () => {
     const d = mkDupla({
       status: "pausada",
-      intencoes: [mkIntencao({ numero: 3 })],
+      encaminhamentos: [mkDoPreparo({ numero: 3 })],
     });
     const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
     expect(a.avisos).toHaveLength(0);
@@ -478,6 +517,57 @@ describe("passo oficial sem row — 'a agendar'", () => {
     // "a agendar" aparece pra passo já esperado ou o próximo sem row;
     // proximoNumero aqui é o 1 (tem row) e não há faltante: nenhum previsto
     expect(todosOsItens(a).filter((i) => i.tipo === "a_agendar")).toHaveLength(0);
+  });
+});
+
+describe("row falha segue acionável — não só a do alvo", () => {
+  // duas semanas furadas seguidas: antes só a primeira (o alvo) tinha
+  // caminho — a segunda sumia da agenda, da ficha e da home
+  it("dois nao_aconteceu seguidos viram dois itens 'a agendar' com remarcar", () => {
+    const eventos = [
+      mkEvento(1, "2026-09-29"),
+      mkEvento(2, "2026-10-06"),
+      mkEvento(3, "2026-10-13"),
+    ];
+    const d = mkDupla({
+      encontros: [
+        mkEncontro({
+          numero: 1,
+          status: "nao_aconteceu",
+          data_hora: "2026-09-29T19:00:00-03:00",
+        }),
+        mkEncontro({
+          numero: 2,
+          status: "nao_aconteceu",
+          data_hora: "2026-10-06T19:00:00-03:00",
+        }),
+      ],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d], eventos });
+    const previstos = todosOsItens(a).filter((i) => i.tipo === "a_agendar");
+    expect(previstos.map((p) => p.numero)).toEqual([1, 2]);
+    expect(previstos.every((p) => p.acoes.includes("remarcar"))).toBe(true);
+    // a remarcação edita a própria row — nunca cria duplicata
+    expect(previstos[0].encontro?.numero).toBe(1);
+    expect(previstos[1].encontro?.numero).toBe(2);
+  });
+
+  it("cancelado/não-aconteceu com data FUTURA vira item de dia com remarcar", () => {
+    const d = mkDupla({
+      encontros: [
+        mkEncontro({
+          numero: 1,
+          status: "cancelado",
+          data_hora: `${AMANHA}T19:00:00-03:00`,
+        }),
+      ],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d], eventos: [mkEvento(1, AMANHA)] });
+    const itens = todosOsItens(a).filter(
+      (i) => i.tipo === "encontro" && i.numero === 1
+    );
+    expect(itens).toHaveLength(1);
+    expect(itens[0].acoes).toEqual(["remarcar"]);
   });
 });
 

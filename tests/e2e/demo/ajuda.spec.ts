@@ -73,7 +73,7 @@ test.describe("demo — ajuda", () => {
     });
     await materiais.locator("summary").click();
     await expect(
-      materiais.getByRole("link", { name: "Jornada" })
+      materiais.getByRole("link", { name: "Materiais" })
     ).toHaveAttribute("href", "/jovem/materiais");
 
     // …e a pergunta exclusiva de staff fica de fora do FAQ dele — nem a
@@ -87,7 +87,7 @@ test.describe("demo — ajuda", () => {
     ).toBeVisible();
 
     // o "Como funciona" fala a linguagem dele — e o mapa do menu é o da
-    // nav do jovem (Jornada), não o /materiais de staff
+    // nav do jovem (Materiais), não o /materiais de staff
     await page.goto("/jovem/ajuda?aba=como-funciona");
     await expect(
       page.getByRole("heading", { name: "Como é a mentoria" })
@@ -98,7 +98,7 @@ test.describe("demo — ajuda", () => {
     // <dt> não ganha nome acessível do conteúdo no Chromium — o termo é
     // achado pelo texto exato dentro da lista de definições
     await expect(
-      page.locator("dt").getByText("Jornada", { exact: true })
+      page.locator("dt").getByText("Materiais", { exact: true })
     ).toBeVisible();
   });
 });

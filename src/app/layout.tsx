@@ -81,7 +81,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         tema === "escuro" ? " dark" : ""
       }`}
     >
-      <body className="min-h-full flex flex-col">
+      {/* suppressHydrationWarning: extensões de browser (Monica, tradutores)
+          injetam atributos no <body> antes da hidratação — sem isso o dev
+          acusa mismatch e a página renderiza morta. Só cobre atributos do
+          próprio elemento; filhos seguem verificados. */}
+      <body suppressHydrationWarning className="min-h-full flex flex-col">
         {/* script crua antes de qualquer conteúdo: resolve o "auto" via
             matchMedia no primeiro paint — a classe mora no <html>, que já
             existe quando o body começa a parsear */}

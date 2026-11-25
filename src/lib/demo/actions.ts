@@ -9,6 +9,7 @@ import {
   desmarcarOnboardingDemo,
   limparDemo,
   limparDemoLidas,
+  limparTermoSimulado,
   resetarOnboardingDemo,
 } from "./mode";
 
@@ -20,6 +21,7 @@ export async function entrarNaDemo(papel: AppRole) {
   await definirPapelDemo(papel);
   await resetarOnboardingDemo();
   await limparDemoLidas();
+  await limparTermoSimulado();
   redirect("/");
 }
 

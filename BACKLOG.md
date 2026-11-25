@@ -184,6 +184,10 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 - [ ] **PDM nativo na plataforma** — **decisão fechada (REALIZA-181)**: o PDM deixa de ser só `duplas.pdm_url` (link Drive) e vira modelo de dados próprio — `pdm_metas` (meta SMART: descrição, área da vida, indicador de sucesso, prazo, status) + `pdm_submetas` com progresso. Co-edição mentor+mentorado, coord lê, superfícies na ficha da dupla / portal do jovem / resumo de jornada. `pdm_url` fica como legado opcional.
 - [x] ~~**Roteiros semanais 5–10**~~ — os cartões-roteiro dos encontros 1–10 estão em prod como `materiais` (`tipo=conteudo`, `audiencia=dpp`, `encontro_num` 1–10, bloco contíguo de `ordem` 3–12, grupo "Encontro N", acervo progressivo). 7–10 subiram em out/2026. **11–16 seguem sem fonte**: não existem PDFs além da semana 10 — subir conforme a equipe produzir (mesmo padrão).
 - [ ] **Termos da equipe executiva** (coordenação/supervisores): todo mundo que entra na plataforma deveria assinar, mas hoje só mentores (`termo-voluntario`) e mentorados (`termo-mentorando`/`autorizacao-responsavel`) têm documento. Quando o jurídico definir o modelo da equipe, vira mais um slug em `documento_templates` + renderer em `src/lib/documentos/` — a infra de assinatura/evidência/link já é genérica.
+- [ ] **LGPD — dados livres no matching e na IA (decisão do DPO, auditoria nov/2026)**. Três frentes:
+  - O doc de matching do mentorado inclui motivação, objetivos, escolaridade, ONG de origem, interesses e até 5 campos livres do `form_bruto`, de menores inclusive. Ele vai ao provedor de temas (`IA_API_BASE`) e à OpenAI (embeddings) em `src/lib/ia/matching.ts` e `scripts/vetorizar-pessoas.mjs`, sem base legal registrada para a transferência internacional. O comentário de `src/lib/ia/embed.ts` ("só a pergunta") não vale para o matching. Caminho sugerido: tirar o `form_bruto` e os campos sem finalidade declarada do doc.
+  - A `0158` tirou a triagem: demanda e motivo escritos pelo jovem vão direto ao mural de todo `mentor_especialista` ativo.
+  - `ia_confirmacoes` (`0163`) guarda os args completos (mensagem de até 4000 chars) e só é limpa pelo próprio dono na próxima prévia. Um usuário inativo retém esses dados para sempre. Falta um job de limpeza global.
 - [ ] **Contra-assinatura do presidente**: subir o PNG em qualquer ficha → seção Assinaturas → engrenagem (ou `documentos/sistema/contra-assinatura.png` no storage). Os PDFs do termo já saem assinados pelo instituto quando a imagem existe.
 
 ## REALIZA-238 — auditoria dos guias vs catálogo (out/2026)
@@ -383,3 +387,46 @@ Pedido do Thiago (perdido numa sessão anterior, resgatado em 24/out):
 - [ ] **Filtros da aba Pessoas reorganizados** — os pills de filtro devem
   ficar abaixo, logo antes da lista de pessoas. Transformar "aguardando
   par" em um dropdown e movê-lo para cima dos filtros/pesquisa.
+
+## Perfil & onboarding do jovem — pedidos do Thiago (nov/2026) · épico REALIZA-418
+
+O `/jovem/perfil` ficou pra trás do `/perfil` do staff — sem edição
+própria, sem foto, sem identidade visual. Pedidos agrupados:
+
+- [ ] **Foto no perfil do jovem** (REALIZA-419) — self-upload igual ao do staff
+  (`FotoField` + bucket `avatares`, pasta por pessoa). Hoje
+  `mentorados.avatar_path` existe mas só a coordenação sobe a foto no
+  cadastro/edição; o jovem não consegue trocar a própria. "perfil deles
+  tá muito pobre".
+- [ ] **Ficha editável pelo mentorado** (REALIZA-420) — o jovem edita os próprios
+  dados (bio, contato, dados do intake que fizer sentido). Hoje a ficha
+  é read-only pro dono; definir quais campos são self-editáveis vs
+  coord-only (documentos/matching ficam com a coord).
+- [ ] **Bio** (REALIZA-421) — campo livre curto no perfil do jovem (e talvez staff):
+  quem é, o que faz, o que busca na mentoria. Alimenta a página interna
+  `/pessoas/[id]` e o perfil.
+- [ ] **Perfil mais visual** (REALIZA-422) — hoje é form + texto corrido. Cards,
+  avatar em destaque, resumo da jornada/dupla, mais personalização.
+  Desktop: layout menos centralizado (aproveitar a largura — hoje é
+  uma coluna estreita no meio da tela).
+- [ ] **Perfil do jovem paritário ao do staff** (REALIZA-423) — mesma riqueza do
+  `/perfil` de coord/mentor: dados, ações, identidade.
+- [ ] **Esconder "pedidos de ajuda" quando vazio** (REALIZA-424) — seção some quando
+  não há nenhum pedido (hoje ocupa espaço mostrando vazio).
+- [ ] **Enxugar textos de privacidade** (REALIZA-425) — bloco redundante/verboso;
+  condensar pro essencial.
+- [ ] **Onboarding do jovem no padrão dos outros papéis** (REALIZA-426) — hoje o
+  wizard do jovem não tem a Liza e tá visualmente aquém dos de
+  mentor/coord. Trazer a Liza pra apresentar o fluxo e polir as telas.
+- [ ] **Gamificação (prioridade baixa)** (REALIZA-427) — badges com stats (encontros
+  feitos, registros em dia, marcos da jornada). Não precisa morar no
+  perfil; estender a derivação pura de `jornadaDaDupla`/`marcosEntre`
+  (zero backend novo). Decisão prévia: jornada individual, nunca
+  competição entre duplas; streak foi cortado antes ("meio inútil") —
+  badges sim, streak não.
+- [ ] **CTA "avaliar encontro fora da lista" na home do jovem** (REALIZA-428) — na aba
+  Início, quando o encontro que aconteceu não aparece pra avaliar, o
+  jovem não sabe por quê (só avalia o que está agendado). CTA explicando
+  o fluxo — "quer avaliar um encontro que não apareceu aqui? peça pro
+  mentor agendar ele primeiro, mesmo que já tenha acontecido" — ou, se o
+  jovem puder agendar/registrar pelo app, link direto pra isso.

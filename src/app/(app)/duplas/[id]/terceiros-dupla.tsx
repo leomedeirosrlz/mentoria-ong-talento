@@ -100,9 +100,19 @@ function msgConviteWhatsApp(
   convidadoNome: string,
   jovemNome: string,
   token: string,
-  origem: string
+  origem: string,
+  /** nome do mentor quando é ele quem envia — um convite sem remetente
+   *  vindo do número dele lê anônimo; omitido = texto de equipe */
+  remetenteNome?: string
 ): string {
-  return `Olá, ${nomeExib(convidadoNome)}! ${nomeExib(jovemNome)} indicou você pra contar como vê essa pessoa. É a avaliação por terceiros do Programa de Mentoria Realiza.vc. São só 2 perguntas rápidas e sua resposta é confidencial: ${urlPublica(token, origem, "/t")}`;
+  const c = nomeExib(convidadoNome);
+  const j = nomeExib(jovemNome);
+  const url = urlPublica(token, origem, "/t");
+  if (remetenteNome) {
+    const m = nomeExib(remetenteNome) || "o mentor";
+    return `Olá, ${c}! Aqui é ${m}, mentor de ${j}. Foi ${j} quem indicou você pra contar como vê essa pessoa. São só 2 perguntas rápidas e sua resposta é confidencial: ${url}`;
+  }
+  return `Olá, ${c}! Aqui é a equipe do Realiza.vc. ${j} indicou você pra contar como vê essa pessoa. É a avaliação por terceiros do Programa de Mentoria Realiza.vc. São só 2 perguntas rápidas e sua resposta é confidencial: ${url}`;
 }
 
 /** Expiração é lazy no banco (só vira 'expirado' quando o link é tocado) —
@@ -120,12 +130,14 @@ function LinhaContato({
   jovemNome,
   podeGerenciar,
   jornadaViva,
+  remetenteNome,
 }: {
   contato: TerceiroContato;
   duplaId: string;
   jovemNome: string;
   podeGerenciar: boolean;
   jornadaViva: boolean;
+  remetenteNome?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -138,7 +150,12 @@ function LinhaContato({
 
   function reemitir() {
     start(async () => {
-      const r = await reemitirConviteTerceiro(contato.id);
+      // rede caída rejeita a action — sem o catch o erro subia pro boundary
+      const r = await reemitirConviteTerceiro(contato.id).catch(() => null);
+      if (!r) {
+        toast.error("Sem conexão. Tente de novo.");
+        return;
+      }
       if ("error" in r) {
         toast.error(r.error);
         return;
@@ -152,7 +169,7 @@ function LinhaContato({
         toast.success(
           r.reutilizado
             ? "O link pendente é o mesmo. Copiado de novo."
-            : "Link novo copiado. O anterior morreu."
+            : "Link novo copiado. O anterior deixou de funcionar."
         );
       } catch {
         toast.success(
@@ -208,7 +225,7 @@ function LinhaContato({
                 ) : (
                   <PaperPlaneTilt aria-hidden />
                 )}
-                Reemitir link
+                Gerar outro link
               </Button>
               {/* expirado também edita: o caminho de consertar indicação
                   errada é editar a row + reemitir (a delete policy segue
@@ -244,7 +261,8 @@ function LinhaContato({
                       contato.nome,
                       jovemNome,
                       contato.token,
-                      origem
+                      origem,
+                      remetenteNome
                     )
                   );
                   return wa ? (
@@ -361,7 +379,11 @@ function EditarContatoDialog({
         nome,
         vinculo,
         whatsapp: whatsapp || null,
-      });
+      }).catch(() => null);
+      if (!r) {
+        toast.error("Sem conexão. Tente de novo.");
+        return;
+      }
       if ("error" in r) {
         toast.error(r.error);
         return;
@@ -459,7 +481,11 @@ function NovoContatoDialog({
         nome,
         vinculo,
         whatsapp: whatsapp || null,
-      });
+      }).catch(() => null);
+      if (!r) {
+        toast.error("Sem conexão. Tente de novo.");
+        return;
+      }
       if ("error" in r) {
         toast.error(r.error);
         return;
@@ -563,14 +589,18 @@ function Consolidacao({
 
   function salvar(publicar: boolean) {
     start(async () => {
-      const r = await salvarConsolidadoTerceiros(duplaId, texto, publicar);
+      const r = await salvarConsolidadoTerceiros(duplaId, texto, publicar).catch(() => null);
+      if (!r) {
+        toast.error("Sem conexão. Tente de novo.");
+        return;
+      }
       if ("error" in r) {
         toast.error(r.error);
         return;
       }
       toast.success(
         publicar
-          ? "Consolidação publicada. O jovem já vê na área dele."
+          ? "Resumo publicado. O jovem já vê na área dele."
           : publicado
             ? "Despublicado. O jovem não vê mais."
             : "Rascunho salvo."
@@ -617,7 +647,7 @@ function Consolidacao({
         )}
       </div>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Reescreva o que se repete nas respostas SEM dizer quem falou. O
+        Escreva o que mais se repetiu nas respostas, sem dizer quem falou. O
         jovem lê só este texto, nunca as respostas individuais.
       </p>
       <Textarea
@@ -637,7 +667,7 @@ function Consolidacao({
           disabled={pending}
         >
           {pending ? <CircleNotch className="animate-spin" aria-hidden /> : null}
-          {publicado ? "Despublicar" : "Salvar rascunho"}
+          {publicado ? "Retirar do jovem" : "Salvar rascunho"}
         </Button>
         <Button
           type="button"
@@ -645,7 +675,7 @@ function Consolidacao({
           onClick={() => salvar(true)}
           disabled={pending || !texto.trim()}
         >
-          {publicado ? "Atualizar publicação" : "Publicar pro jovem"}
+          {publicado ? "Atualizar publicação" : "Mostrar para o jovem"}
         </Button>
       </div>
     </div>
@@ -659,6 +689,7 @@ export function TerceirosDupla({
   mentoradoNome,
   podeGerenciar,
   jornadaViva,
+  remetenteNome,
   className,
 }: {
   duplaId: string;
@@ -670,6 +701,9 @@ export function TerceirosDupla({
   podeGerenciar: boolean;
   /** ativa|pausada — dupla fechada vira só leitura */
   jornadaViva: boolean;
+  /** nome do mentor quando é ele quem opera — assina o convite do
+   *  WhatsApp como pessoa (sem ele o texto sai em voz de equipe) */
+  remetenteNome?: string;
   className?: string;
 }) {
   const [dialogAberto, setDialogAberto] = useState(false);
@@ -698,9 +732,9 @@ export function TerceirosDupla({
         )}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Guia semana 1→2: o jovem indica até 9 pessoas (3 amigos, 3 familiares,
+        O jovem indica até 9 pessoas (3 amigos, 3 familiares,
         3 colegas); cada uma responde 2 perguntas por link próprio. Você lê
-        identificado e consolida anônimo. O jovem só vê a síntese publicada.
+        com nome e resume sem dizer quem falou. O jovem só vê o resumo publicado.
       </p>
 
       {aberto && (
@@ -713,6 +747,7 @@ export function TerceirosDupla({
               jovemNome={mentoradoNome}
               podeGerenciar={podeGerenciar}
               jornadaViva={jornadaViva}
+              remetenteNome={remetenteNome}
             />
           ))}
         </ul>

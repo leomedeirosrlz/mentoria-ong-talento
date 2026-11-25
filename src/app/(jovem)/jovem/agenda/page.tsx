@@ -73,7 +73,7 @@ const STATUS = {
     cls: "border-[var(--warn)]/50 text-[var(--warn-text)]",
   },
   realizado: {
-    rotulo: "Aconteceu",
+    rotulo: "Realizado",
     cls: "border-[var(--ok)]/50 text-[var(--ok-text)]",
   },
   nao_aconteceu: {
@@ -164,13 +164,8 @@ export default async function JovemAgenda() {
         d.mentor_id != null
     )
     .map((d) => d.mentor_id!);
-  const semDuplaDpp = !duplas.some(
-    (d) => d.trilha !== "especialista" && d.status === "ativa"
-  );
-  const waCoord = waLink(
-    contatos.find((c) => c.papel === "coordenacao")?.whatsapp,
-    `Olá! Sou ${me?.nome_social || me?.nome || ""}, mentorado(a) do programa, e preciso falar com a equipe.`
-  );
+  const equipeCoord = contatos.filter((c) => c.papel === "coordenacao");
+  const nomeTela = (me?.nome_social || me?.nome || "").split(" ")[0];
   // a grade do jovem marca nos chips/slots do especialista os horários que
   // encaixam nela ("encaixa com você" — mesma régua da mesa de negociação)
   const dispJovem =
@@ -330,22 +325,22 @@ export default async function JovemAgenda() {
                           propostas={pedidosEsp.propostas[pedido.id] ?? []}
                           slots={slots}
                           meuId={me?.id ?? ""}
-                          waCoord={waCoord}
+                          equipe={equipeCoord}
+                          nomeJovem={nomeTela}
                           disponibilidade={dispJovem}
                         />
                       </div>
                     ) : slots.length === 0 ? (
                       <div className="space-y-2">
                         <p className="text-sm text-muted-foreground">
-                          {esp.primeiro} ainda não abriu horários livres.
-                          Pede por aqui que quem aceita propõe um com você
+                          {esp.primeiro} ainda não tem horários livres.
+                          Peça por aqui e a pessoa propõe um horário com você
                           {esp.wa ? ", ou chama no WhatsApp" : ""}.
                         </p>
                         <PedirEspecialistaDialog
                           especialistas={pedidosEsp.catalogo}
                           trilhasAtivas={trilhasAtivasEsp}
                           slotsPorEsp={{ [d.mentor_id!]: slots }}
-                          semDuplaDpp={semDuplaDpp}
                           preEspId={d.mentor_id}
                           trigger={
                             <Button variant="outline" size="sm">
@@ -362,7 +357,6 @@ export default async function JovemAgenda() {
                         especialistas={pedidosEsp.catalogo}
                         trilhasAtivas={trilhasAtivasEsp}
                         slotsPorEsp={{ [d.mentor_id!]: slots }}
-                        semDuplaDpp={semDuplaDpp}
                         disponibilidade={dispJovem}
                       />
                     )}

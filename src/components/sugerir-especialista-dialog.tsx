@@ -43,7 +43,12 @@ export function SugerirEspecialistaDialog({
 }: {
   mentoradoId: string;
   duplaDppId: string;
-  especialistas: { id: string; nome: string; areas: string[] | null }[];
+  especialistas: {
+    id: string;
+    nome: string;
+    nome_social?: string | null;
+    areas: string[] | null;
+  }[];
   nomeJovem: string;
   /** Elemento do trigger — default é o botão padrão da casa. `null` suprime:
    *  o menu "Mais" da ficha abre o dialog controlado (REALIZA-157). */
@@ -172,7 +177,9 @@ export function SugerirEspecialistaDialog({
                 ...Object.fromEntries(
                   especialistas.map((e) => [
                     e.id,
-                    e.areas?.length ? `${e.nome} · ${e.areas.join(", ")}` : e.nome,
+                    e.areas?.length
+                      ? `${e.nome_social ?? e.nome} · ${e.areas.join(", ")}`
+                      : (e.nome_social ?? e.nome),
                   ])
                 ),
               }}
@@ -190,8 +197,8 @@ export function SugerirEspecialistaDialog({
                 {especialistas.map((e) => (
                   <SelectItem key={e.id} value={e.id}>
                     {e.areas?.length
-                      ? `${e.nome} · ${e.areas.join(", ")}`
-                      : e.nome}
+                      ? `${e.nome_social ?? e.nome} · ${e.areas.join(", ")}`
+                      : (e.nome_social ?? e.nome)}
                   </SelectItem>
                 ))}
               </SelectContent>

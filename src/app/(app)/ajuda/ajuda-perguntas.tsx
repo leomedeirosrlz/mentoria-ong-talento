@@ -46,7 +46,7 @@ export function AjudaPerguntas({ perguntas }: { perguntas: PerguntaAjuda[] }) {
 
       {visiveis.length === 0 ? (
         <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-          Nenhuma pergunta com “{busca.trim()}”.
+          Nenhuma pergunta combina com “{busca.trim()}”. Tente outra palavra.
         </p>
       ) : (
         // re-key na busca: as seções remontam e a entrada anima (convenção

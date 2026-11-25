@@ -76,7 +76,7 @@ function universoBase(): UniversoReg {
 }
 
 const HEADER =
-  'Carimbo de data/hora,Pontuação,Nome,Nome do Mentorando,"Qual encontro/semana está sendo avaliado?","Data do encontro","O que foi realizado neste encontro? (Descreva as atividades)","Como você avalia o desempenho e participação do jovem neste encontro?","Foi identificada alguma dificuldade que precisa de atenção?","Qual será o próximo passo do acompanhamento?","Observações do mentor. (Opcional)","Algum documento/foto de importância que gostaria de nos enviar?"';
+  'Carimbo de data/hora,Pontuação,Nome,Nome do Mentorando,"Qual encontro/semana está sendo avaliado?","Data do encontro","O que aconteceu neste encontro? (Descreva as atividades)","Como você avalia o desempenho e participação do jovem neste encontro?","Foi identificada alguma dificuldade que precisa de atenção?","Qual será o próximo passo do acompanhamento?","Observações do mentor. (Opcional)","Algum documento/foto de importância que gostaria de nos enviar?"';
 
 const linha = (cells: (string | number)[]) => cells.join(",");
 
@@ -114,7 +114,7 @@ describe("canonHeaderReg", () => {
     expect(canonHeaderReg("Nome do Mentorando")).toBe("mentorado");
     expect(canonHeaderReg("Qual encontro/semana está sendo avaliado?")).toBe("numero");
     expect(canonHeaderReg("Data do encontro")).toBe("data");
-    expect(canonHeaderReg("O que foi realizado neste encontro? (Descreva as atividades)")).toBe("feito");
+    expect(canonHeaderReg("O que aconteceu neste encontro? (Descreva as atividades)")).toBe("feito");
     expect(canonHeaderReg("Como você avalia o desempenho e participação do jovem neste encontro?")).toBe("avaliacao");
     expect(canonHeaderReg("Foi identificada alguma dificuldade que precisa de atenção?")).toBe("dificuldade");
     expect(canonHeaderReg("Qual será o próximo passo do acompanhamento?")).toBe("proximo");

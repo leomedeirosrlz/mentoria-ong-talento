@@ -15,9 +15,6 @@ export function TermoBanner() {
       <Signature size={15} aria-hidden className="shrink-0" />
       <span className="min-w-0 flex-1 truncate">
         <span className="font-medium">Assine o termo de adesão</span>
-        <span className="hidden sm:inline">
-          {" "}· pendente para completar o cadastro
-        </span>
       </span>
       <ArrowRight size={14} aria-hidden className="shrink-0" />
     </Link>

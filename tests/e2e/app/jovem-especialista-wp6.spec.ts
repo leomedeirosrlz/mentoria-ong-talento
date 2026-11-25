@@ -126,11 +126,9 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     // --- o mentor DPP registra a sugestão na ficha da dupla ---
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.duplaDpp}`);
+    // desktop: as ações da ficha são botões inline (o "Mais" é sm:hidden)
     await page
-      .getByRole("button", { name: "Mais ações da dupla" })
-      .click();
-    await page
-      .getByRole("menuitem", { name: /Sugerir especialista pro jovem/ })
+      .getByRole("button", { name: /Sugerir especialista pro jovem/ })
       .click();
     await page.locator("#sug-mentor-demanda").fill(DEMANDA_SUG);
     await page
@@ -251,10 +249,7 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.duplaDpp}`);
     await page
-      .getByRole("button", { name: "Mais ações da dupla" })
-      .click();
-    await page
-      .getByRole("menuitem", { name: /Sugerir especialista pro jovem/ })
+      .getByRole("button", { name: /Sugerir especialista pro jovem/ })
       .click();
     await page.locator("#sug-mentor-demanda").fill(DEMANDA_DISP);
     await page
@@ -264,15 +259,11 @@ test.describe("WP6 — especialista do lado do jovem", () => {
       page.getByText(/confirma ou ajusta na página de especialistas/i)
     ).toBeVisible({ timeout: 15_000 });
 
-    // com a sugestão pendente, o gesto some do menu (a RPC também deduplica)
+    // com a sugestão pendente, o gesto some do cabeçalho (a RPC também deduplica)
     await page.reload();
-    await page
-      .getByRole("button", { name: "Mais ações da dupla" })
-      .click();
     await expect(
-      page.getByRole("menuitem", { name: /Sugerir especialista pro jovem/ })
+      page.getByRole("button", { name: /Sugerir especialista pro jovem/ })
     ).toHaveCount(0);
-    await page.keyboard.press("Escape");
 
     // o jovem dispensa — a sol vira 'cancelada' e sai de vista
     await relogar(page, JOVEM_EMAIL, SENHA);

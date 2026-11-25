@@ -163,7 +163,7 @@ export function AvaliacaoEncontroForm({
                   Como foi o encontro?
                 </h1>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  1 minuto · só a nota é obrigatória
+                  Leva 1 minuto. Só a nota é obrigatória.
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                   {privacidadeAvaliacao(trilha)}
@@ -307,7 +307,7 @@ export function AvaliacaoEncontroForm({
                 </span>
                 Sobre o que vocês conversaram?
                 <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                  (opcional · marque quantas quiser)
+                  (opcional, pode marcar mais de uma)
                 </span>
               </legend>
               <div className="mt-1.5 flex flex-wrap gap-1.5">

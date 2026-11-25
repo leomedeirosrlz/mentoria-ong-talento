@@ -105,8 +105,7 @@ export function resumoPedidoJovem(
   switch (efetivo) {
     case "sugerida":
       return "Seu mentor sugeriu. Você decide na página de especialistas.";
-    case "aguardando_coord":
-      return "A coordenação tá olhando seu pedido antes de liberar.";
+    case "aguardando_coord": // legado: sem triagem desde a 0158
     case "aberta":
       return nomeEsp
         ? `Esperando ${nomeEsp} responder.`
@@ -264,7 +263,7 @@ export function stepperCicloDeVida({
       estado: sugerida && !aceite ? "atual" : sol || dupla ? "feito" : "futuro",
     },
     {
-      rotulo: efetivo === "aguardando_coord" ? "Em triagem" : "No mural",
+      rotulo: "No mural",
       // a data do passo é a entrada no mural — sugerida ainda não entrou
       data: sugerida ? null : diaMes(sol?.created_at),
       estado: aceite

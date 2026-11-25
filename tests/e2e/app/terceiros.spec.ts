@@ -110,7 +110,7 @@ test("fluxo completo: convite → resposta pública → consolidado pro jovem", 
     .getByPlaceholder(/O que mais apareceu foi/)
     .fill(CONSOLIDADO);
   await page
-    .getByRole("button", { name: "Publicar pro jovem" })
+    .getByRole("button", { name: "Mostrar para o jovem" })
     .click();
   await expect(page.getByText("publicada")).toBeVisible({ timeout: 15_000 });
 

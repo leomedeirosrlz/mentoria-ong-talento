@@ -53,6 +53,15 @@ function emDias(dias: number, hora = "19:00") {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${hora}`;
 }
 
+/** Primeira terça a pelo menos `min` dias — a grade da fixture (mentor e
+ *  mentorada) só marca terça/quinta à noite; fora dela o dialog pede
+ *  "Marcar mesmo assim" e o spec dependia do dia da semana em que rodava. */
+function naTerca(min: number, hora = "19:00") {
+  const d = new Date(Date.now() + min * 86400e3);
+  const ate = (2 - d.getDay() + 7) % 7;
+  return emDias(min + ate, hora);
+}
+
 /** Linha da agenda do jovem pra um nº — ancora no <p> "Nº encontro" e sobe
  *  dois níveis (texto → row com botões e badge). O `exact` é o que separa
  *  o 6º do 16º. */
@@ -196,7 +205,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await entrarComoJovem(page);
     await page.goto("/jovem/agenda");
 
-    await page.getByRole("button", { name: "Agendar encontro" }).click();
+    await page.getByRole("button", { name: "Marcar encontro" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
 
@@ -208,7 +217,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await dialog.locator("#data_hora").fill(emDias(7));
     await dialog.locator("#link").fill("https://meet.google.com/e2e-agenda");
     await dialog
-      .getByRole("button", { name: "Confirmar agendamento" })
+      .getByRole("button", { name: "Marcar o encontro" })
       .click();
 
     await expect(page.getByText("6º encontro agendado.")).toBeVisible();
@@ -270,7 +279,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await dialog.locator("#motivo-select").click();
     await page.getByRole("option", { name: "Conflito de agenda" }).click();
     await dialog
-      .getByRole("button", { name: "Confirmar remarcação" })
+      .getByRole("button", { name: "Salvar nova data" })
       .click();
 
     await expect(page.getByText("7º encontro remarcado.")).toBeVisible();
@@ -318,7 +327,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     ).toBeVisible();
     await dialog.locator("#link").fill("https://meet.google.com/e2e-test");
     await dialog
-      .getByRole("button", { name: "Confirmar remarcação" })
+      .getByRole("button", { name: "Salvar nova data" })
       .click();
 
     await expect(page.getByText("9º encontro remarcado.")).toBeVisible();
@@ -401,7 +410,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
       .click();
 
     await expect(
-      page.getByText("Encontro marcado como não realizado.")
+      page.getByText("Encontro marcado como não aconteceu.")
     ).toBeVisible();
     // o botão some e vira badge no histórico
     await expect(
@@ -577,9 +586,9 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     const numero = titulo.match(/(\d+)º/)?.[1];
     expect(numero).toBeTruthy();
 
-    await dialog.locator("#data_hora").fill(emDias(6));
+    await dialog.locator("#data_hora").fill(naTerca(6));
     await dialog
-      .getByRole("button", { name: "Confirmar agendamento" })
+      .getByRole("button", { name: "Marcar o encontro" })
       .click();
     // toast novo do dialog: "Agendamento confirmado: Nº encontro."
     await expect(
@@ -685,7 +694,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await dialog.locator("#motivo-select").click();
     await page.getByRole("option", { name: "Conflito de agenda" }).click();
     await dialog
-      .getByRole("button", { name: "Confirmar remarcação" })
+      .getByRole("button", { name: "Salvar nova data" })
       .click();
 
     await expect(page.getByText("4º encontro remarcado.")).toBeVisible();

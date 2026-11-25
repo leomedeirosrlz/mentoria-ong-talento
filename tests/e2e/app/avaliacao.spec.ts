@@ -359,7 +359,7 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     expect(row.avaliacao_visivel_mentor).toBe(true);
 
     await chave.click();
-    await expect(page.getByText("Voltou a valer só na média.")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Seu mentor voltou a ver só a média de vocês.")).toBeVisible({ timeout: 15_000 });
     await expect(chave).not.toBeChecked();
     [row] = await buscarViaServiceRole<
       { avaliacao_visivel_mentor: boolean }[]

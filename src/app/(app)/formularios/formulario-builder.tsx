@@ -80,6 +80,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { novoUuid } from "@/lib/uuid";
 
 /** Rascunho de campo no editor — `opcoes` já é array de linhas (o textarea
  *  "uma por linha" morreu); `id` é estável entre edições porque as respostas
@@ -96,7 +97,7 @@ type DraftCampo = {
   formato?: FormularioCampoFormato;
 };
 
-const novoId = () => `c_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
+const novoId = () => `c_${novoUuid().replace(/-/g, "").slice(0, 12)}`;
 
 const CAMPO_TIPO_ICONE: Record<FormularioCampoTipo, Icon> = {
   texto: TextT,

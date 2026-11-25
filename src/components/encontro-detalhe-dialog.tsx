@@ -72,14 +72,14 @@ export function EncontroDetalheDialog({
   const [agora] = useState(() => Date.now());
   const nota =
     dupla.notas?.find((n) => n.numero === encontro.numero)?.texto ?? null;
-  // checklist do mentor neste nº (REALIZA-21) — leitura pra coord/sup, sem
-  // checkbox: quem lê não opera o plano dele
-  const intencoes = (dupla.intencoes ?? [])
-    .filter((i) => i.numero === encontro.numero)
+  // combinados deste nº (0157): os do registro e os que o mentor anotou no
+  // preparo (o antigo afazer) — uma lista só, como no card da ficha
+  const combinados = (dupla.encaminhamentos ?? [])
+    .filter(
+      (e) =>
+        e.numero === encontro.numero || (reg != null && e.registro_id === reg.id)
+    )
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
-  const combinados = reg
-    ? (dupla.encaminhamentos ?? []).filter((e) => e.registro_id === reg.id)
-    : [];
   const tardio = reg != null && registroTardio(reg, encontro);
 
   // anexos não vêm no payload da agenda — busca sob demanda ao abrir;
@@ -98,7 +98,7 @@ export function EncontroDetalheDialog({
     let vivo = true;
     createClient()
       .from("registro_anexos")
-      .select("*, autor:profiles!registro_anexos_created_by_fkey(nome)")
+      .select("*, autor:profiles!registro_anexos_created_by_fkey(nome, nome_social)")
       .eq("registro_id", reg.id)
       .order("created_at", { ascending: true })
       .then(({ data, error }) => {
@@ -147,8 +147,8 @@ export function EncontroDetalheDialog({
             <span>
               {encontro.numero}º encontro ·{" "}
               <DuplaNomes
-                mentor={dupla.mentor.nome}
-                mentorado={dupla.mentorado.nome}
+                mentor={dupla.mentor.nome_social ?? dupla.mentor.nome}
+                mentorado={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
               />
             </span>
           </DialogTitle>
@@ -201,46 +201,12 @@ export function EncontroDetalheDialog({
             </div>
           )}
 
-          {intencoes.length > 0 && (
-            <div className="rounded-lg bg-muted/40 px-3.5 py-2.5">
-              <p className="text-xs font-medium text-muted-foreground">
-                Afazeres do mentor
-              </p>
-              <ul className="mt-1 space-y-1">
-                {intencoes.map((i) => (
-                  <li key={i.id} className="flex items-start gap-2">
-                    {i.feito ? (
-                      <CheckCircle
-                        size={15}
-                        className="mt-0.5 shrink-0 text-[var(--ok)]"
-                      />
-                    ) : (
-                      <Circle
-                        size={15}
-                        className="mt-0.5 shrink-0 text-muted-foreground/60"
-                      />
-                    )}
-                    <span
-                      className={
-                        i.feito
-                          ? "text-muted-foreground line-through"
-                          : undefined
-                      }
-                    >
-                      {i.texto}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           {reg ? (
             <div className="space-y-2 rounded-lg border p-3.5">
               <RegistroView reg={reg} tardio={tardio} />
               {erroAnexos && (
                 <p className="pt-1 text-xs text-muted-foreground">
-                  Não foi possível carregar as evidências. Elas estão na ficha
+                  Não deu para carregar os arquivos. Eles estão na ficha
                   da dupla.
                 </p>
               )}
@@ -268,7 +234,9 @@ export function EncontroDetalheDialog({
                       <span className="block pl-4.5 text-muted-foreground">
                         {[
                           a.tamanho != null ? formatTamanho(a.tamanho) : null,
-                          a.autor?.nome ? `por ${a.autor.nome}` : null,
+                          a.autor?.nome
+                            ? `por ${a.autor.nome_social ?? a.autor.nome}`
+                            : null,
                           formatDiaMes(a.created_at),
                         ]
                           .filter(Boolean)
@@ -345,7 +313,7 @@ export function EncontroDetalheDialog({
 
           <div className="border-t pt-3">
             <Link
-              href={`/duplas/${dupla.id}#registrar-${encontro.id}`}
+              href={`/duplas/${dupla.id}?aba=encontros#encontro-${encontro.id}`}
               className="inline-flex min-h-11 items-center gap-1 text-xs font-medium underline underline-offset-2 hover:text-muted-foreground sm:min-h-0"
             >
               Abrir na ficha da dupla

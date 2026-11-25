@@ -3,22 +3,22 @@ fonte: mensagem-indicadas
 titulo: Mensagem às pessoas indicadas
 material: mensagem-indicadas
 tipo: template
-natureza: transcrito
+natureza: consolidado
 audiencia: [mentor_dpp, coordenacao, supervisor]
 versao: vigente (documento nativo em /materiais/documento/mensagem-indicadas)
-origem: src/lib/materiais-documentos.ts — template do Guia do Mentor DPP
+origem: src/lib/materiais-documentos.ts, template do Guia do Mentor DPP
   (cap. 14, item 2 "Mensagem às pessoas indicadas"), renderizado como
   documento nativo no app. Material do catálogo (seed ordem 20, encontro 1).
-  Na plataforma, a avaliação por terceiros também roda nativa na ficha da
-  dupla (links por contato) — esta mensagem segue o modelo do guia para
-  contato direto.
+  Na plataforma, a avaliação por terceiros roda nativa na ficha da dupla
+  (links por contato). Texto consolidado e sanitizado em 04/11/2026;
+  prevalece sobre o documento nativo quando divergirem.
 ---
 
 # Mensagem às pessoas indicadas
 
-Envie às pessoas que o(a) jovem indicou, com cópia oculta entre elas.
+Envie a cada pessoa que o(a) jovem indicou o link dela, gerado na ficha da dupla na plataforma.
 
-> **Importante:** as respostas alimentam a avaliação inicial — e ninguém saberá quem disse o quê. Diga isso com clareza, como no modelo.
+**Importante:** as respostas alimentam a avaliação inicial e ninguém saberá quem disse o quê. Diga isso com clareza, como no modelo.
 
 ## Modelo
 
@@ -28,7 +28,7 @@ Prezado(a) [nome],
 
 Meu nome é [seu nome]. [Nome do(a) jovem] está participando do Programa de Mentoria Social do Instituto Realiza.vc e eu sou o(a) mentor(a) que vai acompanhá-lo(a) nessa jornada.
 
-Para ajudar nesse trabalho, peço a sua colaboração respondendo a **duas perguntas rápidas**. Basta responder a este e-mail até [data].
+Para ajudar nesse trabalho, peço a sua colaboração respondendo a **duas perguntas rápidas** pelo link: [link]. Se puder, até [data].
 
 O seu nome foi indicado pelo(a) próprio(a) [nome do(a) jovem]. Não há obrigação de responder, mas a sua contribuição ajuda muito.
 

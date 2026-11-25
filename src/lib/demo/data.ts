@@ -44,7 +44,6 @@ import type {
   Dupla,
   Encaminhamento,
   Encontro,
-  EncontroIntencao,
   EncontroRemarcacao,
   EspecialistaEvento,
   ExcecaoEspecialista,
@@ -65,6 +64,7 @@ import type {
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
 import { disponibilidadeDeConjuntos, toDateStr } from "../ciclo";
+import { audienciasDe } from "../materiais";
 
 // ---------- tabelas da rodada de telas finais (ainda sem migration) ----------
 // Espelhos do plano `docs/planos/implementacao-telas-finais.md` — os WPs
@@ -151,7 +151,7 @@ const uid = (n: number): string =>
 // notificacoes: 30xx · assinaturas: 32xx · doc_templates: 33xx · tokens de
 // assinatura: 34xx · presencas: 36xx ·
 // avaliacao_links: 42xx · avaliacoes_encontro: 44xx ·
-// documentos_pessoa: 46xx · encontro_intencoes: 48xx · cronogramas: 50xx ·
+// documentos_pessoa: 46xx · combinados do preparo: 48xx · cronogramas: 50xx ·
 // especialista_grade: 52xx ·
 // especialista_excecoes: 54xx · chamados: 58xx · chamado_atualizacoes: 60xx ·
 // chamado_comentarios: 62xx · chamado_anexos: 64xx · devolutivas: 66xx ·
@@ -852,6 +852,11 @@ function build(): DemoData {
     responsavel,
     prazo: prazo ? ymd(prazo) : null,
     status,
+    // nº do encontro do registro — preenchido no fim, quando as duplas
+    // existem (mesma derivação da 0157 sobre os combinados antigos)
+    numero: null,
+    feito_em: null,
+    created_by: null,
     // a coluna é NOT NULL (default now()) — a view jovem_encaminhamentos a
     // expõe e a ordenação dos combinados a usa como desempate. Na vida real
     // o combinado nasce junto do registro do encontro; aqui o fixture
@@ -859,26 +864,29 @@ function build(): DemoData {
     created_at: prazo ? em(addDias(prazo, -7), "20:30") : haDias(14, "20:30"),
   });
 
-  /** Item do checklist de intenções do mentor (REALIZA-21) — feito_em é
+  /** Combinado anotado pelo mentor no card do encontro, no preparo (o
+   *  antigo afazer, 0157) — responsável mentor, sem registro. feito_em é
    *  carimbo da transição no banco, então o item feito do fixture já nasce
    *  com ele (aproximo pelo criadoEm, a ordem de leitura é o que importa). */
-  const intencao = (
+  const combinadoDoPreparo = (
     dupla: string,
     numero: number,
-    texto: string,
+    descricao: string,
     feito: boolean,
     criadoEm: string,
     autor: Profile
-  ): EncontroIntencao => ({
+  ): Encaminhamento => ({
     id: uid(0x4800 + ++seqInt),
     dupla_id: dupla,
+    registro_id: null,
     numero,
-    texto,
-    feito,
+    descricao,
+    responsavel: "mentor",
+    prazo: null,
+    status: feito ? "feito" : "pendente",
     feito_em: feito ? criadoEm : null,
     created_by: autor.id,
     created_at: criadoEm,
-    updated_at: criadoEm,
   });
 
   /** Uma remarcação do encontro (REALIZA-341) — no real só o trigger
@@ -1989,8 +1997,8 @@ function build(): DemoData {
       desejado: { nome: helena.nome },
     },
     {
-      // pedido do Wendel SEM dupla DPP: entra na fila de triagem da
-      // coordenação — liberar exige definir a turma (reconhecer_solicitacao)
+      // pedido do Wendel SEM dupla DPP: vai direto ao mural como qualquer
+      // outro (0158: sem triagem da coordenação)
       id: uid(S.triagem),
       mentorado_id: wendel.id,
       dupla_dpp_id: null,
@@ -2003,10 +2011,10 @@ function build(): DemoData {
       especialista_desejado_id: null,
       especialista_id: null,
       dupla_id: null,
-      status: "aguardando_coord",
+      status: "aberta",
       created_by: wendelLogin.id,
       // 6 dias parado: o limiar do alerta do painel da coordenação é 5 —
-      // o Wendel aparece nos "Pedidos parados" como o caso de triagem
+      // o Wendel aparece nos "Pedidos parados" como pedido sem aceite
       created_at: haDias(6, "09:15"),
       respondida_em: null,
       mentorado: { nome: wendel.nome },
@@ -2297,21 +2305,21 @@ function build(): DemoData {
         updated_at: haDias(1, "08:30"),
       },
     ],
-    // checklist do encontro (REALIZA-21): o pendente do 3º encontro
-    // reaparece no "De antes" dos cards seguintes e alimenta o aviso
-    // "Intenções em aberto" da agenda do Ricardo
-    intencoes: [
-      intencao(uid(D.ok), 3,
+  };
+  // combinados do preparo (0157): o pendente do 3º encontro reaparece no
+  // "De antes" dos cards seguintes e alimenta o aviso "Combinados em
+  // aberto" da agenda do Ricardo
+  duplaOk.encaminhamentos.push(
+      combinadoDoPreparo(uid(D.ok), 3,
         "Pedir o contato do professor de matemática pra alinhar a recuperação",
         false, haDias(21, "08:45"), ricardo),
-      intencao(uid(D.ok), 5,
+      combinadoDoPreparo(uid(D.ok), 5,
         "Revisar as submetas do PDM juntos antes de propor metas novas",
         false, haDias(1, "08:35"), ricardo),
-      intencao(uid(D.ok), 5,
+      combinadoDoPreparo(uid(D.ok), 5,
         "Enviar o vídeo da Roda da Vida comentado depois do encontro",
         true, haDias(1, "08:40"), ricardo),
-    ],
-  };
+  );
 
   // d-pend · Carlos × Caio — encontro 4 realizado sem registro (a pendência
   // que o semáforo cobra) + um registro tardio no histórico + o 5º oficial
@@ -2929,13 +2937,18 @@ function build(): DemoData {
   // warnrow da Minha agenda aponta), o 3º agendado no passado sem registro
   // (limbo — exercita o "remarcar/não aconteceu") e o 4º já marcado pra
   // semana seguinte.
+  // datas ancoradas na segunda da semana (TERCA_ENCONTRO_5 - 1), não em
+  // HOJE-n: numa segunda "ontem" caía na semana anterior e a agenda perdia a
+  // 2ª dupla em "Também nesta semana"; num domingo HOJE-6 colidia com o 3º
+  const SEG_T2C = addDias(TERCA_ENCONTRO_5, -1);
   const encT2c: Encontro[] = [
     comRegistro(
-      realizado(uid(D.t2c), 1, addDias(HOJE, -14), { duracao: 75 }),
+      realizado(uid(D.t2c), 1, addDias(SEG_T2C, -14), { duracao: 75 }),
       ricardo, "Matheus", "dpp"
     ),
-    realizado(uid(D.t2c), 2, addDias(HOJE, -6), { duracao: 60, origem: "externo" }),
-    agendado(uid(D.t2c), 3, addDias(HOJE, -1), {}),
+    realizado(uid(D.t2c), 2, addDias(SEG_T2C, -7), { duracao: 60, origem: "externo" }),
+    // de terça em diante segue no passado (o limbo continua exercitado)
+    agendado(uid(D.t2c), 3, SEG_T2C, {}),
     // âncora na terça (não em HOJE+n): a segunda da próxima semana é
     // sempre segunda — com HOJE+n o dia varia com o dia da build e um
     // "agendado pra semana seguinte" podia cair no domingo da semana
@@ -2950,7 +2963,7 @@ function build(): DemoData {
     turma: "T2 · 2026/2027",
     cronograma_id: cronogramaT2,
     status: "ativa",
-    iniciada_em: ymd(addDias(HOJE, -18)),
+    iniciada_em: ymd(addDias(SEG_T2C, -17)),
     trilha: "dpp",
     demanda: null,
     solicitacao_id: null,
@@ -2967,6 +2980,15 @@ function build(): DemoData {
   };
 
   const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaRito, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b, duplaT2c];
+  // combinado do registro herda o nº do encontro (backfill da 0157)
+  for (const d of duplas) {
+    const numeroPorRegistro = new Map(
+      d.encontros.flatMap((e) => (e.registro ? [[e.registro.id, e.numero] as const] : []))
+    );
+    for (const c of d.encaminhamentos)
+      if (c.numero == null && c.registro_id)
+        c.numero = numeroPorRegistro.get(c.registro_id) ?? null;
+  }
 
   // ---------- devolutivas (WP6) ----------
   // Feed datado por trilha — a última entrega continua sendo o que marca a
@@ -3068,7 +3090,7 @@ function build(): DemoData {
       id: uid(0x2203),
       titulo: "Registro do encontro fecha na sexta",
       corpo:
-        "Mentores DPP: o registro do encontro da semana fecha na sexta. Sem ele, o encontro conta como atraso no semáforo da dupla. Se não aconteceu, marquem 'não aconteceu' em vez de deixar pendente.",
+        "Mentores DPP: o registro do encontro da semana fecha na sexta. Sem ele, o encontro conta como atraso para a dupla. Se não aconteceu, marquem 'não aconteceu' em vez de deixar pendente.",
       audiencia: "dpp",
       prioridade: "urgente",
       created_by: marina.id,
@@ -3228,7 +3250,7 @@ function build(): DemoData {
   // do app), Perguntas Eficazes (o documento que o guia cita) e os links
   // públicos. Arquivos resolvem pro PDF placeholder da rota demo; doc: abre o
   // doc real.
-  const materiais: Material[] = [
+  const catalogo: Material[] = [
     { id: uid(0x2001), titulo: "Guia do Mentor DPP", descricao: "Metodologia completa: jornada, 16 encontros, instrumentos e templates.", tipo: "guia", url: null, path: "materiais/guia-dpp.pdf", audiencia: "dpp", encontro_num: null, ordem: 1 },
     { id: uid(0x2002), titulo: "Guia do Mentor Especialista", descricao: "Metodologia da mentoria com especialista: 5 encontros e cinco funções.", tipo: "guia", url: null, path: "materiais/guia-especialista.pdf", audiencia: "especialista", encontro_num: null, ordem: 2 },
     ...Array.from({ length: 16 }, (_, i) => i + 1).map((n, i) => ({
@@ -3255,6 +3277,18 @@ function build(): DemoData {
     { id: uid(0x203a), titulo: "Formação EaD gratuita", descricao: "Trilha opcional com certificado para mentores.", tipo: "link", url: "https://ead.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 29 },
     { id: uid(0x203b), titulo: "Checklist de competências do mentor", descricao: "As 10 competências do guia para marcar antes do ciclo e no 16º encontro.", tipo: "template", url: null, path: "doc:checklist-competencias", audiencia: "dpp", encontro_num: null, ordem: 30 },
   ];
+  // audiências da 0167: material de mentor serve o supervisor, Feedback
+  // Construtivo sai do jovem, Formação EaD é de mentores e mentorados
+  const materiais: Material[] = catalogo.map((m) => {
+    if (m.titulo === "Feedback Construtivo")
+      return { ...m, audiencias: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"] };
+    if (m.titulo === "Formação EaD gratuita")
+      return { ...m, audiencias: ["mentor_dpp", "mentor_especialista", "mentorado"] };
+    const base = audienciasDe(m);
+    return base.includes("mentor_dpp") || base.includes("mentor_especialista")
+      ? { ...m, audiencias: [...base, "supervisor"] }
+      : m;
+  });
 
   // ---------- notificações por papel ----------
   // 2-3 por persona; algumas não lidas pra badge do sino sair de zero

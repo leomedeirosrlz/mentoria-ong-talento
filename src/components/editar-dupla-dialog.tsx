@@ -26,7 +26,13 @@ import {
 } from "@/lib/dupla-desfecho";
 import type { AppRole, Cronograma, SituacaoMentorado } from "@/lib/types";
 
-type Opt = { id: string; nome: string; role?: string | null; papeis?: AppRole[] };
+type Opt = {
+  id: string;
+  nome: string;
+  nome_social?: string | null;
+  role?: string | null;
+  papeis?: AppRole[];
+};
 const NENHUM = "__nenhum";
 
 /** Papéis efetivos com fallback no primário — embed `profile_papeis` vazio
@@ -98,13 +104,13 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
         const [perfis, ments, ds, mps, crons] = await Promise.all([
           supabase
             .from("profiles")
-            .select("id, nome, role, profile_papeis(papel)")
+            .select("id, nome, nome_social, role, profile_papeis(papel)")
             .in("role", ["mentor_dpp", "mentor_especialista", "supervisor", "coordenacao"])
             .eq("ativo", true)
             .order("nome"),
           supabase
             .from("mentorados")
-            .select("id, nome, situacao")
+            .select("id, nome, nome_social, situacao")
             .order("nome"),
           // sem filtro de status: a ocupação filtra em JS. A própria dupla
           // sai pelo .neq — senão o mentor atual apareceria lotado por ela
@@ -148,7 +154,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
               : "mentor_dpp";
           ms.unshift({
             id: dupla.mentor.id,
-            nome: `${dupla.mentor.nome} (atual)`,
+            nome: `${dupla.mentor.nome_social ?? dupla.mentor.nome} (atual)`,
             role: dupla.mentor.role,
             papeis: dupla.mentor.role
               ? [...new Set<AppRole>([papelDaTrilha, dupla.mentor.role])]
@@ -157,7 +163,10 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
         }
         const sup0 = dupla.supervisor;
         if (sup0 && !ss.some((s) => s.id === sup0.id)) {
-          ss.unshift({ id: sup0.id, nome: `${sup0.nome} (atual)` });
+          ss.unshift({
+            id: sup0.id,
+            nome: `${sup0.nome_social ?? sup0.nome} (atual)`,
+          });
         }
         setMentores(ms);
         setSupervisores(ss);
@@ -169,7 +178,10 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
           (m) => m.id === dupla.mentorado.id || !foraDoPrograma(m)
         );
         if (!mts.some((m) => m.id === dupla.mentorado.id)) {
-          mts.push({ id: dupla.mentorado.id, nome: dupla.mentorado.nome });
+          mts.push({
+            id: dupla.mentorado.id,
+            nome: dupla.mentorado.nome_social ?? dupla.mentorado.nome,
+          });
         }
         setMentorados(mts);
         const contagem: Record<string, number> = {};
@@ -317,12 +329,18 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
           const did = String(fd.get("mentorado_id") ?? "");
           const mentorNome =
             mid === dupla.mentor.id
-              ? dupla.mentor.nome
-              : mentores.find((m) => m.id === mid)?.nome;
+              ? (dupla.mentor.nome_social ?? dupla.mentor.nome)
+              : (() => {
+                  const m = mentores.find((m) => m.id === mid);
+                  return m ? (m.nome_social ?? m.nome) : undefined;
+                })();
           const mentoradoNome =
             did === dupla.mentorado.id
-              ? dupla.mentorado.nome
-              : mentorados.find((m) => m.id === did)?.nome;
+              ? (dupla.mentorado.nome_social ?? dupla.mentorado.nome)
+              : (() => {
+                  const m = mentorados.find((m) => m.id === did);
+                  return m ? (m.nome_social ?? m.nome) : undefined;
+                })();
           toast.success(
             mentorNome && mentoradoNome
               ? `Dupla atualizada: ${mentorNome} e ${mentoradoNome}.`
@@ -499,7 +517,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 defaultValue={dupla.mentor.id}
                 items={Object.fromEntries(mentoresOrd.map((m) => [
                   m.id,
-                  `${m.nome} · ${usoTrilha(m.id)}/${capTrilha(m.id)}${sufixoPapel(m)}`,
+                  `${m.nome_social ?? m.nome} · ${usoTrilha(m.id)}/${capTrilha(m.id)}${sufixoPapel(m)}`,
                 ]))}
                 onValueChange={(v) => {
                   const id = v ?? dupla.mentor.id;
@@ -532,7 +550,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                         value={m.id}
                         disabled={(m.id !== dupla.mentor.id && usadas >= total) || trilhaBloqueada(m)}
                       >
-                        {m.nome} · {usadas}/{total}
+                        {m.nome_social ?? m.nome} · {usadas}/{total}
                         {sufixoPapel(m)}
                         {trilhaBloqueada(m) ? " · outro tipo" : ""}
                       </SelectItem>
@@ -552,7 +570,9 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 defaultValue={dupla.mentorado.id}
                 items={Object.fromEntries(mentoradosOrd.map((m) => [
                   m.id,
-                  rotuloOcupado(m.id) ? `${m.nome} (${rotuloOcupado(m.id)})` : m.nome,
+                  rotuloOcupado(m.id)
+                    ? `${m.nome_social ?? m.nome} (${rotuloOcupado(m.id)})`
+                    : (m.nome_social ?? m.nome),
                 ]))}
               >
                 <SelectTrigger id="edit-mentorado-select" aria-labelledby="edit-mentorado-label edit-mentorado-select"><SelectValue /></SelectTrigger>
@@ -563,7 +583,9 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                     const ocupado = ocupadoEm(m.id) != null;
                     return (
                       <SelectItem key={m.id} value={m.id} disabled={ocupado}>
-                        {rotuloOcupado(m.id) ? `${m.nome} (${rotuloOcupado(m.id)})` : m.nome}
+                        {rotuloOcupado(m.id)
+                          ? `${m.nome_social ?? m.nome} (${rotuloOcupado(m.id)})`
+                          : (m.nome_social ?? m.nome)}
                       </SelectItem>
                     );
                   })}
@@ -578,13 +600,13 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                   <Select
                     name="supervisor_id"
                     defaultValue={dupla.supervisor?.id ?? NENHUM}
-                    items={{ [NENHUM]: "Nenhum", ...Object.fromEntries(supervisoresOrd.map((s) => [s.id, s.nome])) }}
+                    items={{ [NENHUM]: "Nenhum", ...Object.fromEntries(supervisoresOrd.map((s) => [s.id, s.nome_social ?? s.nome])) }}
                   >
                     <SelectTrigger id="edit-supervisor-select" aria-labelledby="edit-supervisor-label edit-supervisor-select"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={NENHUM}>Nenhum</SelectItem>
                       {supervisoresOrd.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                        <SelectItem key={s.id} value={s.id}>{s.nome_social ?? s.nome}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -802,8 +824,8 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
         open={delOpen}
         onOpenChange={setDelOpen}
         titulo="Excluir dupla?"
-        descricao={`Apaga a dupla ${dupla.mentor.nome} e ${dupla.mentorado.nome} junto com ${dupla.encontros.length} ${dupla.encontros.length === 1 ? "encontro" : "encontros"} e ${registrosCount} ${registrosCount === 1 ? "registro" : "registros"}. Essa ação não tem volta. Se quiser manter o histórico, prefira encerrar a dupla.`}
-        sucesso={`Dupla ${dupla.mentor.nome} e ${dupla.mentorado.nome} excluída.`}
+        descricao={`Apaga a dupla ${dupla.mentor.nome_social ?? dupla.mentor.nome} e ${dupla.mentorado.nome_social ?? dupla.mentorado.nome} junto com ${dupla.encontros.length} ${dupla.encontros.length === 1 ? "encontro" : "encontros"} e ${registrosCount} ${registrosCount === 1 ? "registro" : "registros"}. Essa ação não tem volta. Se quiser manter o histórico, prefira encerrar a dupla.`}
+        sucesso={`Dupla ${dupla.mentor.nome_social ?? dupla.mentor.nome} e ${dupla.mentorado.nome_social ?? dupla.mentorado.nome} excluída.`}
         onConfirm={async () => {
           const res = await deleteDupla(dupla.id);
           if (res?.ok) router.push("/duplas");

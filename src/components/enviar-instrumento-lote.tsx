@@ -31,7 +31,10 @@ import {
 } from "@/lib/forms/schema";
 import { DestinoCheckRow } from "@/components/forms/destino-check-row";
 import { CopiarLink } from "@/components/forms/copiar-link";
-import { msgLinkWhatsApp } from "@/components/forms/link-shared";
+import {
+  msgLinkWhatsApp,
+  msgLinkWhatsAppRepasse,
+} from "@/components/forms/link-shared";
 import { useOrigem } from "@/components/forms/use-origem";
 import { fade, T } from "@/components/motion";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -205,7 +208,17 @@ export function EnviarLinkLote({
     l.waFone && l.token
       ? waLink(
           l.waFone,
-          msgLinkWhatsApp(instrumento, l.waNome, l.token, origem)
+          // o número é do mentor quando o jovem não tem WhatsApp — o texto
+          // pede a ponte em vez de convidar o próprio mentor a responder
+          l.waRepasse
+            ? msgLinkWhatsAppRepasse(
+                instrumento,
+                l.waNome,
+                l.waJovemNome,
+                l.token,
+                origem
+              )
+            : msgLinkWhatsApp(instrumento, l.waNome, l.token, origem)
         )
       : null;
 

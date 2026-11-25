@@ -64,8 +64,8 @@ export function NaoAconteceuJovem({ encontroId }: { encontroId: string }) {
           <DialogTitle>O encontro não aconteceu?</DialogTitle>
         </DialogHeader>
         <DialogDescription className="leading-relaxed">
-          O encontro ficará marcado como não realizado. Se rolou de verdade
-          ou foi engano, seu mentor registra como foi na ficha dele.
+          O encontro ficará marcado como não realizado. Se ele rolou de verdade
+          ou foi engano, seu mentor registra como foi.
         </DialogDescription>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>

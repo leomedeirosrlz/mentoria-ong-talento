@@ -30,6 +30,7 @@ export const GRID_DUPLA_LG =
 export type PessoaLinha = {
   id: string;
   nome: string;
+  nome_social?: string | null;
   avatar_path?: string | null;
   email?: string | null;
 };
@@ -84,6 +85,10 @@ export type DuplaLinhaProps = {
   nota?: ReactNode;
   /** a UMA ação contextual: Lembrar, Chamar, Registrar, Concluir rito */
   acao?: ReactNode;
+  /** o ⋯ real: o caller monta (DuplaLinhaMenu com as ações que os dados
+   *  dele sustentam). Ausente, o ⋯ decorativo permanece — contextos sem
+   *  ações sobrando (visão do supervisor) mantêm o visual da casa. */
+  menu?: ReactNode;
   fichaHref: string;
   /** primeiro nome do mentorado, pro aria-label do "Ver ficha" */
   fichaNome: string;
@@ -102,6 +107,7 @@ export function DuplaLinha({
   progresso,
   nota,
   acao,
+  menu,
   fichaHref,
   fichaNome,
   i = 0,
@@ -169,7 +175,10 @@ export function DuplaLinha({
           <DuplaAvatares mentor={mentor} mentorado={mentorado} size={32} />
           <div className="min-w-0">
             <p className="text-sm font-semibold leading-snug">
-              <DuplaNomes mentor={mentor.nome} mentorado={mentorado.nome} />
+              <DuplaNomes
+                mentor={mentor.nome_social ?? mentor.nome}
+                mentorado={mentorado.nome_social ?? mentorado.nome}
+              />
             </p>
             {meta && <p className="mt-0.5 text-xs text-muted-foreground">{meta}</p>}
           </div>
@@ -249,16 +258,22 @@ export function DuplaLinha({
         <div className="order-2 ml-auto flex items-center gap-1.5 @4xl:order-none @4xl:ml-0 @4xl:flex-col @4xl:items-end @4xl:gap-1">
           {acao != null && <span className="relative z-20">{acao}</span>}
           <span className="flex items-center gap-1 @4xl:justify-end">
-            <span
-              aria-hidden
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "sm" }),
-                "pointer-events-none w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
-              )}
-            >
-              <span className="hidden whitespace-nowrap md:inline">Ações</span>
-              <DotsThree weight="bold" />
-            </span>
+            {menu != null ? (
+              /* o ⋯ real vem do caller (client component com os dialogs
+                 dele); fica acima do link esticado como a ação ao lado */
+              <span className="relative z-20">{menu}</span>
+            ) : (
+              <span
+                aria-hidden
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "pointer-events-none w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
+                )}
+              >
+                <span className="hidden whitespace-nowrap md:inline">Ações</span>
+                <DotsThree weight="bold" />
+              </span>
+            )}
           </span>
         </div>
       </div>

@@ -45,26 +45,30 @@ describe("rolesParaAudiencias — fan-out audiência → papéis", () => {
   });
 });
 
-// kill-switch global (TODO pendente): enquanto desligado, só auth/conta
-// sai — notificação volta como falha de transporte coerente, nunca falso
-// sucesso pro caller
+// kill-switch global liberado: notificação passa do switch e o guard
+// seguinte é a config do transporte — cair no "não configurado" com a
+// key stubada vazia prova o caminho sem rede
 describe("EMAIL_ENVIO_LIBERADO — kill-switch do envio", () => {
-  it("desligado: notificação não sai, destinos voltam em falhas", async () => {
-    expect(EMAIL_ENVIO_LIBERADO).toBe(false);
-    const r = await enviarEmailsLote({
-      para: ["a@x.com", "b@x.com"],
-      assunto: "teste",
-      html: "<p>x</p>",
-    });
-    expect(r.enviados).toBe(0);
-    expect(r.falhas).toEqual(["a@x.com", "b@x.com"]);
-    expect(r.error).toMatch(/desativado/);
+  it("liberado: notificação passa do switch e cai no guard de config", async () => {
+    expect(EMAIL_ENVIO_LIBERADO).toBe(true);
+    const key = process.env.RESEND_API_KEY;
+    process.env.RESEND_API_KEY = "";
+    try {
+      const r = await enviarEmailsLote({
+        para: ["a@x.com", "b@x.com"],
+        assunto: "teste",
+        html: "<p>x</p>",
+      });
+      expect(r.enviados).toBe(0);
+      expect(r.falhas).toEqual(["a@x.com", "b@x.com"]);
+      expect(r.error).toMatch(/não configurado/);
+    } finally {
+      if (key === undefined) delete process.env.RESEND_API_KEY;
+      else process.env.RESEND_API_KEY = key;
+    }
   });
 
-  it("critico fura o switch — e-mail de conta chega ao guard seguinte", async () => {
-    // sem RESEND_API_KEY no vitest: passar do kill-switch e cair no guard
-    // de config prova o bypass (error muda de "desativado" pra "não
-    // configurado"); a key fica stubada vazia por garantia — nunca rede
+  it("critico segue passando — caminho de conta inalterado", async () => {
     const key = process.env.RESEND_API_KEY;
     process.env.RESEND_API_KEY = "";
     try {

@@ -260,11 +260,19 @@ otp_expiry = 3600
 # (supabase/templates/*.html). No projeto hosteado o conteúdo desses
 # arquivos vai colado no dashboard: Authentication → Emails.
 [auth.email.template.magic_link]
-subject = "Seu link de acesso — Realiza.vc"
+subject = "Mentoria Social: seu link de acesso"
 content_path = "./supabase/templates/magic-link.html"
 
+[auth.email.template.confirmation]
+subject = "Mentoria Social: confirme seu cadastro"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.email_change]
+subject = "Mentoria Social: confirme a troca de e-mail"
+content_path = "./supabase/templates/email-change.html"
+
 [auth.email.template.recovery]
-subject = "Redefinir sua senha — Realiza.vc"
+subject = "Mentoria Social: redefina sua senha"
 content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize notification email template

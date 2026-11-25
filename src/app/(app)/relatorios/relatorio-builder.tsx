@@ -259,40 +259,49 @@ export function RelatorioBuilder({
       {/* barra de configuração — mesma língua dos filtros de /duplas e
           /pessoas: grupos com rótulo overline + chips filterChipCls */}
       <div className="space-y-4">
-        <div role="group" aria-labelledby="flt-turma" className="flex flex-wrap items-center gap-1.5">
+        {/* grupos de filtro: no mobile a fileira de chips rola na horizontal
+            (rótulo fica fixo à esquerda), no desktop volta a quebrar linha */}
+        <div role="group" aria-labelledby="flt-turma" className="flex items-center gap-1.5">
           <GrupoLabel id="flt-turma">Turma</GrupoLabel>
-          {[...turmas, "todas"].map((t) => (
-            <button
-              key={t}
-              type="button"
-              aria-pressed={turma === t}
-              onClick={() => setTurma(t)}
-              className={filterChipCls(turma === t)}
-              title={t !== "todas" ? t : undefined}
-            >
-              {t === "todas" ? "Todas" : turmaCurta(t)}
-            </button>
-          ))}
+          {/* py-1 -my-1: overflow-x-auto vira overflow-y:auto no computado
+              e cliparia o focus-visible:ring dos chips */}
+          <div className="scroll-fina -my-1 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto py-1 sm:flex-wrap sm:overflow-visible">
+            {[...turmas, "todas"].map((t) => (
+              <button
+                key={t}
+                type="button"
+                aria-pressed={turma === t}
+                onClick={() => setTurma(t)}
+                className={filterChipCls(turma === t)}
+                title={t !== "todas" ? t : undefined}
+              >
+                {t === "todas" ? "Todas" : turmaCurta(t)}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div role="group" aria-labelledby="flt-linhas" className="flex flex-wrap items-center gap-1.5">
+        <div role="group" aria-labelledby="flt-linhas" className="flex items-center gap-1.5">
           <GrupoLabel id="flt-linhas">Linhas</GrupoLabel>
-          {(["pessoas", "duplas"] as const).map((g) => (
-            <button
-              key={g}
-              type="button"
-              aria-pressed={gran === g}
-              onClick={() => trocarGran(g)}
-              className={filterChipCls(gran === g)}
-            >
-              {g === "pessoas" ? "Uma por pessoa" : "Uma por dupla"}
-            </button>
-          ))}
+          <div className="scroll-fina -my-1 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto py-1 sm:flex-wrap sm:overflow-visible">
+            {(["pessoas", "duplas"] as const).map((g) => (
+              <button
+                key={g}
+                type="button"
+                aria-pressed={gran === g}
+                onClick={() => trocarGran(g)}
+                className={filterChipCls(gran === g)}
+              >
+                {g === "pessoas" ? "Uma por pessoa" : "Uma por dupla"}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div role="group" aria-labelledby="flt-colunas" className="flex flex-wrap items-center gap-1.5">
+        <div role="group" aria-labelledby="flt-colunas" className="flex items-center gap-1.5">
           <GrupoLabel id="flt-colunas">Colunas</GrupoLabel>
-          {catalogo.map((c) => {
+          <div className="scroll-fina -my-1 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto py-1 sm:flex-wrap sm:overflow-visible">
+            {catalogo.map((c) => {
             // saindo já lê como desligado — a coluna desmonta quando o
             // fade termina, mas o chip vira "off" no clique
             const on = colunas.includes(c.id) && !saindo.has(c.id);
@@ -316,6 +325,7 @@ export function RelatorioBuilder({
               </button>
             );
           })}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

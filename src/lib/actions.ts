@@ -196,11 +196,12 @@ function camposApresentacao(
   }
 
   if (!parcial || formData.has("linkedin")) {
-    const linkedin = String(formData.get("linkedin") ?? "").trim() || null;
-    // case-sensitive de propósito — o CHECK profiles_linkedin_http (0030) é `~`
-    if (linkedin && !/^https?:\/\//.test(linkedin)) {
-      return { error: "Confira o link do LinkedIn: precisa começar com http:// ou https://." };
-    }
+    const linkedinRaw = String(formData.get("linkedin") ?? "").trim();
+    // aceita como a pessoa digita: sem protocolo vira https://; o CHECK
+    // profiles_linkedin_http (0030) exige o esquema em minúsculas
+    const linkedin = linkedinRaw
+      ? `https://${linkedinRaw.replace(/^https?:\/\//i, "")}`
+      : null;
     out.linkedin = linkedin;
   }
 
@@ -1312,7 +1313,8 @@ export async function updatePessoa(profileId: string, formData: FormData) {
     ...civis,
     ...consentPatch(formData, atual?.consent_lgpd_em),
   };
-  if (formData.has("voluntario")) {
+  // sentinela: checkbox desmarcado não posta (mesmo padrão do salvarOnboarding)
+  if (formData.has("decl_voluntario")) {
     patch.voluntario = formData.get("voluntario") === "on";
   }
   // quem já tem login troca o e-mail no auth.users (o trigger 0060 espelha
@@ -2939,11 +2941,14 @@ export async function agendarEncontro(formData: FormData) {
   const motivoOutro = String(formData.get("motivo_outro") ?? "").trim();
   if (!dupla_id || !numero || !data_hora) return { error: "Data e horário são obrigatórios." };
   const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", dupla_id).single();
-  if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  // sem row a RLS escondeu (não é dele) ou a dupla não existe — os `d!`
+  // abaixo estourariam TypeError em vez do contrato { error }
+  if (!d) return { error: "Dupla não encontrada." };
+  if (d.status !== "ativa") return { error: "Essa dupla não está ativa." };
   // DPP sem cronograma é dado inválido (o CHECK da 0061 impede criar, mas uma
   // dupla antiga pode chegar aqui) — sem calendário o teto de número seria
   // uma mentira; aponta a correção em vez de agendar contra nada
-  if (d && d.trilha !== "especialista" && !d.cronograma_id) {
+  if (d.trilha !== "especialista" && !d.cronograma_id) {
     return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
   }
   const quando = parseDataHora(data_hora);
@@ -2959,7 +2964,7 @@ export async function agendarEncontro(formData: FormData) {
   // trilha especialista (0074): sessão nova só nasce de pedido aceito —
   // agendarEncontro continua servindo pra REMARCAR uma tentativa existente,
   // nunca pra criar row do zero
-  if (d?.trilha === "especialista" && !existente) {
+  if (d.trilha === "especialista" && !existente) {
     return {
       error:
         "As sessões da trilha especialista nascem dos pedidos aceitos — combine com o jovem ou a coordenação.",
@@ -2981,13 +2986,13 @@ export async function agendarEncontro(formData: FormData) {
   // teto de nº por trilha — especialista conta TENTATIVAS (o CHECK do banco
   // aceita até 24; aqui só passa row existente, então o teto é o do banco);
   // DPP mede contra o calendário DA DUPLA (0061), nunca o global
-  const maxNum = d?.trilha === "especialista"
+  const maxNum = d.trilha === "especialista"
     ? 24
     : (
         await supabase
           .from("ciclo_eventos").select("numero")
           .eq("tipo", "encontro")
-          .eq("cronograma_id", d!.cronograma_id!)
+          .eq("cronograma_id", d.cronograma_id!)
           .order("numero", { ascending: false }).limit(1).maybeSingle()
       ).data?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
@@ -3117,7 +3122,9 @@ export async function salvarLinkEncontro(encontroId: string, link: string | null
     .eq("id", encontroId)
     .maybeSingle();
   if (!encontro) return { error: "Encontro não encontrado." };
-  if (encontro.status !== "agendado") {
+  // remarcado é legado mantido (marcarNaoAconteceu aceita): a row ainda é
+  // agendável, só o status ficou velho — bloquear impedia trocar o link
+  if (encontro.status !== "agendado" && encontro.status !== "remarcado") {
     return { error: "Só dá pra mexer no link de um encontro agendado." };
   }
   const dupla = Array.isArray(encontro.duplas) ? encontro.duplas[0] : encontro.duplas;
@@ -3152,7 +3159,7 @@ export async function salvarLinkEncontro(encontroId: string, link: string | null
       .from("encontros")
       .update({ link: linkLimpo })
       .eq("id", encontroId)
-      .eq("status", "agendado")
+      .in("status", ["agendado", "remarcado"])
       .select("id");
     if (error) return { error: erroAmigavel(error) };
     if (!data?.length) return { error: "Esse encontro não está mais agendado." };
@@ -3452,7 +3459,13 @@ export async function salvarRegistro(formData: FormData) {
   if (plano.inserir.length) {
     const { error: encErr } = await supabase
       .from("encaminhamentos")
-      .insert(plano.inserir.map((t) => ({ dupla_id, registro_id: registro.id, ...t })));
+      .insert(plano.inserir.map((t) => ({
+        dupla_id,
+        registro_id: registro.id,
+        numero: encDb.numero,
+        created_by: eu.id,
+        ...t,
+      })));
     if (encErr) return { error: erroAmigavel(encErr) };
   }
 
@@ -3507,20 +3520,21 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
   }
 
   const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", duplaId).single();
-  if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
-  if (d && d.trilha !== "especialista" && !d.cronograma_id) {
+  if (!d) return { error: "Dupla não encontrada." };
+  if (d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  if (d.trilha !== "especialista" && !d.cronograma_id) {
     return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
   }
 
   // teto de nº por trilha — a nota segue o passo do guia (16 DPP / 5
   // especialista); no DPP o teto é do cronograma dela, não do calendário global
-  const maxNum = d?.trilha === "especialista"
+  const maxNum = d.trilha === "especialista"
     ? maxEncontros("especialista")
     : (
         await supabase
           .from("ciclo_eventos").select("numero")
           .eq("tipo", "encontro")
-          .eq("cronograma_id", d!.cronograma_id!)
+          .eq("cronograma_id", d.cronograma_id!)
           .order("numero", { ascending: false }).limit(1).maybeSingle()
       ).data?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
@@ -3549,122 +3563,69 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
   return { ok: true };
 }
 
-// ---------- intenções do encontro (checklist do mentor, REALIZA-21) ----------
+// ---------- combinados do encontro (afazeres unificados, 0157) ----------
 
-/** Cria um item do checklist no nº do guia (REALIZA-21). A chave é
- *  (dupla_id, numero) — a intenção pode existir antes do encontro agendado
- *  e não se move com remarcação/"não aconteceu". Guardas idênticas à nota:
- *  papel mentor, dupla ativa, nº dentro do teto do cronograma DELA. */
-export async function criarIntencao(duplaId: string, numero: number, texto: string) {
+/** Cria um combinado no nº do guia, direto do card do encontro — no preparo
+ *  (antes do registro) ou depois dele. A chave é (dupla_id, numero): existe
+ *  antes do encontro agendado e não se move com remarcação/"não aconteceu".
+ *  Responsável "mentor" é o antigo afazer: o jovem não vê (0070 filtra
+ *  responsavel = 'mentorado'). Guardas da nota: papel mentor, dupla ativa,
+ *  nº dentro do teto do cronograma DELA. */
+export async function criarCombinadoEncontro(
+  duplaId: string,
+  numero: number,
+  descricao: string,
+  responsavel: "mentor" | "mentorado",
+  prazo?: string | null
+) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  // a intenção é plano do mentor — nem a coord escreve por ele (a policy
-  // aceitaria; o contrato fica aqui, mesmo desenho da nota)
+  // o combinado é da dupla — a coord só marca feito (toggleEncaminhamento)
   if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
-    return { error: "Os afazeres do encontro são do mentor da dupla." };
+    return { error: "O combinado é da dupla. A coordenação só pode marcar como feito." };
+  }
+  if (responsavel !== "mentor" && responsavel !== "mentorado") {
+    return { error: "Escolha quem fica responsável pelo combinado." };
   }
 
   const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", duplaId).single();
-  if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
-  if (d && d.trilha !== "especialista" && !d.cronograma_id) {
+  if (!d) return { error: "Dupla não encontrada." };
+  if (d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  if (d.trilha !== "especialista" && !d.cronograma_id) {
     return { error: "Essa dupla está sem cronograma. A coordenação vincula um na edição da dupla." };
   }
 
-  // teto de nº por trilha — a intenção segue o passo do guia (16 DPP / 5
+  // teto de nº por trilha — o combinado segue o passo do guia (16 DPP / 5
   // especialista); no DPP o teto é do cronograma dela, não do calendário global
-  const maxNum = d?.trilha === "especialista"
+  const maxNum = d.trilha === "especialista"
     ? maxEncontros("especialista")
     : (
         await supabase
           .from("ciclo_eventos").select("numero")
           .eq("tipo", "encontro")
-          .eq("cronograma_id", d!.cronograma_id!)
+          .eq("cronograma_id", d.cronograma_id!)
           .order("numero", { ascending: false }).limit(1).maybeSingle()
       ).data?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
     return { error: "Escolha um encontro da lista." };
   }
 
-  const limpo = texto.trim();
-  if (!limpo) return { error: "Escreva o afazer antes de adicionar." };
-  if (limpo.length > 280) return { error: "Afazer muito longo (máx. 280 caracteres)." };
+  const limpo = descricao.trim();
+  if (limpo.length < 2) return { error: "Escreva o combinado antes de adicionar." };
+  if (limpo.length > 500) return { error: "Combinado muito longo (máx. 500 caracteres)." };
+  const prazoLimpo = prazo?.trim() ?? "";
+  if (prazoLimpo && !/^\d{4}-\d{2}-\d{2}$/.test(prazoLimpo)) {
+    return { error: "Confira a data do prazo." };
+  }
 
   const { error } = await supabase
-    .from("encontro_intencoes")
-    .insert({ dupla_id: duplaId, numero, texto: limpo, created_by: eu.id });
+    .from("encaminhamentos")
+    .insert({ dupla_id: duplaId, numero, descricao: limpo, responsavel, prazo: prazoLimpo || null, created_by: eu.id });
   if (error) return { error: erroAmigavel(error) };
 
   revalidatePath("/agenda");
   revalidatePath(`/duplas/${duplaId}`);
-  return { ok: true };
-}
-
-/** Marca/desmarca um item. O update vai por id e a RLS escopa à dupla do
- *  mentor — item de outra dupla devolve 0 rows e vira "não encontrada".
- *  `feito_em` é carimbo do trigger, não do caller. */
-export async function marcarIntencao(id: string, feito: boolean) {
-  if (await demoAtivo()) return { error: DEMO_MSG };
-  const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
-    return { error: "Os afazeres do encontro são do mentor da dupla." };
-  }
-
-  // a dupla vem junto no embed: o gate é o status DELA (encerrada/pausada
-  // congela o checklist), não o status do encontro — "enviar vídeo depois"
-  // é justamente o caso de marcar após o realizado
-  const { data: row } = await supabase
-    .from("encontro_intencoes")
-    .select("id, dupla_id, duplas(status)")
-    .eq("id", id)
-    .maybeSingle();
-  if (!row) return { error: "Afazer não encontrado." };
-  const dupla = Array.isArray(row.duplas) ? row.duplas[0] : row.duplas;
-  if (dupla && dupla.status !== "ativa") return { error: "Essa dupla não está ativa." };
-
-  const { data, error } = await supabase
-    .from("encontro_intencoes")
-    .update({ feito })
-    .eq("id", id)
-    .select("id");
-  if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) return { error: "Afazer não encontrado." };
-
-  revalidatePath("/agenda");
-  revalidatePath(`/duplas/${row.dupla_id}`);
-  return { ok: true };
-}
-
-/** Remove um item — o gesto é apagar o que foi digitado errado, não
- *  arquivar: item cumprido fica na lista como feito. */
-export async function removerIntencao(id: string) {
-  if (await demoAtivo()) return { error: DEMO_MSG };
-  const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
-    return { error: "Os afazeres do encontro são do mentor da dupla." };
-  }
-
-  const { data: row } = await supabase
-    .from("encontro_intencoes")
-    .select("id, dupla_id, duplas(status)")
-    .eq("id", id)
-    .maybeSingle();
-  if (!row) return { error: "Afazer não encontrado." };
-  const dupla = Array.isArray(row.duplas) ? row.duplas[0] : row.duplas;
-  if (dupla && dupla.status !== "ativa") return { error: "Essa dupla não está ativa." };
-
-  const { data, error } = await supabase
-    .from("encontro_intencoes")
-    .delete()
-    .eq("id", id)
-    .select("id");
-  if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) return { error: "Afazer não encontrado." };
-
-  revalidatePath("/agenda");
-  revalidatePath(`/duplas/${row.dupla_id}`);
   return { ok: true };
 }
 
@@ -3742,6 +3703,7 @@ export async function toggleEncaminhamento(id: string, feito: boolean, duplaId: 
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
   revalidatePath("/");
+  revalidatePath("/agenda");
   revalidatePath("/duplas");
   revalidatePath(`/duplas/${duplaId}`);
   return { ok: true };
@@ -4098,6 +4060,68 @@ export async function conflitoEncontro(
   return {
     ok: true,
     conflitos: (Array.isArray(data) ? data : []) as ConflitoEncontro[],
+  };
+}
+
+/** Primeiro nome de uso — nome social quando existe, senão o primeiro token
+ *  do civil (mesma régua de primeiroNomeDaDupla, sem depender do embed). */
+const primeiroNomeDe = (n: string | null | undefined) =>
+  (n ?? "").trim().split(/\s+/)[0] || null;
+
+/** Grades semanais dos dois lados da dupla — insumo do aviso de horário do
+ *  AgendarEncontroDialog: "quem não marcou essa célula" antes de confirmar.
+ *  Leitura best-effort como conflitoEncontro — qualquer falha devolve tudo
+ *  null e o dialog segue sem aviso, nunca bloqueia o agendamento. A trilha
+ *  especialista também volta vazia: lá o horário nasce do combinado
+ *  bilateral da sessão, não da grade semanal do DPP. */
+export async function disponibilidadesDaDupla(duplaId: string): Promise<{
+  mentor: Disponibilidade | null;
+  jovem: Disponibilidade | null;
+  jovemNome: string | null;
+}> {
+  const vazio = {
+    mentor: null as Disponibilidade | null,
+    jovem: null as Disponibilidade | null,
+    jovemNome: null as string | null,
+  };
+  if (await demoAtivo()) {
+    const d = getDemoData();
+    const dupla = d.duplas.find((x) => x.id === duplaId);
+    if (!dupla || dupla.trilha === "especialista") return vazio;
+    return {
+      mentor:
+        d.mentorProfiles.find((m) => m.profile_id === dupla.mentor.id)
+          ?.disponibilidade ?? null,
+      jovem: dupla.mentorado.disponibilidade ?? null,
+      jovemNome: primeiroNomeDe(
+        dupla.mentorado.nome_social ?? dupla.mentorado.nome
+      ),
+    };
+  }
+  const { supabase, me: eu } = await me();
+  if (!eu) return vazio;
+  const { data: dupla } = await supabase
+    .from("duplas")
+    .select("mentor_id, mentorado_id, trilha")
+    .eq("id", duplaId)
+    .maybeSingle();
+  if (!dupla || dupla.trilha === "especialista") return vazio;
+  const [{ data: mp }, { data: jovem }] = await Promise.all([
+    supabase
+      .from("mentor_profiles")
+      .select("disponibilidade")
+      .eq("profile_id", dupla.mentor_id)
+      .maybeSingle(),
+    supabase
+      .from("mentorados")
+      .select("disponibilidade, nome, nome_social")
+      .eq("id", dupla.mentorado_id)
+      .maybeSingle(),
+  ]);
+  return {
+    mentor: (mp?.disponibilidade ?? null) as Disponibilidade | null,
+    jovem: (jovem?.disponibilidade ?? null) as Disponibilidade | null,
+    jovemNome: primeiroNomeDe(jovem?.nome_social ?? jovem?.nome),
   };
 }
 

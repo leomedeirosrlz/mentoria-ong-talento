@@ -69,7 +69,11 @@ export function AvisosSection({
   if (!avisos.length && !souCoord) return null;
 
   return (
-    <details id="avisos" className={cn("group scroll-mt-20", className)}>
+    <details
+      id="avisos"
+      // aviso urgente ou importante abre sozinho — recolhido, passava batido
+      open={avisos.some((a) => a.prioridade !== "normal") || undefined}
+      className={cn("group scroll-mt-20", className)}>
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg py-2 pr-1 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
         <h2 className="flex items-baseline gap-1.5 text-base font-semibold">
           <Megaphone size={16} className="self-center text-muted-foreground" aria-hidden />

@@ -1,8 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { WhatsappLogo } from "@phosphor-icons/react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { Minus, Plus, WhatsappLogo } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { waLink } from "@/lib/ciclo";
 import {
@@ -14,9 +22,12 @@ import {
 } from "@/lib/relatorio";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 const LARGURA_MIN = 56;
 const LARGURA_INICIAL = 168;
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 2.5;
 
 type Ordem = { col: string; dir: 1 | -1 } | null;
 
@@ -128,6 +139,138 @@ export function RelatorioCanvas({
   const drag = useRef<{ col: string; x0: number; w0: number; wAtual?: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
+  // ---------- zoom da grade ----------
+  // `zoom` (CSS) relayouta a tabela de verdade — o scroller nativo cuida do
+  // pan, sticky/resize/seleção seguem íntegros e as medidas de scroll já
+  // vêm no espaço ampliado (scrollLeft conta px de tela). zoomRef espelha o
+  // estado síncrono: os gestos leem/escrevem fora do ciclo de render.
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  // `zoom` padronizado: Chrome 128+/Safari/FF126+. Sem suporte o style é
+  // ignorado — esconde a pill e trava o gesto (senão a âncora moveria o
+  // scroll sem efeito visual). useSyncExternalStore com snapshot do server
+  // = false: sem hydration mismatch e sem setState-em-effect (lint)
+  const zoomOk = useSyncExternalStore(
+    () => () => {},
+    () => CSS.supports("zoom", "1"),
+    () => false
+  );
+  // âncora do zoom pendente: ponto do conteúdo que deve ficar parado sob
+  // `ax/ay` (px dentro do scroller). Aplicado no layout-effect pós-render,
+  // quando o novo tamanho já mede.
+  const ancoraZoom = useRef<{ cx: number; cy: number; ax: number; ay: number } | null>(null);
+
+  // zDom: escala do conteúdo renderizado AGORA (zoomRef pode estar à
+  // frente com zoom pendente). A âncora é guardada em unidades de
+  // conteúdo absolutas ((scroll+offset)/zDom) — zooms enfileirados num
+  // mesmo frame compõem certo em vez de derivar.
+  const zDom = useRef(1);
+
+  const aplicarZoom = useCallback((novo: number, pto?: { x: number; y: number }) => {
+    const el = wrapRef.current;
+    const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, novo));
+    if (!el || !zoomOk || z === zoomRef.current) return;
+    const r = el.getBoundingClientRect();
+    const ax = pto ? pto.x - r.left : r.width / 2;
+    const ay = pto ? pto.y - r.top : r.height / 2;
+    // ponto do conteúdo sob a âncora em unidades de layout — o scroll'
+    // multiplica pela escala nova e devolve o conteúdo sob o dedo/cursor
+    ancoraZoom.current = {
+      cx: (el.scrollLeft + ax) / zDom.current,
+      cy: (el.scrollTop + ay) / zDom.current,
+      ax,
+      ay,
+    };
+    zoomRef.current = z;
+    setZoom(z);
+  }, [zoomOk]);
+
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    const a = ancoraZoom.current;
+    ancoraZoom.current = null;
+    zDom.current = zoom;
+    if (!el || !a) return;
+    el.scrollLeft = a.cx * zoom - a.ax;
+    el.scrollTop = a.cy * zoom - a.ay;
+  }, [zoom]);
+
+  // Pinça (toque): dois pointers no scroller — distância relativa × zoom do
+  // início do gesto, ancorado no ponto médio. `touch-pan` no scroller já
+  // bloqueia o pinch-zoom da página; o preventDefault no touchmove de 2+
+  // dedos segura o pan nativo de dois dedos, que brigaria com a âncora.
+  const toques = useRef(new Map<number, { x: number; y: number }>());
+  const pinca = useRef<{ d0: number; z0: number } | null>(null);
+
+  const onCanvasPointerDown = (e: React.PointerEvent) => {
+    // resize de coluna ativo por toque: um 2º dedo não pode virar pinça —
+    // o drag mede em px de tela e derivaria com a escala mudando
+    if (e.pointerType !== "touch" || drag.current) return;
+    toques.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (toques.current.size === 2) {
+      const [a, b] = [...toques.current.values()];
+      pinca.current = { d0: Math.hypot(a.x - b.x, a.y - b.y), z0: zoomRef.current };
+    }
+  };
+  const onCanvasPointerMove = (e: React.PointerEvent) => {
+    const p = toques.current.get(e.pointerId);
+    if (!p) return;
+    toques.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (toques.current.size < 2) return;
+    const [a, b] = [...toques.current.values()];
+    const pin = pinca.current;
+    // 3→2 dedos (ou cancelamento nativo): semeia a pinça aqui — sem isso
+    // o gesto morria até levantar tudo
+    if (!pin) {
+      pinca.current = { d0: Math.hypot(a.x - b.x, a.y - b.y), z0: zoomRef.current };
+      return;
+    }
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    // dedos no mesmo ponto: d/d0 = Inf ou NaN saltava zoom/scroll
+    if (pin.d0 < 8 || d < 8) return;
+    aplicarZoom((pin.z0 * d) / pin.d0, {
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2,
+    });
+  };
+  const onCanvasPointerEnd = (e: React.PointerEvent) => {
+    toques.current.delete(e.pointerId);
+    if (toques.current.size < 2) pinca.current = null;
+  };
+
+  // Ctrl/Cmd+roda = zoom no cursor (convenção de canvas/Figma); touchmove
+  // de 2+ dedos bloqueado pro pan nativo não disputar a âncora da pinça.
+  // Os dois precisam de listener não-passivo — React registra wheel/touch
+  // como passive e o preventDefault morreria.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const wheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      // deltaMode: Firefox manda LINHAS (≈3/notch), páginas (≈1) também
+      // existe — normaliza pra px antes da curva exponencial
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 120 : 1);
+      if (!dy) return; // roda horizontal: não engole o evento à toa
+      e.preventDefault();
+      aplicarZoom(zoomRef.current * Math.exp(-dy * 0.0022), {
+        x: e.clientX,
+        y: e.clientY,
+      });
+    };
+    // segura o pan nativo de 2 dedos só durante a pinça da grade —
+    // `touches` conta o documento inteiro e mataria pan legítimo de
+    // 1 dedo aqui + outro dedo parado noutro canto da página
+    const touch = (e: TouchEvent) => {
+      if (toques.current.size >= 2) e.preventDefault();
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    el.addEventListener("touchmove", touch, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", wheel);
+      el.removeEventListener("touchmove", touch);
+    };
+  }, [aplicarZoom]);
+
   const ordenadas = useMemo(() => {
     if (!ordem) return linhas;
     return [...linhas].sort(
@@ -172,15 +315,36 @@ export function RelatorioCanvas({
     } catch {}
   }, [ordenadas, selecionadas, paraTsv]);
 
-  // Ctrl+C com seleção ativa copia como TSV (mesmo gesto do Excel)
+  // Ctrl+C com seleção de LINHAS ativa copia como TSV (mesmo gesto do
+  // Excel) — mas só quando não há seleção de texto nativa no canvas: se a
+  // pessoa arrastou o mouse sobre o texto de uma célula (a seleção começa
+  // ou termina dentro da grade), o Ctrl+C é do texto e o browser copia
+  // normal. Idem com foco em campo editável: dentro do input da edição
+  // inline a cópia é sempre do conteúdo do campo, nunca da grade.
   useEffect(() => {
     const el = wrapRef.current;
     if (!el || selecionadas === null) return;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "c" && selecionadas.size > 0) {
-        e.preventDefault();
-        void copiar();
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "c") return;
+      if (selecionadas.size === 0) return;
+      const alvo = e.target;
+      if (
+        alvo instanceof HTMLElement &&
+        (alvo.isContentEditable || alvo.closest("input, textarea") !== null)
+      ) {
+        return;
       }
+      const sel = window.getSelection();
+      if (
+        sel &&
+        !sel.isCollapsed &&
+        sel.toString() !== "" &&
+        (el.contains(sel.anchorNode) || el.contains(sel.focusNode))
+      ) {
+        return;
+      }
+      e.preventDefault();
+      void copiar();
     };
     el.addEventListener("keydown", onKey);
     return () => el.removeEventListener("keydown", onKey);
@@ -242,12 +406,16 @@ export function RelatorioCanvas({
     drag.current = {
       col,
       x0: e.clientX,
-      w0: larguras[col] ?? (e.target as HTMLElement).closest("th")?.offsetWidth ?? LARGURA_INICIAL,
+      // w0 em unidades de layout: o style.width do th já é `larguras ??
+      // LARGURA_INICIAL` — e sob `zoom` padronizado o offsetWidth também
+      // mede layout (não tela), então ler do estado é certo em toda escala
+      w0: larguras[col] ?? LARGURA_INICIAL,
     };
     const move = (ev: PointerEvent) => {
       const d = drag.current;
       if (!d) return;
-      const w = Math.max(LARGURA_MIN, d.w0 + ev.clientX - d.x0);
+      // clientX anda em px de tela — a variação em layout divide por zoom
+      const w = Math.max(LARGURA_MIN, d.w0 + (ev.clientX - d.x0) / zoomRef.current);
       d.wAtual = w;
       setLarguras((prev) => ({ ...prev, [d.col]: w }));
     };
@@ -356,12 +524,18 @@ export function RelatorioCanvas({
     <div>
       {/* scroller: overscroll-behavior padrão (auto) — roda/chaining sobem pra
           página quando a grade está no limite; NUNCA overscroll-contain aqui,
-          que segura o gesto mesmo sem nada pra rolar */}
+          que segura o gesto mesmo sem nada pra rolar. touch-pan-* libera o pan
+          nativo e tira o pinch-zoom da página — a pinça vira zoom da grade */}
+      <div className="relative">
       <div
         ref={wrapRef}
         tabIndex={-1}
+        onPointerDown={onCanvasPointerDown}
+        onPointerMove={onCanvasPointerMove}
+        onPointerUp={onCanvasPointerEnd}
+        onPointerCancel={onCanvasPointerEnd}
         className={cn(
-          "scroll-fina max-h-[70dvh] overflow-auto overscroll-auto [scrollbar-gutter:stable]",
+          "scroll-fina max-h-[70dvh] touch-pan-x touch-pan-y overflow-auto overscroll-auto [scrollbar-gutter:stable]",
           // moldura do modo edição: inset lime sutil em volta da área toda —
           // box-shadow no scroller não rola com o conteúdo nem é clipada
           editavel &&
@@ -370,7 +544,7 @@ export function RelatorioCanvas({
       >
         <table
           className="border-separate border-spacing-0 text-left text-[13px] leading-snug"
-          style={{ tableLayout: "fixed", width: "max-content" }}
+          style={{ tableLayout: "fixed", width: "max-content", zoom }}
         >
           <thead>
             <tr className="bg-muted">
@@ -497,6 +671,15 @@ export function RelatorioCanvas({
                               // linha (borbulha pro tr); clique simples abre
                               // a edição sem mexer na seleção
                               if (e.shiftKey) return;
+                              // o mouseup que fecha um arrasto de seleção de
+                              // texto dentro da célula também dispara click —
+                              // abrir o editor aqui trocaria a célula por
+                              // inputs e destruiria a seleção antes do Ctrl+C.
+                              // Seleção ativa → não é clique de editar; deixa
+                              // borbulhar pro tr (vira clique de linha, como
+                              // numa célula não-editável)
+                              const sel = window.getSelection();
+                              if (sel && !sel.isCollapsed) return;
                               e.stopPropagation();
                               abrirEdicao(l, c.id);
                             }
@@ -593,16 +776,51 @@ export function RelatorioCanvas({
           </p>
         )}
       </div>
+      {/* controles de zoom — flutuam sobre o canto do scroller tipo canvas
+          (Figma/Maps). O gesto é útil até em grade estreita — leitura
+          confortável no celular, por isso a pill é sempre visível */}
+      {zoomOk && (
+      <div className="absolute bottom-3 right-3 z-40 flex items-center gap-0.5 rounded-full border border-border bg-popover/95 p-1 shadow-md backdrop-blur">
+        <Button
+          variant="ghost"
+          aria-label="Reduzir zoom"
+          onClick={() => aplicarZoom(zoomRef.current / 1.25)}
+          className="size-9 rounded-full text-muted-foreground sm:size-7"
+        >
+          <Minus size={15} aria-hidden />
+        </Button>
+        <Button
+          variant="ghost"
+          title="Voltar ao tamanho normal"
+          aria-label={`Zoom ${Math.round(zoom * 100)}%, voltar ao tamanho normal`}
+          onClick={() => aplicarZoom(1)}
+          className="min-w-10 rounded-full px-1.5 text-xs tabular-nums text-muted-foreground"
+        >
+          {Math.round(zoom * 100)}%
+        </Button>
+        <Button
+          variant="ghost"
+          aria-label="Ampliar zoom"
+          onClick={() => aplicarZoom(zoomRef.current * 1.25)}
+          className="size-9 rounded-full text-muted-foreground sm:size-7"
+        >
+          <Plus size={15} aria-hidden />
+        </Button>
+      </div>
+      )}
+      </div>
       <p className="mt-2 text-xs text-muted-foreground">
         {/* a grade rola na horizontal — no touch o gesto é deslizar; as
             instruções de teclado (Shift/Ctrl/Enter/Esc) só fazem sentido
             com teclado, então cada linha aparece no seu form factor */}
         <span className="sm:hidden">
-          Deslize pra ver mais colunas · toque no título pra ordenar.
+          Deslize pra ver mais colunas · pinça (ou os botões) pra dar zoom ·
+          toque no título pra ordenar.
         </span>
         <span className="max-sm:hidden">
           Arraste a borda de uma coluna pra redimensionar · clique no título pra ordenar ·
           clique numa linha e Shift+clique em outra pra selecionar. Ctrl+C copia pra planilha.
+          Ctrl+roda dá zoom.
           {editavel && " Clique numa célula destacada pra editar: Enter confirma, Esc desfaz."}
         </span>
       </p>

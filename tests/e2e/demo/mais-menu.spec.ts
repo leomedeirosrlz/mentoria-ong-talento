@@ -25,7 +25,7 @@ const DUPLA_SEM_PEDIDO = "de000000-0000-4000-8000-000000001548"; // Luiza × Lau
 const ITENS = [
   "Enviar formulário",
   "Solicitar mentor especialista",
-  "Remanejar dupla",
+  "Trocar mentor ou mentorado",
 ] as const;
 
 test.describe("demo — ações de segunda ordem da ficha", () => {

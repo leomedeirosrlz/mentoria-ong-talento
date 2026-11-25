@@ -1,3 +1,5 @@
+import { pathInterno } from "../utils";
+
 /** Payload do POST /api/ia/chat (REALIZA-283): o body é `.strict()` na
  *  rota — só `role`/`content` passam. Campos de UI (`estado`, `tools`)
  *  que o estado da conversa carrega derrubam o parse com "Pedido
@@ -27,6 +29,8 @@ export function extrairAcoes(texto: string): { rotulo: string; href: string }[] 
   const vistos = new Set<string>();
   for (const m of texto.matchAll(LINK_INTERNO)) {
     const href = m[2];
+    // "//host" casa com o regex mas é externo — o chip navega na mesma aba
+    if (!pathInterno(href)) continue;
     // /materiais/ é citação de guia — vai pra fileira "Fontes" (render.ts),
     // não pra chip de ação, senão o mesmo link renderiza duas vezes
     if (href.startsWith("/materiais/")) continue;

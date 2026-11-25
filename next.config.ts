@@ -71,6 +71,15 @@ const nextConfig: NextConfig = {
   // .next/standalone (server.js + node_modules traçado) — a imagem final
   // carrega standalone + static + public apenas
   output: "standalone",
+  // docs/rag/*.md é lido via fs pelas páginas documento/[slug] em runtime
+  // (a rota renderiza por request — a auth do layout a torna dinâmica) e o
+  // trace automático não enxerga leitura de diretório. Sem o include, o
+  // standalone e a function da Vercel não carregam o corpus e as páginas
+  // de documento cairiam em 404.
+  outputFileTracingIncludes: {
+    "/materiais/documento/*": ["./docs/rag/**/*.md"],
+    "/jovem/materiais/documento/*": ["./docs/rag/**/*.md"],
+  },
   // acesso ao dev server a partir de outros dispositivos (celular via LAN
   // ou Tailscale): sem a origem aqui o Next bloqueia os endpoints de dev —
   // o HMR falha, a hydration nunca roda e a página renderiza morta (SSR
@@ -79,6 +88,10 @@ const nextConfig: NextConfig = {
     "192.168.15.6",
     "100.113.24.100",
     "thixmachine2.tailf3e87b.ts.net",
+    // nb-linux (WSL do notebook atual)
+    "192.168.15.4",
+    "100.116.25.126",
+    "nb-linux.tailf3e87b.ts.net",
   ],
   async headers() {
     return [

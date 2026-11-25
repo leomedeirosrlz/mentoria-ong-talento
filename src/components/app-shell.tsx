@@ -14,6 +14,7 @@ import {
   List,
   ListChecks,
   Question,
+  Sparkle,
   Table,
   UserCircle,
   UsersThree,
@@ -47,12 +48,13 @@ const NAV = [
   // 0084: a fila de chamados é casa nova da coordenação/auxiliar — badge =
   // chamados sem dono (quem assumir primeiro trata)
   { href: "/chamados", label: "Chamados", curto: "Chamados", icon: Lifebuoy, roles: ["coordenacao", "supervisor"], grupo: "Acompanhar" },
-  { href: "/materiais", label: "Materiais de apoio", curto: "Materiais", icon: FolderOpen, roles: null, grupo: "Programa" },
+  { href: "/materiais", label: "Materiais", curto: "Materiais", icon: FolderOpen, roles: null, grupo: "Programa" },
   { href: "/formularios", label: "Formulários", curto: "Forms", icon: ListChecks, roles: ["coordenacao"], grupo: "Programa" },
   { href: "/turmas", label: "Turmas", curto: "Turmas", icon: ChalkboardTeacher, roles: ["coordenacao"], grupo: "Programa" },
   { href: "/registros", label: "Registros", curto: "Registros", icon: ClipboardText, roles: ["coordenacao", "supervisor"], grupo: "Dados" },
   { href: "/relatorios", label: "Relatórios", curto: "Relatórios", icon: Table, roles: ["coordenacao"], grupo: "Dados" },
   { href: "/pessoas", label: "Pessoas", curto: "Pessoas", icon: UsersThree, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"], grupo: "Dados" },
+  { href: "/ia", label: "Uso da Liza", curto: "Liza", icon: Sparkle, roles: ["coordenacao"], grupo: "Dados" },
   // REALIZA-345: a Ajuda vale pra todos os papéis de staff e fica fora da
   // barra do celular (o MOBILE_PRIMEIRO não a inclui — mora no menu lateral)
   { href: "/ajuda", label: "Ajuda", curto: "Ajuda", icon: Question, roles: null, grupo: "Ajuda" },
@@ -359,7 +361,9 @@ export function AppShell({
               </Link>
             );
           })}
-          <Sheet open={menuAberto} onOpenChange={setMenuAberto}>
+          {/* key explícita: irmão do array do map — sem ela o Sheet entra
+              na lista implícita sem key e o React reclama no AppShell */}
+          <Sheet key="nav-menu" open={menuAberto} onOpenChange={setMenuAberto}>
             <SheetTrigger
               aria-label={[
                 menuAtivo ? "Menu, seção atual fora da barra" : "Menu",

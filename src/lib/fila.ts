@@ -124,7 +124,8 @@ export function filaMentorados(
     )
     .map((m) => ({
       id: m.id,
-      nome: m.nome,
+      // nome de exibição — o social quando existe, como no resto do app
+      nome: m.nome_social ?? m.nome,
       avatar_path: m.avatar_path,
       whatsapp: m.whatsapp,
       origem: m.ong_origem ?? m.origem ?? null,
@@ -173,7 +174,7 @@ export function filaMentores(
     if (teto - usadas <= 0) continue;
     itens.push({
       id: p.id,
-      nome: p.nome,
+      nome: p.nome_social ?? p.nome,
       avatar_path: p.avatar_path,
       whatsapp: p.whatsapp,
       origem: p.origem ?? null,

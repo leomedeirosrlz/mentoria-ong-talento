@@ -27,15 +27,17 @@ export default async function JovemPerfil({
   searchParams: Promise<{ c?: string }>;
 }) {
   const { c } = await searchParams;
-  const [me, perfil, meusChamados] = await Promise.all([
+  const cSel = c && UUID_RE.test(c) ? c : null;
+  // detalhe junto com a lista: getChamadoDetalhe reaproveita a linha do
+  // getChamados (React.cache) em vez de esperar a lista terminar
+  const [me, perfil, meusChamados, detalhe] = await Promise.all([
     getMe(),
     getJovemPerfil(),
     getChamados(),
+    cSel ? getChamadoDetalhe(cSel) : Promise.resolve(null),
   ]);
   if (!me) redirect("/login"); // o layout já barra — convenção das páginas
   const tema = temaValido((await cookies()).get(TEMA_COOKIE)?.value);
-  const cSel = c && UUID_RE.test(c) ? c : null;
-  const detalhe = cSel ? await getChamadoDetalhe(cSel) : null;
 
   const nomeTela = me.nome_social || me.nome;
   const escolaridadeRotulo = perfil?.escolaridade
@@ -120,7 +122,7 @@ export default async function JovemPerfil({
         open={!perfil || fichaVazia}
       >
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 rounded-xl px-6 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-open/ficha:rounded-b-none [&::-webkit-details-marker]:hidden">
-          <span className="text-sm font-semibold">Sua ficha no programa</span>
+          <span className="text-sm font-semibold">Seus dados no programa</span>
           {perfil ? (
             <span className="text-xs text-muted-foreground">
               {fichaVazia ? "ainda vazia" : "mantida pela coordenação"}
@@ -130,7 +132,7 @@ export default async function JovemPerfil({
               variant="outline"
               className="border-[var(--warn)]/60 font-normal text-[var(--warn-text)]"
             >
-              não vinculada
+              não ligada
             </Badge>
           )}
           <CaretDown
@@ -142,7 +144,7 @@ export default async function JovemPerfil({
         <div className="border-t border-border px-6 pb-6 pt-5">
           {!perfil ? (
             <p className="text-sm text-muted-foreground">
-              Sua ficha de mentorado ainda não está vinculada à sua conta. A
+              Seu cadastro de mentorado ainda não está ligado à sua conta. A
               coordenação faz essa conexão no seu cadastro.
             </p>
           ) : fichaVazia ? (

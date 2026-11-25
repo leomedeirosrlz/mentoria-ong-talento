@@ -133,16 +133,17 @@ describe("saudadeDaDupla — risco", () => {
     expect(s.feitos).toBe(0);
   });
 
-  it("atraso conta só a janela da dupla (iniciada_em poda o começo do ciclo)", () => {
-    // hoje = 28/10: esperados dentro da janela são só os encontros 3 e 4
+  it("atraso soma os defasados vencidos da fila de recuperação", () => {
+    // hoje = 28/10, entrada 21/10: oficiais da janela são os encontros 3 e 4;
+    // os defasados 1 e 2 já venceram na fila (~2-3/semana) → esperado = 4
     const s = saudadeDaDupla(
       mkDupla({ iniciada_em: "2025-10-21" }),
       CICLO_16,
       dt("2025-10-28")
     );
     expect(s.semaforo).toBe("risco");
-    expect(s.motivo).toBe("2 encontros em atraso");
-    expect(s.esperado).toBe(2);
+    expect(s.motivo).toBe("4 encontros em atraso");
+    expect(s.esperado).toBe(4);
   });
 
   it("avaliação baixa + dificuldade no último registro é risco (antes do atraso)", () => {
@@ -170,7 +171,7 @@ describe("saudadeDaDupla — atenção", () => {
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-14"));
     expect(s.semaforo).toBe("atencao");
     expect(s.motivo).toBe(
-      "Encontro 2 ainda não aconteceu (reposição na mesma semana)"
+      "Encontro 2 ainda não aconteceu (pode ser feito na mesma semana)"
     );
   });
 
@@ -180,7 +181,7 @@ describe("saudadeDaDupla — atenção", () => {
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-14"));
     expect(s.semaforo).toBe("atencao");
     expect(s.motivo).toBe(
-      "Encontro 1 ainda não aconteceu (reposição na mesma semana)"
+      "Encontro 1 ainda não aconteceu (pode ser feito na mesma semana)"
     );
   });
 
@@ -212,7 +213,7 @@ describe("saudadeDaDupla — atenção", () => {
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-08"));
     expect(s.semaforo).toBe("atencao");
     expect(s.motivo).toBe(
-      "Dificuldade de organização/rotina identificada"
+      "Dificuldade de organização e rotina identificada"
     );
   });
 
@@ -243,7 +244,7 @@ describe("saudadeDaDupla — pendência de registro (limbo e >24h)", () => {
     });
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-08"));
     expect(s.semaforo).toBe("atencao");
-    expect(s.motivo).toBe("1º encontro agendado já passou. Falta o registro");
+    expect(s.motivo).toBe("1º encontro já passou e ainda falta registrar como foi");
     // o limbo cobre o evento esperado do seu número: esperado sai de 1 pra 0
     expect(s.esperado).toBe(0);
     expect(s.registroPendente).toBe(true);
@@ -255,7 +256,7 @@ describe("saudadeDaDupla — pendência de registro (limbo e >24h)", () => {
     });
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-09"));
     expect(s.semaforo).toBe("atencao");
-    expect(s.motivo).toBe("Encontro realizado sem registro");
+    expect(s.motivo).toBe("Encontro feito, mas sem registro");
     expect(s.registroPendente).toBe(true);
   });
 
@@ -278,7 +279,42 @@ describe("saudadeDaDupla — pendência de registro (limbo e >24h)", () => {
     });
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-16"));
     expect(s.semaforo).toBe("atencao");
-    expect(s.motivo).toBe("1º encontro agendado já passou. Falta o registro");
+    expect(s.motivo).toBe("1º encontro já passou e ainda falta registrar como foi");
+  });
+
+  it("remarcado vencido sem registro é limbo também — pendência, não atraso", () => {
+    // status legado: antes do emLimbo unificado ele virava "atraso" no
+    // semáforo enquanto a agenda já o tratava como "rolou?"
+    const dupla = mkDupla({
+      encontros: [
+        mkEncontro(1, {
+          status: "remarcado",
+          data_hora: "2025-10-07T19:00:00-03:00",
+        }),
+      ],
+    });
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-08"));
+    expect(s.semaforo).toBe("atencao");
+    expect(s.motivo).toBe("1º encontro já passou e ainda falta registrar como foi");
+    expect(s.esperado).toBe(0);
+    expect(s.registroPendente).toBe(true);
+  });
+
+  it("remarcado futuro conta como próximo encontro (desliga o preventivo)", () => {
+    // mesmo caso do "próximo agendado de outro número" — a row é remarcada,
+    // não agendada: o compromisso futuro vale igual
+    const dupla = mkDupla({
+      encontros: [
+        encRealizado(1, "2025-10-07"),
+        mkEncontro(3, {
+          status: "remarcado",
+          data_hora: "2025-10-21T19:00:00-03:00",
+        }),
+      ],
+    });
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-13"));
+    expect(s.semaforo).toBe("ok");
+    expect(s.proximo?.numero).toBe(3);
   });
 
   it("agendado passado COM registro não é limbo nem pendência", () => {
@@ -295,7 +331,7 @@ describe("saudadeDaDupla — pendência de registro (limbo e >24h)", () => {
     // sem limbo: o encontro 1 conta como esperado e não feito → 1 atraso
     expect(s.semaforo).toBe("atencao");
     expect(s.motivo).toBe(
-      "Encontro 1 ainda não aconteceu (reposição na mesma semana)"
+      "Encontro 1 ainda não aconteceu (pode ser feito na mesma semana)"
     );
   });
 });
@@ -307,7 +343,7 @@ describe("saudadeDaDupla — preventivo (oficial da semana sem agenda)", () => {
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-13"));
     expect(s.semaforo).toBe("atencao");
     expect(s.motivo).toBe(
-      "O 2º encontro é terça-feira (14/10/2025) e ainda não foi agendado"
+      "O 2º encontro é terça-feira (14/10/2025) e ainda não tem data marcada"
     );
   });
 
@@ -349,7 +385,7 @@ describe("saudadeDaDupla — preventivo (oficial da semana sem agenda)", () => {
     const s = saudadeDaDupla(dupla, eventos, dt("2025-10-23"));
     expect(s.semaforo).toBe("atencao");
     expect(s.motivo).toBe(
-      "O 2º encontro é terça-feira (28/10/2025) e ainda não foi agendado"
+      "O 2º encontro é terça-feira (28/10/2025) e ainda não tem data marcada"
     );
   });
 });
@@ -365,7 +401,7 @@ describe("saudadeDaDupla — combinado vencido e ok", () => {
     ];
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-08"));
     expect(s.semaforo).toBe("atencao");
-    expect(s.motivo).toBe("Combinado com prazo vencido");
+    expect(s.motivo).toBe("Um combinado passou do prazo");
   });
 
   it("prazo no dia não vence (só < hoje) — e combinado feito não vence", () => {
@@ -493,7 +529,7 @@ describe("saudadeDaDupla — trilha de especialista (sem calendário)", () => {
   it("sinais próprios seguem valendo: limbo vira pendência", () => {
     const s = saudadeDaDupla(esp([encAgendado(1, "2025-10-07")]), CICLO_16, dt("2025-10-14"));
     expect(s.semaforo).toBe("atencao");
-    expect(s.motivo).toBe("1º encontro agendado já passou. Falta o registro");
+    expect(s.motivo).toBe("1º encontro já passou e ainda falta registrar como foi");
   });
 
   it("avaliação baixa + dificuldade também é risco na especialista", () => {
@@ -506,7 +542,7 @@ describe("saudadeDaDupla — trilha de especialista (sem calendário)", () => {
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-14"));
     expect(s.semaforo).toBe("risco");
     expect(s.motivo).toBe(
-      "Avaliação baixa e dificuldade de outra no último encontro"
+      "Avaliação baixa e dificuldade de outro tipo no último encontro"
     );
   });
 
@@ -525,7 +561,7 @@ describe("saudadeDaDupla — trilha de especialista (sem calendário)", () => {
     );
     expect(s.semaforo).toBe("atencao");
     expect(s.motivo).toBe(
-      "Trilha com 3 meses sem sessão nova. Vale checar se ainda faz sentido"
+      "Faz 3 meses sem sessão nova na trilha. Vale conferir se ainda faz sentido"
     );
   });
 
@@ -604,7 +640,7 @@ describe("saudadeDaDupla — trilha de especialista (sem calendário)", () => {
       dt("2025-10-15")
     );
     expect(s.semaforo).toBe("atencao");
-    expect(s.motivo).toBe("1º encontro agendado já passou. Falta o registro");
+    expect(s.motivo).toBe("1º encontro já passou e ainda falta registrar como foi");
   });
 
   it("estagnação não se aplica a DPP nem a trilha sem início registrado", () => {
@@ -709,7 +745,7 @@ describe("saudadeDaDupla — motivos[] e sinais[] (todos os critérios)", () => 
     ]);
     expect(s.sinais[0].tom).toBe("risco");
     expect(s.sinais[0].texto).toBe(
-      "Avaliação baixa e dificuldade de organização/rotina no último encontro"
+      "Avaliação baixa e dificuldade de organização e rotina no último encontro"
     );
     // o motivo legado continua sendo o combo (o primeiro da fila)
     expect(s.motivo).toBe(s.sinais[0].texto);

@@ -14,6 +14,7 @@ import { descartarChamadoAnexo } from "@/lib/actions-chamados";
 import { formatTamanho } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { novoUuid } from "@/lib/uuid";
 
 const LIMITE_BYTES = 10 * 1024 * 1024;
 const BUCKET = "chamado-anexos";
@@ -90,7 +91,7 @@ export function useAnexosPendentes(chamadoId: string, meuId: string) {
     if (preview) previewsRef.current.add(preview);
     setPendentes((l) => [
       ...l,
-      { key: crypto.randomUUID(), file, preview, status: "aguardando" },
+      { key: novoUuid(), file, preview, status: "aguardando" },
     ]);
   }
 
@@ -124,7 +125,7 @@ export function useAnexosPendentes(chamadoId: string, meuId: string) {
     let falhas = 0;
     for (const p of alvo) {
       marcar(p.key, "enviando");
-      const path = `${chamadoId}/${crypto.randomUUID()}-${saneiaNome(p.file.name)}`;
+      const path = `${chamadoId}/${novoUuid()}-${saneiaNome(p.file.name)}`;
       try {
         // row primeiro: a policy do storage confere os metadados antes de
         // aceitar o binário (molde registro_anexos). Se o upload falha,
@@ -169,9 +170,12 @@ export function useAnexosPendentes(chamadoId: string, meuId: string) {
 export function ChamadoAnexos({
   onArquivo,
   disabled,
+  compacto,
 }: {
   onArquivo: (file: File) => void;
   disabled?: boolean;
+  /** só o clipe, dentro da caixa do composer */
+  compacto?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -193,13 +197,15 @@ export function ChamadoAnexos({
       <Button
         type="button"
         variant="ghost"
-        size="sm"
+        size={compacto ? "icon-sm" : "sm"}
         onClick={() => fileRef.current?.click()}
         disabled={disabled}
+        aria-label={compacto ? "Anexar arquivo" : undefined}
+        title={compacto ? "Anexar arquivo" : undefined}
         className="text-muted-foreground"
       >
         <Paperclip aria-hidden />
-        Anexar arquivo
+        {!compacto && "Anexar arquivo"}
       </Button>
     </>
   );

@@ -22,6 +22,7 @@ import {
   type PainelJornadaLinha,
 } from "@/lib/jornada";
 import { lembreteBloqueadoAte } from "@/lib/ciclo";
+import { autoria } from "@/lib/whatsapp-msgs";
 import type { Interacao } from "@/lib/interacoes";
 import { turmaCurta } from "@/lib/turma";
 import type { CicloEvento } from "@/lib/types";
@@ -62,8 +63,8 @@ export const CARDS: CardSpec[] = [
     chave: "roda_inicial",
     titulo: ESTACOES.roda_inicial.titulo,
     descricao:
-      "Satisfação 1–10 nas 16 áreas da vida: o ponto de partida que a aplicação formal compara.",
-    chips: ["Enc. 1"],
+      "Nota de 1 a 10 em cada uma das 16 áreas da vida. É o ponto de partida, que a versão formal compara depois.",
+    chips: ["Encontro 1"],
     estacao: "roda_inicial",
     sistemaForm: "roda_vida",
   },
@@ -71,8 +72,8 @@ export const CARDS: CardSpec[] = [
     chave: "visao",
     titulo: ESTACOES.visao.titulo,
     descricao:
-      "5 perguntas pra imaginar o futuro. Vira a Declaração de Visão no topo do PDM.",
-    chips: ["Enc. 1–4"],
+      "5 perguntas pra imaginar o futuro. Vira a Declaração de Visão, no topo do Plano de Desenvolvimento.",
+    chips: ["Encontros 1 a 4"],
     estacao: "visao",
     sistemaForm: "visao",
   },
@@ -80,8 +81,8 @@ export const CARDS: CardSpec[] = [
     chave: "metas",
     titulo: ESTACOES.metas.titulo,
     descricao:
-      "3–5 metas com o porquê de cada uma; a dupla revisa com o modelo SMART.",
-    chips: ["Enc. 2–3"],
+      "De 3 a 5 metas, cada uma com o porquê. A dupla revisa se cada meta é clara, possível e tem prazo.",
+    chips: ["Encontros 2 e 3"],
     estacao: "metas",
     sistemaForm: "metas",
   },
@@ -89,8 +90,8 @@ export const CARDS: CardSpec[] = [
     chave: "pdm",
     titulo: ESTACOES.pdm.titulo,
     descricao:
-      "Documento vivo: Visão no topo, metas com indicador de sucesso e prazo, mapa de submetas.",
-    chips: ["Construir 1–4", "Revisar enc. 9"],
+      "Documento vivo: a visão no topo, metas com jeito de medir e prazo, e os passos de cada meta.",
+    chips: ["Construir nos encontros 1 a 4", "Revisar no encontro 9"],
     estacao: "pdm",
     sistemaForm: "pdm",
   },
@@ -98,7 +99,7 @@ export const CARDS: CardSpec[] = [
     chave: "avaliacao_encontro",
     titulo: ESTACOES.avaliacao_encontro.titulo,
     descricao:
-      "Nota de 1 a 5 + comentário depois de cada encontro. O link nasce sozinho quando o encontro vira realizado.",
+      "Nota de 1 a 5 e um comentário depois de cada encontro. O link aparece sozinho quando o encontro fica realizado.",
     chips: ["Todo encontro"],
     estacao: "avaliacao_encontro",
   },
@@ -106,8 +107,8 @@ export const CARDS: CardSpec[] = [
     chave: "roda_formal",
     titulo: ESTACOES.roda_formal.titulo,
     descricao:
-      "O jovem refaz as 16 notas e a dupla vê o antes e o depois sobre a leitura inicial.",
-    chips: ["Enc. 12–14"],
+      "O jovem refaz as 16 notas, e a dupla compara com a primeira avaliação.",
+    chips: ["Encontros 12 a 14"],
     estacao: "roda_formal",
     sistemaForm: "roda_vida",
   },
@@ -164,7 +165,7 @@ function TagEstado({
         variant="outline"
         className="text-xs font-medium text-muted-foreground"
       >
-        janela não aberta
+        ainda não abriu
       </Badge>
     );
   }
@@ -290,7 +291,7 @@ function LinhaAtrasado({
             duplaId={linha.dupla_id}
             destNome={linha.jovem_nome}
             telefone={info.jovemWhatsapp}
-            mensagem={`Oi ${primeiro}, tudo bem? Aqui é ${eu}, da equipe do Realiza.vc. ${
+            mensagem={`Oi ${primeiro}, tudo bem? ${autoria(eu || undefined)}. ${
               nomes.length === 1 ? "Uma atividade" : "Algumas atividades"
             } da sua jornada ${nomes.length === 1 ? "está" : "estão"} esperando por você: ${lista}. É só abrir Minha jornada no app.`}
             nudge={{
@@ -488,7 +489,7 @@ export function InstrumentosPrograma({
                     ) : (
                       // 360º — a emissão é manual de encerramento, por dupla
                       <span className="text-xs text-muted-foreground">
-                        A coordenação emite na ficha de cada dupla.
+                        A coordenação envia pela ficha de cada dupla.
                       </span>
                     )
                   ) : null}
@@ -576,7 +577,7 @@ export function InstrumentosPrograma({
           intakes de matching — os fechamentos da jornada moram aqui */}
       {ehCoord && (
         <p className="text-xs leading-relaxed text-muted-foreground">
-          As inscrições de matching ficam em{" "}
+          As inscrições para formar duplas ficam em{" "}
           <Link
             href="/formularios"
             className="font-medium underline underline-offset-2 hover:text-foreground"

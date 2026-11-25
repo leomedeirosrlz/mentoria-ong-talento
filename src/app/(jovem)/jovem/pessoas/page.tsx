@@ -85,10 +85,10 @@ export default async function JovemPessoas() {
     },
     {
       id: "supervisao",
-      titulo: "Supervisão",
+      titulo: "Apoio da sua dupla",
       icon: UserCheck,
       itens: porPapel("supervisor"),
-      vazio: "O auxiliar executivo da sua dupla aparece aqui.",
+      vazio: "O apoio da sua dupla aparece aqui.",
     },
     {
       id: "coordenacao",
@@ -176,8 +176,8 @@ export default async function JovemPessoas() {
         </Card>
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
           Um colega só aparece aqui quando tem conta na plataforma, e o
-          WhatsApp dele só aparece se ele escolher compartilhar. O seu você
-          controla em{" "}
+          WhatsApp dele só aparece se ele escolher compartilhar. Você controla o seu
+          em{" "}
           <Link
             href="/jovem/perfil"
             className="font-medium underline underline-offset-2"

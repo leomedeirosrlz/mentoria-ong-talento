@@ -109,10 +109,13 @@ export function sessaoFresca(session: {
 }
 
 /** Só paths internos: "/" sozinho ou "/" + algo que não seja "/" nem "\" —
- *  "//host" e "/\host" normalizam pra externo no URL parser (open redirect). */
+ *  "//host" e "/\host" normalizam pra externo no URL parser (open redirect).
+ *  Controle também cai: o parser WHATWG descarta tab/CR/LF em qualquer
+ *  posição, então "/\t/host" viraria "//host" depois da checagem. */
 export function pathInterno(p: string | null | undefined): string | null {
+  if (p == null || /[\x00-\x1f\x7f]/.test(p)) return null;
   if (p === "/") return p;
-  return p != null && /^\/[^/\\]/.test(p) ? p : null;
+  return /^\/[^/\\]/.test(p) ? p : null;
 }
 
 /** Traduz erro do Postgres/PostgREST pra mensagem de UI (sem vazar schema nem

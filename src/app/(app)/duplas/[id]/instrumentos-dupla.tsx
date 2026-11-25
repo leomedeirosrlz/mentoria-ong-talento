@@ -83,6 +83,7 @@ function LinhaInstrumento({
   mentoradoWhatsapp,
   podeEnviar,
   jornadaViva,
+  remetenteMentorNome,
 }: {
   /** null quando o instrumento ainda não foi semeado no banco — a linha
    *  existe pra jornada completa aparecer, mas sem ação */
@@ -95,6 +96,9 @@ function LinhaInstrumento({
    *  qualquer papel (Copiar/WhatsApp/Gerar): o link que o jovem já tem
    *  segue respondível, mas ninguém emite nem reenvia. */
   jornadaViva: boolean;
+  /** Quando quem vê é o mentor: a msg do link sai na voz dele ("seu
+   *  mentor"), não "a equipe" — o texto vai do número dele. */
+  remetenteMentorNome?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -128,7 +132,7 @@ function LinhaInstrumento({
       setEnviado(r.token);
       toast.success(
         r.reutilizado
-          ? "Este link já estava pendente. Reaproveitado."
+          ? "Esse link ainda não foi respondido. Usamos o mesmo."
           : "Link gerado. Copie ou envie pelo WhatsApp."
       );
       router.refresh();
@@ -241,7 +245,8 @@ function LinhaInstrumento({
                 titulo,
                 mentoradoNome,
                 tokenVivo,
-                origem
+                origem,
+                remetenteMentorNome
               )}
               duplaId={duplaId}
               label="Enviar no WhatsApp"
@@ -281,6 +286,7 @@ export function InstrumentosDupla({
   mentoradoWhatsapp,
   podeEnviar,
   jornadaViva,
+  remetenteMentorNome,
   className,
 }: {
   duplaId: string;
@@ -292,6 +298,8 @@ export function InstrumentosDupla({
   podeEnviar: boolean;
   /** ativa|pausada — dupla fechada vira só leitura de resultados */
   jornadaViva: boolean;
+  /** Voz do link de WhatsApp: nome quando quem envia é o mentor da dupla. */
+  remetenteMentorNome?: string;
   className?: string;
 }) {
   if (!itens.length) return null;
@@ -307,7 +315,7 @@ export function InstrumentosDupla({
       <h2 className="text-base font-semibold">Instrumentos da jornada</h2>
       <p className="mt-1 text-xs text-muted-foreground">
         Os exercícios oficiais do guia: o jovem responde por link único, sem
-        login, e o resultado volta estruturado aqui.
+        login, e as respostas aparecem aqui.
       </p>
       <ul className="mt-2 divide-y divide-border/60">
         {INSTRUMENTOS_SISTEMA.map((s) => (
@@ -319,6 +327,7 @@ export function InstrumentosDupla({
             mentoradoWhatsapp={mentoradoWhatsapp}
             podeEnviar={podeEnviar}
             jornadaViva={jornadaViva}
+            remetenteMentorNome={remetenteMentorNome}
           />
         ))}
       </ul>

@@ -53,19 +53,22 @@ const STATUS_TOM: Record<ChamadoStatus, string> = {
 
 const primeiroNome = (n: string) => n.split(" ")[0];
 
-/** Pill de status do chamado. `visao` muda a fala do "aberto": pra equipe é
- *  "sem dono" (a fila é o trabalho dela), pro autor é "aguardando" (o vazio
- *  de dono não é problema dele). Chamado restrito vira pill neutra — o
- *  "sem dono" não pode ser verificado por quem vê a máscara. */
+/** Pill de status do chamado. `visao` muda a fala: pra equipe o aberto sem
+ *  dono é "Sem dono" (a fila é o trabalho dela); pro autor é "Aguardando a
+ *  equipe" e o atendimento ganha nome ("Marina está cuidando"). Chamado
+ *  restrito vira pill neutra: quem vê a máscara não confere o dono. */
 export function ChamadoStatusBadge({
   status,
   dono,
+  souDono,
   restrito,
   visao,
   className,
 }: {
   status: ChamadoStatus;
   dono?: string | null;
+  /** o dono é quem está vendo: "Com você" em vez do próprio nome */
+  souDono?: boolean;
   restrito?: boolean;
   visao: "staff" | "autor";
   className?: string;
@@ -86,10 +89,14 @@ export function ChamadoStatusBadge({
     );
   }
   let texto = CHAMADO_STATUS_LABEL[status];
-  if (status === "aberto" && !dono) {
-    texto = visao === "staff" ? "Aberto · sem dono" : "Aberto · aguardando";
-  } else if (status !== "resolvido" && dono) {
-    texto = `${texto} · ${primeiroNome(dono)}`;
+  if (status !== "resolvido") {
+    if (!dono) {
+      texto = visao === "staff" ? "Sem dono" : "Aguardando a equipe";
+    } else if (visao === "staff") {
+      texto = souDono ? "Com você" : `Com ${primeiroNome(dono)}`;
+    } else {
+      texto = `${primeiroNome(dono)} está cuidando`;
+    }
   }
   return (
     <Badge
@@ -102,10 +109,26 @@ export function ChamadoStatusBadge({
   );
 }
 
+/** Marca de urgência: a categoria que importa ver de longe. Ícone + rótulo,
+ *  nunca só a cor. */
+export function UrgenciaMarca({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-destructive",
+        className
+      )}
+    >
+      <Lightning size={13} weight="fill" aria-hidden />
+      Urgência
+    </span>
+  );
+}
+
 // ---------- categoria ----------
 // Urgência carrega o sinal no ÍCONE (raio vermelho) — pill neutra evita dois
 // vermelhos lado a lado quando o chamado urgente também está "aberto".
-const CAT_ICON: Record<ChamadoCategoria, ComponentType<{ size?: number | string; className?: string; "aria-hidden"?: boolean | "true" | "false" }> | null> = {
+export const CAT_ICON: Record<ChamadoCategoria, ComponentType<{ size?: number | string; className?: string; weight?: "regular" | "fill" | "bold"; "aria-hidden"?: boolean | "true" | "false" }>> = {
   urgencia: Lightning,
   agenda: CalendarBlank,
   metodologia: GraduationCap,
