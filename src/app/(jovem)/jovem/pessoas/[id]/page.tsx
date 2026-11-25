@@ -274,7 +274,9 @@ function SecaoDiretorio({ e }: { e: JovemDiretorioEntry }) {
       <h2 className="text-base font-semibold">
         {e.tipo === "jovem" ? "Jovem do programa" : "Pessoa do programa"}
       </h2>
-      {e.bio && <p className="mt-3 text-sm leading-relaxed">{e.bio}</p>}
+      {e.bio && (
+        <p className="mt-3 text-sm leading-relaxed break-words">{e.bio}</p>
+      )}
       <dl className="mt-4 space-y-4">
         {atuacao && <Linha rotulo="Atuação" valor={atuacao} />}
         <Linha rotulo="Cidade" valor={e.cidade?.trim() || "—"} />
@@ -345,13 +347,14 @@ function SecaoContato({ c, nomeJovem }: { c: JovemContato; nomeJovem: string }) 
           {c.email ? (
             <a
               href={`mailto:${c.email}`}
+              title={c.email}
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
-                "gap-1.5"
+                "max-w-full gap-1.5"
               )}
             >
-              <EnvelopeSimple size={15} aria-hidden />
-              {c.email}
+              <EnvelopeSimple size={15} aria-hidden className="shrink-0" />
+              <span className="min-w-0 truncate">{c.email}</span>
             </a>
           ) : null}
           {wa ? (
@@ -455,7 +458,9 @@ function SecaoEspecialista({
       <h2 className="text-base font-semibold">
         {daPropriaTrilha ? "Sobre" : "Especialista do programa"}
       </h2>
-      {e.bio && <p className="mt-3 text-sm leading-relaxed">{e.bio}</p>}
+      {e.bio && (
+        <p className="mt-3 text-sm leading-relaxed break-words">{e.bio}</p>
+      )}
       <dl className="mt-4 space-y-4">
         {demandaTrilha && <Linha rotulo="Sua trilha" valor={demandaTrilha} />}
         {atuacao && <Linha rotulo="Atuação" valor={atuacao} />}

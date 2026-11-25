@@ -252,6 +252,32 @@ describe("enriqueceDiretorio — a rede é a faceta marcada (0239)", () => {
     for (const c of colegas) if (c.id) expect(redeIds).toContain(c.id);
   });
 
+  it("whatsapp/email chegam só da fonte da ficha — rede com canal, resto null (525)", () => {
+    // contato da rede projeta os dois canais que a ficha já expõe
+    const ricardo = porNome("Ricardo");
+    expect(ricardo?.whatsapp).toBe("5511987654003");
+    expect(ricardo?.email).toBe("ricardo.tavares@realiza.vc");
+    // o especialista da trilha chega pelo braço catálogo mas casa o
+    // contato da rede — o canal é o mesmo da ficha
+    const sofia = porNome("Sofia");
+    expect(sofia?.rede).toBe(true);
+    expect(sofia?.whatsapp).toBe("5511987654004");
+    expect(sofia?.email).toBe("sofia.nogueira@realiza.vc");
+    // colega com opt-in: whatsapp, nunca e-mail (a view não projeta)
+    const caio = porNome("Caio");
+    expect(caio?.whatsapp).toBe("5511976123002");
+    expect(caio?.email).toBeNull();
+    // colega sem opt-in e gente fora da rede: nenhum canal viaja
+    const dandara = porNome("Dandara");
+    expect(dandara?.rede).toBe(true);
+    expect(dandara?.whatsapp).toBeNull();
+    expect(dandara?.email).toBeNull();
+    const beatriz = porNome("Beatriz");
+    expect(beatriz?.rede).toBe(false);
+    expect(beatriz?.whatsapp).toBeNull();
+    expect(beatriz?.email).toBeNull();
+  });
+
   it("vínculo na voz do jovem + selo de dupla não-ativa", () => {
     expect(porNome("Ricardo")?.vinculo).toBe("Seu mentor");
     const caio = porNome("Caio");

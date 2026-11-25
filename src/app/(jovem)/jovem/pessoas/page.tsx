@@ -18,8 +18,9 @@ export const metadata: Metadata = { title: "Pessoas" };
  *  o catálogo de especialistas. A rede do jovem é uma LENTE sobre a
  *  lista (marca "Sua rede" + faceta "Minha rede"), resolvida no client
  *  por jovem_contatos ∪ mentorados_turma — a view marca minha_rede, o
- *  merge repara o quirk do distinct on (id). Nenhum card abre canal: o
- *  contato direto mora na ficha e só pra quem já tem vínculo. */
+ *  merge repara o quirk do distinct on (id). REALIZA-525: o card da
+ *  rede abre o WhatsApp quando a view já entrega o canal — o mesmo
+ *  dado que a ficha expõe, o resto segue fechado atrás do vínculo. */
 export default async function JovemPessoas() {
   const [me, perfil, entradas, contatos, colegas, duplas] =
     await Promise.all([

@@ -1192,7 +1192,7 @@ export function PessoasListas({
             <Button
               variant="ghost"
               size="sm"
-              className="h-9 px-3 text-xs"
+              className="px-3 text-xs"
               onClick={limparFiltros}
             >
               Limpar filtros

@@ -3,17 +3,28 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
-import { MagnifyingGlass, MapPin } from "@phosphor-icons/react";
+import {
+  MagnifyingGlass,
+  MapPin,
+  WhatsappLogo,
+} from "@phosphor-icons/react";
 import { Avatar } from "@/components/avatar";
 import { EspecialistaCatalogoCard } from "@/components/especialista-catalogo-card";
+import { FormSurface } from "@/components/form-surface";
 import { HighlightText } from "@/components/highlight-text";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
+import {
+  OpcaoPilula,
+  OVERLINE,
+} from "@/components/ui/filtro-opcoes";
+import { FiltrosButton } from "@/components/ui/filtros-button";
 import { Input } from "@/components/ui/input";
 import { avatarPublicUrl } from "@/lib/avatar";
+import { waLink } from "@/lib/ciclo";
 import { fuzzyMatch } from "@/lib/fuzzy";
+import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
 import {
   baldeDaEntrada,
   FACETAS_DIRETORIO,
@@ -28,8 +39,11 @@ import { cn, normaliza } from "@/lib/utils";
 // (rede marcada) e TUDO filtra no client sobre o payload SSR — faceta de
 // vínculo (?papel), chip de tema (?area) e busca fuzzy (?busca), estado na
 // URL por replaceState pra deep-link, mesma gramática do /pessoas de staff.
-// Card nunca carrega ação de contato: o canal direto mora na ficha e só pra
-// quem já tem vínculo.
+// Filtros moram num modal único (REALIZA-525): a régua de pills expostas
+// saía da largura do celular — a entrada "Filtros" abre o painel rico
+// (rascunho → Aplicar, FormSurface = sheet no mobile / dialog no desktop).
+// O card da rede abre o WhatsApp quando a view já autoriza o canal — o
+// mesmo dado da ficha, projetado por enriqueceDiretorio.
 
 const FACETA_IDS = new Set(FACETAS_DIRETORIO.map((f) => f.id));
 
@@ -57,10 +71,11 @@ function especialistaDe(p: DiretorioPessoa): JovemEspecialista {
 
 export function JovemDiretorio({
   pessoas,
+  nomeJovem,
 }: {
   pessoas: DiretorioPessoa[];
-  /** Nome de tela do jovem — entra na assinatura (a página já o tem); hoje
-   *  os cards não exibem voz (o canal WA mora na ficha e na rede do perfil). */
+  /** Nome de tela do jovem — assina a mensagem pronta do WhatsApp que o
+   *  card da rede abre (a mesma da ficha e da seção "Sua rede"). */
   nomeJovem: string;
 }) {
   const [busca, setBusca] = useState(() => {
@@ -111,19 +126,42 @@ export function JovemDiretorio({
 
   // a faceta recorta por vínculo — "rede" é lente (p.rede), os demais vão
   // pelo balde único onde a pessoa mora
-  const porFaceta =
-    faceta === "todos"
+  const recorteDe = (f: FacetaDiretorio) =>
+    f === "todos"
       ? pessoas
-      : faceta === "rede"
+      : f === "rede"
         ? pessoas.filter((p) => p.rede)
-        : pessoas.filter((p) => baldeDaEntrada(p) === faceta);
+        : pessoas.filter((p) => baldeDaEntrada(p) === f);
+  const porFaceta = recorteDe(faceta);
+
+  // modal de filtros (REALIZA-525): as réguas de pills viviam estourando a
+  // barra do celular — o painel único rascunha vínculo + tema e aplica de
+  // uma vez (gramática dos filtros de /registros e /pessoas da coord)
+  const [filtrosAberto, setFiltrosAberto] = useState(false);
+  const [draft, setDraft] = useState<{
+    faceta: FacetaDiretorio;
+    area: string | null;
+  }>({ faceta: "todos", area: null });
+  const abrirFiltros = () => {
+    setDraft({ faceta, area: areaSel });
+    setFiltrosAberto(true);
+  };
+  const ativosFiltro =
+    (faceta !== "todos" ? 1 : 0) + (areaSel != null ? 1 : 0);
+  const draftAtivos =
+    (draft.faceta !== "todos" ? 1 : 0) + (draft.area != null ? 1 : 0);
+  const aplicarDraft = () => {
+    setFaceta(draft.faceta);
+    setAreaSel(draft.area);
+    setFiltrosAberto(false);
+  };
 
   // chips de tema: união de areas (adulto/especialista) e interesses
   // (jovem) presentes NO RECORTE da faceta — frequência desc, alfabético.
-  // Calculado antes do filtro de área pra linha não perder o chip ativo.
-  const temas: { nome: string; n: number }[] = (() => {
+  // Calculado antes do filtro de área pra opção ativa não sumir da lista.
+  const temasDe = (lista: DiretorioPessoa[]) => {
     const contagem = new Map<string, number>();
-    for (const p of porFaceta) {
+    for (const p of lista) {
       for (const a of p.areas ?? p.interesses ?? []) {
         contagem.set(a, (contagem.get(a) ?? 0) + 1);
       }
@@ -133,6 +171,16 @@ export function JovemDiretorio({
       .sort(
         (a, b) => b.n - a.n || a.nome.localeCompare(b.nome, "pt-BR")
       );
+  };
+  // as opções do modal respondem ao rascunho de faceta — o tema aplicado
+  // entra na lista mesmo fora do recorte novo (a pessoa não fica presa
+  // num filtro sem saída, mesma régua das pílulas de encontro)
+  const temasDraft = (() => {
+    const t = temasDe(recorteDe(draft.faceta));
+    if (draft.area != null && !t.some((x) => x.nome === draft.area)) {
+      t.push({ nome: draft.area, n: 0 });
+    }
+    return t;
   })();
 
   // escopo = faceta + tema (sem a busca) — denominador honesto do "N de M"
@@ -176,102 +224,138 @@ export function JovemDiretorio({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2.5">
-        <div className="flex flex-wrap items-center gap-2" role="search">
-          <div className="relative w-full sm:max-w-sm">
-            <MagnifyingGlass
-              aria-hidden
-              size={16}
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              type="search"
-              aria-label="Buscar pessoa"
-              placeholder="Buscar por nome"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              className="pl-8"
-            />
-          </div>
-          <span
-            role="status"
-            aria-live="polite"
-            className="text-xs text-muted-foreground tabular-nums"
-          >
-            {filtrando
-              ? `${exibidas.length} de ${escopo.length} ${
-                  escopo.length === 1 ? "pessoa" : "pessoas"
-                }`
-              : `${pessoas.length} ${
-                  pessoas.length === 1 ? "pessoa" : "pessoas"
-                }`}
-          </span>
-          {filtrando && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 px-3 text-xs"
-              onClick={limparFiltros}
-            >
-              Limpar filtros
-            </Button>
-          )}
+      {/* barra única (REALIZA-525): busca + entrada "Filtros" — as pills
+          de vínculo e os chips de tema saíram da tela e viraram opções
+          do painel, com o selo de ativos marcando o estado filtrado */}
+      <div className="flex flex-wrap items-center gap-2" role="search">
+        <div className="relative w-full sm:max-w-sm">
+          <MagnifyingGlass
+            aria-hidden
+            size={16}
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            type="search"
+            aria-label="Buscar pessoa"
+            placeholder="Buscar por nome"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="pl-8"
+          />
         </div>
-
-        {/* pills de vínculo — rolam na horizontal quando passam da
-            largura (o fade do FilterChipRow marca o corte) */}
-        <FilterChipRow
-          role="group"
-          aria-label="Filtrar por vínculo"
-          className="-mx-4 px-4 pb-1 sm:mx-0 sm:px-0"
+        <FiltrosButton ativos={ativosFiltro} onClick={abrirFiltros} />
+        <span
+          role="status"
+          aria-live="polite"
+          className="text-xs text-muted-foreground tabular-nums"
         >
-          {FACETAS_DIRETORIO.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              aria-pressed={faceta === f.id}
-              onClick={() => setFaceta(f.id)}
-              className={filterChipCls(faceta === f.id)}
-            >
-              {f.rotulo}
-            </button>
-          ))}
-        </FilterChipRow>
-
-        {/* chips de tema — single-select: re-tocar o ativo limpa o
-            recorte (o mesmo gesto das pills de turma) */}
-        {temas.length > 0 && (
-          <FilterChipRow
-            role="group"
-            aria-label="Filtrar por tema"
-            className="-mx-4 px-4 pb-1 sm:mx-0 sm:px-0"
+          {filtrando
+            ? `${exibidas.length} de ${escopo.length} ${
+                escopo.length === 1 ? "pessoa" : "pessoas"
+              }`
+            : `${pessoas.length} ${
+                pessoas.length === 1 ? "pessoa" : "pessoas"
+              }`}
+        </span>
+        {filtrando && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-3 text-xs"
+            onClick={limparFiltros}
           >
-            {temas.map((t) => (
-              <button
-                key={t.nome}
-                type="button"
-                aria-pressed={areaSel === t.nome}
-                onClick={() =>
-                  setAreaSel(areaSel === t.nome ? null : t.nome)
-                }
-                className={filterChipCls(areaSel === t.nome)}
-              >
-                {t.nome}
-                <span
-                  className={cn(
-                    "text-[11px] tabular-nums",
-                    areaSel === t.nome
-                      ? "text-background/70"
-                      : "text-muted-foreground"
-                  )}
-                >
-                  {t.n}
-                </span>
-              </button>
-            ))}
-          </FilterChipRow>
+            Limpar filtros
+          </Button>
         )}
       </div>
+
+      {/* painel rico de filtros — o FormSurface vira sheet de rodapé no
+          celular e dialog no desktop, com o "Aplicar" preso no pé */}
+      <FormSurface
+        open={filtrosAberto}
+        onOpenChange={setFiltrosAberto}
+        titulo="Filtros"
+        size="lg"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              className="sm:me-auto"
+              disabled={draftAtivos === 0}
+              onClick={() => setDraft({ faceta: "todos", area: null })}
+            >
+              Limpar
+            </Button>
+            <Button type="button" onClick={aplicarDraft}>
+              Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <fieldset>
+            <legend className={OVERLINE}>Vínculo</legend>
+            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+              {FACETAS_DIRETORIO.map((f) => (
+                <OpcaoPilula
+                  key={f.id}
+                  nome="flt-vinculo"
+                  valor={f.id}
+                  atual={draft.faceta}
+                  onSelect={(v) =>
+                    setDraft((d) => ({
+                      ...d,
+                      faceta: v as FacetaDiretorio,
+                    }))
+                  }
+                >
+                  {f.rotulo}
+                </OpcaoPilula>
+              ))}
+            </div>
+          </fieldset>
+          {temasDraft.length > 0 && (
+            <fieldset>
+              <legend className={OVERLINE}>Tema</legend>
+              <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                <OpcaoPilula
+                  nome="flt-tema"
+                  valor="__todos__"
+                  atual={draft.area ?? "__todos__"}
+                  onSelect={() => setDraft((d) => ({ ...d, area: null }))}
+                >
+                  Todos
+                </OpcaoPilula>
+                {temasDraft.map((t) => (
+                  <OpcaoPilula
+                    key={t.nome}
+                    nome="flt-tema"
+                    valor={t.nome}
+                    atual={draft.area ?? "__todos__"}
+                    onSelect={(v) =>
+                      setDraft((d) => ({ ...d, area: v }))
+                    }
+                    className="justify-start gap-1.5 px-3"
+                  >
+                    <span className="min-w-0 truncate">{t.nome}</span>
+                    <span
+                      className={cn(
+                        "ml-auto shrink-0 text-[11px] tabular-nums",
+                        draft.area === t.nome
+                          ? "text-background/70"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {t.n}
+                    </span>
+                  </OpcaoPilula>
+                ))}
+              </div>
+            </fieldset>
+          )}
+        </div>
+      </FormSurface>
 
       {pessoas.length === 0 ? (
         <Card>
@@ -309,6 +393,7 @@ export function JovemDiretorio({
                 key={p.id}
                 e={especialistaDe(p)}
                 href={`/jovem/pessoas/${p.id}`}
+                acao={<WaIconLink p={p} nomeJovem={nomeJovem} />}
                 badge={
                   p.rede
                     ? {
@@ -326,6 +411,7 @@ export function JovemDiretorio({
                 p={p}
                 indice={i}
                 marca={q ? qtBusca : undefined}
+                nomeJovem={nomeJovem}
               />
             )
           )}
@@ -335,19 +421,55 @@ export function JovemDiretorio({
   );
 }
 
+/** O WhatsApp do card (REALIZA-525): a rede já autoriza o canal pela
+ *  view — o ícone abre o wa.me com a mesma mensagem pronta da ficha
+ *  (colega ganha a assinatura "da sua turma"). Sem número ou fora da
+ *  rede não renderiza: nunca um link vazio nem um canal não-autorizado. */
+function WaIconLink({
+  p,
+  nomeJovem,
+}: {
+  p: DiretorioPessoa;
+  nomeJovem: string;
+}) {
+  const nome = p.nome_social || p.nome;
+  const wa = waLink(
+    p.whatsapp,
+    msgApresentacaoJovem(nomeJovem, p.tipo === "jovem")
+  );
+  if (!p.rede || !wa) return null;
+  return (
+    <a
+      href={wa}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Conversar com ${nome} no WhatsApp (abre em nova aba)`}
+      className={cn(
+        buttonVariants({ variant: "outline", size: "icon-sm" }),
+        "shrink-0"
+      )}
+    >
+      <WhatsappLogo size={16} aria-hidden />
+    </a>
+  );
+}
+
 /** Card do diretório pra jovem do programa e adulto fora do catálogo —
  *  avatar+nome+vínculo+cidade+chips; o bloco inteiro é UM link pra ficha
- *  (aria-label nomeado, prefetch off) e nenhuma ação de contato: o canal
- *  direto só existe pra quem já é da rede e mora na ficha. */
+ *  (aria-label nomeado, prefetch off). O WhatsApp abre como ação-irmã do
+ *  link quando a pessoa é da rede e a view já entrega o canal — fora
+ *  dela, o contato segue fechado atrás do vínculo. */
 function DiretorioCard({
   p,
   indice,
   marca,
+  nomeJovem,
 }: {
   p: DiretorioPessoa;
   indice: number;
   /** Query viva da busca — destaca os trechos casados no nome e nos chips. */
   marca?: string;
+  nomeJovem: string;
 }) {
   const nome = p.nome_social || p.nome;
   const lugar = [p.cidade, p.uf].filter(Boolean).join(" · ");
@@ -411,6 +533,7 @@ function DiretorioCard({
               Sua rede
             </Badge>
           )}
+          <WaIconLink p={p} nomeJovem={nomeJovem} />
         </div>
 
         {chips.length > 0 && (

@@ -27,6 +27,7 @@ export function EspecialistaCatalogoCard({
   e,
   badge,
   href,
+  acao,
   rodape,
 }: {
   e: JovemEspecialista;
@@ -35,6 +36,9 @@ export function EspecialistaCatalogoCard({
   badge?: { texto: string; cls?: string } | null;
   /** Ficha da pessoa — o bloco nome/avatar vira link quando presente. */
   href?: string;
+  /** Ação na linha do topo, IRMÃ do link (o WhatsApp da rede) — nunca
+   *  dentro dele: interativo aninhado em link é inválido. */
+  acao?: React.ReactNode;
   /** Ação de pé do card — a superfície decide; sem ela o bloco some. */
   rodape?: React.ReactNode;
 }) {
@@ -81,18 +85,23 @@ export function EspecialistaCatalogoCard({
   return (
     <Card className="flex h-full flex-col">
       <CardContent className="flex flex-1 flex-col gap-3 py-4">
-        {href ? (
-          <Link
-            href={href}
-            prefetch={false}
-            aria-label={`Abrir perfil de ${nome}`}
-            className="-mx-1 -mt-1 rounded-lg px-1 pt-1 outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            {blocoTopo}
-          </Link>
-        ) : (
-          blocoTopo
-        )}
+        {/* a ação do topo é IRMÃ do link (nunca filha): flex-1 no link
+            deixa o botão encostar na borda sem espremer o bloco */}
+        <div className="flex items-start gap-2">
+          {href ? (
+            <Link
+              href={href}
+              prefetch={false}
+              aria-label={`Abrir perfil de ${nome}`}
+              className="-mx-1 -mt-1 min-w-0 flex-1 rounded-lg px-1 pt-1 outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              {blocoTopo}
+            </Link>
+          ) : (
+            <div className="min-w-0 flex-1">{blocoTopo}</div>
+          )}
+          {acao}
+        </div>
 
         {e.areas && e.areas.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -110,7 +119,7 @@ export function EspecialistaCatalogoCard({
         )}
 
         {e.bio && (
-          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground sm:line-clamp-3">
+          <p className="line-clamp-2 text-sm leading-relaxed break-words text-muted-foreground sm:line-clamp-3">
             {e.bio}
           </p>
         )}
@@ -133,7 +142,7 @@ export function EspecialistaCatalogoCard({
                   <dt className="text-xs font-medium text-muted-foreground">
                     {rotulo}
                   </dt>
-                  <dd className="text-xs leading-relaxed">{texto}</dd>
+                  <dd className="text-xs leading-relaxed break-words">{texto}</dd>
                 </div>
               ))}
             </dl>
