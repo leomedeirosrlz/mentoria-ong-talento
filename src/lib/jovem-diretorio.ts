@@ -58,7 +58,7 @@ export function vinculoDeContato(c: JovemContato): string {
     case "especialista":
       return "Seu especialista";
     case "supervisor":
-      return "Auxiliar executivo da sua dupla";
+      return "Auxiliar da sua dupla";
     case "coordenacao":
       return papelLabel("coordenacao");
     default:

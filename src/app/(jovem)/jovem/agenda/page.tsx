@@ -567,7 +567,7 @@ export default async function JovemAgenda() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Os encontros das suas mentorias. Vocês combinam as datas juntos.
+            Seus encontros com o mentor e com especialistas. As datas vocês combinam aqui.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -785,9 +785,9 @@ export default async function JovemAgenda() {
                           Horários {esp.deQuem}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Sessões de 1h · escolhe um horário e manda o pedido.
-                          Quando {esp.quem} aceitar, a sessão aparece
-                          aqui na agenda.
+                          Sessões de 1h. Escolha um horário e envie o
+                          pedido. Quando {esp.quem} aceitar, a sessão
+                          aparece na sua agenda.
                         </p>
                       </div>
                       {esp.wa && (

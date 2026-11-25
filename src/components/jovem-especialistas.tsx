@@ -40,7 +40,7 @@ export function JovemEspecialistas({
     const quem = (sugestao.solicitante?.nome ?? "Seu mentor").split(" ")[0];
     acao = (
       <Acao href="/jovem/especialistas" titulo="1 sugestão esperando você">
-        {quem} sugeriu um especialista pra você. Veja quem é e responda.
+        {quem} sugeriu um especialista pra você. Dá uma olhada e responda.
       </Acao>
     );
   } else if (contraproposta) {

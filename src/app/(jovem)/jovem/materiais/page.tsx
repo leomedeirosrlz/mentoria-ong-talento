@@ -492,7 +492,7 @@ export default async function JovemMateriais() {
               Meus instrumentos
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              O que está por vir abre sozinho no encontro certo.
+              Os próximos abrem no encontro certo.
             </p>
           </div>
           {/* histórico da recorrente — com pendência o acesso mora no

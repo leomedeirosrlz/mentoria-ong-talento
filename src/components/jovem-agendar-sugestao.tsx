@@ -179,7 +179,7 @@ export function JovemAgendarSugestao({
             {numero}º encontro com {comQuem}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Sugestão pra destravar o próximo passo
+            Sugestão de data
           </p>
 
           <div className="mt-3 space-y-1.5">
