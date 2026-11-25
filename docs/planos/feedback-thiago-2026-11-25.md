@@ -1,7 +1,15 @@
 # Feedback do Thiago — 25/11/2026
 
 > Registro bruto para o pipeline `feedback → recon → issues → specs → implementação → review`.
-> Nada aqui foi implementado ainda. As imagens citadas são as do feedback enviado no chat.
+> As imagens citadas são as do feedback enviado no chat.
+
+**Status (25/11, fim do dia):** as seis frentes foram implementadas e estão em
+`staging` (commit `2bb20283`, deploy `dpl_GxdkGb8vehb4WfLVMjQ2MSFMDVLo` em
+`https://staging.realiza.vc`). Gate: typegen/tsc limpos, eslint 0 erros,
+vitest 3290 verdes, guard 11/11, build ok, full demo 297/297. A segunda
+passada de QA visual (`_recon/qa-visual-1125.md`) encontrou 9 pontos que o
+cliente já havia pedido e que passaram batido — todos corrigidos na rodada
+seguinte, sem migration nova.
 
 **Issues Jira abertas (25/11):** REALIZA-525 (mobile Pessoas/Especialistas/self view), REALIZA-530 (agenda/retroativo/CTAs), REALIZA-528 (materiais), REALIZA-526 (ficha/plano/especialista/combinados), REALIZA-527 (Liza), REALIZA-529 (badges 2.0 — Claude).
 
