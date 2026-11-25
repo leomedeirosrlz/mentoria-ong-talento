@@ -828,7 +828,7 @@ export default async function JovemAgenda() {
                         <p className="text-sm text-muted-foreground">
                           {esp.primeiro ?? "Seu especialista"} ainda não
                           abriu horários livres. Pede por aqui que quem
-                          aceita propõe um com você
+                          aceitar propõe um horário com você
                           {esp.wa ? ", ou chama no WhatsApp" : ""}.
                         </p>
                         <PedirEspecialistaDialog
