@@ -455,3 +455,25 @@ Recon + opinião: `docs/planos/issues/_recon/plano-518-522-2026-11-23.md` e `pla
 ## Backlog — avaliação do jovem (nov/2026)
 
 - [ ] **REALIZA-524** — Modal de avaliação: mostrar data e dia da semana além do número/nome do encontro; fallback para data nula; cobrir também o fluxo por token.
+
+## Backlog — acervo (nov/2026)
+
+- [ ] **"Formação EaD" é curso, para mentorado e mentor** — no acervo da plataforma o item aparece como "trilha opcional para mentores", o que estreita o público e troca o tipo. Corrigir na próxima leva: tratar como **curso** (tipo `curso`, não `link`/`trilha`), audiencia para **os dois papéis**, e alinhar título/descrição/CTA nas duas vitrines (jovem e mentor). Enquanto isso, a descrição fica neutra ("Curso gratuito com certificado."). Ver `docs/planos/copy/auditoria-1125.md`.
+
+## Backlog — QA de experiência 25/11 (mentorado + mentor)
+
+Recon completo em `docs/planos/qa/qa-1125.md`. Corrigidos na branch de copy: "pra ficar em dia", "Em verde", ⋯ ghost, densidade do card do plano, recesso colapsável.
+
+- [ ] **Próximo encontro: uma fonte só** — card, lista, home e ficha divergem; ordenar por data e marcar quando um encontro é adiantado.
+- [ ] **Confirmar data checa conflito** — hoje aceita o mesmo slot oferecido ao passo seguinte, sem aviso, e não revalida a tela.
+- [ ] **Contestar/recesso com feedback e trava** — POST sem toast/estado, botão reenvia.
+- [ ] **Link da chamada como ação primária** — está cinza e sem ícone de externo na home.
+- [ ] **Roteiro do jovem ≠ guia do mentor** — `/jovem/roteiro/[n]` entrega "Preparação do(a) mentor(a)" com checkboxes mortos.
+- [ ] **Liza sem vazamento de implementação** e lendo as mesmas queries das telas.
+- [ ] **Sessão de especialista com "Editar link"** — paridade com as sessões de mentor.
+- [ ] **Nome nunca truncado por badge** — Sofia Nog… em Pessoas; bio sem saída.
+- [ ] **WhatsApp da ficha** — URL pública e mensagem em 1ª pessoa.
+- [ ] **"Não serve pra mim" da ficha** — ação real ou remover.
+- [ ] **Números com um denominador** — progresso em 3 réguas, "0 de 3 metas" com submetas ✓.
+- [ ] **Formatos de data** — um curto e um longo por contexto.
+- [ ] **Densidade: tabs cortadas, filtro "Mat…", CTA sob a nav.**

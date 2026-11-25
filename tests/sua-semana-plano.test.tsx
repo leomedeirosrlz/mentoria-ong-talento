@@ -179,7 +179,7 @@ describe("SuaSemanaPlano — CTA e pill por estado", () => {
       <SuaSemanaPlano {...base} semana={semana} quem="Ricardo" />
     );
     expect(alvo.textContent).toContain(
-      "Este é o 5º encontro do plano que Ricardo combinou."
+      "O 5º encontro é passo do combinado com Ricardo."
     );
     // nada pede aceite num combinado já valendo
     expect(alvo.textContent).not.toMatch(/aceit/i);

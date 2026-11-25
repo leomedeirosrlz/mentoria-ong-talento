@@ -120,6 +120,8 @@ export function RecessoDecisao({
 }) {
   const [pendente, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
+  // respondido vira uma linha; o "Editar" reabre os dois botões
+  const [editando, setEditando] = useState<ReadonlySet<string>>(new Set());
 
   const declarar = (cicloEventoId: string, usa: boolean) => {
     setErro(null);
@@ -137,6 +139,43 @@ export function RecessoDecisao({
     <>
       {recessos.map((r) => {
         const decidido = r.declaradoEm != null && r.usa != null;
+        // o colapso só vale onde o "Editar" reabre a decisão — na versão
+        // só-leitura (card do plano, staff) ele esconderia a autoria pra
+        // sempre, então ali a linha segue expandida
+        const compacto =
+          decidido && podeDeclarar && !editando.has(r.cicloEventoId);
+        if (compacto) {
+          return (
+            <div
+              key={r.cicloEventoId}
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+            >
+              <Check size={14} aria-hidden className="shrink-0 text-[var(--ok-text)]" />
+              <span className="min-w-0 flex-1">
+                <span className="font-medium">
+                  {r.usa ? "Pausar os encontros" : "Seguir nos encontrando"}
+                </span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {janela(r.inicio, r.fim)}
+                </span>
+              </span>
+              {podeDeclarar && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="min-h-9 px-2 text-muted-foreground"
+                  onClick={() =>
+                    setEditando((s) => new Set(s).add(r.cicloEventoId))
+                  }
+                >
+                  Editar
+                </Button>
+              )}
+            </div>
+          );
+        }
         return (
           <div
             key={r.cicloEventoId}

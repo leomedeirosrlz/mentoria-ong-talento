@@ -676,7 +676,6 @@ function itensDaDupla(
           : null;
       const passo = passoEsp(s, trilha.sessoes);
       const meta: string[] = [];
-      if (trilha.especialista_nome) meta.push(`com ${trilha.especialista_nome}`);
       if (trilha.demanda) meta.push(trilha.demanda);
       if (s.status === "realizado" && registroTemConteudo(s.registro))
         meta.push("registro entregue");

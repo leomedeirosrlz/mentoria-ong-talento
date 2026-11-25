@@ -247,7 +247,9 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
       'section[aria-labelledby="agenda-proximos"]'
     );
     const linha6 = linha(proximos, 6);
-    await expect(linha6.getByText("Agendado")).toBeVisible({
+    await expect(
+      linha6.getByText("Agendado").filter({ visible: true })
+    ).toBeVisible({
       timeout: 15_000,
     });
     await abrirMenuEncontro(page, linha6);
@@ -520,7 +522,9 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     ).toBeVisible({ timeout: 15_000 });
     // o botão some e vira badge no histórico
     await expect(
-      linha(historico, 6).getByText("Não aconteceu", { exact: true })
+      linha(historico, 6)
+        .getByText("Não aconteceu", { exact: true })
+        .filter({ visible: true })
     ).toBeVisible({ timeout: 15_000 });
 
     const [row] = await buscarViaServiceRole<{ status: string }[]>(
@@ -861,7 +865,9 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     const proximos = page.locator(
       'section[aria-labelledby="agenda-proximos"]'
     );
-    await expect(linha(proximos, 4).getByText("Agendado")).toBeVisible({
+    await expect(
+      linha(proximos, 4).getByText("Agendado").filter({ visible: true })
+    ).toBeVisible({
       timeout: 15_000,
     });
     await expect(historico.getByText("4º encontro")).toHaveCount(0, {

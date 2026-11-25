@@ -347,7 +347,9 @@ test.describe("mentorado — shell /jovem", () => {
     });
     // .first: a trilha esp (e specs paralelos) põe outro "Agendado" na
     // mesma lista — o assert é "o encontro existe com o badge", não "1 só"
-    await expect(proximos.getByText("Agendado").first()).toBeVisible();
+    await expect(
+      proximos.getByText("Agendado").filter({ visible: true }).first()
+    ).toBeVisible();
   });
 
   // WP7 (REALIZA-140) + FR-007 (010) — /jovem/materiais é o hub de

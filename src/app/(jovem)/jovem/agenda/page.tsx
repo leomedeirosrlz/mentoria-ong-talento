@@ -567,7 +567,7 @@ export default async function JovemAgenda() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Os encontros das suas mentorias. Vocês combinam as datas juntos.
+            Seus encontros com o mentor e especialistas. As datas vocês combinam aqui.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -665,11 +665,15 @@ export default async function JovemAgenda() {
                     ? "Recessos do programa"
                     : "Recesso do programa"}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Vocês decidem juntos se pausam os encontros ou seguem
-                  se encontrando.
-                  Qualquer um dos dois pode responder pela dupla.
-                </p>
+                {!recessosDaAgenda.every(
+                  (r) => r.declaradoEm != null && r.usa != null
+                ) && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Vocês decidem juntos se pausam os encontros ou seguem
+                    se encontrando. Qualquer um dos dois pode responder
+                    pela dupla.
+                  </p>
+                )}
               </div>
             </div>
             <RecessoDecisao
@@ -691,7 +695,7 @@ export default async function JovemAgenda() {
       {(combinadoPlano != null || mostrarCombinarPlano) && (
         <Card id="plano" className="scroll-mt-20">
           <CardContent className="space-y-3 p-4">
-            <h2 className="text-base font-semibold">O combinado</h2>
+            <h2 className="text-base font-semibold">Pra ficar em dia</h2>
             {combinadoPlano ? (
               <>
                 <p className="text-sm text-muted-foreground">
@@ -785,9 +789,9 @@ export default async function JovemAgenda() {
                           Horários {esp.deQuem}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Sessões de 1h · escolhe um horário e manda o pedido.
-                          Quando {esp.quem} aceitar, a sessão aparece
-                          aqui na agenda.
+                          Sessões de 1h. Escolha um horário e envie o
+                          pedido. Quando {esp.quem} aceitar, a sessão
+                          aparece na sua agenda.
                         </p>
                       </div>
                       {esp.wa && (
@@ -828,7 +832,7 @@ export default async function JovemAgenda() {
                         <p className="text-sm text-muted-foreground">
                           {esp.primeiro ?? "Seu especialista"} ainda não
                           abriu horários livres. Pede por aqui que quem
-                          aceita propõe um com você
+                          aceitar propõe um horário com você
                           {esp.wa ? ", ou chama no WhatsApp" : ""}.
                         </p>
                         <PedirEspecialistaDialog
@@ -871,7 +875,7 @@ export default async function JovemAgenda() {
             </span>
             <p>
               Nenhum encontro por aqui ainda. Quando a dupla marcar o
-              primeiro, ele aparece nesta agenda.
+              primeiro, ele aparece aqui.
             </p>
           </CardContent>
         </Card>

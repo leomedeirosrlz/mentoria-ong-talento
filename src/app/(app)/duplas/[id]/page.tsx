@@ -256,7 +256,7 @@ function linhaDoProximo(
     case "pendente_registro":
       return `Realizado em ${formatDate(enc?.realizado_em ?? enc?.data_hora)}. Falta o registro.`;
     case "limbo":
-      return `Agendado para ${formatDateTime(enc?.data_hora)}, já passou: falta confirmar.`;
+      return `Agendado para ${formatDateTime(enc?.data_hora)}. Já passou, aguardando confirmação.`;
     case "agendado":
       return `Agendado para ${formatDateTime(enc?.data_hora)}.`;
     case "nao_aconteceu":

@@ -692,8 +692,10 @@ export default async function JovemHome() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {duplaEmCurso
-            ? `Sua mentoria ${duplaAtual.trilha === "especialista" ? "com o especialista" : "do programa"} está em curso.`
-            : "Sua jornada de mentoria por aqui."}
+            ? duplaAtual.trilha === "especialista"
+              ? "Seus encontros com o especialista, combinados e próximos passos."
+              : "Seus encontros, combinados e próximos passos, num lugar só."
+            : "Seus encontros, combinados e próximos passos."}
         </p>
       </header>
 

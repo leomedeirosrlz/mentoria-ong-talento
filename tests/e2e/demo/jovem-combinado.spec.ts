@@ -8,7 +8,7 @@ import { entrarNaDemo, expect, test } from "../helpers";
 
 const card = (page: Parameters<typeof entrarNaDemo>[0]) =>
   page.locator("div.rounded-xl", {
-    has: page.getByRole("heading", { name: "O combinado" }),
+    has: page.getByRole("heading", { name: "Pra ficar em dia" }),
   });
 
 const D_OK = "de000000-0000-4000-8000-000000001537";

@@ -247,7 +247,7 @@ export function AgendarEncontroDialog({
     // remarcação é sempre pra frente — mover agendado pro passado
     // esconderia atraso (o retroativo é só pra encontro novo)
     if (atual && local <= agoraFresco) {
-      setAviso("Remarcar é sempre pra frente — escolha uma data futura.");
+      setAviso("Remarcar é sempre pra frente. Escolha uma data futura.");
       return;
     }
     const retroativo = !atual && local <= agoraFresco;

@@ -65,8 +65,8 @@ export function SuaSemanaPlano({
       {/* o vínculo é o que distingue "um encontro" de "um passo do
           combinado" — só quando o próximo é passo do plano */}
       {semana.vinculo != null && (
-        <p className="text-sm font-medium">
-          Este é o {semana.vinculo}º encontro do plano que {quem} combinou.
+        <p className="hidden text-sm font-medium sm:block">
+          O {semana.vinculo}º encontro é passo do combinado com {quem}.
         </p>
       )}
 

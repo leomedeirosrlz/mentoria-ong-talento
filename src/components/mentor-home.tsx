@@ -875,7 +875,7 @@ export async function MentorHome({
                 </div>
                 <p className="mt-3 rounded-lg border border-[var(--destaque-borda)] bg-[var(--destaque-suave)] px-3 py-2 text-sm">
                   {dupla.status === "concluida"
-                    ? "Jornada concluída. Agradecemos pelo ciclo!"
+                    ? "Jornada concluída. Foi um ciclo inteiro."
                     : "Dupla encerrada. Agradecemos pela jornada!"}
                 </p>
               </div>
