@@ -455,3 +455,7 @@ Recon + opinião: `docs/planos/issues/_recon/plano-518-522-2026-11-23.md` e `pla
 ## Backlog — avaliação do jovem (nov/2026)
 
 - [ ] **REALIZA-524** — Modal de avaliação: mostrar data e dia da semana além do número/nome do encontro; fallback para data nula; cobrir também o fluxo por token.
+
+## Backlog — acervo (nov/2026)
+
+- [ ] **"Formação EaD" é curso, para mentorado e mentor** — no acervo da plataforma o item aparece como "trilha opcional para mentores", o que estreita o público e troca o tipo. Corrigir na próxima leva: tratar como **curso** (tipo `curso`, não `link`/`trilha`), audiencia para **os dois papéis**, e alinhar título/descrição/CTA nas duas vitrines (jovem e mentor). Enquanto isso, a descrição fica neutra ("Curso gratuito com certificado."). Ver `docs/planos/copy/auditoria-1125.md`.

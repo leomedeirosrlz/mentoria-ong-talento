@@ -99,7 +99,7 @@ export function QuadradosPlano({
       </div>
       <ul
         aria-hidden
-        className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"
+        className="mt-2 hidden flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground sm:flex"
       >
         {presentes.map((e) => (
           <li key={e} className="inline-flex items-center gap-1.5">
@@ -162,7 +162,7 @@ export function AceitesPlano({
 export function QuadradosCombinado({ resumo }: { resumo: ResumoCombinado }) {
   return (
     <QuadradosPlano
-      rotulo={`${resumo.feitos} de ${resumo.total} encontros do plano feitos`}
+      rotulo={`${resumo.feitos} de ${resumo.total} feitos`}
       itens={resumo.passos.map((p) => ({
         numero: p.numero,
         estado:
@@ -223,7 +223,7 @@ export function fraseDoCombinado(
     return {
       tom: "neutro",
       pill: "Plano combinado",
-      texto: `Próximo: ${r.proximo.numero}º encontro, sugestão ${diaCurto(r.proximo.data)}. Confirmem a data pra seguir no plano.`,
+      texto: `Próximo: ${r.proximo.numero}º encontro, sugestão ${diaCurto(r.proximo.data)}.`,
       cta: "Confirmar data",
     };
   }

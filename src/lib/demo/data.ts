@@ -3760,7 +3760,7 @@ function build(): DemoData {
     { id: uid(0x2037), titulo: "Cronograma do programa — Turma 1", descricao: null, tipo: "conteudo", url: null, path: "doc:ciclo-cronograma", audiencia: "dpp", encontro_num: null, ordem: 26 },
     { id: uid(0x2038), titulo: "Cronograma do programa — Turma 2", descricao: null, tipo: "conteudo", url: null, path: "doc:ciclo-turma2-cronograma", audiencia: "dpp", encontro_num: null, ordem: 27 },
     { id: uid(0x2039), titulo: "Plataforma de mentoria", descricao: "Onde os encontros oficiais são agendados e avaliados.", tipo: "link", url: "https://mentoria.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 28 },
-    { id: uid(0x203a), titulo: "Formação EaD gratuita", descricao: "Formação gratuita pra quem quer ser mentor no futuro.", tipo: "link", url: "https://ead.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 29 },
+    { id: uid(0x203a), titulo: "Formação EaD gratuita", descricao: "Curso gratuito com certificado.", tipo: "link", url: "https://ead.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 29 },
     { id: uid(0x203b), titulo: "Checklist de competências do mentor", descricao: "As 10 competências do guia para marcar antes do ciclo e no 16º encontro.", tipo: "template", url: null, path: "doc:checklist-competencias", audiencia: "dpp", encontro_num: null, ordem: 30 },
   ];
   // audiências da 0167: material de mentor serve o supervisor, Feedback
