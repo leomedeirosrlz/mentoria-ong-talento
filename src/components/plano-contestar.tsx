@@ -22,9 +22,9 @@ export function PlanoContestarButton({
 
   return (
     <Button
-      variant="outline"
+      variant="ghost"
       size="sm"
-      className="min-h-11 sm:min-h-8"
+      className="min-h-11 px-2 text-muted-foreground sm:min-h-8"
       disabled={pending}
       onClick={() =>
         start(async () => {
