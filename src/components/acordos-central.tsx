@@ -134,7 +134,7 @@ export function AcordosCentral({
                     msgPlanoCombinado({
                       paraNome:
                         dupla.mentorado.nome_social ?? dupla.mentorado.nome,
-                      quem: quemPlano,
+                      quem: souMentor ? null : quemPlano,
                       href: `${SITE_URL}/jovem/combinado`,
                     })
                   )

@@ -209,11 +209,15 @@ export function msgPlanoCombinado({
   href,
 }: {
   paraNome?: string | null;
-  quem: string;
+  /** Nome de quem propôs quando o aviso NÃO sai da própria pessoa (staff).
+   *  Mentor mandando o próprio convite usa `null` e a frase fica em
+   *  primeira pessoa — "A Fulana combinou" soava como terceiro falando. */
+  quem?: string | null;
   href: string;
 }): string {
   const oi = pn(paraNome ?? undefined) ? `Oi ${pn(paraNome ?? undefined)}` : "Oi";
-  return `${oi}, ${quem} combinou um plano de encontros com você no Realiza.vc. Dá uma olhada e confirma se serve: ${href}`;
+  const autor = quem ? `${quem} combinou` : "eu combinei";
+  return `${oi}, ${autor} um plano de encontros com você no Realiza.vc. Dá uma olhada e confirma se serve: ${href}`;
 }
 
 /** Apresentação do jovem no canal direto — a mesma frase abre a conversa
