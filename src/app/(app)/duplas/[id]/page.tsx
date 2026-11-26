@@ -76,7 +76,6 @@ import {
   eventosDoCronograma,
   formatDate,
   formatDateTime,
-  rotuloSlot,
   foraDoPrograma,
   jornadaDaDupla,
   linkSeguro,
@@ -1028,7 +1027,7 @@ export default async function DuplaPage({
           atual: encontroAlvo,
           piso: dupla.iniciada_em ?? undefined,
           jovemNome: primeiroNomeMentorado,
-          item: `Remarcar ${proximoNumero}º · ${rotuloSlot(encontroAlvo.data_hora)}`,
+          item: `Remarcar ${proximoNumero}º`,
         }
       : // a sessão nasce do pedido aceito — aqui só se move a tentativa que
         // já existe (numero = tentativa, não passo)
