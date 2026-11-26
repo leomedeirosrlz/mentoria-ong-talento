@@ -125,8 +125,10 @@ export function JovemShell({
           Pular pro conteúdo
         </a>
 
-        {/* top bar mobile: logo + nome + sino + sair (o header pede o nome
-            do jovem e a saída à mão — o avatar mora no item Perfil) */}
+        {/* top bar mobile: logo + nome + sino + avatar→perfil — a mesma
+            anatomia do AppShell do mentor (rodada 1125b, item 22). O Sair
+            saiu daqui: a 320px o quarteto avatar+sino+sair+pill da demo
+            não cabia; a saída mora no Menu, logo abaixo do bloco de perfil */}
         <header className="sticky top-0 z-40 flex min-h-14 items-center justify-between border-b border-border bg-background/95 pt-[env(safe-area-inset-top)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] backdrop-blur md:hidden">
           <div className="flex min-w-0 items-center gap-3">
             <Link
@@ -147,11 +149,20 @@ export function JovemShell({
           </div>
           <div className="flex items-center gap-1">
             <NotificacoesBell side="bottom" align="end" />
-            <SignOutButton
-              somenteIcone
-              label="Sair"
-              className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-            />
+            <Link
+              href="/jovem/perfil"
+              aria-label="Meu perfil"
+              aria-current={ativo(pathname, "/jovem/perfil") ? "page" : undefined}
+              className="grid size-11 place-items-center rounded-lg transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <Avatar
+                nome={nomeTela}
+                papel="mentorado"
+                src={fotoUrl}
+                fallbackSrc={gravatarUrl}
+                size={28}
+              />
+            </Link>
           </div>
         </header>
 
@@ -344,7 +355,32 @@ export function JovemShell({
                   })}
                 </nav>
                 <div className="border-t border-sidebar-border px-3 pt-3 pb-4">
-                  <SignOutButton className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50" />
+                  {/* bloco de perfil do rodapé, igual ao do AppShell: o item
+                      "Perfil" continua na lista acima e aqui a zona de usuário
+                      (avatar + nome + papel) ancora a saída — com o Sair fora
+                      do topo, o Menu é o caminho sempre visível pra ela */}
+                  <Link
+                    href="/jovem/perfil"
+                    aria-current={ativo(pathname, "/jovem/perfil") ? "page" : undefined}
+                    className="flex min-h-11 items-center gap-3 rounded-lg px-2 py-2 transition-colors outline-none hover:bg-sidebar-accent focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    <Avatar
+                      nome={nomeTela}
+                      papel="mentorado"
+                      src={fotoUrl}
+                      fallbackSrc={gravatarUrl}
+                      size={32}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium" title={nomeTela}>
+                        {nomeTela}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        Mentorado
+                      </span>
+                    </span>
+                  </Link>
+                  <SignOutButton className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50" />
                 </div>
               </SheetContent>
             </Sheet>

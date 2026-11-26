@@ -57,12 +57,26 @@ test.describe("navegação do celular", () => {
       "Início",
       "Agenda",
       "Materiais",
-      "Especialistas",
+      "Espec.",
     ]);
+    // o texto curto cabe na célula a 320px; o nome acessível segue completo
+    await expect(
+      barra.getByRole("link", { name: "Especialistas" })
+    ).toBeVisible();
+
+    // topo padronizado com o do mentor (rodada 1125b, item 22): sino +
+    // avatar → perfil; o Sair saiu da barra e mora no Menu
+    const topo = page.getByRole("banner");
+    await expect(topo.getByRole("link", { name: "Meu perfil" })).toBeVisible();
+    await expect(topo.getByRole("button", { name: /Sair/ })).toHaveCount(0);
+
     await barra.getByRole("button", { name: /^Menu/ }).click();
     const menu = page.getByRole("dialog", { name: "Menu" });
-    // o painel tem a navegação inteira, na mesma ordem do desktop
-    await expect(menu.getByRole("link")).toHaveText([
+    // a nav do painel tem a navegação inteira, na mesma ordem do desktop —
+    // o escopo na <nav> deixa o bloco de perfil do rodapé de fora da conta
+    await expect(
+      menu.getByRole("navigation", { name: "Menu" }).getByRole("link")
+    ).toHaveText([
       "Início",
       "Agenda",
       "Materiais",
@@ -71,5 +85,11 @@ test.describe("navegação do celular", () => {
       "Perfil",
       "Ajuda",
     ]);
+    // rodapé do Menu: bloco de perfil (avatar + nome + papel) → /jovem/perfil
+    // e o Sair logo abaixo — a alternativa clara à saída que saiu do topo
+    const perfilRodape = menu.getByRole("link", { name: /Mentorado/ });
+    await expect(perfilRodape).toBeVisible();
+    await expect(perfilRodape).toHaveAttribute("href", "/jovem/perfil");
+    await expect(menu.getByRole("button", { name: /Sair/ })).toBeVisible();
   });
 });
