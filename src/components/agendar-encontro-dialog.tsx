@@ -521,7 +521,7 @@ export function AgendarEncontroDialog({
               ref={linkRef}
               id="link"
               type="url"
-              placeholder="https://meet.google.com/…"
+              placeholder="Meet, Teams, Zoom…"
               defaultValue={atual?.link ?? ""}
             />
           </div>

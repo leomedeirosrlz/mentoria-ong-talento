@@ -12,7 +12,6 @@ import {
   formatDiaSemana,
   linkSeguro,
   podeEntrarAgora,
-  provedorDaChamada,
   toDateStr,
 } from "@/lib/ciclo";
 import type { JovemEncontro } from "@/lib/queries-jovem";
@@ -122,9 +121,7 @@ export function ProximoEncontro({
               className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}
             >
               <VideoCamera size={18} aria-hidden />
-              {provedorDaChamada(link)
-                ? `Abrir no ${provedorDaChamada(link)}`
-                : "Abrir a chamada"}
+              Abrir a chamada
               <ArrowSquareOut size={16} aria-hidden />
               <span className="sr-only"> (abre em nova aba)</span>
             </a>

@@ -115,7 +115,7 @@ export function EditarLinkDialog({
               id="link"
               name="link"
               type="url"
-              placeholder="https://meet.google.com/…"
+              placeholder="Meet, Teams, Zoom…"
               defaultValue={linkAtual ?? ""}
             />
             <p className="text-xs text-muted-foreground">
