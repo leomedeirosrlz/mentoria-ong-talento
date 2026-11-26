@@ -716,6 +716,11 @@ export default async function JovemAgenda() {
                   realizados={realizadosDpp}
                   recessos={recessosDaAgenda}
                   sugestoes={sugestoesAgendar}
+                  reservaHero={
+                    numeroAgendar != null && sugestoesAgendar?.principal
+                      ? { numero: numeroAgendar, ...sugestoesAgendar.principal }
+                      : null
+                  }
                   combinadoHref="/jovem/combinado"
                 />
                 {(combinadoPlano.status === "aceito" ||

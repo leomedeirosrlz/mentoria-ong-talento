@@ -89,6 +89,7 @@ export function PlanoAcordosCard({
   realizados = [],
   recessos = [],
   sugestoes,
+  reservaHero,
   combinadoHref,
   whatsappHref,
 }: {
@@ -117,6 +118,9 @@ export function PlanoAcordosCard({
   /** Pacote do motor (perfil/grade/ocupados) — alimenta a sugestão da
    *  linha e os chips do "Outra data". Sem ele, date+time de step 900. */
   sugestoes?: SeletorSugestoes | null;
+  /** Sugestão exposta no cartão "Agendar encontro" — enquanto visível,
+   *  reserva o instante pros passos do plano (menos pro próprio nº). */
+  reservaHero?: { numero: number; data: string; hora: string } | null;
   /** Rota do documento do combinado (020) — "Ler o combinado" no card */
   combinadoHref?: string;
   /** deep link wa.me com template dinâmico (518) — sem provider */
@@ -377,7 +381,13 @@ export function PlanoAcordosCard({
         janela,
         perfil: sugestoes?.perfil,
         disponibilidade: sugestoes?.disponibilidade,
-        ocupados: [...ocupadosBase, ...sugeridos],
+        ocupados: [
+          ...ocupadosBase,
+          ...(reservaHero && reservaHero.numero !== p.numero
+            ? [`${reservaHero.data}T${reservaHero.hora}:00-03:00`]
+            : []),
+          ...sugeridos,
+        ],
         duracaoMin: sessao
           ? (p.duracao_min ?? DURACAO_SESSAO_MIN)
           : sugestoes?.duracaoMin,
@@ -572,7 +582,7 @@ export function PlanoAcordosCard({
                             }
                           >
                             <CalendarPlus aria-hidden />
-                            {ehAncora ? "Marcar sessão" : "Confirmar"}
+                            {ehAncora ? "Marcar sessão" : "Confirmar data"}
                           </Button>
                           {/* 526: um CTA à vista; trocar a data é exceção e
                               mora no ⋯ (mesmo AcoesMenu dos cards) */}
@@ -847,6 +857,13 @@ export function PlanoAcordosCard({
             }),
             ocupados: [
               ...ocupadosRotulados,
+              ...(reservaHero && reservaHero.numero !== passoSeletor.numero
+                ? [{
+                    inicio: `${reservaHero.data}T${reservaHero.hora}:00-03:00`,
+                    rotulo: `sugestão do ${reservaHero.numero}º encontro`,
+                    rotuloArtigo: `a sugestão do ${reservaHero.numero}º encontro`,
+                  }]
+                : []),
               ...ocupadosSugs(seletor.grupo ?? [passoSeletor.numero]),
             ],
             janela,

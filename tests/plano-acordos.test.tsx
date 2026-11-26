@@ -211,7 +211,7 @@ describe("sugestões dos passos pendentes (507)", () => {
       />
     );
     // confirma o 3º direto na sugestão (ter 01/12 às 19:00)
-    act(() => clicar(botao(linhas(alvo)[0], "Confirmar")));
+    act(() => clicar(botao(linhas(alvo)[0], "Confirmar data")));
     await assentar();
 
     // abre o seletor do 4º e vai pro dia do confirmado: 19:00 vira choque
