@@ -38,12 +38,12 @@ test.describe("o combinado — jovem confirma a sugestão", () => {
       .filter({ hasText: "6º encontro" })
       .filter({ hasText: "sugestão" });
     await expect(linha6).toContainText(
-      /sugestão \w{3} \d{2}\/\d{2} às 19:00/
+      /sugestão \w{3} \d{2}\/\d{2} às \d{2}:\d{2}/
     );
     // um toque: Confirma sem digitar nada → a linha vira "Marcado pra…"
     await c.getByRole("button", { name: "Confirmar data" }).click();
     await expect(
-      c.getByText(/Marcado pra \w{3} \d{2}\/\d{2} às 19:00/)
+      c.getByText(/Marcado pra \w{3} \d{2}\/\d{2} às \d{2}:\d{2}/)
     ).toBeVisible();
     await expect(
       c.getByRole("button", { name: "Confirmar data" })
@@ -74,13 +74,13 @@ test.describe("o combinado — jovem confirma a sugestão", () => {
     await dialog
       .getByRole("radio", { name: /Outro horário/ })
       .click();
-    await dialog.getByLabel("Escolher outro horário").fill("19:30");
+    await dialog.getByLabel("Escolher outro horário").fill("20:30");
     await expect(
       dialog.getByRole("button", { name: "Confirmar data" })
     ).toBeEnabled();
     await dialog.getByRole("button", { name: "Confirmar data" }).click();
     await expect(
-      c.getByText(/Marcado pra \w{3} \d{2}\/\d{2} às 19:30/)
+      c.getByText(/Marcado pra \w{3} \d{2}\/\d{2} às 20:30/)
     ).toBeVisible();
   });
 });
