@@ -195,7 +195,7 @@ export default async function JovemPerfil({
           areas={me.interesses}
           seed={me.id}
         />
-        <div className="px-4 pb-5 sm:px-6 sm:pb-6">
+        <div className="relative px-4 pb-5 sm:px-6 sm:pb-6">
           {/* wrap só entre blocos: o grupo de selos é flex-nowrap e, quando
               não cabe ao lado da foto, desce inteiro pra borda esquerda do
               bloco — nunca quebra peça por linha nem invade a câmera */}

@@ -37,14 +37,14 @@ export function VitrineSelos({
   escolhidas: string[];
   nivel: NiveisJornada | null;
 }) {
-  // Mobile: o grupo desce inteiro e começa na mesma linha do nome (padding
-  // do card). Desktop: encosta na direita do bloco, com -me-1 pra tinta da
-  // última peça fechar na mesma linha ótica do padding.
+  // Fora do fluxo, ancorado no topo-direita do bloco: a vitrine não empurra
+  // foto, nome nem botão. `-me-1` fecha a tinta da última peça na linha do
+  // padding.
   return (
     <div
       role="group"
       aria-label="Selos do perfil"
-      className="flex flex-nowrap items-end gap-0.5 sm:ml-auto sm:-me-1"
+      className="absolute top-0 right-0 -me-1 flex flex-nowrap items-start gap-0.5"
     >
       {pecas.map((p) => (
         <Dialog key={p.chave}>
