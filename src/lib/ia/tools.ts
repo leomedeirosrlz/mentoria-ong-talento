@@ -2649,7 +2649,7 @@ export const IA_TOOLS = {
     roles: ["mentorado"],
     escreve: true,
     resumo: async (
-      a: { dupla_id: string; numero: number; data_hora: string },
+      a: { dupla_id: string; numero: number; data_hora: string; motivo_tardio?: string },
       supabase
     ) => {
       const dupla = await rotuloDupla(supabase, a.dupla_id);
@@ -2723,7 +2723,7 @@ export const IA_TOOLS = {
   jovem_registrar_retroativo: {
     nome: "jovem_registrar_retroativo",
     descricao:
-      "Declara que um encontro do guia já aconteceu sem agendamento prévio — a dupla se combinou por fora (retroativo). O passo fica realizado na hora, libera a avaliação do jovem e avisa o mentor pra contar como foi no registro dele. Também corrige a data de um retroativo que a própria pessoa criou (mesmo número, nova data). encontros_retroativo lista os passos elegíveis: só data oficial já vencida, nunca o último do ciclo (fechar a jornada segue registro do mentor) e nunca a trilha de especialista (as sessões dela são do especialista)." +
+      "Declara que um encontro do guia já aconteceu sem agendamento prévio — a dupla se combinou por fora (retroativo). O passo fica realizado na hora, libera a avaliação do jovem e avisa o mentor pra contar como foi no registro dele. Também corrige a data de um retroativo que a própria pessoa criou (mesmo número, nova data). encontros_retroativo lista os passos elegíveis: só data oficial já vencida, nunca o último do ciclo (fechar a jornada segue registro do mentor) e nunca a trilha de especialista (as sessões dela são do especialista). Se encontros_retroativo marcar exige_motivo, pergunte o motivo antes de confirmar e envie motivo_tardio." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -2741,25 +2741,36 @@ export const IA_TOOLS = {
           .describe(
             "data/hora ISO 8601 com fuso de quando aconteceu, ex. 2026-11-10T19:00:00-03:00"
           ),
+        motivo_tardio: z
+          .string()
+          .min(2)
+          .max(1000)
+          .optional()
+          .describe(
+            "obrigatório quando o passo venceu há mais de 7 dias; pergunte antes de confirmar"
+          ),
       })
       .strict(),
     roles: ["mentorado"],
     escreve: true,
     resumo: async (
-      a: { dupla_id: string; numero: number; data_hora: string },
+      a: { dupla_id: string; numero: number; data_hora: string; motivo_tardio?: string },
       supabase
     ) => {
       const dupla = await rotuloDupla(supabase, a.dupla_id);
       return `Registrar o ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} como realizado em ${formatDiaHora(a.data_hora)}`;
     },
     run: async (
-      a: { dupla_id: string; numero: number; data_hora: string },
+      a: { dupla_id: string; numero: number; data_hora: string; motivo_tardio?: string },
       ctx
     ) =>
       rpcEscreve(ctx, "registrar_retroativo_mentorado", {
         p_dupla: a.dupla_id,
         p_numero: a.numero,
         p_data_hora: a.data_hora,
+        ...(a.motivo_tardio?.trim()
+          ? { p_motivo_tardio: a.motivo_tardio.trim() }
+          : {}),
       }),
   },
 
@@ -3234,7 +3245,7 @@ export const IA_TOOLS = {
     roles: ["mentor_dpp", "mentor_especialista", "coordenacao"],
     escreve: true,
     resumo: async (
-      a: { dupla_id: string; numero: number; data_hora: string },
+      a: { dupla_id: string; numero: number; data_hora: string; motivo_tardio?: string },
       supabase
     ) => {
       const dupla = await rotuloDupla(supabase, a.dupla_id);

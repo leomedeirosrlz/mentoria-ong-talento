@@ -28,6 +28,7 @@ import { reconciliaCombinados } from "@/lib/combinados";
 import type { CombinadoEnviado } from "@/lib/combinados";
 import { snapshotDuplaHoje } from "@/lib/jobs";
 import { temPapel } from "@/lib/types";
+import type { Database } from "@/lib/database.types";
 import type { AppRole, ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, SituacaoMentorado, Trilha } from "@/lib/types";
 import {
   emailValido,
@@ -3301,11 +3302,13 @@ export async function registrarEncontroRetroativo(
       realizado_em: quando.toISOString(),
       status: "realizado",
       origem: "externo",
-      ...(regra.tardio
-        ? { motivo_reagendamento: `Registro tardio: ${motivoLimpo}` }
-        : {}),
       created_by: eu.id,
-    })
+      // colunas da 0242 — o cast cobre a janela até database.types ser
+      // regenerado pelo lead depois de aplicar a migration
+      ...(regra.tardio
+        ? { motivo_retroativo: motivoLimpo, retroativo_tardio: true }
+        : {}),
+    } as Database["public"]["Tables"]["encontros"]["Insert"])
     .select("id")
     .single();
   if (error) {

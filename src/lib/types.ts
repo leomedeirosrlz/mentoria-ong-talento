@@ -497,6 +497,11 @@ export type Encontro = {
   link: string | null;
   /** Por que a dupla remarcou (label do preset ou texto livre) — só escrito quando a data muda. */
   motivo_reagendamento: string | null;
+  /** Motivo do registro retroativo tardio (0242) — auditável; opcional até
+   *  a migration aplicada regenerar o contrato de leitura. */
+  motivo_retroativo?: string | null;
+  /** true quando o registro retroativo passou de 7 dias do vencimento oficial. */
+  retroativo_tardio?: boolean;
   /** Sessão combinada (0226): uuid compartilhado por todos os encontros que
    *  aconteceram numa sessão só — mesmo sessao_id = mesma sessão física.
    *  null = encontro de sessão própria (o comum). */

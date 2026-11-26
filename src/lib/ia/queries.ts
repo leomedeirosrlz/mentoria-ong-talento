@@ -1444,7 +1444,14 @@ export async function getJovemRetroativoIa(supabase: SupabaseClient) {
     // (fechar a jornada segue registro do mentor, mesma régua da 0208)
     elegiveis: cron
       .filter((p) => p.numero < maxNum && p.data <= hoje && !porNumero.has(p.numero))
-      .map((p) => ({ numero: p.numero, data_oficial: p.data })),
+      .map((p) => ({
+        numero: p.numero,
+        data_oficial: p.data,
+        exige_motivo:
+          new Date(`${hoje}T00:00:00Z`).getTime() -
+            new Date(`${p.data}T00:00:00Z`).getTime() >
+          7 * 24 * 60 * 60 * 1000,
+      })),
     criados_por_voce: encs
       .filter(
         (e) => e.status === "realizado" && meuId != null && e.created_by === meuId

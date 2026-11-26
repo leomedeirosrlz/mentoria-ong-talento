@@ -15,6 +15,7 @@ import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { erroAmigavel as erroAmigavelBase } from "./utils";
 import type { Disponibilidade, SolicitacaoEspecialistaStatus } from "./types";
+import type { Database } from "./database.types";
 
 // Writes do jovem (REALIZA-112 PR2) — o pedido de especialista vai direto
 // por RPC definer: a 0074 já valida tudo no servidor (teto de trilhas,
@@ -368,11 +369,16 @@ export async function registrarRetroativoJovem(
   if (regra.tardio && !motivoTardioOk(motivoLimpo)) {
     return { error: "Já passaram mais de 7 dias. Conte por que esse registro está sendo feito agora." };
   }
-  const { data, error } = await supabase.rpc("registrar_retroativo_mentorado", {
+  // a 0242 adiciona p_motivo_tardio; database.types só reflete a coluna/
+  // argumento depois que o lead aplica e regenera. O cast preserva o contrato
+  // antigo localmente sem apagar o campo que a RPC nova espera.
+  const rpcArgs = {
     p_dupla: duplaId,
     p_numero: numero,
     p_data_hora: quando.toISOString(),
-  });
+    p_motivo_tardio: motivoLimpo || null,
+  } as Database["public"]["Functions"]["registrar_retroativo_mentorado"]["Args"];
+  const { data, error } = await supabase.rpc("registrar_retroativo_mentorado", rpcArgs);
   if (error) return { error: erroAmigavel(error) };
   const ret = retornoRpc(data);
   if (ret.error) return { error: ret.error };
