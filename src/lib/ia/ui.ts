@@ -158,6 +158,30 @@ export type UiPessoas = {
   pessoas: { id: string; nome: string; papel: AppRole | null }[];
 };
 
+/** BI demográfico da coordenação/auxiliar (onda 5): contagens por
+ *  estado, gênero, faixa de idade, papel ou trilha, no recorte que a
+ *  sessão já lê por RLS. O card é a própria resposta — o modelo narra,
+ *  o número sai daqui. `chave` guarda o valor de máquina pro grupo
+ *  "não informado" desenhar hatch (o buraco nomeado, nunca escondido). */
+export type UiAgregado = {
+  kind: "agregado";
+  /** "Pessoas por estado (UF)" — o título pronto vem do payload */
+  titulo: string;
+  /** filtros aplicados como a equipe os lê ("Mentorado · SP") —
+   *  null quando a pergunta não filtrou (programa todo) */
+  recorte: string | null;
+  /** pessoas que passaram nos filtros — o denominador de cada barra */
+  total: number;
+  /** "pessoas ativas" | "pessoas cadastradas" — o universo honesto */
+  universo: string;
+  itens: { chave: string; rotulo: string; n: number; pct: number }[];
+  /** cauda dobrada fora do top N — null quando o top cobriu tudo */
+  outros: { pessoas: number; grupos: number } | null;
+  /** papel/trilha contam participação: uma pessoa entra em mais de uma
+   *  linha e a soma dos pct pode passar de 100 — o card avisa */
+  participacao_multipla: boolean;
+};
+
 export type UiChamados = {
   kind: "chamados";
   aberto: number;
@@ -368,6 +392,7 @@ export type UiBloco =
   | UiFila
   | UiCapacidade
   | UiPessoas
+  | UiAgregado
   | UiChamados
   | UiInstrumentos
   | UiFontes
@@ -398,6 +423,7 @@ export const STATUS_TOOL: Record<string, string> = {
   guia_limpar: "Preparando pra voltar ao guia…",
   aguardando_par: "Olhando a fila de pareamento…",
   capacidade_mentores: "Conferindo as vagas dos mentores…",
+  pessoas_agregado: "Contando as pessoas do programa…",
   adocao_por_superficie: "Lendo a adoção por superfície…",
   adocao_por_dia: "Lendo a série diária de gestos…",
   adocao_caminhos: "Lendo os caminhos de navegação…",
@@ -787,6 +813,30 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           nome: String(p.nome_social ?? p.nome ?? ""),
           papel: (str(p.papel) as AppRole | null) ?? null,
         })),
+      };
+    }
+    case "pessoas_agregado": {
+      const grupos = arr(d.grupos);
+      if (!grupos.length) return null;
+      const outros = obj(d.outros);
+      return {
+        kind: "agregado",
+        titulo: str(d.titulo) ?? "Pessoas",
+        recorte: str(d.recorte) || null,
+        total: num(d.total_pessoas),
+        universo: str(d.universo) ?? "pessoas",
+        // a tool já ordena e capa no top — o card não reordena (a ordem
+        // é semântica: faixa segue a idade, "não informado" fecha a lista)
+        itens: grupos.map((g) => ({
+          chave: String(g.chave),
+          rotulo: String(g.rotulo ?? g.chave),
+          n: num(g.pessoas),
+          pct: num(g.percentual),
+        })),
+        outros: outros
+          ? { pessoas: num(outros.pessoas), grupos: num(outros.grupos) }
+          : null,
+        participacao_multipla: d.participacao_multipla === true,
       };
     }
     case "chamados_resumo": {

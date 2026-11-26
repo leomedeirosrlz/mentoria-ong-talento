@@ -25,6 +25,7 @@ import {
 } from "@phosphor-icons/react";
 import type {
   UiAgenda,
+  UiAgregado,
   UiBloco,
   UiCapacidade,
   UiChamados,
@@ -385,6 +386,8 @@ export function UiCard({ bloco, jovem }: { bloco: UiBloco; jovem?: boolean }) {
       return <CardCapacidade b={bloco} />;
     case "pessoas":
       return <CardPessoas b={bloco} />;
+    case "agregado":
+      return <CardAgregado b={bloco} />;
     case "chamados":
       return <CardChamados b={bloco} r={r} />;
     case "instrumentos":
@@ -1609,6 +1612,80 @@ export function CardPessoas({ b }: { b: UiPessoas }) {
           </li>
         ))}
       </ul>
+    </Cartao>
+  );
+}
+
+// ---------- agregado (BI de pessoas, onda 5) ----------
+
+/** Paleta categórica das séries da casa (--chart-N): cor de dado, não de
+ *  status — a fatia "não informado" sai do ciclo e desenha o hatch
+ *  neutro (buraco nomeado, mesma régua da BarraSegmentada). */
+const CHART_CLS = [
+  "bg-[var(--chart-1)]",
+  "bg-[var(--chart-2)]",
+  "bg-[var(--chart-3)]",
+  "bg-[var(--chart-4)]",
+  "bg-[var(--chart-5)]",
+];
+
+/** Linha por grupo da dimensão: rótulo + "n · pct%" e a barra fina do
+ *  recorte. O denominador é o TOTAL de pessoas (a proporção desenhada é
+ *  a do número ao lado — a régua da FunilEtapas), então em papel/trilha,
+ *  que contam participação, cada barra segue lendo a fatia da pessoa. */
+export function CardAgregado({ b }: { b: UiAgregado }) {
+  return (
+    <Cartao
+      titulo={b.titulo}
+      meta={plural(b.total, "pessoa", "pessoas")}
+      rodape={<Rodape href="/pessoas">Abrir Pessoas</Rodape>}
+    >
+      {b.recorte && <p className={EYEBROW}>Recorte: {b.recorte}</p>}
+      <ul className="mt-2 space-y-2.5">
+        {b.itens.map((g, i) => (
+          <li key={g.chave} style={passo(i + 1)} className="animate-enter">
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate font-medium">{g.rotulo}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                <b className="font-semibold text-foreground">{g.n}</b>
+                {` · ${g.pct}%`}
+              </span>
+            </div>
+            <BarraSegmentada
+              className="mt-1"
+              altura="sm"
+              animate
+              i={Math.min(i, 3)}
+              denominador={b.total}
+              segmentos={[
+                {
+                  valor: g.n,
+                  rotulo: g.rotulo,
+                  ...(g.chave === "__nao_informado"
+                    ? {}
+                    : { cls: CHART_CLS[i % CHART_CLS.length] }),
+                },
+              ]}
+              ariaLabel={`${g.rotulo}: ${g.n} de ${b.total} (${g.pct}%)`}
+            />
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2.5 text-xs text-muted-foreground">
+        {[
+          b.outros
+            ? `outros: ${plural(b.outros.pessoas, "pessoa", "pessoas")} em ${plural(b.outros.grupos, "grupo", "grupos")}`
+            : null,
+          b.universo === "pessoas cadastradas"
+            ? "inclui inativas, desistentes e concluídas"
+            : "só pessoas ativas",
+          b.participacao_multipla
+            ? "uma pessoa pode contar em mais de uma linha"
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </p>
     </Cartao>
   );
 }

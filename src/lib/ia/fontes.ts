@@ -202,6 +202,7 @@ const ROTULO_TOOL: Record<string, string> = {
   registros_da_dupla: "registros da dupla",
   aguardando_par: "fila de pareamento",
   capacidade_mentores: "ocupação de mentores",
+  pessoas_agregado: "perfil das pessoas",
   duplas_do_usuario: "suas duplas",
   duplas_panorama: "panorama das duplas",
   agenda_do_periodo: "agenda do período",

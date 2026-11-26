@@ -3328,8 +3328,23 @@ export const IA_TOOLS = {
         );
       }
       const pessoas = await getPessoasBiIa(ctx.supabase, a.incluir_inativas);
+      const agregado = agregarPessoasBi(pessoas, a.dimensao, a, a.limite);
+      // a linha de exemplo também segue a fronteira: supervisor pode ver
+      // nome/papel/trilha/UF do recorte dele, mas não recebe nem o rótulo
+      // "não informado" de gênero/idade — a dimensão sensível não entra
+      // no payload fora da coordenação
+      const linhas =
+        ctx.papel === "coordenacao"
+          ? agregado.linhas
+          : agregado.linhas.map((l) => ({
+              nome: l.nome,
+              papel: l.papel,
+              trilhas: l.trilhas,
+              uf: l.uf,
+            }));
       return {
-        ...agregarPessoasBi(pessoas, a.dimensao, a, a.limite),
+        ...agregado,
+        linhas,
         filtros_aplicados: Object.fromEntries(
           Object.entries({
             papel: a.papel,

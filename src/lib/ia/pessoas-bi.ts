@@ -5,7 +5,7 @@
 // em profiles é excluída, mesma régua de getContagemPessoas).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { papelLabel } from "@/lib/ciclo";
+import { papelLabel, papelLabelComposto } from "@/lib/ciclo";
 import type { AppRole, Genero, Trilha } from "@/lib/types";
 
 export type DimensaoPessoasBi =
@@ -43,6 +43,16 @@ export const FAIXAS_IDADE: Record<FaixaIdade, string> = {
   "35_mais": "35 anos ou mais",
 };
 
+/** Rótulo da dimensão como a coordenação fala — vira o título do card
+ *  ("Pessoas por estado (UF)") e a prosa do modelo. */
+export const DIMENSAO_LABEL: Record<DimensaoPessoasBi, string> = {
+  estado: "estado (UF)",
+  genero: "gênero",
+  faixa_idade: "faixa de idade",
+  papel: "papel",
+  trilha: "trilha",
+};
+
 /** Faixa etária na data de referência — aniversário ainda não cumprido
  *  conta na faixa anterior. */
 export function faixaIdadeDe(
@@ -77,6 +87,19 @@ export function rotuloGenero(g: Genero | null): string {
 
 const rotuloTrilha = (t: Trilha | null) =>
   t === "dpp" ? "DPP" : t === "especialista" ? "Especialista" : "Sem trilha viva";
+
+/** Os filtros aplicados como a coordenação os lê ("Mentor DPP · SP ·
+ *  trilha DPP") — vai no payload pro card e pro modelo citarem o recorte
+ *  sem traduzir valor de máquina. "" quando a pergunta não filtrou. */
+export function rotuloFiltros(f: FiltrosPessoasBi): string {
+  const partes: string[] = [];
+  if (f.papel) partes.push(papelLabel(f.papel));
+  if (f.uf) partes.push(f.uf.trim().toUpperCase());
+  if (f.genero) partes.push(rotuloGenero(f.genero));
+  if (f.faixa_idade) partes.push(FAIXAS_IDADE[f.faixa_idade]);
+  if (f.trilha) partes.push(`trilha ${rotuloTrilha(f.trilha)}`);
+  return partes.join(" · ");
+}
 
 export function rotuloDaChave(dim: DimensaoPessoasBi, chave: string): string {
   if (chave === "__nao_informado") return "Não informado";
@@ -226,6 +249,14 @@ export function agregarPessoasBi(
     }
   }
   const total = pessoas.length;
+
+  // Ordem semântica por dimensão: faixa segue a idade e trilha segue o
+  // vocabulário (DPP, especialista, sem trilha), nunca o tamanho da
+  // fatia. Nas demais o critério é contagem — e o buraco nomeado
+  // ("não informado") fecha a lista SEMPRE, não só em empate: ele
+  // existe e se lê, mas não grita na frente dos dados.
+  const ORDEM_FAIXA: FaixaIdade[] = ["ate_17", "18_24", "25_34", "35_mais"];
+  const rabo = (c: string) => (c === "__nao_informado" ? 1 : 0);
   const ordenadas = [...contagens.entries()]
     .map(([chave, pessoas]) => ({
       chave,
@@ -233,10 +264,23 @@ export function agregarPessoasBi(
       pessoas,
       percentual: total ? Math.round((pessoas / total) * 1000) / 10 : 0,
     }))
-    .sort((a, b) =>
-      b.pessoas - a.pessoas ||
-      (a.chave === "__nao_informado" ? 1 : b.chave === "__nao_informado" ? -1 : a.rotulo.localeCompare(b.rotulo, "pt-BR"))
-    );
+    .sort((a, b) => {
+      if (dimensao === "faixa_idade") {
+        const ia = ORDEM_FAIXA.indexOf(a.chave as FaixaIdade);
+        const ib = ORDEM_FAIXA.indexOf(b.chave as FaixaIdade);
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+      }
+      if (dimensao === "trilha") {
+        const ord = (c: string) =>
+          c === "dpp" ? 0 : c === "especialista" ? 1 : 2;
+        return ord(a.chave) - ord(b.chave) || b.pessoas - a.pessoas;
+      }
+      return (
+        rabo(a.chave) - rabo(b.chave) ||
+        b.pessoas - a.pessoas ||
+        a.rotulo.localeCompare(b.rotulo, "pt-BR")
+      );
+    });
 
   const n = Math.min(Math.max(Math.trunc(limite || 8), 1), 20);
   const grupos = ordenadas.slice(0, n);
@@ -246,7 +290,9 @@ export function agregarPessoasBi(
     .slice(0, 5)
     .map((p) => ({
       nome: p.nome,
-      papel: p.papel ? papelLabel(p.papel) : "Sem papel",
+      // o híbrido lê o composto ("Mentor DPP + especialista"), não só o
+      // primário — a linha de exemplo diz a pessoa como ela é
+      papel: papelLabelComposto({ role: p.papel, papeis: p.papeis }),
       trilhas: p.trilhas.map((t) => rotuloTrilha(t)),
       uf: p.uf,
       genero: rotuloGenero(p.genero),
@@ -255,6 +301,8 @@ export function agregarPessoasBi(
 
   return {
     dimensao,
+    titulo: `Pessoas por ${DIMENSAO_LABEL[dimensao]}`,
+    recorte: rotuloFiltros(filtros),
     total_pessoas: total,
     universo: filtros.incluir_inativas ? "pessoas cadastradas" : "pessoas ativas",
     deduplicacao: "jovens contam pela ficha de mentorado; a conta de login role=mentorado não soma de novo",

@@ -10,13 +10,25 @@
 import { projetarFicha, projetarResumo } from "@/lib/ia/tools";
 import type { DuplaIa } from "@/lib/ia/queries";
 import {
+  agregarPessoasBi,
+  type DimensaoPessoasBi,
+  type FiltrosPessoasBi,
+  type PessoaBi,
+} from "@/lib/ia/pessoas-bi";
+import {
   escopoDaProposta,
   montarPlanoEmDia,
   type PlanoAplicavel,
 } from "@/lib/plano-em-dia";
 import { montarDocCombinado } from "@/lib/plano-roteiros";
 import { gradeCombinada, toDateStr } from "@/lib/ciclo";
-import type { Disponibilidade, Dupla, DuplaPlanoEscopo } from "@/lib/types";
+import type {
+  AppRole,
+  Disponibilidade,
+  Dupla,
+  DuplaPlanoEscopo,
+  Trilha,
+} from "@/lib/types";
 import { uiDaTool, type UiBloco } from "@/lib/ia/ui";
 import { leituraAderencia } from "@/lib/relatorios/leituras-aderencia";
 import { resumoAderencia } from "@/lib/relatorios/operacional";
@@ -32,6 +44,9 @@ import {
   demoJovemEncaminhamentos,
   demoJovemEncontros,
   demoJovemPlano,
+  demoMentorados,
+  demoPessoalMap,
+  demoPessoas,
   demoSolicitacoesVisiveis,
 } from "./queries";
 
@@ -112,6 +127,66 @@ function resolverDuplaNomeada(
     duplas.find((d) => nomeia(d.mentor?.nome_social ?? d.mentor?.nome)) ??
     null
   );
+}
+
+/** Universo do BI no recorte que a persona enxerga — a mesma montagem do
+ *  getPessoasBiIa real, só que sobre as queries demo (que já escopam por
+ *  papel e devolvem o mapa pessoal vazio fora da coordenação). O jovem
+ *  conta pela ficha de mentorado, nunca pela conta de login. */
+function pessoasBiDemo(role: AppRole): PessoaBi[] {
+  const pessoalProf = demoPessoalMap(role, "profiles_pessoal");
+  const pessoalMent = demoPessoalMap(role, "mentorados_pessoal");
+  const trilhas = new Map<string, Set<Trilha>>();
+  const add = (id: string | null | undefined, t: Trilha | null | undefined) => {
+    if (!id || (t !== "dpp" && t !== "especialista")) return;
+    const s = trilhas.get(id) ?? new Set<Trilha>();
+    s.add(t);
+    trilhas.set(id, s);
+  };
+  for (const d of demoDuplas(role)) {
+    if (d.status !== "ativa" && d.status !== "pausada") continue;
+    add(d.mentor?.id, d.trilha);
+    add(d.mentorado?.id, d.trilha);
+  }
+  const pessoas: PessoaBi[] = [];
+  for (const p of demoPessoas(role)) {
+    // conta de jovem fora — ela existe só porque a ficha em mentorados a
+    // representa; inativas ficam pro filtro incluir_inativas (a demo não
+    // pergunta por elas)
+    if (p.role === "mentorado" || !p.ativo) continue;
+    const efetivos = new Set(
+      [p.role, ...(p.papeis ?? [])].filter((r): r is AppRole => r != null)
+    );
+    const vivas = new Set<Trilha>(trilhas.get(p.id) ?? []);
+    if (efetivos.has("mentor_dpp")) vivas.add("dpp");
+    if (efetivos.has("mentor_especialista")) vivas.add("especialista");
+    const sens = pessoalProf.get(p.id);
+    pessoas.push({
+      id: p.id,
+      nome: (p.nome_social || p.nome || "Sem nome").trim(),
+      papel: p.role,
+      papeis: [...efetivos],
+      trilhas: [...vivas],
+      uf: p.uf?.toUpperCase() ?? null,
+      genero: sens?.genero ?? null,
+      data_nascimento: sens?.data_nascimento ?? null,
+    });
+  }
+  for (const m of demoMentorados(role)) {
+    if ((m.situacao ?? "ativo") !== "ativo") continue;
+    const sens = pessoalMent.get(m.id);
+    pessoas.push({
+      id: m.id,
+      nome: (m.nome_social || m.nome || "Sem nome").trim(),
+      papel: "mentorado",
+      papeis: ["mentorado"],
+      trilhas: [...(trilhas.get(m.id) ?? [])],
+      uf: m.uf?.toUpperCase() ?? null,
+      genero: sens?.genero ?? null,
+      data_nascimento: sens?.data_nascimento ?? null,
+    });
+  }
+  return pessoas;
 }
 
 export async function responderDemoIa(
@@ -673,6 +748,9 @@ export async function responderDemoIa(
     }
   }
 
+  // BI demográfico (onda 5): a demo agrega o dataset evergreen pelo
+  // mesmo caminho da tool (pessoasBiDemo → agregarPessoasBi → uiDaTool),
+  // então o card sai igual ao da rota real
   const perguntaBi = /quantas pessoas|quantos jovens|por estado|por sexo|por g[êe]nero|faixa de idade|por idade|por papel|por trilha/.test(p);
   if (perguntaBi && !STAFF.includes(role)) {
     return {
@@ -681,11 +759,45 @@ export async function responderDemoIa(
     };
   }
   if (perguntaBi) {
-    const jovens = duplas.length ? new Set(duplas.map((d) => d.mentorado?.id).filter(Boolean)).size : 2;
-    const content = role === "supervisor" && /sexo|g[êe]nero|idade/.test(p)
-      ? `Na demonstração os números são de exemplo. Gênero e faixa de idade são visão da coordenação; no seu recorte eu consigo agregar por estado, papel ou trilha.`
-      : `Na demonstração os números são de exemplo, contando só pessoas ativas. Estado: SP com ${jovens}, Rio de Janeiro com 1 e não informado com 1. Jovens contam pela ficha de mentorado, sem duplicar a conta de login. Idade sai só em faixas; contato, data de nascimento e dados civis não entram na resposta.`;
-    return { content: content + sugestoes(["Quantas pessoas por trilha?", "Resumo da semana"]), ui: [] };
+    // mesma fronteira da tool real: gênero e idade são visão da
+    // coordenação; o auxiliar agrega estado, papel e trilha no recorte dele
+    if (role !== "coordenacao" && /sexo|g[êe]nero|idade/.test(p)) {
+      return {
+        content: `Na demonstração os números são de exemplo. Gênero e faixa de idade são visão da coordenação; no seu recorte eu consigo agregar por estado, papel ou trilha.${sugestoes(["Quantas pessoas por estado?", "Como está minha dupla?"])}`,
+        ui: [],
+      };
+    }
+    const dimensao: DimensaoPessoasBi = /estado|\buf\b/.test(p)
+      ? "estado"
+      : /sexo|g[êe]nero/.test(p)
+        ? "genero"
+        : /idade/.test(p)
+          ? "faixa_idade"
+          : /trilha/.test(p)
+            ? "trilha"
+            : // "quantas pessoas/jovens" genérico lê a composição por papel
+              "papel";
+    const filtros: FiltrosPessoasBi = {};
+    if (/jovens|mentorad/.test(p)) filtros.papel = "mentorado";
+    const ufM = p.match(
+      /\b(sp|rj|mg|es|ba|pr|rs|sc|pe|ce|df|go|mt|ms|ma|pb|rn|al|se|pi|pa|am|to|ro|ac|ap|rr)\b/
+    );
+    if (ufM) filtros.uf = ufM[1].toUpperCase();
+    const out = agregarPessoasBi(pessoasBiDemo(role), dimensao, filtros, 8);
+    const ui = uiDaTool("pessoas_agregado", out);
+    const top = out.grupos
+      .slice(0, 3)
+      .map((g) => `${g.rotulo} com ${g.pessoas}`)
+      .join(", ");
+    const content = `Na demonstração os números são de exemplo, contando só pessoas ativas${out.recorte ? ` no recorte ${out.recorte}` : ""}. ${
+      top
+        ? `${out.titulo}: ${top}${out.outros ? ` e mais ${out.outros.pessoas}` : ""}.`
+        : "Ninguém entra nesse recorte."
+    } Jovens contam pela ficha de mentorado, sem duplicar a conta de login. Idade sai só em faixas; contato, data de nascimento e dados civis não entram na resposta.`;
+    return {
+      content: content + sugestoes(["Quantas pessoas por trilha?", "Resumo da semana"]),
+      ui: ui ? [ui] : [],
+    };
   }
 
   // leitura de aderência (REALIZA-465): "e a adesão?" também na demo, com

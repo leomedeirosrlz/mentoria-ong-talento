@@ -220,6 +220,7 @@ const COORD_GENERICO: Pill[] = [
   { texto: "Resumo da semana", tool: "resumo_semana" },
   { texto: "Quem está aguardando par?", tool: "aguardando_par" },
   { texto: "Quem tem vaga pra parear?", tool: "capacidade_mentores" },
+  { texto: "Quantas pessoas por estado?", tool: "pessoas_agregado" },
   { texto: "Encontros desta semana", tool: "agenda_do_periodo" },
   {
     texto: "Quantos chamados abertos?",
@@ -233,6 +234,7 @@ const COORD_GENERICO: Pill[] = [
 const SUPERVISOR_GENERICO: Pill[] = [
   { texto: "Resumo da semana", tool: "resumo_semana" },
   { texto: "Alguma dupla minha pede atenção?", tool: "resumo_semana" },
+  { texto: "Quantas pessoas por estado?", tool: "pessoas_agregado" },
   { texto: "Encontros desta semana", tool: "agenda_do_periodo" },
   { texto: "Tem combinado vencido?", tool: "combinados_das_duplas" },
   { texto: "Escreva um lembrete pra dupla", tool: "mensagem_template" },
