@@ -36,6 +36,8 @@ import { feriadoNacional } from "./feriados";
 import type { CicloEvento, Disponibilidade, Dupla } from "./types";
 import {
   DURACAO_SESSAO_MIN,
+  GAP_89_DEGRAUS,
+  GAP_89_OFICIAL,
   GAP_DIAS_EXIGE,
   GAP_MINIMO_DIAS,
   GAP_UM_POR_DIA,
@@ -155,6 +157,9 @@ export type PlanoEmDia =
       /** At the returned pace, how many of the encounters still ahead fit
        *  until the closure. Null without a closure event. */
       cabemAteEncerramento: { cabem: number; faltam: number } | null;
+      /** Quando a recuperação comprime a folga oficial do 8→9 (prática das
+       *  submetas), o degrau usado e o oficial. Null quando não precisou. */
+      praticaFlex: { dias: number; oficial: number } | null;
       /** Nível nomeado de flexibilização (FR-011) — deriva de ritmo ×
        *  atraso × encerramento, não do ritmo pedido na chamada. */
       nivel: NivelFlexibilizacao;
@@ -420,7 +425,7 @@ export function montarPlanoEmDia(input: {
   // escada de ritmos (e, com recesso no caminho, a mesma escada sem ele)
   // e só depois o plano devolvido usa o ritmo escolhido. Estado local por
   // simulação.
-  const rodar = (r: number, semRecesso: boolean) => {
+  const rodar = (r: number, semRecesso: boolean, gap89: number) => {
     const recs = semRecesso ? [] : recessos;
     const dentroRecesso = (d: string) =>
       recs.find((x) => d >= x.ini && d <= x.fim);
@@ -430,6 +435,9 @@ export function montarPlanoEmDia(input: {
       r >= RITMO_UM_POR_DIA ? GAP_UM_POR_DIA : GAP_MINIMO_DIAS;
     const gapApos = (numero: number | null): number => {
       if (numero == null) return 0;
+      // 8→9 tem folga própria (prática das submetas): o degrau vem da
+      // simulação — oficial, 7 dias ou o piso —, não do gap genérico
+      if (numero === 8) return gap89;
       const exige = META_PASSOS_PLANO[numero]?.exige;
       return exige ? GAP_DIAS_EXIGE[exige] : pisoGenerico;
     };
@@ -757,11 +765,15 @@ export function montarPlanoEmDia(input: {
   // A caminhada é pura: cache por (ritmo, recesso) pras sondas não
   // re-fazerem conta
   const cacheRodar = new Map<string, ReturnType<typeof rodar>>();
-  const simular = (r: number, semRecesso = false) => {
-    const k = `${r}:${semRecesso}`;
+  const simular = (
+    r: number,
+    semRecesso = false,
+    gap89: number = GAP_89_OFICIAL
+  ) => {
+    const k = `${r}:${semRecesso}:${gap89}`;
     let s = cacheRodar.get(k);
     if (!s) {
-      s = rodar(r, semRecesso);
+      s = rodar(r, semRecesso, gap89);
       cacheRodar.set(k, s);
     }
     return s;
@@ -778,15 +790,29 @@ export function montarPlanoEmDia(input: {
     (!devidos.length &&
       !pendenciasRegistro.length &&
       !travados.some((t) => t.data > t.oficialData)) ||
-    (simular(RITMO_UM_POR_DIA).convergiu &&
-      simular(RITMO_UM_POR_DIA).dataProjetada == null);
+    (simular(RITMO_UM_POR_DIA, false, GAP_89_OFICIAL).convergiu &&
+      simular(RITMO_UM_POR_DIA, false, GAP_89_OFICIAL).dataProjetada == null);
   // escada do mais leve ao mais pesado: "em dia" já é ritmo_normal (nada
   // a flexibilizar); o primeiro degrau que fecha nomeia o nível; nenhum
   // degrau fechando vira conversa com a coordenação
-  const ritmoQueFecha = (semRecesso: boolean) =>
-    RITMOS_PLANO.find((r) => simular(r, semRecesso).dataRecuperacao != null) ??
-    null;
-  const ritmoLeve = emDia ? null : ritmoQueFecha(false);
+  const ritmoQueFecha = (gap89: number, semRecesso: boolean) =>
+    RITMOS_PLANO.find(
+      (r) => simular(r, semRecesso, gap89).dataRecuperacao != null
+    ) ?? null;
+  // primeiro degrau que fecha: folga oficial (14d) → 7d → piso. Só desce
+  // quando o degrau anterior não fecha antes do encerramento.
+  let gap89 = GAP_89_OFICIAL;
+  let ritmoLeve: number | null = null;
+  if (!emDia) {
+    for (const g of GAP_89_DEGRAUS) {
+      const r = ritmoQueFecha(g, false);
+      if (r != null) {
+        gap89 = g;
+        ritmoLeve = r;
+        break;
+      }
+    }
+  }
   const estado: EstadoPlano = emDia
     ? "em_dia"
     : ritmoLeve != null
@@ -801,8 +827,10 @@ export function montarPlanoEmDia(input: {
 
   const ritmo =
     ritmoPedido ?? (emDia ? RITMOS_PLANO[0] : (ritmoLeve ?? RITMO_UM_POR_DIA));
-  const s = simular(ritmo);
-  const avisos = [...s.avisos];
+  const s = simular(ritmo, false, gap89);
+  // em dia não tem plano: a caminhada de sondagem não vira aviso nem data
+  const avisos = emDia ? [] : [...s.avisos];
+
 
   // 018 — fusão no plano: a marca `sessao` etiqueta os passos que a
   // dupla decidiu juntar numa sessão só, sem mexer na matemática (a
@@ -810,6 +838,17 @@ export function montarPlanoEmDia(input: {
   const passosPlano = input.fusao?.length
     ? marcarSessoes(s.passosPlano, input.fusao)
     : s.passosPlano;
+  // a folga oficial do 8→9 (prática das submetas) só é comprimida quando
+  // sem isso o plano não fecha — e a copy diz isso, não esconde
+  const flexPratica89 =
+    !emDia && gap89 < GAP_89_OFICIAL && passosPlano.some((p) => p.numero >= 8)
+      ? { dias: gap89, oficial: GAP_89_OFICIAL }
+      : null;
+  if (flexPratica89) {
+    avisos.push(
+      `O calendário oficial deixa duas semanas entre o 8º e o 9º (prática das submetas). Para fechar até o encerramento, este plano usa ${gap89} dias — é a flexibilização da recuperação.`
+    );
+  }
 
   // 518: ritmo acima de 1 por dia — o espaçamento do guia segue valendo,
   // então a copy não promete densidade que o calendário não comporta
@@ -827,7 +866,7 @@ export function montarPlanoEmDia(input: {
   let alternativaRitmo: { ritmo: number; data: string } | null = null;
   if (!emDia && s.dataRecuperacao == null) {
     for (let r = ritmo + 1; r <= RITMO_UM_POR_DIA; r++) {
-      const alt = simular(r);
+      const alt = simular(r, false, gap89);
       if (alt.dataRecuperacao != null) {
         alternativaRitmo = { ritmo: r, data: alt.dataRecuperacao };
         avisos.push(
@@ -842,7 +881,8 @@ export function montarPlanoEmDia(input: {
   // se encontrando nele, só quando isso alivia o plano (degrau mais leve)
   // ou salva o que não fecha. Plano que já fecha antes do recesso não
   // ganha a sugestão. A decisão é da dupla, no card
-  const dataLeve = ritmoLeve != null ? simular(ritmoLeve).dataRecuperacao : null;
+  const dataLeve =
+    ritmoLeve != null ? simular(ritmoLeve, false, gap89).dataRecuperacao : null;
   let alternativaRecesso: { ritmo: number; data: string } | null = null;
   const recessoNoCaminho = recessos.some(
     (r) =>
@@ -851,9 +891,9 @@ export function montarPlanoEmDia(input: {
       (dataLeve == null || dataLeve >= r.ini)
   );
   if (!emDia && recessoNoCaminho) {
-    const r = ritmoQueFecha(true);
+    const r = ritmoQueFecha(gap89, true);
     if (r != null && (ritmoLeve == null || r < ritmoLeve)) {
-      alternativaRecesso = { ritmo: r, data: simular(r, true).dataRecuperacao! };
+      alternativaRecesso = { ritmo: r, data: simular(r, true, gap89).dataRecuperacao! };
     }
   }
 
@@ -871,14 +911,17 @@ export function montarPlanoEmDia(input: {
     emDia,
     estado,
     pendenciasRegistro,
-    passos: passosPlano,
+    // em dia não tem plano a listar: a caminhada de sondagem pode incluir
+    // futuros que estouram o encerramento, e eles não são dívida da dupla
+    passos: emDia ? [] : passosPlano,
     ritmo,
-    dataRecuperacao: s.dataRecuperacao,
+    dataRecuperacao: emDia ? null : s.dataRecuperacao,
     // "só em X" é evidência do conversa — pra quem já está em dia a
     // data honesta é hoje, não a projeção dos futuros no caminho
     dataProjetada: emDia ? null : s.dataProjetada,
     encerramento,
-    cabemAteEncerramento: s.cabemAteEncerramento,
+    praticaFlex: flexPratica89,
+    cabemAteEncerramento: emDia ? null : s.cabemAteEncerramento,
     nivel,
     sugestao,
     alternativaRitmo,

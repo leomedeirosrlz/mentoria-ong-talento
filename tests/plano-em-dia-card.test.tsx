@@ -61,6 +61,7 @@ const plano = (over: Partial<PlanoAplicavel> = {}): PlanoAplicavel => ({
   dataProjetada: "2026-12-10",
   encerramento: "2027-01-15",
   cabemAteEncerramento: null,
+  praticaFlex: null,
   nivel: "semana_dupla",
   sugestao: "Dois encontros por semana recuperam o ritmo.",
   alternativaRitmo: null,
