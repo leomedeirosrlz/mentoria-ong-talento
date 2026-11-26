@@ -7,6 +7,7 @@ import { motion } from "motion/react";
 import {
   CalendarDots,
   FolderOpen,
+  Handshake,
   House,
   List,
   Question,
@@ -44,6 +45,7 @@ const NAV = [
   // `curto` vale só pra ela; sidebar, menu e aria-label seguem completos
   { href: "/jovem/especialistas", label: "Especialistas", curto: "Espec.", icon: Sparkle },
   { href: "/jovem/pessoas", label: "Pessoas", icon: Users },
+  { href: "/jovem/minha-dupla", label: "Minha dupla", icon: Handshake },
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },
   // REALIZA-345: a Ajuda do jovem — fora do MOBILE_PRIMEIRO, mora no Menu
   { href: "/jovem/ajuda", label: "Ajuda", icon: Question },

@@ -905,10 +905,18 @@ export default async function JovemHome({
       {/* Minha mentoria compacta — os 3 adultos mais pertinentes (mentor da
           dupla atual primeiro); a rede inteira segue em /jovem/pessoas. */}
       <section aria-labelledby="dupla-titulo">
-        <h2 id="dupla-titulo" className="mb-2.5 flex items-center gap-2 font-semibold">
-          <Handshake size={18} className="text-muted-foreground" aria-hidden />
-          Minha mentoria
-        </h2>
+        <div className="mb-2.5 flex items-center justify-between gap-3">
+          <h2 id="dupla-titulo" className="flex items-center gap-2 font-semibold">
+            <Handshake size={18} className="text-muted-foreground" aria-hidden />
+            Minha mentoria
+          </h2>
+          <Link
+            href="/jovem/minha-dupla"
+            className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Ver minha dupla
+          </Link>
+        </div>
         {!duplaAtual ? (
           <Card>
             <CardContent className="py-8 text-center">
