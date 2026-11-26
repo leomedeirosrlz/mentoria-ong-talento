@@ -358,11 +358,11 @@ test.describe("demo — chamados (WP1)", () => {
     await expect(page.getByText(/interna?\b/i)).toHaveCount(0);
   });
 
-  test("mentorada acompanha os próprios pedidos no perfil", async ({
+  test("mentorada acompanha os próprios pedidos na home (#apoio)", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentorado");
-    await page.goto("/jovem/perfil");
+    await page.goto("/jovem");
 
     await expect(
       page.getByRole("heading", { name: "Meus pedidos de ajuda" })
@@ -379,13 +379,16 @@ test.describe("demo — chamados (WP1)", () => {
     await expect(linha.getByText(/Plataforma · /)).toBeVisible();
     await expect(linha.getByText("Aguardando a equipe")).toBeVisible();
 
-    // detalhe embutido no perfil: só a trilha pública, sem nome de staff
+    // o link antigo /jovem/perfil?c=<id> cai na âncora #apoio da home —
+    // detalhe embutido: só a trilha pública, sem nome de staff
     await page.goto(`/jovem/perfil?c=${CH_PLATAFORMA}`);
+    await expect(page).toHaveURL(
+      new RegExp(`/jovem\\?c=${CH_PLATAFORMA}`)
+    );
     await expect(
       page.getByText("Chamado aberto por Ana Beatriz Silva.")
     ).toBeVisible();
-    await expect(page.getByText(/comentário interno/i)).toHaveCount(0);
-  });
+    await expect(page.getByText(/comentário interno/i)).toHaveCount(0);  });
 
   test("resposta da equipe vira pendência; cuidando é neutro; resolvido sai (504)", async ({
     page,
@@ -408,7 +411,7 @@ test.describe("demo — chamados (WP1)", () => {
     const verResposta = fazer.getByRole("link", { name: "Ver resposta" });
     await expect(verResposta).toHaveAttribute(
       "href",
-      `/jovem/perfil?c=${CH_FERIADO}`
+      `/jovem?c=${CH_FERIADO}#apoio`
     );
     // CHA-000148 tem dono mas a trilha pública ainda não tem fala da
     // equipe — a pendência informa, não promete: "está cuidando" neutro
@@ -422,7 +425,7 @@ test.describe("demo — chamados (WP1)", () => {
     const verAndamento = fazer.getByRole("link", { name: "Ver andamento" });
     await expect(verAndamento).toHaveAttribute(
       "href",
-      `/jovem/perfil?c=${CH_CUIDANDO}`
+      `/jovem?c=${CH_CUIDANDO}#apoio`
     );
     // CHA-000144 segue aberto sem dono — espera não é tarefa, não aparece
     await expect(
@@ -434,7 +437,7 @@ test.describe("demo — chamados (WP1)", () => {
       fazer.getByText("Não achei onde avaliar o encontro")
     ).toHaveCount(0);
     await expect(
-      fazer.locator(`a[href="/jovem/perfil?c=${CH_ENCERRADO}"]`)
+      fazer.locator(`a[href="/jovem?c=${CH_ENCERRADO}#apoio"]`)
     ).toHaveCount(0);
 
     // o gesto é link de verdade: foco de teclado cai nele
@@ -453,9 +456,10 @@ test.describe("demo — chamados (WP1)", () => {
     );
     expect(scrollW).toBeLessThanOrEqual(390);
 
-    // a ação abre a conversa no perfil — a resposta pública está lá
+    // a ação abre a conversa na âncora #apoio da home — a resposta
+    // pública está lá
     await verResposta.click();
-    await expect(page).toHaveURL(new RegExp(`/jovem/perfil\\?c=${CH_FERIADO}`));
+    await expect(page).toHaveURL(new RegExp(`/jovem\\?c=${CH_FERIADO}`));
     await expect(page.getByText(/aproveitem o feriado/)).toBeVisible();
     // e a pill do autor é neutra: "Marina está cuidando" é informação,
     // não alerta — nada de âmbar de fila (QW8)
@@ -468,7 +472,7 @@ test.describe("demo — chamados (WP1)", () => {
     page,
   }) => {
     await entrarNaDemo(page, "mentorado");
-    await page.goto("/jovem/perfil");
+    await page.goto("/jovem#apoio");
 
     // aberto → "Aguardando a equipe" e em atendimento → "Marina está
     // cuidando", ambos neutros pro autor (o texto e o ícone seguem — só a

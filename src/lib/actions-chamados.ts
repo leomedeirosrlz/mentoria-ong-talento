@@ -38,14 +38,15 @@ function erroRpc(error: { message?: string } | null): string {
 }
 
 /** Só as telas que mostram chamado: /chamados, a home (MeusChamadosCard e
- *  o badge "sem dono" do layout) e, pro jovem, /jovem/perfil — /jovem não
- *  lista chamado. As páginas são dinâmicas, então isso só invalida o router
- *  cache de quem agiu; a página atual já volta re-renderizada na resposta da
- *  action (qualquer revalidação faz o Next renderizá-la). */
+ *  o badge "sem dono" do layout) e, pro jovem, /jovem — os "Meus pedidos"
+ *  migraram do perfil pra âncora #apoio da home. As páginas são dinâmicas,
+ *  então isso só invalida o router cache de quem agiu; a página atual já
+ *  volta re-renderizada na resposta da action (qualquer revalidação faz o
+ *  Next renderizá-la). */
 function revalidaChamado(papel: string | null, opts?: { home?: boolean }) {
   revalidatePath("/chamados");
   if (opts?.home !== false) revalidatePath("/");
-  if (papel === "mentorado") revalidatePath("/jovem/perfil");
+  if (papel === "mentorado") revalidatePath("/jovem");
 }
 
 /** E-mail redundante + log depois da resposta: o Resend (e o rpc de log)
@@ -231,7 +232,7 @@ export async function publicarAtualizacaoChamado(id: string, texto: string) {
     ?.autor;
   if (autor?.email) {
     // jovem não alcança /chamados (o layout manda pra /jovem e o pedido se
-    // perde) — os pedidos dele vivem em /jovem/perfil. Admin client: quem
+    // perde) — os pedidos dele vivem em /jovem#apoio. Admin client: quem
     // atende nem sempre lê o profile do jovem pelo RLS. O papel também
     // decide o substantivo do e-mail (ajuda/apoio/chamado, R15)
     let papelAutor: string | null = null;
@@ -251,7 +252,7 @@ export async function publicarAtualizacaoChamado(id: string, texto: string) {
         texto: texto.trim(),
         papel: papelAutor,
         href: jovem
-          ? `${SITE_URL}/jovem/perfil?c=${id}`
+          ? `${SITE_URL}/jovem?c=${id}#apoio`
           : `${SITE_URL}/chamados?c=${id}`,
       }),
       contexto: "publicarAtualizacaoChamado",

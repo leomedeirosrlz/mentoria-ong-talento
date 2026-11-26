@@ -326,12 +326,9 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     tema: "apoio",
     pergunta: "Preciso de ajuda. Com quem eu falo?",
     resposta:
-      "Toque em Precisa de ajuda? Fale com a equipe, na sua página inicial, ou chame a coordenação no WhatsApp que fica ao lado. Você acompanha a resposta no seu Perfil, em Meus pedidos de ajuda.",
+      "Toque em Precisa de ajuda? Fale com a equipe, na sua página inicial, ou chame a coordenação no WhatsApp que fica ao lado. Você acompanha a resposta na própria página inicial, em Meus pedidos de ajuda.",
     prioridade: 20,
-    links: [
-      { rotulo: "Início", href: "/jovem" },
-      { rotulo: "Perfil", href: "/jovem/perfil" },
-    ],
+    links: [{ rotulo: "Início", href: "/jovem#apoio" }],
     papeis: ["mentorado"],
   },
   {
@@ -527,7 +524,8 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     id: "conta-sair-jovem",
     tema: "conta",
     pergunta: "Como saio da minha conta?",
-    resposta: "Toque no ícone de sair no topo da tela. Ele também está no Menu.",
+    resposta:
+      "No computador, o botão Sair fica no fim da barra lateral. No celular, ele fica no Menu, junto do seu nome.",
     papeis: ["mentorado"],
   },
 ];
@@ -901,7 +899,8 @@ export const MENU_DO_PAPEL: { papel: AppRole; itens: ItemComoFunciona[] }[] = [
     itens: [
       {
         rotulo: "Início",
-        texto: "Seu resumo: próximo encontro, combinados e novidades.",
+        texto:
+          "Seu resumo: próximo encontro, combinados, pedidos de ajuda e novidades.",
       },
       {
         rotulo: "Agenda",
@@ -923,7 +922,7 @@ export const MENU_DO_PAPEL: { papel: AppRole; itens: ItemComoFunciona[] }[] = [
       },
       {
         rotulo: "Perfil",
-        texto: "Seus dados, seus pedidos de ajuda e suas preferências de contato.",
+        texto: "Seus dados e suas preferências de contato.",
       },
       {
         rotulo: "Ajuda",

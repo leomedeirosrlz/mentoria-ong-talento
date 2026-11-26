@@ -188,7 +188,9 @@ test.describe("mentorado — shell /jovem", () => {
   test("home lista o combinado do jovem e esconde o do mentor", async ({
     page,
   }) => {
-    await page.goto("/jovem");
+    // a seção nasce recolhida — a âncora abre ao hidratar (mesmo caminho
+    // das pendências do "Para fazer agora")
+    await page.goto("/jovem#combinados-titulo");
     const combinados = page.locator(
       'section[aria-labelledby="combinados-titulo"]'
     );
@@ -200,7 +202,7 @@ test.describe("mentorado — shell /jovem", () => {
   test("home mostra o próximo encontro e os documentos pendentes", async ({
     page,
   }) => {
-    await page.goto("/jovem");
+    await page.goto("/jovem#docs-titulo");
     // o hero "Seu próximo encontro" (redesign) é o card de abertura — a
     // home mostra só o PRÓXIMO encontro (futuros[0]); em run paralelo a
     // trilha esp ou outro spec pode pôr um mais perto, então o assert é
@@ -228,7 +230,9 @@ test.describe("mentorado — shell /jovem", () => {
   test("marcar combinado persiste via RPC marcar_combinado", async ({
     page,
   }) => {
-    await page.goto("/jovem");
+    // âncora abre a seção recolhida (o reload adiante mantém o hash e
+    // reabre sozinha — prova o caminho que uma pendência usa)
+    await page.goto("/jovem#combinados-titulo");
     const combinados = page.locator(
       'section[aria-labelledby="combinados-titulo"]'
     );
@@ -284,13 +288,15 @@ test.describe("mentorado — shell /jovem", () => {
     page,
   }) => {
     await page.goto("/jovem");
-    // o botão solto virou a linha discreta "Precisa de ajuda?" — abre o
-    // mesmo diálogo de chamado (0084)
+    // o botão solto virou a linha discreta de ajuda — sem pedido vivo o
+    // trigger cheio é "Pedir ajuda / Precisa de ajuda? Fale com a equipe";
+    // com pedido em curso (o teste pode herdar um de runs anteriores) o
+    // gesto encolhe no ghost "Pedir ajuda". Os dois abrem o mesmo chamado.
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
       () =>
         page
-          .getByRole("button", { name: "Precisa de ajuda? Fale com a equipe" })
+          .getByRole("button", { name: /Pedir ajuda|Precisa de ajuda/ })
           .click(),
       () => dialog.isVisible()
     );

@@ -502,7 +502,7 @@ function avisos(lista: AvisoPendencia[]): PendenciaJovem[] {
 
 /** 50 — o pedido de ajuda andou: resposta pública da equipe ("X respondeu
  *  seu pedido") ou alguém cuidando sem resposta ainda (estado neutro — a
- *  linha informa, não promete). A conversa mora no perfil. */
+ *  linha informa, não promete). A conversa mora na home, na âncora #apoio. */
 function chamados(lista: ChamadoPendencia[]): PendenciaJovem[] {
   const out: PendenciaJovem[] = [];
   for (const c of lista) {
@@ -520,7 +520,7 @@ function chamados(lista: ChamadoPendencia[]): PendenciaJovem[] {
       acao: {
         tipo: "abrir_chamado",
         rotulo: respondeu ? "Ver resposta" : "Ver andamento",
-        href: `/jovem/perfil?c=${c.id}`,
+        href: `/jovem?c=${c.id}#apoio`,
         alvoId: c.id,
       },
     });

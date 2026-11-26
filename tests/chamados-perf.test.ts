@@ -260,11 +260,20 @@ describe("actions — e-mail depois da resposta e revalidação escopada", () =>
     log.mockRestore();
   });
 
-  it("revalida só as telas com chamado; /jovem/perfil só pro jovem", async () => {
+  it("revalida só as telas com chamado; /jovem só pro jovem", async () => {
     await abrirChamado(input);
     expect(m.revalidatePath.mock.calls.map((c) => c[0]).sort()).toEqual([
       "/",
       "/chamados",
+    ]);
+  });
+
+  it("ação do jovem revalida a home dele — #apoio mora em /jovem", async () => {
+    m.respostas.profiles = () => ({ id: JOVEM, role: "mentorado", nome: "Lia" });
+    await comentarChamado(C1, "obrigada!");
+    expect(m.revalidatePath.mock.calls.map((c) => c[0]).sort()).toEqual([
+      "/chamados",
+      "/jovem",
     ]);
   });
 

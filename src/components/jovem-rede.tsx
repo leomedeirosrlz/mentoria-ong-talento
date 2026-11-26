@@ -20,6 +20,7 @@ export function ContatoLinha({
   selo,
   vinculo,
   nomeJovem,
+  compacto = false,
 }: {
   c: JovemContato;
   /** "trilha concluída", "mentoria pausada"… — null quando a dupla vive */
@@ -28,20 +29,23 @@ export function ContatoLinha({
    *  do jovem; quando a linha mora num grupo por papel, o grupo já diz. */
   vinculo?: string | null;
   nomeJovem: string;
+  /** Resumo de uma superfície densa (home): linha menor e só o canal
+   *  principal; a ficha/rede completa segue com e-mail e WhatsApp. */
+  compacto?: boolean;
 }) {
   const nome = c.nome_social || c.nome || "?";
   const wa = waLink(c.whatsapp, msgApresentacaoJovem(nomeJovem));
   return (
-    <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+    <li className={cn("flex items-center gap-3 first:pt-0 last:pb-0", compacto ? "py-1.5" : "py-3")}>
       <Link
         href={`/jovem/pessoas/${c.id}`}
         prefetch={false}
-        className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <Avatar
           nome={nome}
           src={c.avatar_path ? avatarPublicUrl(c.avatar_path) : null}
-          size={40}
+          size={compacto ? 32 : 40}
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{nome}</p>
@@ -53,13 +57,13 @@ export function ContatoLinha({
         </div>
       </Link>
       <div className="flex shrink-0 items-center gap-1.5">
-        {c.email && (
+        {!compacto && c.email && (
           <a
             href={`mailto:${c.email}`}
             aria-label={`Enviar e-mail para ${nome}`}
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
-              "px-2.5"
+              "min-h-11 px-2.5"
             )}
           >
             <EnvelopeSimple size={15} aria-hidden />
@@ -72,7 +76,7 @@ export function ContatoLinha({
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Conversar com ${nome} no WhatsApp`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}
           >
             <WhatsappLogo size={15} aria-hidden />
             <span className="sr-only sm:not-sr-only sm:inline">WhatsApp</span>

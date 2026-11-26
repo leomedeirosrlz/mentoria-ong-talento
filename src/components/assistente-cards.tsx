@@ -346,7 +346,8 @@ function rotas(jovem: boolean) {
         ficha: () => "/jovem",
         encontros: () => "/jovem/agenda",
         instrumentos: () => "/jovem",
-        chamados: () => "/jovem/perfil",
+        // "Meus pedidos" mora na âncora #apoio da home do jovem
+        chamados: (c?: string) => `/jovem${c ? `?c=${c}` : ""}#apoio`,
         agenda: "/jovem/agenda",
       }
     : {
