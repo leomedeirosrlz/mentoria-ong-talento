@@ -458,7 +458,7 @@ export function AgendarEncontroDialog({
         pending={pending}
         aviso={aviso}
         onAviso={setAviso}
-        ocupadosExtra={ocupados}
+        ocupadosExtra={ocupados?.filter((o) => o.inicio !== atual?.data_hora)}
         onMudanca={mudaSel}
         onConfirmar={confirmar}
       >
