@@ -55,7 +55,6 @@ export function rotaPessoas(
     cat?: CatPessoas;
     turma?: string;
     status?: StatusPessoa;
-    trilha?: "dpp" | "especialista";
     pendencias?: boolean;
     ordem?: "pendencias";
     agrupar?: "turma";
@@ -66,7 +65,6 @@ export function rotaPessoas(
     cat: o.cat,
     turma: o.turma,
     status: o.status,
-    trilha: o.trilha,
     pendencias: o.pendencias ? "1" : undefined,
     ordem: o.ordem,
     agrupar: o.agrupar,

@@ -15,6 +15,8 @@ import { getDemoData } from "@/lib/demo/data";
 import {
   baldeDaEntrada,
   enriqueceDiretorio,
+  GRUPOS_DIRETORIO,
+  rotuloFaceta,
 } from "@/lib/jovem-diretorio";
 
 // A demo promete o mesmo recorte das views da 0076 — estes testes travam a
@@ -301,6 +303,30 @@ describe("enriqueceDiretorio — a rede é a faceta marcada (0239)", () => {
     expect(baldeDaEntrada({ tipo: "adulto", papel: "coordenacao" })).toBe("equipe");
     // híbrido adulto com papel projetado especialista cai no balde esp
     expect(baldeDaEntrada({ tipo: "adulto", papel: "mentor_especialista" })).toBe("especialistas");
+  });
+
+  it("o diretório agrupa por balde — quem mentora primeiro, na ordem do staff", () => {
+    expect(GRUPOS_DIRETORIO).toEqual([
+      "mentores",
+      "especialistas",
+      "colegas",
+      "equipe",
+    ]);
+    // o agrupamento da página depende do invariante: toda linha real cai
+    // num balde que vira seção (balde solto ficaria invisível no grid)
+    for (const p of pessoas) {
+      expect(GRUPOS_DIRETORIO).toContain(baldeDaEntrada(p));
+    }
+  });
+
+  it("rotuloFaceta fala a mesma palavra da pill — seção e URL nunca divergem", () => {
+    for (const b of GRUPOS_DIRETORIO) {
+      expect(rotuloFaceta(b)).not.toBe(b);
+    }
+    expect(rotuloFaceta("mentores")).toBe("Mentores");
+    expect(rotuloFaceta("rede")).toBe("Minha rede");
+    // faceta desconhecida degrada pro id, nunca pra vazio
+    expect(rotuloFaceta("xyz" as never)).toBe("xyz");
   });
 });
 

@@ -56,6 +56,31 @@ test.describe("jovem — diretório Pessoas", () => {
       page.getByRole("status").filter({ hasText: /\d+ pessoas/ })
     ).toBeVisible();
 
+    // o diretório abre agrupado por papel — a mesma leitura do /pessoas
+    // de staff: seção nomeada com a contagem, quem mentora primeiro
+    const sec = (rotulo: RegExp) =>
+      page.locator("section", {
+        has: page.getByRole("heading", { name: rotulo }),
+      });
+    for (const rotulo of [
+      /^Mentores/,
+      /^Especialistas/,
+      /^Colegas/,
+      /^Equipe/,
+    ]) {
+      await expect(
+        page.getByRole("heading", { name: rotulo })
+      ).toBeVisible();
+    }
+    // Ricardo é DPP → seção Mentores; Caio e Dandara → Colegas
+    await expect(
+      sec(/^Mentores/).getByText("Ricardo Tavares").first()
+    ).toBeVisible();
+    await expect(
+      sec(/^Colegas/).getByText("Caio Henrique Oliveira")
+    ).toBeVisible();
+    await expect(sec(/^Colegas/).getByText("Dandara Souza")).toBeVisible();
+
     // a rede dela, dedup por pessoa (o Paulo supervisiona as 3 duplas) —
     // selo "Sua rede" + vínculo na voz dela
     await expect(cardDe(page, "Ricardo Tavares")).toBeVisible();
@@ -102,9 +127,16 @@ test.describe("jovem — diretório Pessoas", () => {
       })
     ).toHaveAttribute("href", /wa\.me\/5511987654004/);
 
-    // "Minha rede" recorta sem recarregar — a URL registra o estado
+    // "Minha rede" recorta sem recarregar — a URL registra o estado.
+    // É lente transversal (corta os baldes), não um balde: a grade fica
+    // plana, sem seção paralela
     await aplicarFaceta(page, "Minha rede");
     await expect(page).toHaveURL(/\?papel=rede/);
+    await expect(
+      page.getByRole("heading", {
+        name: /^(Mentores|Especialistas|Colegas|Equipe) \(\d+\)/,
+      })
+    ).toHaveCount(0);
     await expect(cardDe(page, "Ricardo Tavares")).toBeVisible();
     await expect(cardDe(page, "Sofia Nogueira")).toBeVisible();
     await expect(cardDe(page, "Helena Prado")).toBeVisible();
@@ -112,9 +144,13 @@ test.describe("jovem — diretório Pessoas", () => {
     await expect(cardDe(page, "Beatriz Lins")).toHaveCount(0);
     await expect(cardDe(page, "Marcos Vinícius")).toHaveCount(0);
 
-    // "Especialistas" abre o catálogo rico — a linha "Atende:" mora aqui
+    // "Especialistas" abre o catálogo rico — a linha "Atende:" mora aqui,
+    // e a faceta de balde é ela mesma a seção (heading único com a contagem)
     await aplicarFaceta(page, "Especialistas");
     await expect(page).toHaveURL(/papel=especialistas/);
+    await expect(
+      page.getByRole("heading", { name: /^Especialistas \(\d+\)/ })
+    ).toHaveCount(1);
     await expect(cardDe(page, "Sofia Nogueira")).toBeVisible();
     await expect(cardDe(page, "Marcos Vinícius")).toBeVisible();
     await expect(cardDe(page, "Camila Ferraz")).toBeVisible();

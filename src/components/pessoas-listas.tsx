@@ -74,6 +74,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { EspecialistaCatalogoCard } from "@/components/especialista-catalogo-card";
+import { SecaoPessoas } from "@/components/secao-pessoas";
 
 const ehMentor = (p: Profile) =>
   temPapel(p, "mentor_dpp") || temPapel(p, "mentor_especialista");
@@ -145,9 +146,10 @@ const GRUPO_LABEL: Record<Grupo, string> = {
 };
 
 /** Facetas de categoria do diretório (023) — o staff fora da coordenação
- *  recorta por pills (o modal de filtros é coord-only). "Mentores DPP"
- *  separa a trilha principal e "Especialistas" abre o catálogo rico no
- *  lugar das linhas; o híbrido conta nas duas. */
+ *  recorta por pills (o modal de filtros é coord-only). "Especialistas"
+ *  abre o catálogo rico no lugar das linhas e vem antes de "Mentores DPP"
+ *  (ordem de uso); o híbrido conta nas duas. A faceta absorveu a régua
+ *  de trilha — o recorte DPP × especialista não tem segunda via na barra. */
 type CatDiretorio =
   | "equipe"
   | "supervisores"
@@ -158,8 +160,8 @@ type CatDiretorio =
 const CATS_DIRETORIO: CatDiretorio[] = [
   "equipe",
   "supervisores",
-  "mentores_dpp",
   "especialistas",
+  "mentores_dpp",
   "mentorados",
 ];
 
@@ -396,12 +398,22 @@ export function PessoasListas({
     return new URLSearchParams(window.location.search).get("busca") ?? "";
   });
   const [buscaDebounced, setBuscaDebounced] = useState(busca);
-  // categoria = recorte por papel (equipe, mentores, mentorados…) — vive
-  // no modal de filtros; na URL vai crua (?cat=mentorados)
+  // categoria = recorte por papel (equipe, mentores, mentorados…) — pra
+  // coord vive no modal de filtros, pro diretório vira pill na barra; na
+  // URL vai crua (?cat=mentorados). Deep-link antigo ?trilha= do diretório
+  // mapeia pra faceta equivalente quando ela existe (o recorte achou casa
+  // nova, o parâmetro velho sai da URL)
   const [cat, setCat] = useState<string>(() => {
     if (typeof window === "undefined") return "todos";
-    const c = new URLSearchParams(window.location.search).get("cat");
-    return c && !c.startsWith("turma:") ? c : "todos";
+    const sp = new URLSearchParams(window.location.search);
+    const c = sp.get("cat");
+    if (c && !c.startsWith("turma:")) return c;
+    if (!souCoord) {
+      const t = sp.get("trilha");
+      if (t === "dpp") return "mentores_dpp";
+      if (t === "especialista") return "especialistas";
+    }
+    return "todos";
   });
   // turma = recorte por ciclo em pills na barra (Todos, Turma 1, Turma 2…);
   // "sem-turma" marca o balde de quem não tem evidência nenhuma. Link
@@ -420,20 +432,12 @@ export function PessoasListas({
     return t === "sem-turma" || t === SEM_TURMA ? SEM_TURMA : t;
   });
   // filtros do modal (REALIZA-376): status operacional no vocabulário
-  // fechado e "somente com pendências" — a trilha do mentor virou pill
-  // na barra (um tap pro catálogo de especialistas)
+  // fechado e "somente com pendências"
   const [statusSel, setStatusSel] = useState<StatusPessoa | "todos">(() => {
     if (typeof window === "undefined") return "todos";
     const s = new URLSearchParams(window.location.search).get("status");
     return s && s in STATUS_PESSOA_LABEL ? (s as StatusPessoa) : "todos";
   });
-  const [trilhaSel, setTrilhaSel] = useState<"todas" | "dpp" | "especialista">(
-    () => {
-      if (typeof window === "undefined") return "todas";
-      const t = new URLSearchParams(window.location.search).get("trilha");
-      return t === "dpp" || t === "especialista" ? t : "todas";
-    }
-  );
   const [soPendencias, setSoPendencias] = useState(
     () =>
       typeof window !== "undefined" &&
@@ -600,18 +604,6 @@ export function PessoasListas({
     };
   }, [souCoord, basePessoas, mentorados, mapas]);
 
-  // track-pill counts share the turma denominator (whole base, not the
-  // filtered slice); a hybrid mentor counts in both pools
-  const trilhaInfo = useMemo(() => {
-    let dpp = 0;
-    let esp = 0;
-    for (const p of basePessoas) {
-      if (temPapel(p, "mentor_dpp")) dpp++;
-      if (temPapel(p, "mentor_especialista")) esp++;
-    }
-    return { dpp, esp };
-  }, [basePessoas]);
-
   // valor efetivo dos recortes — um deep-link pode apontar pra turma que
   // não existe mais (ou faceta que o papel não tem): cai no neutro
   const catEf =
@@ -633,11 +625,10 @@ export function PessoasListas({
           : null;
   // filtros de gestão são coord-only — um deep-link com ?status= ou
   // ?pendencias= não pode recortar o diretório em cima de dados que o
-  // papel não recebe (os mapas chegam vazios da página). A trilha virou
-  // faceta do diretório (023): o papel efetivo vem do embed de papéis
-  // que staff lê — DPP × especialista filtra sem mapa de turma
+  // papel não recebe (os mapas chegam vazios da página). O recorte de
+  // trilha saiu de vez: no diretório o mesmo conceito já são as facetas
+  // de categoria ("Mentores DPP", "Especialistas")
   const statusSelEf = souCoord ? statusSel : "todos";
-  const trilhaSelEf = trilhaSel;
   const soPendEf = souCoord && soPendencias;
   // "pendências primeiro" precisa dos mapas de gestão — no diretório
   // cairia numa régua vazia; vale o sort por nome
@@ -677,19 +668,6 @@ export function PessoasListas({
     s.secundarios.includes(statusSelEf);
   const statusOkPessoa = (p: Profile) => statusOk(statusProfile(p));
   const statusOkMentorado = (m: Mentorado) => statusOk(statusMentorado(m));
-  // trilha é conceito de mentor (o papel define); o jovem entra pelo
-  // vínculo — a trilha dele é a das duplas que já teve
-  const trilhaOkPessoa = (p: Profile) =>
-    trilhaSelEf === "todas" ||
-    temPapel(
-      p,
-      trilhaSelEf === "dpp" ? "mentor_dpp" : "mentor_especialista"
-    );
-  const trilhaOkMentorado = (m: Mentorado) =>
-    trilhaSelEf === "todas" ||
-    mapas.duplas.some(
-      (d) => d.mentorado_id === m.id && d.trilha === trilhaSelEf
-    );
   // "somente com pendências" segue a régua do dot warn do Detalhes (termo,
   // formação do mentor, "ainda não entrou", documentos do jovem) — inativo
   // e quem saiu do programa não têm pendência cobrável
@@ -768,14 +746,12 @@ export function PessoasListas({
     turmaOkPessoa(p) &&
     catOkPessoa(p) &&
     statusOkPessoa(p) &&
-    trilhaOkPessoa(p) &&
     areaOkPessoa(p) &&
     pendOkPessoa(p);
   const filtrosMentorado = (m: Mentorado) =>
     catOkMentorado &&
     turmaOkMentorado(m) &&
     statusOkMentorado(m) &&
-    trilhaOkMentorado(m) &&
     areaOkMentorado(m) &&
     pendOkMentorado(m);
 
@@ -913,11 +889,9 @@ export function PessoasListas({
     );
 
   // grade da faceta "Especialistas" (023) — mesmos recortes das linhas
-  // que valem pro catálogo: trilha via papel efetivo (a =especialista é
-  // tautológica nele, a =dpp deixa os híbridos), tema e busca fuzzy
-  const dppIds = new Set(
-    basePessoas.filter((p) => temPapel(p, "mentor_dpp")).map((p) => p.id)
-  );
+  // que valem pro catálogo: tema e busca fuzzy (a trilha virou a própria
+  // faceta — quem quer DPP vai na pill "Mentores DPP", não num segundo
+  // filtro dentro do catálogo)
   const scoreEsp = (e: JovemEspecialista) =>
     Math.max(
       ...[e.nome, e.nome_social].map(
@@ -927,10 +901,7 @@ export function PessoasListas({
   const catalogoEscopo = !usaCatalogo
     ? []
     : catalogo.filter(
-        (e) =>
-          (trilhaSelEf === "todas" ||
-            (trilhaSelEf === "dpp" && dppIds.has(e.id))) &&
-          (areaSelEf == null || (e.areas ?? []).includes(areaSelEf))
+        (e) => areaSelEf == null || (e.areas ?? []).includes(areaSelEf)
       );
   const catalogoExibidos = catalogoEscopo
     .map((e) => ({ e, s: q ? scoreEsp(e) : 0 }))
@@ -1046,13 +1017,12 @@ export function PessoasListas({
     catEf !== "todos" ||
     turmaSelEf != null ||
     statusSelEf !== "todos" ||
-    trilhaSelEf !== "todas" ||
     areaSelEf != null ||
     soPendEf;
 
-  // selo do botão "Filtros": só os filtros de verdade — turma, trilha e
-  // busca já são pills/campo próprios; agrupar e ordenar são controles
-  // de visão
+  // selo do botão "Filtros": só os filtros de verdade — turma já é pill
+  // própria e a busca campo próprio; agrupar e ordenar são controles de
+  // visão
   const ativosFiltro =
     (catEf !== "todos" ? 1 : 0) +
     (statusSelEf !== "todos" ? 1 : 0) +
@@ -1067,7 +1037,6 @@ export function PessoasListas({
     setCat("todos");
     setTurmaSel(null);
     setStatusSel("todos");
-    setTrilhaSel("todas");
     setAreaSel(null);
     setSoPendencias(false);
     setOrdem("nome");
@@ -1099,7 +1068,6 @@ export function PessoasListas({
     catEf,
     turmaSelEf ?? "",
     statusSelEf,
-    trilhaSelEf,
     areaSelEf ?? "",
     soPendEf ? "1" : "0",
     ordemEf,
@@ -1119,8 +1087,9 @@ export function PessoasListas({
     else sp.delete("turma");
     if (statusSelEf !== "todos") sp.set("status", statusSelEf);
     else sp.delete("status");
-    if (trilhaSelEf !== "todas") sp.set("trilha", trilhaSelEf);
-    else sp.delete("trilha");
+    // ?trilha= era o filtro removido — links antigos perdem o parâmetro
+    // na primeira renderização; no diretório ele já entrou como ?cat
+    sp.delete("trilha");
     if (areaSelEf != null) sp.set("area", areaSelEf);
     else sp.delete("area");
     if (soPendEf) sp.set("pendencias", "1");
@@ -1140,7 +1109,6 @@ export function PessoasListas({
     catEf,
     turmaSelEf,
     statusSelEf,
-    trilhaSelEf,
     areaSelEf,
     soPendEf,
     ordemEf,
@@ -1152,8 +1120,8 @@ export function PessoasListas({
     <>
       {/* barra de filtros (REALIZA-376 + 023): busca sempre; pro staff
           fora da coordenação as facetas do diretório são pills próprias
-          (categoria, trilha, tema) na gramática da casa — pro coord pills
-          de turma + o modal de filtros seguem como estavam */}
+          (categoria e tema) na gramática da casa — pro coord pills de
+          turma + o modal de filtros */}
       <div className="space-y-2.5">
         <div className="flex flex-wrap items-center gap-2">
           {/* role=search: o campo de busca fica dentro do landmark que
@@ -1308,69 +1276,9 @@ export function PessoasListas({
               )}
             </FilterChipRow>
           )}
-        {/* mentor-track pills — one tap to the specialist catalogue (the
-            row already carries "DPP 1/2 · Esp 0/1" in the meta). Faceta
-            de todo staff (023): o papel efetivo vem do embed de papéis
-            que staff lê. Hidden when no specialist exists: an all-DPP
-            program gains nothing */}
-        {trilhaInfo.esp > 0 && (
-          <FilterChipRow
-            role="group"
-            aria-label="Filtrar por trilha de mentor"
-            className="-mx-4 px-4 pb-1 sm:mx-0 sm:px-0"
-          >
-            <button
-              type="button"
-              aria-pressed={trilhaSelEf === "todas"}
-              onClick={() => setTrilhaSel("todas")}
-              className={filterChipCls(trilhaSelEf === "todas")}
-            >
-              Todas trilhas
-            </button>
-            <button
-              type="button"
-              aria-pressed={trilhaSelEf === "dpp"}
-              onClick={() =>
-                setTrilhaSel(trilhaSelEf === "dpp" ? "todas" : "dpp")
-              }
-              className={filterChipCls(trilhaSelEf === "dpp")}
-            >
-              DPP
-              <span
-                className={cn(
-                  "text-[11px] tabular-nums",
-                  trilhaSelEf === "dpp"
-                    ? "text-background/70"
-                    : "text-muted-foreground"
-                )}
-              >
-                {trilhaInfo.dpp}
-              </span>
-            </button>
-            <button
-              type="button"
-              aria-pressed={trilhaSelEf === "especialista"}
-              onClick={() =>
-                setTrilhaSel(
-                  trilhaSelEf === "especialista" ? "todas" : "especialista"
-                )
-              }
-              className={filterChipCls(trilhaSelEf === "especialista")}
-            >
-              Especialista
-              <span
-                className={cn(
-                  "text-[11px] tabular-nums",
-                  trilhaSelEf === "especialista"
-                    ? "text-background/70"
-                    : "text-muted-foreground"
-                )}
-              >
-                {trilhaInfo.esp}
-              </span>
-            </button>
-          </FilterChipRow>
-        )}
+        {/* a régua de trilha saiu de vez (onda 4): no diretório o mesmo
+            recorte já são as facetas de categoria; pra coordenação a busca
+            e as facetas por papel cobrem o caso sem um segundo eixo */}
         {/* chips de tema do diretório (023) — single-select, o mesmo chip
             desmarca; o universo é o que as linhas já carregam (areas de
             mentor, interesses dos demais e dos jovens) */}
@@ -1433,21 +1341,18 @@ export function PessoasListas({
       <div className="space-y-5">
         {porTurma &&
           gruposTurmaVisiveis.map(({ turma, itens }) => (
-            <section key={turma} className="space-y-2">
-              <h2 className="text-sm font-semibold tabular-nums">
-                {turma === SEM_TURMA
+            <SecaoPessoas
+              key={turma}
+              titulo={
+                turma === SEM_TURMA
                   ? "Sem turma"
                   : turmaAno(turma)
                     ? `${turmaLonga(turma)} · ${turmaAno(turma)}`
-                    : turmaLonga(turma)}{" "}
-                <span className="font-normal text-muted-foreground">
-                  ({itens.length})
-                </span>
-              </h2>
-              <div
-                key={`${chaveFiltros}|${turma}`}
-                className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2"
-              >
+                    : turmaLonga(turma)
+              }
+              total={itens.length}
+              chaveGrade={`${chaveFiltros}|${turma}`}
+            >
                 {itens.map((item, i) =>
                   item.tipo === "profile" ? (
                     <PessoaRow
@@ -1490,8 +1395,7 @@ export function PessoasListas({
                     />
                   )
                 )}
-              </div>
-            </section>
+            </SecaoPessoas>
           ))}
         {/* faceta "Especialistas" do diretório (023): a grade do catálogo
             staff no lugar das linhas — card completo (foto, áreas, bio,
@@ -1499,17 +1403,12 @@ export function PessoasListas({
             Sem rodapé: a única ação do card é abrir a ficha, e ela já
             mora no Link do topo */}
         {!porTurma && usaCatalogo && catalogoExibidos.length > 0 && (
-          <section className="space-y-2">
-            <h2 className="text-sm font-semibold tabular-nums">
-              Especialistas{" "}
-              <span className="font-normal text-muted-foreground">
-                ({catalogoExibidos.length})
-              </span>
-            </h2>
-            <div
-              key={`${chaveFiltros}|especialistas`}
-              className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2"
-            >
+          <SecaoPessoas
+            titulo="Especialistas"
+            total={catalogoExibidos.length}
+            chaveGrade={`${chaveFiltros}|especialistas`}
+            cards
+          >
               {catalogoExibidos.map((e, i) => (
                 <div
                   key={e.id}
@@ -1527,29 +1426,17 @@ export function PessoasListas({
                   />
                 </div>
               ))}
-            </div>
-          </section>
+          </SecaoPessoas>
         )}
         {!porTurma &&
           !usaCatalogo &&
           grupos.map(({ g, pessoas: gp, mentorados: gm }) => (
-          <section key={g} className="space-y-2">
-            <h2 className="text-sm font-semibold tabular-nums">
-              {GRUPO_LABEL[g]}{" "}
-              <span className="font-normal text-muted-foreground">
-                ({gp.length + gm.length})
-              </span>
-            </h2>
-            <div
-              key={`${chaveFiltros}|${g}`}
-              // items-start: o Detalhes aberto cresce só o próprio card —
-              // sem ele a linha do grid assume a altura do maior item e o
-              // card vizinho estica vazio junto. grid-cols-1 explícito: sem
-              // template abaixo de sm a coluna implícita dimensiona por
-              // max-content (474px com bio longa) e alarga a página —
-              // o FAB fixo ia parar fora da tela (mesma falha da agenda)
-              className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2"
-            >
+          <SecaoPessoas
+            key={g}
+            titulo={GRUPO_LABEL[g]}
+            total={gp.length + gm.length}
+            chaveGrade={`${chaveFiltros}|${g}`}
+          >
               {gp.map((p, i) => (
                 <PessoaRow
                   key={p.id}
@@ -1584,8 +1471,7 @@ export function PessoasListas({
                   marca={q ? qtBusca : undefined}
                 />
               ))}
-            </div>
-          </section>
+          </SecaoPessoas>
         ))}
 
         {(porTurma

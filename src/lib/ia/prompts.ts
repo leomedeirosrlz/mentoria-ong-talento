@@ -36,7 +36,7 @@ export function systemPromptIa(papeis: AppRole[], pagina?: string): string {
 Quando sugerir um recorte de tela ("ver as em risco", "abrir pessoas com pendência", "a agenda da semana"), monte o link já com o parâmetro — a página aplica o filtro na chegada:
 - /duplas?recorte=risco|atencao|andamento|pausada|concluida|encerrada|apoio — opcional &turma=<rótulo da turma> (ex.: "Turma 2")
 - /duplas/<id>?aba=agora|encontros|instrumentos|pessoas
-- /pessoas?busca=<termo>&cat=equipe|supervisores|mentores|mentorados|sempapel&status=inativo|convidado|nao_acessou|termo_pendente|docs_pendentes|ativo&trilha=dpp|especialista&turma=<rótulo ou sem-turma>&pendencias=1&ordem=pendencias&agrupar=turma
+- /pessoas?busca=<termo>&cat=equipe|supervisores|mentores|mentorados|sempapel&status=inativo|convidado|nao_acessou|termo_pendente|docs_pendentes|ativo&turma=<rótulo ou sem-turma>&pendencias=1&ordem=pendencias&agrupar=turma
 - /registros?encontro=<número>&avaliacao=excelente|boa|regular|baixa&apoio=1&tardio=1&dificuldade=com|nenhuma|aprendizagem|participacao|comportamental|organizacao|outro&dupla=<uuid>&turma=<uuid>&periodo=4s|8s&q=<termo>&ordem=recentes|prioridade|antigas&grupo=dupla|semana|avaliacao&persp=mentor|jovem|ambos&r=<uuid do registro>
 - /agenda?dia=AAAA-MM-DD&visao=dpp|especialista&aba=minha|por-mentorado|calendario|consolidada&jw=semana|mes|ciclo&turma=<rótulo>
 - /materiais?aba=instrumentos|biblioteca

@@ -10,6 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/avatar";
 import { EspecialistaCatalogoCard } from "@/components/especialista-catalogo-card";
+import { SecaoPessoas } from "@/components/secao-pessoas";
 import { FormSurface } from "@/components/form-surface";
 import { HighlightText } from "@/components/highlight-text";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +29,10 @@ import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
 import {
   baldeDaEntrada,
   FACETAS_DIRETORIO,
+  GRUPOS_DIRETORIO,
+  rotuloFaceta,
   rotuloTipo,
+  type BaldeDiretorio,
   type DiretorioPessoa,
   type FacetaDiretorio,
 } from "@/lib/jovem-diretorio";
@@ -39,11 +43,14 @@ import { cn, normaliza } from "@/lib/utils";
 // (rede marcada) e TUDO filtra no client sobre o payload SSR — faceta de
 // vínculo (?papel), chip de tema (?area) e busca fuzzy (?busca), estado na
 // URL por replaceState pra deep-link, mesma gramática do /pessoas de staff.
-// Filtros moram num modal único (REALIZA-525): a régua de pills expostas
-// saía da largura do celular — a entrada "Filtros" abre o painel rico
-// (rascunho → Aplicar, FormSurface = sheet no mobile / dialog no desktop).
-// O card da rede abre o WhatsApp quando a view já autoriza o canal — o
-// mesmo dado da ficha, projetado por enriqueceDiretorio.
+// A grade abre agrupada por papel (onda 4): as mesmas seções nomeadas com
+// contagem que a staff lê — "Minha rede" fica fora por ser lente
+// transversal, não um balde. Filtros moram num modal único (REALIZA-525):
+// a régua de pills expostas saía da largura do celular — a entrada
+// "Filtros" abre o painel rico (rascunho → Aplicar, FormSurface = sheet
+// no mobile / dialog no desktop). O card da rede abre o WhatsApp quando
+// a view já autoriza o canal — o mesmo dado da ficha, projetado por
+// enriqueceDiretorio.
 
 const FACETA_IDS = new Set(FACETAS_DIRETORIO.map((f) => f.id));
 
@@ -222,6 +229,46 @@ export function JovemDiretorio({
   // (convenção de movimento: troca de filtro sempre anima)
   const chaveFiltros = [q, faceta, areaSel ?? ""].join("|");
 
+  // o diretório abre agrupado por papel — a mesma leitura da staff em
+  // /pessoas (seção nomeada com a contagem, ordem de GRUPOS_DIRETORIO).
+  // "Minha rede" fica de fora: é lente transversal que corta os baldes,
+  // não um grupo a mais — duplicar gente numa seção paralela ia contra
+  // o modelo que as duas superfícies dividem
+  const porBalde = new Map<BaldeDiretorio, DiretorioPessoa[]>();
+  for (const b of GRUPOS_DIRETORIO) porBalde.set(b, []);
+  for (const p of exibidas) porBalde.get(baldeDaEntrada(p))?.push(p);
+
+  // o card é o mesmo na grade plana da lente e nas seções por balde —
+  // especialista vai pro card de catálogo (a grade rica), o resto pro
+  // DiretorioCard
+  const cardDe = (p: DiretorioPessoa, i: number) =>
+    p.tipo === "especialista" ? (
+      <EspecialistaCatalogoCard
+        key={p.id}
+        e={especialistaDe(p)}
+        href={`/jovem/pessoas/${p.id}`}
+        acao={<WaIconLink p={p} nomeJovem={nomeJovem} />}
+        badge={
+          p.rede
+            ? {
+                texto: p.vinculo ?? "Sua rede",
+                cls: "border-[var(--ok)]/50 text-[var(--ok-text)]",
+              }
+            : p.vagas === 0
+              ? { texto: "Sem vagas", cls: "text-muted-foreground" }
+              : null
+        }
+      />
+    ) : (
+      <DiretorioCard
+        key={p.id}
+        p={p}
+        indice={i}
+        marca={q ? qtBusca : undefined}
+        nomeJovem={nomeJovem}
+      />
+    );
+
   return (
     <div className="space-y-4">
       {/* barra única (REALIZA-525): busca + entrada "Filtros" — as pills
@@ -385,36 +432,33 @@ export function JovemDiretorio({
             )}
           </CardContent>
         </Card>
+      ) : faceta === "rede" ? (
+        // "Minha rede" é lente transversal — grade plana, sem seção
+        // paralela (mesma régua da grade das seções: coluna explícita +
+        // items-start)
+        <div
+          key={chaveFiltros}
+          className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2"
+        >
+          {exibidas.map(cardDe)}
+        </div>
       ) : (
-        <div key={chaveFiltros} className="grid gap-4 sm:grid-cols-2">
-          {exibidas.map((p, i) =>
-            p.tipo === "especialista" ? (
-              <EspecialistaCatalogoCard
-                key={p.id}
-                e={especialistaDe(p)}
-                href={`/jovem/pessoas/${p.id}`}
-                acao={<WaIconLink p={p} nomeJovem={nomeJovem} />}
-                badge={
-                  p.rede
-                    ? {
-                        texto: p.vinculo ?? "Sua rede",
-                        cls: "border-[var(--ok)]/50 text-[var(--ok-text)]",
-                      }
-                    : p.vagas === 0
-                      ? { texto: "Sem vagas", cls: "text-muted-foreground" }
-                      : null
-                }
-              />
-            ) : (
-              <DiretorioCard
-                key={p.id}
-                p={p}
-                indice={i}
-                marca={q ? qtBusca : undefined}
-                nomeJovem={nomeJovem}
-              />
-            )
-          )}
+        <div className="space-y-5">
+          {GRUPOS_DIRETORIO.map((b) => {
+            const lista = porBalde.get(b) ?? [];
+            if (lista.length === 0) return null;
+            return (
+              <SecaoPessoas
+                key={b}
+                titulo={rotuloFaceta(b)}
+                total={lista.length}
+                chaveGrade={`${chaveFiltros}|${b}`}
+                cards
+              >
+                {lista.map(cardDe)}
+              </SecaoPessoas>
+            );
+          })}
         </div>
       )}
     </div>
