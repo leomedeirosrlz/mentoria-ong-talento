@@ -86,6 +86,7 @@ export const PILLS_TOOL_ROLES = {
   meus_pedidos: ["mentorado"],
   minha_agenda: ["mentorado"],
   minha_dupla: ["mentorado"],
+  pessoas_agregado: ["coordenacao", "supervisor"],
   plano_em_dia: ["coordenacao", "supervisor", "mentor_dpp"],
   registros_da_dupla: [
     "coordenacao",

@@ -126,6 +126,7 @@ import { getIaConfig } from "./config";
 import { CacheTtl } from "./cache";
 import { buscarNosGuias, catalogoGuias } from "./guias";
 import { emitirProdutoEvento } from "../produto-eventos-server";
+import { agregarPessoasBi, getPessoasBiIa } from "./pessoas-bi";
 
 /** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário
  *  ('importacao' entrou na 0193: match semântico/revisão NL do import CSV;
@@ -3273,6 +3274,78 @@ export const IA_TOOLS = {
           motivo_outro: ehPreset ? undefined : preset || undefined,
         })
       );
+    },
+  },
+
+
+  pessoas_agregado: {
+    nome: "pessoas_agregado",
+    descricao:
+      "Agrega pessoas do programa por estado (uf), gênero, faixa de idade, papel ou trilha, com filtros simples. Coordenação vê o programa todo; supervisor vê só o recorte que a RLS dele alcança. Gênero e idade são visão da coordenação. Retorna contagens, percentuais, top N com outros e no máximo 5 linhas de exemplo sem contato nem data de nascimento.",
+    schema: z
+      .object({
+        dimensao: z
+          .enum(["estado", "genero", "faixa_idade", "papel", "trilha"])
+          .describe("dimensão do agrupamento"),
+        papel: z
+          .enum(["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista", "mentorado"])
+          .optional()
+          .describe("filtra por papel efetivo"),
+        uf: z.string().trim().min(2).max(2).optional().describe("sigla do estado, ex.: SP"),
+        genero: z
+          .enum(["feminino", "masculino", "nao_binario", "outro", "prefiro_nao_dizer"])
+          .optional(),
+        faixa_idade: z
+          .enum(["ate_17", "18_24", "25_34", "35_mais"])
+          .optional(),
+        trilha: z.enum(["dpp", "especialista"]).optional(),
+        incluir_inativas: z
+          .boolean()
+          .default(false)
+          .describe("false conta só pessoas ativas; true inclui inativas, desistentes e concluídas"),
+        limite: z.number().int().min(1).max(20).default(8).describe("top N de grupos; o restante vira outros"),
+      })
+      .strict(),
+    roles: ["coordenacao", "supervisor"],
+    run: async (a: {
+      dimensao: "estado" | "genero" | "faixa_idade" | "papel" | "trilha";
+      papel?: AppRole;
+      uf?: string;
+      genero?: "feminino" | "masculino" | "nao_binario" | "outro" | "prefiro_nao_dizer";
+      faixa_idade?: "ate_17" | "18_24" | "25_34" | "35_mais";
+      trilha?: "dpp" | "especialista";
+      incluir_inativas: boolean;
+      limite: number;
+    }, ctx) => {
+      const sensivel =
+        a.dimensao === "genero" ||
+        a.dimensao === "faixa_idade" ||
+        a.genero != null ||
+        a.faixa_idade != null;
+      if (sensivel && ctx.papel !== "coordenacao") {
+        throw new ErroTool(
+          "Gênero e faixa de idade são visão da coordenação. Posso agregar por estado, papel ou trilha dentro do seu recorte."
+        );
+      }
+      const pessoas = await getPessoasBiIa(ctx.supabase, a.incluir_inativas);
+      return {
+        ...agregarPessoasBi(pessoas, a.dimensao, a, a.limite),
+        filtros_aplicados: Object.fromEntries(
+          Object.entries({
+            papel: a.papel,
+            uf: a.uf?.toUpperCase(),
+            genero: a.genero,
+            faixa_idade: a.faixa_idade,
+            trilha: a.trilha,
+          }).filter(([, v]) => v != null)
+        ),
+        escopo:
+          ctx.papel === "coordenacao"
+            ? "programa inteiro, com a RLS da coordenação"
+            : "recorte visível ao supervisor, com a RLS da sessão",
+        privacidade:
+          "sem contato, data de nascimento, dados civis, cor/raça ou motivação; idade sai só em faixas",
+      };
     },
   },
 

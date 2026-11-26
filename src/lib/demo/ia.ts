@@ -673,6 +673,21 @@ export async function responderDemoIa(
     }
   }
 
+  const perguntaBi = /quantas pessoas|quantos jovens|por estado|por sexo|por g[êe]nero|faixa de idade|por idade|por papel|por trilha/.test(p);
+  if (perguntaBi && !STAFF.includes(role)) {
+    return {
+      content: `Essa visão é da coordenação. Eu não mostro contagem de pessoas por estado, gênero ou idade pra outros papéis.${sugestoes(role === "mentorado" ? ["Quem é meu mentor?"] : ["Como está minha dupla?"])}`,
+      ui: [],
+    };
+  }
+  if (perguntaBi) {
+    const jovens = duplas.length ? new Set(duplas.map((d) => d.mentorado?.id).filter(Boolean)).size : 2;
+    const content = role === "supervisor" && /sexo|g[êe]nero|idade/.test(p)
+      ? `Na demonstração os números são de exemplo. Gênero e faixa de idade são visão da coordenação; no seu recorte eu consigo agregar por estado, papel ou trilha.`
+      : `Na demonstração os números são de exemplo, contando só pessoas ativas. Estado: SP com ${jovens}, Rio de Janeiro com 1 e não informado com 1. Jovens contam pela ficha de mentorado, sem duplicar a conta de login. Idade sai só em faixas; contato, data de nascimento e dados civis não entram na resposta.`;
+    return { content: content + sugestoes(["Quantas pessoas por trilha?", "Resumo da semana"]), ui: [] };
+  }
+
   // leitura de aderência (REALIZA-465): "e a adesão?" também na demo, com
   // os números do dataset evergreen e o mesmo recorte de papel (as duplas
   // que a persona enxerga). Sem card, como na tool real.

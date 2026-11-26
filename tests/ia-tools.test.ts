@@ -234,6 +234,7 @@ describe("registry", () => {
         "mural_especialista",
         "operacional_insights",
         "pedir_reabertura_chamado",
+        "pessoas_agregado",
         "pessoas_busca",
         "plano_aplicar_passo",
         "plano_em_dia",

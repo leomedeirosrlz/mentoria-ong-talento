@@ -32,6 +32,7 @@ const UUID = "11111111-2222-4333-8444-555555555555";
 const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   resumo_semana: {},
   operacional_insights: {},
+  pessoas_agregado: { dimensao: "estado" },
   ficha_dupla: { dupla_id: UUID },
   registros_da_dupla: { dupla_id: UUID },
   aguardando_par: {},
