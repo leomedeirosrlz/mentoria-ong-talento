@@ -41,12 +41,12 @@ test.describe("o combinado — jovem confirma a sugestão", () => {
       /sugestão \w{3} \d{2}\/\d{2} às 19:00/
     );
     // um toque: Confirma sem digitar nada → a linha vira "Marcado pra…"
-    await c.getByRole("button", { name: "Confirmar" }).click();
+    await c.getByRole("button", { name: "Confirmar data" }).click();
     await expect(
       c.getByText(/Marcado pra \w{3} \d{2}\/\d{2} às 19:00/)
     ).toBeVisible();
     await expect(
-      c.getByRole("button", { name: "Confirmar" })
+      c.getByRole("button", { name: "Confirmar data" })
     ).toHaveCount(0);
   });
 
@@ -99,7 +99,7 @@ test.describe("o combinado — staff", () => {
     ).toBeVisible();
     await expect(regiao.getByText(/^6º encontro( · |$)/)).toBeVisible();
     await expect(
-      regiao.getByRole("button", { name: "Confirmar" })
+      regiao.getByRole("button", { name: "Confirmar data" })
     ).toBeVisible();
   });
 
@@ -116,7 +116,7 @@ test.describe("o combinado — staff", () => {
       regiao.getByText(/sugestão \w{3} \d{2}\/\d{2} às \d{2}:\d{2}/)
     ).toBeVisible();
     await expect(
-      regiao.getByRole("button", { name: "Confirmar" })
+      regiao.getByRole("button", { name: "Confirmar data" })
     ).toHaveCount(0);
   });
 });
@@ -131,7 +131,7 @@ test.describe("o combinado — 390px", () => {
     await expect(c).toBeVisible();
     await expect(c.getByText(/De \d{2}\/\d{2} a/)).toBeVisible();
     await expect(
-      c.getByRole("button", { name: "Confirmar" })
+      c.getByRole("button", { name: "Confirmar data" })
     ).toBeVisible();
     const scrollWidth = await page.evaluate(
       () => document.documentElement.scrollWidth

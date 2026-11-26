@@ -179,7 +179,7 @@ export function AgendaEspecialista({
               titulo: `Sessão ${passo} com ${r.nome} ficou sem confirmação`,
               detalhe: `Estava marcada para ${formatDiaHora(
                 e.data_hora
-              )}. Aconteceu? Confirme ou remarque na ficha.`,
+              )}. Aconteceu? Registre como foi ou remarque na ficha.`,
               href: `/duplas/${d.id}#registrar-${e.id}`,
               rotuloAcao: "Registrar sessão",
             }

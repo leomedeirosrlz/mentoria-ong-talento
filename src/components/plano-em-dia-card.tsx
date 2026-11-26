@@ -311,7 +311,7 @@ export function PlanoEmDiaCard({
                 <span className="text-muted-foreground">
                   {p.numero}º encontro{" "}
                   {p.estado === "limbo"
-                    ? `marcado pra ${formatDateTime(p.dataHora)}, ainda sem confirmação`
+                    ? `marcado pra ${formatDateTime(p.dataHora)}, ainda sem registro do desfecho`
                     : "realizado, ainda sem registro"}
                   .
                 </span>
@@ -320,7 +320,7 @@ export function PlanoEmDiaCard({
                     href={`?aba=encontros#registrar-${p.encontroId}`}
                     className={buttonVariants({ variant: "outline", size: "sm" })}
                   >
-                    {p.estado === "limbo" ? "Confirmar" : "Registrar"}
+                    {p.estado === "limbo" ? "Registrar como foi" : "Registrar"}
                   </Link>
                 )}
               </li>
