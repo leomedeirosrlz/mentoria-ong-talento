@@ -250,7 +250,7 @@ export function JovemShell({
             AppShell; 6 labels a 375px colidiam) */}
         <nav
           aria-label="Navegação principal"
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:hidden"
         >
           <div className="flex">
             {visiveis.map((item) => {
