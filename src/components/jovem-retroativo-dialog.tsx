@@ -7,6 +7,7 @@ import { registrarRetroativoJovem } from "@/lib/actions-jovem";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { elementoReal } from "@/lib/elemento-lazy";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -58,6 +59,7 @@ export function JovemRetroativoDialog({
   const [openInterno, setOpenInterno] = useState(false);
   const open = openProp ?? openInterno;
   const [aviso, setAviso] = useState<string | null>(null);
+  const [motivoTardio, setMotivoTardio] = useState("");
   const [pending, start] = useTransition();
   const router = useRouter();
   const numeroFixo = atual?.numero ?? null;
@@ -138,7 +140,7 @@ export function JovemRetroativoDialog({
     const local = `${data}T${hora}`;
     start(async () => {
       try {
-        const res = await registrarRetroativoJovem(duplaId, n, local);
+        const res = await registrarRetroativoJovem(duplaId, n, local, motivoTardio);
         if (res?.error) {
           setAviso(res.error);
           return;
@@ -185,7 +187,17 @@ export function JovemRetroativoDialog({
         aviso={aviso}
         onAviso={setAviso}
         onConfirmar={confirmar}
-      />
+      >
+        <label className="block space-y-1 text-sm">
+          <span className="font-medium">Por que está registrando agora?</span>
+          <Input
+            value={motivoTardio}
+            onChange={(e) => setMotivoTardio(e.target.value)}
+            placeholder="Obrigatório depois de 7 dias do vencimento"
+            maxLength={140}
+          />
+        </label>
+      </SeletorDiaHora>
     </>
   );
 }

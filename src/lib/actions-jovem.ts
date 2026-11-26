@@ -9,6 +9,8 @@ import {
 } from "./ciclo";
 import { parseDataHora } from "./escritas";
 import { getSlotsLivres } from "./queries-especialista";
+import { getJovemJornada } from "./queries-jovem";
+import { avaliarRetroativo, motivoTardioOk } from "./retroativo-guarda";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { erroAmigavel as erroAmigavelBase } from "./utils";
@@ -339,7 +341,8 @@ function retornoRpc(data: unknown): {
 export async function registrarRetroativoJovem(
   duplaId: string,
   numero: number,
-  dataHora: string
+  dataHora: string,
+  motivoTardio?: string | null
 ): Promise<{ error?: string; ok?: boolean; encontroId?: string }> {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -352,6 +355,19 @@ export async function registrarRetroativoJovem(
   }
   const quando = parseDataHora(dataHora);
   if (!quando) return { error: "Confira a data." };
+  const jornada = await getJovemJornada();
+  const oficial = jornada?.dupla_id === duplaId
+    ? (jornada.cronograma ?? []).find(
+        (e) => e.tipo === "encontro" && e.numero === numero
+      )?.data ?? null
+    : null;
+  const hojeStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const regra = avaliarRetroativo({ base: oficial, hoje: hojeStr });
+  if (regra.bloqueado) return { error: regra.bloqueado };
+  const motivoLimpo = motivoTardio?.trim() ?? "";
+  if (regra.tardio && !motivoTardioOk(motivoLimpo)) {
+    return { error: "Já passaram mais de 7 dias. Conte por que esse registro está sendo feito agora." };
+  }
   const { data, error } = await supabase.rpc("registrar_retroativo_mentorado", {
     p_dupla: duplaId,
     p_numero: numero,

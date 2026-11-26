@@ -14,6 +14,7 @@ import { toast } from "@/lib/toast";
 import { registrarEncontroRetroativo } from "@/lib/actions";
 import { formatDate, toDateStr, type EncontroFaltante } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { elementoReal } from "@/lib/elemento-lazy";
 import { SeletorDiaHora } from "@/components/seletor-dia-hora";
 
@@ -61,6 +62,7 @@ export function RegistrarRetroativoDialog({
   const [openInterno, setOpenInterno] = useState(false);
   const open = openProp ?? openInterno;
   const [aviso, setAviso] = useState<string | null>(null);
+  const [motivoTardio, setMotivoTardio] = useState("");
   // id do card recém-criado — o efeito abaixo rola até ele quando o refresh
   // termina (router.push com hash não rola: o card não existia no DOM velho)
   const scrollTarget = useRef<string | null>(null);
@@ -130,7 +132,7 @@ export function RegistrarRetroativoDialog({
     const local = `${data}T${hora}`;
     start(async () => {
       try {
-        const res = await registrarEncontroRetroativo(duplaId, n, local);
+        const res = await registrarEncontroRetroativo(duplaId, n, local, motivoTardio);
         if (res?.error) {
           setAviso(res.error);
         } else {
@@ -204,7 +206,17 @@ export function RegistrarRetroativoDialog({
         aviso={aviso}
         onAviso={setAviso}
         onConfirmar={confirmar}
-      />
+      >
+        <label className="block space-y-1 text-sm">
+          <span className="font-medium">Por que está registrando agora?</span>
+          <Input
+            value={motivoTardio}
+            onChange={(e) => setMotivoTardio(e.target.value)}
+            placeholder="Obrigatório depois de 7 dias do vencimento"
+            maxLength={140}
+          />
+        </label>
+      </SeletorDiaHora>
     </>
   );
 }

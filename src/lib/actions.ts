@@ -83,6 +83,7 @@ import { demoAtivo, demoLidas, demoRole, limparDemo, marcarDemoLidas, marcarDemo
 import { DEMO_MSG } from "./demo/shared";
 import { getDemoData } from "./demo/data";
 import { demoNotificacoes } from "./demo/queries";
+import { avaliarRetroativo, motivoTardioOk } from "./retroativo-guarda";
 
 /** Normaliza o embed `profile_papeis` pro `papeis` efetivo — união do role
  *  primário com as linhas do embed (o primário também vive lá; o dedupe
@@ -3185,6 +3186,7 @@ export async function registrarEncontroRetroativo(
   duplaId: string,
   numero: number,
   dataHora: string,
+  motivoTardio?: string | null,
 ): Promise<{ error?: string; ok?: boolean; encontroId?: string }> {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -3198,8 +3200,8 @@ export async function registrarEncontroRetroativo(
     .from("duplas").select("status, iniciada_em, trilha, cronograma_id").eq("id", duplaId).single();
   if (!d) return { error: "Dupla não encontrada." };
   // fechada (encerrada/concluída) não ganha encontro novo — a jornada acabou
-  if (d.status === "encerrada" || d.status === "concluida") {
-    return { error: "Essa dupla já está encerrada." };
+  if (d.status !== "ativa") {
+    return { error: "Essa dupla não está ativa." };
   }
   // DPP sem cronograma não tem calendário pra medir teto/piso — aponta a
   // correção em vez de registrar contra nada
@@ -3232,6 +3234,24 @@ export async function registrarEncontroRetroativo(
   const piso = d.iniciada_em ?? evs?.[0]?.data ?? null;
   if (piso && quando < new Date(`${piso}T00:00:00-03:00`)) {
     return { error: "A data não pode ser antes do início da mentoria." };
+  }
+
+  // passo vencido é o portão do retroativo; depois de 7 dias o motivo é
+  // obrigatório. Na especialista não há ciclo_eventos: a régua mede a
+  // data da própria sessão informada.
+  const oficial = evs?.find((e) => e.numero === numero)?.data ?? null;
+  const hojeStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const regra = avaliarRetroativo({
+    base: ehEspecialista ? quando.toISOString().slice(0, 10) : oficial,
+    hoje: hojeStr,
+  });
+  if (!ehEspecialista && !oficial) {
+    return { error: "Esse encontro não faz parte do guia oficial." };
+  }
+  if (regra.bloqueado) return { error: regra.bloqueado };
+  const motivoLimpo = motivoTardio?.trim() ?? "";
+  if (regra.tardio && !motivoTardioOk(motivoLimpo)) {
+    return { error: "Já passaram mais de 7 dias. Conte por que esse registro está sendo feito agora." };
   }
 
   // na trilha especialista o número é o ordinal da tentativa — quem decide é
@@ -3281,6 +3301,9 @@ export async function registrarEncontroRetroativo(
       realizado_em: quando.toISOString(),
       status: "realizado",
       origem: "externo",
+      ...(regra.tardio
+        ? { motivo_reagendamento: `Registro tardio: ${motivoLimpo}` }
+        : {}),
       created_by: eu.id,
     })
     .select("id")
