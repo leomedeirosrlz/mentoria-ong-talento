@@ -469,6 +469,7 @@ export function montarPlanoEmDia(input: {
     // conta pela data dele; o resto a caminhada preenche com a data
     // planejada — devido, travado ou futuro
     const cobertura = new Map<number, string>();
+    const semDataRealizado: number[] = [];
     for (const no of jornada.nos) {
       if (
         no.estado === "realizado_completo" ||
@@ -480,8 +481,45 @@ export function montarPlanoEmDia(input: {
           const dia = toDateStr(new Date(quando));
           sobePiso(no.numero, dia);
           cobertura.set(no.numero, dia);
+        } else {
+          // registro antigo sem data (import de 27/10 deixou 3 rows assim):
+          // o passo ESTÁ feito; sem data, a oficial é a âncora honesta. Sem
+          // isso a caminhada não converge e o plano inteiro vira conversa.
+          const oficial = no.evento.data;
+          if (oficial) {
+            sobePiso(no.numero, oficial);
+            cobertura.set(no.numero, oficial);
+            semDataRealizado.push(no.numero);
+          }
         }
       }
+    }
+    // buraco na sequência: passo em aberto ANTES de um já feito — o caso
+    // "fizeram 7, esqueceram de registrar o 3". O plano conta o 3º como
+    // devido; a linha abaixo diz como ele sai da conta.
+    const ultimoFeito = jornada.nos.reduce(
+      (m, no) =>
+        no.estado === "realizado_completo" ||
+        no.estado === "pendente_registro" ||
+        no.estado === "limbo"
+          ? Math.max(m, no.numero)
+          : m,
+      0
+    );
+    const buracos = jornada.nos
+      .filter((no) => no.numero < ultimoFeito && !cobertura.has(no.numero))
+      .map((no) => no.numero);
+    if (buracos.length) {
+      const lista = buracos.map((n) => `${n}º`).join(", ");
+      avisos.push(
+        `${lista} ${buracos.length === 1 ? "está" : "estão"} em aberto entre encontros já feitos. Se ${buracos.length === 1 ? "ele aconteceu" : "eles aconteceram"}, registre na ficha — sai do plano.`
+      );
+    }
+    if (semDataRealizado.length) {
+      const lista = semDataRealizado.map((n) => `${n}º`).join(", ");
+      avisos.push(
+        `${lista} ${semDataRealizado.length === 1 ? "está marcado" : "estão marcados"} como feito sem data de registro — usei a data oficial ${semDataRealizado.length === 1 ? "dele" : "de cada um"} na conta. Corrigir a data na ficha deixa o plano exato.`
+      );
     }
 
     let cursor = addDias(hojeStr, 1);
@@ -697,12 +735,15 @@ export function montarPlanoEmDia(input: {
         }
       }
     }
-    const cabemAteEncerramento = encerramento
-      ? {
-          cabem: itens.filter((i) => i.data <= encerramento).length,
-          faltam: itens.length,
-        }
-      : null;
+    // "cabem X de Y" só faz sentido quando a caminhada fechou; numa
+    // simulação que não converge a contagem contradiz o veredito
+    const cabemAteEncerramento =
+      encerramento && convergiu
+        ? {
+            cabem: itens.filter((i) => i.data <= encerramento).length,
+            faltam: itens.length,
+          }
+        : null;
     return {
       passosPlano,
       avisos,

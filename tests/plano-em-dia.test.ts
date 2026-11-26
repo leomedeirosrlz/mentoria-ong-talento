@@ -518,3 +518,46 @@ describe("montarPlanoEmDia — gates de escopo (review)", () => {
     expect(p5.encontroId).toBe(semData.id);
   });
 });
+
+describe("montarPlanoEmDia — registro feito sem data (QA 1126)", () => {
+  // Produção tinha 3 rows `realizado` com data_hora e realizado_em nulos
+  // (import de 27/10). A cobertura ignorava o passo, a caminhada não
+  // convergia e o plano inteiro caía em "nem 1 por dia fecha" mesmo com
+  // todas as datas sugeridas antes do encerramento.
+  it("passo realizado sem data usa a oficial e não derruba o plano", () => {
+    const d = mkDupla({
+      iniciada_em: "2025-10-01",
+      encontros: [
+        encRealizado(1, "2025-10-07"),
+        encRealizado(2, "2025-10-14"),
+        mkEncontro(3, {
+          status: "realizado",
+          data_hora: null,
+          realizado_em: null,
+        }),
+      ],
+    });
+    const r = plano(d, "2025-11-10");
+    if (!r.aplicavel) throw new Error("não aplicável");
+    expect(r.estado).not.toBe("conversa");
+    expect(r.avisos.join(" ")).toMatch(/sem data de registro/);
+  });
+});
+
+describe("montarPlanoEmDia — buraco na sequência (QA 1126)", () => {
+  it("passo em aberto antes de um feito ganha aviso de registro", () => {
+    const d = mkDupla({
+      iniciada_em: "2025-10-01",
+      encontros: [
+        encRealizado(1, "2025-10-07"),
+        encRealizado(2, "2025-10-14"),
+        // o 3º aconteceu na vida real, mas ninguém registrou
+        encRealizado(4, "2025-10-28"),
+      ],
+    });
+    const r = plano(d, "2025-11-10");
+    if (!r.aplicavel) throw new Error("não aplicável");
+    expect(r.avisos.join(" ")).toMatch(/3º está em aberto/);
+    expect(r.avisos.join(" ")).toMatch(/registre na ficha/);
+  });
+});
