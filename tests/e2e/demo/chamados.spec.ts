@@ -386,7 +386,9 @@ test.describe("demo — chamados (WP1)", () => {
       new RegExp(`/jovem\\?c=${CH_PLATAFORMA}`)
     );
     await expect(
-      page.getByText("Chamado aberto por Ana Beatriz Silva.")
+      page
+        .getByRole("list", { name: "Conversa" })
+        .getByText("Chamado aberto por Ana Beatriz Silva.")
     ).toBeVisible();
     await expect(page.getByText(/comentário interno/i)).toHaveCount(0);  });
 

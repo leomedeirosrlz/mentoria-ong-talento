@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   ArrowsClockwise,
   Bell,
@@ -60,6 +61,16 @@ type Ctx = Estado & {
 const NotificacoesCtx = createContext<Ctx | null>(null);
 
 const POLL_MS = 60_000;
+
+/** Notificações antigas de chamado apontam `/chamados?c=<id>`; para o jovem
+ *  essa fila não existe e o redirect de papel perderia o recorte. No shell
+ *  dele o sino reescreve o deep link pra conversa que mora na home. */
+export function hrefChamadoDoJovem(href: string): string {
+  const url = new URL(href, "https://realiza.local");
+  if (url.pathname !== "/chamados") return href;
+  const c = url.searchParams.get("c");
+  return `/jovem${c ? `?c=${encodeURIComponent(c)}` : ""}#apoio`;
+}
 
 /** Um provider por shell — as duas instâncias do sino (top bar mobile e
  *  sidebar desktop) compartilham estado e um único poll. Leituras são
@@ -276,6 +287,7 @@ export function NotificacoesBell({
   align: "start" | "end" | "center";
 }) {
   const ctx = useContext(NotificacoesCtx);
+  const pathname = usePathname();
   const [aberto, setAberto] = useState(false);
   const [agoraMs, setAgoraMs] = useState(() => Date.now());
   const naoLidas = ctx?.naoLidas ?? 0;
@@ -370,7 +382,11 @@ export function NotificacoesBell({
                     {(() => {
                       // com href é navegação real → <a>: Cmd+click, nova aba e
                       // preview de URL funcionam; sem href continua botão
-                      const hrefOk = pathInterno(n.href);
+                      const hrefInterno = pathInterno(n.href);
+                      const hrefOk =
+                        hrefInterno && pathname.startsWith("/jovem")
+                          ? hrefChamadoDoJovem(hrefInterno)
+                          : hrefInterno;
                       const conteudo = (
                         <>
                           <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
