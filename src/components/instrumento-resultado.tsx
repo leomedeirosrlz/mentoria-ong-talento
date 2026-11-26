@@ -60,7 +60,7 @@ function Bloco({
 function Declaracao({ texto }: { texto: string }) {
   if (!texto) return null;
   return (
-    <blockquote className="rounded-xl border-l-2 border-[var(--brand-lime)] bg-[var(--brand-lime)]/5 px-4 py-3">
+    <blockquote id="pdm-resposta-declaracao" className="rounded-xl border-l-2 border-[var(--brand-lime)] bg-[var(--brand-lime)]/5 px-4 py-3">
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         Declaração de Visão
       </p>
@@ -314,7 +314,8 @@ function MetasResultado({
           {metas.map((m) => (
             <li
               key={m.n}
-              className="rounded-lg border border-border/70 px-3 py-2.5"
+              id={`pdm-resposta-meta-${m.n}`}
+              className="scroll-mt-4 rounded-lg border border-border/70 px-3 py-2.5"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold tabular-nums text-muted-foreground">

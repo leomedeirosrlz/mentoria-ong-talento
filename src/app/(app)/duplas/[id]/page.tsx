@@ -53,6 +53,7 @@ import {
 import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getPdmDaDupla, getPdmResumo } from "@/lib/queries-pdm";
+import { instrumentosOrigemPdm } from "@/lib/pdm-origem";
 import {
   dadosResumoJornada,
   encerramentoDecidido,
@@ -1671,6 +1672,7 @@ export default async function DuplaPage({
                     souMentor &&
                     (dupla.status === "ativa" || dupla.status === "pausada")
                   }
+                  instrumentosOrigem={instrumentosOrigemPdm(instrumentos)}
                 />
               )}
               {terceiros && (

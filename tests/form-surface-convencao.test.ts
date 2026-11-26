@@ -51,9 +51,10 @@ describe("superfície única por viewport (spec 022)", () => {
     // 16 áreas de vida (FR-011): o popup ancora junto ao trigger em vez
     // de alinhar o item marcado por cima da superfície
     expect(item).toContain("alignItemWithTrigger={false}");
-    // os 2 DialogContent que sobram são os permitidos: visão (1
-    // textarea) e confirmação de exclusão — nenhum denso, nenhum size
-    expect(src.match(/<DialogContent/g)).toHaveLength(2);
+    // os 3 DialogContent que sobram são os permitidos: visão (1
+    // textarea), confirmação de exclusão e leitura da resposta de origem —
+    // nenhum form denso, nenhum size proibido
+    expect(src.match(/<DialogContent/g)).toHaveLength(3);
     expect(bloco(src, "VisaoDialog")).toContain("<DialogContent>");
     expect(bloco(src, "ExcluirDialog")).toContain("<DialogContent>");
     expect(src).not.toMatch(DENSA_NUNCA_MD);
