@@ -237,7 +237,7 @@ export function PlanoAcordosCard({
       else
         toast.success(
           acao === "aceitar"
-            ? "Combinado aceito."
+            ? "Plano aceito."
             : "Contestação enviada. A equipe foi avisada."
         );
       router.refresh();
@@ -410,47 +410,61 @@ export function PlanoAcordosCard({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <span className="rounded-full bg-[var(--destaque)]/15 px-2.5 py-0.5 text-xs font-semibold">
           {statusTexto[plano.status] ?? plano.status}
         </span>
         {plano.versao > 1 && (
-          <span className="text-xs text-muted-foreground">
-            versão {plano.versao}
-          </span>
+          <>
+            <span aria-hidden className="h-3 w-px bg-foreground/15" />
+            <span className="text-xs text-muted-foreground">
+              versão {plano.versao}
+            </span>
+          </>
         )}
         {plano.escopo?.ritmo != null && (
-          <span className="text-xs text-muted-foreground">
-            {plano.escopo.ritmo === 1
-              ? "1 encontro por semana"
-              : `até ${plano.escopo.ritmo} encontros por semana`}
-          </span>
+          <>
+            <span aria-hidden className="h-3 w-px bg-foreground/15" />
+            <span className="text-xs text-muted-foreground">
+              {plano.escopo.ritmo === 1
+                ? "1 encontro por semana"
+                : `até ${plano.escopo.ritmo} encontros por semana`}
+            </span>
+          </>
         )}
         {janela && (
-          <span className="text-xs text-muted-foreground">
-            De {ddmm(janela.inicio)} a {ddmm(janela.fim)}
-          </span>
-        )}
-        {combinadoHref && (
-          <Link
-            href={combinadoHref}
-            className="inline-flex items-center gap-1 rounded-sm text-xs font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <BookOpenText size={13} aria-hidden />
-            Ler o combinado
-          </Link>
-        )}
-        {whatsappHref && (
-          <a
-            href={whatsappHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center gap-1 rounded-sm text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8"
-          >
-            Avisar por WhatsApp
-          </a>
+          <>
+            <span aria-hidden className="h-3 w-px bg-foreground/15" />
+            <span className="text-xs text-muted-foreground">
+              De {ddmm(janela.inicio)} a {ddmm(janela.fim)}
+            </span>
+          </>
         )}
       </div>
+
+      {(combinadoHref || whatsappHref) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {combinadoHref && (
+            <Link
+              href={combinadoHref}
+              className="inline-flex items-center gap-1 rounded-sm text-xs font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <BookOpenText size={13} aria-hidden />
+              Ler o plano
+            </Link>
+          )}
+          {whatsappHref && (
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center gap-1 rounded-sm text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8"
+            >
+              Avisar por WhatsApp
+            </a>
+          )}
+        </div>
+      )}
 
       {/* a leitura da proposta muda por lado: quem ainda não respondeu
           vê o pedido; quem já carimbou vê que um aceite da dupla basta */}
@@ -462,7 +476,7 @@ export function PlanoAcordosCard({
       )}
       {estado === "proposto_staff_falta_outro" && meuLado != null && (
         <p className="text-sm text-muted-foreground">
-          Você já respondeu. Um aceite da dupla põe o combinado pra
+          Você já respondeu. Um aceite da dupla põe o plano pra
           valer.
         </p>
       )}
@@ -685,7 +699,7 @@ export function PlanoAcordosCard({
             </p>
             <p className="text-xs text-muted-foreground">
               Podem repensar a resposta antes de aceitar. Se as datas
-              mudarem, o combinado recalcula junto.
+              mudarem, o plano recalcula junto.
             </p>
             <RecessoDecisao
               duplaId={duplaId}
@@ -771,7 +785,7 @@ export function PlanoAcordosCard({
             <DialogTitle>O plano não serve pra você?</DialogTitle>
           </DialogHeader>
           <DialogDescription className="leading-relaxed">
-            A contestação encerra esse combinado. A equipe é avisada e um
+            A contestação encerra esse plano. A equipe é avisada e um
             plano novo pode nascer da conversa de vocês.
           </DialogDescription>
           <DialogFooter>

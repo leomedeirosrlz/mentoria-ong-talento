@@ -91,6 +91,10 @@ export function AcordosCentral({
           return q.charAt(0).toUpperCase() + q.slice(1);
         })();
 
+  const temPlano = !!(planoVivo || ultimoFechado);
+  const ajustesDepoisDePlano = temPlano;
+  const intervencoesDepoisDeGrupo = temPlano || !!ajustesGuia;
+
   if (!planoVivo && !ultimoFechado && !intervencoesAbertas.length && !ajustesGuia)
     return null;
 
@@ -104,8 +108,12 @@ export function AcordosCentral({
       </h2>
 
       {planoVivo && (
-        <div className="mt-3">
-          <PlanoAcordosCard
+        <section aria-labelledby="acordos-plano" className="mt-4">
+          <h3 id="acordos-plano" className="text-sm font-semibold">
+            Plano pra ficar em dia
+          </h3>
+          <div className="mt-2">
+            <PlanoAcordosCard
             plano={{
               ...planoVivo,
               aceites: aceitesDoPlano(planoVivo),
@@ -144,8 +152,9 @@ export function AcordosCentral({
                 : null
             }
           />
+          </div>
           {(planoVivo.status === "aceito" || planoVivo.status === "ativo") && (
-            <div className="mt-3">
+            <div className="mt-4">
               <RoteirosPlano
                 roteiros={roteiros.filter((r) => r.plano_id === planoVivo.id)}
                 planoVersao={planoVivo.versao}
@@ -157,11 +166,14 @@ export function AcordosCentral({
               />
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {!planoVivo && ultimoFechado && (
-        <div className="mt-2 space-y-2">
+        <section aria-labelledby="acordos-plano-fechado" className="mt-4 space-y-2">
+          <h3 id="acordos-plano-fechado" className="text-sm font-semibold">
+            Plano pra ficar em dia
+          </h3>
           <p className="text-sm text-muted-foreground">
             Último plano: {rotuloStatus(ultimoFechado.status)}
             {ultimoFechado.contestado_motivo
@@ -179,35 +191,50 @@ export function AcordosCentral({
                 variante="outline"
               />
             )}
-        </div>
+        </section>
       )}
 
       {ajustesGuia && (
-        <div className="mt-3 rounded-lg bg-muted/50 px-3.5 py-3 shadow-[var(--shadow-inset)]">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-foreground">
-              Guia do {numeroGuiaAtual}º encontro ajustado pra vocês
-            </p>
+        <section
+          aria-labelledby="acordos-ajustes-guia"
+          className={ajustesDepoisDePlano ? "mt-4 border-t border-foreground/10 pt-4" : "mt-4"}
+        >
+          <h3 id="acordos-ajustes-guia" className="text-sm font-semibold">
+            Ajustes no guia
+          </h3>
+          <div className="mt-2 rounded-lg bg-muted/50 px-3.5 py-3 shadow-[var(--shadow-inset)]">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium text-foreground">
+                Guia do {numeroGuiaAtual}º encontro ajustado pra vocês
+              </p>
             {(souMentor || souStaff) && numeroGuiaAtual != null && (
               <VoltarGuiaButton duplaId={dupla.id} numero={numeroGuiaAtual} />
             )}
           </div>
-          <ul className="mt-1.5 space-y-1.5">
-            {ajustesGuia.ajustes.map((a, i) => (
-              <li key={i} className="text-sm">
-                <p>{a.sugestao}</p>
-                <p className="text-xs text-muted-foreground">{a.justificativa}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
+            <ul className="mt-1.5 space-y-1.5">
+              {ajustesGuia.ajustes.map((a, i) => (
+                <li key={i} className="text-sm">
+                  <p>{a.sugestao}</p>
+                  <p className="text-xs text-muted-foreground">{a.justificativa}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
       )}
 
       {souStaff && intervencoesAbertas.length > 0 && (
-        <div className="mt-3 space-y-2">
-          <p className="text-xs font-semibold text-foreground">
+        <section
+          aria-labelledby="acordos-intervencoes"
+          className={
+            intervencoesDepoisDeGrupo
+              ? "mt-4 space-y-2 border-t border-foreground/10 pt-4"
+              : "mt-4 space-y-2"
+          }
+        >
+          <h3 id="acordos-intervencoes" className="text-sm font-semibold">
             Intervenções sugeridas
-          </p>
+          </h3>
           <ul className="space-y-2.5">
             {intervencoesAbertas.map((i) => (
               <li
@@ -233,7 +260,7 @@ export function AcordosCentral({
               </li>
             ))}
           </ul>
-        </div>
+        </section>
       )}
     </section>
   );
