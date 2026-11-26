@@ -32,7 +32,7 @@ import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Lado do jovem (REALIZA-108) — shell próprio, não o AppShell filtrado:
- *  sete destinos fixos e nada de navegação de staff. O acento da nav é o
+ *  oito destinos fixos e nada de navegação de staff. O acento da nav é o
  *  amarelo --role-mentorado (o verde fica pros adultos) — a mesma cor do
  *  avatar-iniciais do jovem no resto do app. */
 const NAV = [
@@ -54,8 +54,8 @@ const NAV = [
 /** Bottom nav: 4 destinos fixos + Menu (REALIZA-221), na mesma prioridade
  *  da sidebar. Primárias = o que ela mais usa: home, a agenda, a jornada
  *  (é onde moram os links dos forms e o acervo) e o catálogo de
- *  especialistas. Pessoas e Perfil ficam no menu lateral, que tem a
- *  navegação inteira. */
+ *  especialistas. Pessoas, Minha dupla, Perfil e Ajuda ficam no menu
+ *  lateral, que tem a navegação inteira. */
 const MOBILE_PRIMEIRO = [
   "/jovem",
   "/jovem/agenda",
@@ -168,7 +168,7 @@ export function JovemShell({
           </div>
         </header>
 
-        {/* sidebar desktop — mesma linguagem do AppShell, sete destinos */}
+        {/* sidebar desktop — mesma linguagem do AppShell, oito destinos */}
         <aside className="hidden md:flex w-56 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex-col fixed inset-y-0">
           <div className="px-5 pt-6 pb-8">
             <Link href="/jovem" className="inline-block" aria-label="Início">
@@ -188,7 +188,7 @@ export function JovemShell({
                   href={item.href}
                   aria-current={at ? "page" : undefined}
                   className={cn(
-                    "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                    "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                     at
                       ? "text-[var(--destaque-foreground)] font-semibold"
                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"

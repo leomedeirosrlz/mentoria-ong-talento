@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   demoEspecialistasCatalogo,
@@ -405,6 +408,65 @@ describe("demoPessoas — profiles_select apertado (0076)", () => {
     expect(ids).toContain(anaLogin);
     expect(ids).toContain(caioLogin);
     expect(ids).not.toContain(dandaraLogin);
+  });
+});
+
+// Guarda de fonte da fatia "minha dupla" (mesmo padrão da superfície
+// única): a página promete leitura jovem_* pura e nenhum gesto local —
+// o invariante é o que a fonte NÃO importa nem projeta. Comentários
+// podem citar a fronteira em prosa, a régua vale pro código.
+const RAIZ = fileURLToPath(new URL("..", import.meta.url));
+const ler = (p: string) => readFileSync(resolve(RAIZ, p), "utf8");
+const semComentario = (src: string) =>
+  src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|\s)\/\/[^\n]*/g, "$1");
+
+describe("/jovem/minha-dupla — leitura do jovem, sem recorte de staff", () => {
+  const fonte = ler("src/app/(jovem)/jovem/minha-dupla/page.tsx");
+  const codigo = semComentario(fonte);
+
+  it("só bebe das leituras do próprio jovem — sem action, serviço ou fonte de staff", () => {
+    const imports = [...fonte.matchAll(/from "([^"]+)"/g)].map((m) => m[1]);
+    expect(imports).toContain("@/lib/queries-jovem");
+    for (const i of imports) {
+      expect(i.startsWith("@/lib/actions"), i).toBe(false);
+      expect(i, i).not.toMatch(/service|admin|semaforo|registro/);
+    }
+  });
+
+  it("não projeta campo interno — semáforo, nota e observação ficam fora", () => {
+    for (const campo of [
+      "semaforo",
+      "nota_interna",
+      "observacao",
+      "observacoes",
+      "motivo_encerramento",
+      "avaliacao_visivel_mentor",
+      "registros.",
+    ]) {
+      expect(codigo.includes(campo), campo).toBe(false);
+    }
+  });
+
+  it("é leitura: sem form, sem action do jovem e sem onClick mutante", () => {
+    expect(codigo).not.toMatch(/<form[\s>]/);
+    expect(codigo).not.toMatch(/use server/);
+    expect(codigo).not.toMatch(/onClick=/);
+    expect(codigo).not.toMatch(/<button[\s>]/);
+  });
+
+  it("está ligada: item na nav do shell e link discreto na home", () => {
+    const shell = ler("src/components/jovem-shell.tsx");
+    expect(shell).toContain('"/jovem/minha-dupla"');
+    // fora da bottom nav — os 4 primeiros + Menu seguem os mesmos
+    const mobile = shell.slice(
+      shell.indexOf("const MOBILE_PRIMEIRO"),
+      shell.indexOf("] as const", shell.indexOf("const MOBILE_PRIMEIRO"))
+    );
+    expect(mobile).not.toContain("minha-dupla");
+    const home = ler("src/app/(jovem)/jovem/page.tsx");
+    expect(home).toContain('href="/jovem/minha-dupla"');
   });
 });
 
