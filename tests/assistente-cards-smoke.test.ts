@@ -104,6 +104,20 @@ const BLOCOS: UiBloco[] = [
     pessoas: [{ id: "p1", nome: "Ana Souza", papel: "mentor_dpp" }],
   },
   {
+    kind: "agregado",
+    titulo: "Pessoas por estado (UF)",
+    recorte: "Mentorado",
+    total: 24,
+    universo: "pessoas ativas",
+    participacao_multipla: false,
+    itens: [
+      { chave: "SP", rotulo: "SP", n: 12, pct: 50 },
+      { chave: "RJ", rotulo: "RJ", n: 5, pct: 21 },
+      { chave: "__nao_informado", rotulo: "Não informado", n: 3, pct: 12 },
+    ],
+    outros: { pessoas: 4, grupos: 2 },
+  },
+  {
     kind: "chamados",
     aberto: 2,
     em_atendimento: 1,
@@ -224,6 +238,29 @@ describe("UiCard: conteúdo", () => {
     expect(out).toContain("Avaliação baixa");
     expect(out).toContain("Dificuldade: participação");
     expect(out).toContain("Fazer um acompanhamento mais próximo");
+  });
+
+  it("agregado: título do recorte, n·pct por linha e cauda honesta", () => {
+    const out = html(de("agregado"));
+    expect(out).toContain("Pessoas por estado (UF)");
+    expect(out).toContain("Recorte: Mentorado");
+    expect(out).toContain("Não informado");
+    expect(out).toContain("outros: 4 pessoas em 2 grupos");
+    expect(out).toContain("só pessoas ativas");
+    expect(out).toContain('href="/pessoas"');
+    // a barra da fatia "não informado" sai do ciclo de cores — hatch neutro
+    expect(out).toContain("viz-hatch");
+  });
+
+  it("agregado com participação múltipla avisa que soma passa de 100%", () => {
+    const b = {
+      ...(de("agregado") as Extract<UiBloco, { kind: "agregado" }>),
+      participacao_multipla: true,
+      outros: null,
+    };
+    const out = html(b);
+    expect(out).toContain("uma pessoa pode contar em mais de uma linha");
+    expect(out).not.toContain("outros:");
   });
 
   it("fila, capacidade, pessoas, chamados, instrumentos, fontes", () => {

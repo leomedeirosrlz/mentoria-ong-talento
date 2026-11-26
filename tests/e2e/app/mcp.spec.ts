@@ -105,6 +105,7 @@ test.describe("servidor MCP (/api/mcp)", () => {
       "aguardando_par",
       "capacidade_mentores",
       "resumo_semana",
+      "pessoas_agregado",
       "minha_dupla",
       "meu_progresso",
     ])
@@ -141,6 +142,7 @@ test.describe("servidor MCP (/api/mcp)", () => {
       "duplas_do_usuario",
       "aguardando_par",
       "pessoas_busca",
+      "pessoas_agregado",
       "registros_da_dupla",
       "plano_em_dia",
     ])

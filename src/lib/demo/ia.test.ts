@@ -128,6 +128,67 @@ describe("responderDemoIa — templates do cap. 14 (REALIZA-388)", () => {
   });
 });
 
+describe("responderDemoIa — BI de pessoas (onda 5)", () => {
+  const agregadoDe = (ui: UiBloco[]) =>
+    ui.find((b): b is Extract<UiBloco, { kind: "agregado" }> => b.kind === "agregado") ?? null;
+
+  it("coord pergunta por estado e recebe o card agregado do dataset", async () => {
+    demo.role = "coordenacao";
+    const r = await responderDemoIa("quantas pessoas por estado?");
+    expect(r).not.toBeNull();
+    expect(r!.content).toContain("Na demonstração");
+    expect(r!.content).toContain("ficha de mentorado");
+    const card = agregadoDe(r!.ui);
+    expect(card).not.toBeNull();
+    expect(card!.titulo).toBe("Pessoas por estado (UF)");
+    expect(card!.total).toBeGreaterThan(0);
+    expect(card!.itens.length).toBeGreaterThan(0);
+  });
+
+  it("coord pergunta por gênero e o card sai — é o recorte dela", async () => {
+    demo.role = "coordenacao";
+    const r = await responderDemoIa("quantos jovens por gênero?");
+    expect(r).not.toBeNull();
+    const card = agregadoDe(r!.ui);
+    expect(card).not.toBeNull();
+    // o filtro "jovens" chega nomeado no recorte do card
+    expect(card!.recorte).toContain("Mentorado");
+    expect(r!.content).not.toContain("coordenação");
+  });
+
+  it("jovem e mentor ouvem a recusa honesta, sem card", async () => {
+    for (const role of ["mentorado", "mentor_dpp"] as const) {
+      demo.role = role;
+      const r = await responderDemoIa("quantas pessoas por estado?");
+      expect(r).not.toBeNull();
+      expect(r!.content).toContain("visão é da coordenação");
+      expect(r!.ui).toEqual([]);
+    }
+  });
+
+  it("auxiliar agrega estado no recorte dele mas não gênero", async () => {
+    demo.role = "supervisor";
+    const ok = await responderDemoIa("quantas pessoas por estado?");
+    expect(ok).not.toBeNull();
+    expect(agregadoDe(ok!.ui)).not.toBeNull();
+
+    const nao = await responderDemoIa("quantos jovens por gênero?");
+    expect(nao).not.toBeNull();
+    expect(nao!.content).toContain("visão da coordenação");
+    expect(nao!.ui).toEqual([]);
+  });
+
+  it("pergunta por trilha agrega sem vazar mecânica nem travessão", async () => {
+    demo.role = "coordenacao";
+    const r = await responderDemoIa("quantas pessoas por trilha?");
+    expect(r).not.toBeNull();
+    expect(r!.content).not.toMatch(MECANICA);
+    expect(r!.content).not.toContain("—");
+    const card = agregadoDe(r!.ui);
+    expect(card!.participacao_multipla).toBe(true);
+  });
+});
+
 describe("responderDemoIa — ficar em dia (026/FR-016)", () => {
   // uids do dataset evergreen: faixa 0x06xx vira sufixo decimal —
   // 1537 = Ricardo×Bia, 1538 = Carlos×Caio (atrasadas), 1549 = Ricardo×

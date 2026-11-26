@@ -168,6 +168,37 @@ describe("demais tools", () => {
     expect("pagina" in b.fontes[0]).toBe(false);
   });
 
+  it("pessoas_agregado → agregado com título, recorte e cauda honesta", () => {
+    const b = uiDaTool("pessoas_agregado", {
+      dimensao: "estado",
+      titulo: "Pessoas por estado (UF)",
+      recorte: "Mentorado · SP",
+      total_pessoas: 20,
+      universo: "pessoas ativas",
+      participacao_multipla: false,
+      grupos: [
+        { chave: "SP", rotulo: "SP", pessoas: 12, percentual: 60 },
+        { chave: "__nao_informado", rotulo: "Não informado", pessoas: 3, percentual: 15 },
+      ],
+      outros: { grupos: 2, pessoas: 5 },
+      linhas: [{ nome: "Ana", papel: "Mentorado" }],
+    });
+    if (b?.kind !== "agregado") throw new Error("sem card");
+    expect(b.titulo).toBe("Pessoas por estado (UF)");
+    expect(b.recorte).toBe("Mentorado · SP");
+    expect(b.total).toBe(20);
+    expect(b.itens).toHaveLength(2);
+    // a chave de máquina viaja pro card desenhar o hatch do buraco
+    expect(b.itens[1].chave).toBe("__nao_informado");
+    expect(b.outros).toEqual({ pessoas: 5, grupos: 2 });
+  });
+
+  it("pessoas_agregado sem grupos não vira card (recorte vazio é texto)", () => {
+    expect(
+      uiDaTool("pessoas_agregado", { grupos: [], total_pessoas: 0 })
+    ).toBeNull();
+  });
+
   it("lookup intermediário e tool sem card não viram card", () => {
     expect(uiDaTool("duplas_do_usuario", { duplas: [{ dupla_id: "x" }] })).toBeNull();
     expect(uiDaTool("tool_que_nao_existe", { a: 1 })).toBeNull();
