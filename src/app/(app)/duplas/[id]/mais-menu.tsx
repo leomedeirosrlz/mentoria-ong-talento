@@ -1,17 +1,18 @@
 "use client";
 
-// Overflow "⋯" do header da ficha (REALIZA-157, revisto na #9 do review
-// 21/11): o cabeçalho mostra UMA ação primária e todo o resto mora aqui —
-// cada item é um DropdownMenuItem comum com onClick que só escolhe qual
-// dialog abrir. A composição anterior (Dialog.Trigger render={Menu.Item})
-// era o defeito: o item híbrido não preenchia a largura do popup e obrigava
-// o Portal keepMounted hand-rolled pra não desmontar o dialog junto do
-// menu. Com os dialogs fora do popup o menu volta ao DropdownMenuContent
-// padrão — fill, setas e devolução de foco vêm de graça do Menu.
+// Ações secundárias + overflow "⋯" do header da ficha (REALIZA-157,
+// revisto na onda 1125b): a primária mora fora, até duas ações de rotina
+// ficam visíveis aqui e o resto entra no menu — rotina antes, gestão depois
+// do separador. Cada item continua sendo só o gatilho controlado do dialog
+// certo. A composição anterior (Dialog.Trigger render={Menu.Item}) era o
+// defeito: o item híbrido não preenchia a largura do popup e obrigava o
+// Portal keepMounted hand-rolled pra não desmontar o dialog junto do menu.
+// Com os dialogs fora do popup o menu volta ao DropdownMenuContent padrão —
+// fill, setas e devolução de foco vêm de graça do Menu.
 //
-// Cada prop-grupo presente = um item + o dialog dele, sempre montado (fecha
+// Cada prop-grupo presente = uma ação + o dialog dela, sempre montado (fecha
 // com animação e abre limpo — os dialogs resetam na borda de subida do
-// `open`, mesmo padrão do RemanejarDuplaDialog). Sem item nenhum, some.
+// `open`, mesmo padrão do RemanejarDuplaDialog). Sem ação nenhuma, some.
 // Estado de pedido de especialista NÃO entra aqui como item desabilitado:
 // ele mora num lugar só, o card "Pedidos em aberto" (review #9).
 
@@ -46,6 +47,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -59,6 +61,15 @@ type DialogId =
   | "editar"
   | "encerrar"
   | "remanejar";
+
+/** Ações de rotina que podem sair do menu e ficar visíveis na barra. */
+export type AcaoSecundariaDupla =
+  | "agendar"
+  | "remarcar"
+  | "apoio"
+  | "form"
+  | "solicitar"
+  | "sugerir";
 
 // ícones do Mais: tamanho e cor explícitos — é o que alinha o texto do item
 // com o da linha (REALIZA-157); sem o size-4 o svg herdava o tamanho do texto
@@ -78,6 +89,8 @@ export function DuplaMaisMenu({
   editar,
   encerrar,
   remanejar,
+  secundarias = [],
+  primarioPresente = true,
 }: {
   duplaId: string;
   /** "Agendar Nº encontro" — ação de primeira classe quando a primária já
@@ -125,52 +138,132 @@ export function DuplaMaisMenu({
   encerrar?: boolean;
   /** "Remanejar" — troca um lado da dupla viva (coordenação). */
   remanejar?: Dupla | null;
+  /** Até duas ações de rotina visíveis antes do ⋯, na ordem recebida. */
+  secundarias?: readonly AcaoSecundariaDupla[];
+  /** Sem primária no cabeçalho, a primeira secundária assume o peso visual
+   *  de decisão pra barra não virar um ⋯ solto. */
+  primarioPresente?: boolean;
 }) {
   const [aberto, setAberto] = useState<DialogId | null>(null);
 
-  const itens = [
-    agendar && { id: "agendar", Icone: CalendarPlus, rotulo: agendar.item },
-    remarcar && { id: "remarcar", Icone: CalendarBlank, rotulo: remarcar.item },
-    pedirApoio && { id: "apoio", Icone: HandHeart, rotulo: "Pedir apoio" },
-    formulario && { id: "form", Icone: PaperPlaneTilt, rotulo: "Enviar formulário" },
-    solicitar && { id: "solicitar", Icone: UserPlus, rotulo: "Solicitar mentor especialista" },
-    sugerir && { id: "sugerir", Icone: Sparkle, rotulo: "Sugerir especialista pro jovem" },
-    editar && { id: "editar", Icone: PencilSimple, rotulo: "Editar dupla" },
-    remanejar && { id: "remanejar", Icone: ArrowsLeftRight, rotulo: "Remanejar dupla" },
-    encerrar && { id: "encerrar", Icone: FlagCheckered, rotulo: "Encerrar trilha" },
+  const acoes = [
+    agendar && {
+      id: "agendar",
+      Icone: CalendarPlus,
+      rotulo: agendar.item,
+      grupo: "rotina",
+    },
+    remarcar && {
+      id: "remarcar",
+      Icone: CalendarBlank,
+      rotulo: remarcar.item,
+      grupo: "rotina",
+    },
+    pedirApoio && {
+      id: "apoio",
+      Icone: HandHeart,
+      rotulo: "Pedir apoio",
+      grupo: "rotina",
+    },
+    formulario && {
+      id: "form",
+      Icone: PaperPlaneTilt,
+      rotulo: "Enviar formulário",
+      grupo: "rotina",
+    },
+    solicitar && {
+      id: "solicitar",
+      Icone: UserPlus,
+      rotulo: "Solicitar mentor especialista",
+      grupo: "rotina",
+    },
+    sugerir && {
+      id: "sugerir",
+      Icone: Sparkle,
+      rotulo: "Sugerir especialista pro jovem",
+      grupo: "rotina",
+    },
+    editar && {
+      id: "editar",
+      Icone: PencilSimple,
+      rotulo: "Editar dupla",
+      grupo: "gestao",
+    },
+    remanejar && {
+      id: "remanejar",
+      Icone: ArrowsLeftRight,
+      rotulo: "Remanejar dupla",
+      grupo: "gestao",
+    },
+    encerrar && {
+      id: "encerrar",
+      Icone: FlagCheckered,
+      rotulo: "Encerrar trilha",
+      grupo: "gestao",
+    },
   ].filter(Boolean) as {
     id: DialogId;
     Icone: typeof UserPlus;
     rotulo: string;
+    grupo: "rotina" | "gestao";
   }[];
-  if (itens.length === 0) return null;
+  const porId = new Map(acoes.map((a) => [a.id, a]));
+  const visiveis = secundarias
+    .map((id) => porId.get(id))
+    .filter((a): a is NonNullable<typeof a> => a != null)
+    .slice(0, 2);
+  const idsVisiveis = new Set(visiveis.map((a) => a.id));
+  const noMenu = acoes.filter((a) => !idsVisiveis.has(a.id));
+  const rotina = noMenu.filter((a) => a.grupo === "rotina");
+  const gestao = noMenu.filter((a) => a.grupo === "gestao");
+  const temMenu = rotina.length + gestao.length > 0;
+  if (visiveis.length === 0 && !temMenu) return null;
+
+  const itemMenu = ({ id, Icone, rotulo }: (typeof acoes)[number]) => (
+    <DropdownMenuItem
+      key={id}
+      aria-haspopup="dialog"
+      onClick={() => setAberto(id)}
+    >
+      <Icone aria-hidden className={ICONE} />
+      {rotulo}
+    </DropdownMenuItem>
+  );
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button variant="outline" size="sm" aria-label="Mais ações da dupla">
-              <DotsThree weight="bold" aria-hidden className="size-4" />
-              Mais
-            </Button>
-          }
-        />
-        {/* w-56: o popup é mais largo que o trigger — a âncora ficaria
-            apertada pros labels de ação (o default é w-(--anchor-width)) */}
-        <DropdownMenuContent align="end" className="w-56">
-          {itens.map(({ id, Icone, rotulo }) => (
-            <DropdownMenuItem
-              key={id}
-              aria-haspopup="dialog"
-              onClick={() => setAberto(id)}
-            >
-              <Icone aria-hidden className={ICONE} />
-              {rotulo}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {visiveis.map(({ id, Icone, rotulo }, i) => (
+        <Button
+          key={id}
+          type="button"
+          variant={!primarioPresente && i === 0 ? "default" : "outline"}
+          size="sm"
+          aria-haspopup="dialog"
+          onClick={() => setAberto(id)}
+        >
+          <Icone aria-hidden />
+          {rotulo}
+        </Button>
+      ))}
+      {temMenu && (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button variant="outline" size="sm" aria-label="Mais ações da dupla">
+                <DotsThree weight="bold" aria-hidden className="size-4" />
+                Mais
+              </Button>
+            }
+          />
+          {/* w-56: o popup é mais largo que o trigger — a âncora ficaria
+              apertada pros labels de ação (o default é w-(--anchor-width)) */}
+          <DropdownMenuContent align="end" className="w-56">
+            {rotina.map(itemMenu)}
+            {rotina.length > 0 && gestao.length > 0 && <DropdownMenuSeparator />}
+            {gestao.map(itemMenu)}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
 
       {/* os dialogs ficam no nível do botão, controlados — fechar o menu
           não os desmonta e o foco volta pro "Mais" ao sair */}

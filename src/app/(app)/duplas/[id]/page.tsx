@@ -139,7 +139,7 @@ import {
   PdmDupla,
   TerceirosDupla,
 } from "./ficha-paineis-lazy";
-import { DuplaMaisMenu } from "./mais-menu";
+import { DuplaMaisMenu, type AcaoSecundariaDupla } from "./mais-menu";
 import { DevolutivaEspecialista } from "@/components/devolutiva-especialista";
 import { MarcoNotifier } from "@/components/marco-notifier";
 import { Badge } from "@/components/ui/badge";
@@ -1005,9 +1005,91 @@ export default async function DuplaPage({
     );
   }
 
-  // Editar dupla é da coordenação — entra como item do ⋯ junto com o
-  // resto (review 21/11, #9: uma primária + menu, nada em linha)
+  // Editar dupla é da coordenação — entra como item de gestão do ⋯
   const podeEditarDupla = souCoord;
+
+  // ações da barra materializadas uma vez: a mesma disponibilidade decide
+  // o que fica visível, o que sobra pro ⋯ e os dialogs controlados dele
+  const acaoAgendar =
+    souMentor && pendenteRegistro && precisaAgendar
+      ? {
+          numero: proximoNumero,
+          atual: encontroAlvo,
+          sugerido: sugeridoProximo,
+          piso: dupla.iniciada_em ?? undefined,
+          jovemNome: primeiroNomeMentorado,
+          item: `Agendar ${proximoNumero}º encontro`,
+        }
+      : null;
+  const acaoRemarcar =
+    souMentor && podeAgendar && proximoJaAgendado && encontroAlvo?.data_hora
+      ? {
+          numero: proximoNumero,
+          atual: encontroAlvo,
+          piso: dupla.iniciada_em ?? undefined,
+          jovemNome: primeiroNomeMentorado,
+          item: `Remarcar ${proximoNumero}º · ${rotuloSlot(encontroAlvo.data_hora)}`,
+        }
+      : // a sessão nasce do pedido aceito — aqui só se move a tentativa que
+        // já existe (numero = tentativa, não passo)
+        souMentor && ehEsp && dupla.status === "ativa" && tentativaAgendada
+        ? {
+            numero: tentativaAgendada.numero,
+            atual: tentativaAgendada,
+            piso: dupla.iniciada_em ?? undefined,
+            jovemNome: primeiroNomeMentorado,
+            rotulo: "sessão de especialista",
+            item: "Remarcar sessão",
+          }
+        : null;
+  const podePedirApoio =
+    souMentor && (dupla.status === "ativa" || dupla.status === "pausada");
+  const acaoFormulario =
+    souCoord && (dupla.status === "ativa" || dupla.status === "pausada")
+      ? {
+          formularios: formulariosAtivos,
+          mentor: {
+            id: dupla.mentor.id,
+            nome: dupla.mentor.nome_social ?? dupla.mentor.nome,
+            whatsapp: dupla.mentor.whatsapp,
+          },
+          mentorado: {
+            id: dupla.mentorado.id,
+            nome: dupla.mentorado.nome_social ?? dupla.mentorado.nome,
+            whatsapp: dupla.mentorado.whatsapp,
+          },
+        }
+      : null;
+  const acaoSolicitar = podeSolicitar ? { especialistas } : null;
+  const acaoSugerir = podeSugerir
+    ? {
+        mentoradoId: dupla.mentorado.id,
+        nomeJovem: dupla.mentorado.nome_social ?? dupla.mentorado.nome,
+        especialistas,
+      }
+    : null;
+  const acaoRemanejar =
+    souCoord && (dupla.status === "ativa" || dupla.status === "pausada")
+      ? dupla
+      : null;
+  // rotina visível, no máximo duas: "Pedir apoio" nunca se esconde numa
+  // dupla viva; o segundo slot acompanha o momento do calendário. Lado da
+  // equipe: envio de form antes do pedido de especialista.
+  const secundariasFicha = (
+    souMentor
+      ? [
+          podePedirApoio ? "apoio" : null,
+          acaoAgendar ? "agendar" : null,
+          acaoRemarcar ? "remarcar" : null,
+          acaoSolicitar ? "solicitar" : null,
+          acaoSugerir ? "sugerir" : null,
+        ]
+      : [
+          acaoFormulario ? "form" : null,
+          acaoSolicitar ? "solicitar" : null,
+        ]
+  ).filter((a): a is AcaoSecundariaDupla => a != null).slice(0, 2);
+  const temPrimaria = souMentor ? primarioMentor != null : acaoWA != null;
 
   const renderEncontro = (passo: PassoGuia) => {
     // DPP: numero é a identidade do passo. Especialista (0074): numero é a
@@ -1938,89 +2020,30 @@ export default async function DuplaPage({
           </p>
         )}
 
-        {/* UMA ação primária por papel + ⋯ com todo o resto (review 21/11,
-            #9): cada prop-grupo presente vira um item; os dialogs moram
-            dentro do componente, fora do popup (REALIZA-157). O menu some
-            sozinho quando nenhuma ação se aplica */}
+        {/* primária à esquerda; no máximo duas rotinas contextuais à
+            direita e o ⋯ sempre por último. O grupo da direita quebra como
+            uma peça só em telas estreitas — nada de overflow nem de um ⋯
+            órfão quando a primária não existe */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {souMentor && primarioMentor}
           {!souMentor && acaoWA && <DuplaWaAcao {...acaoWA} />}
 
-          <DuplaMaisMenu
-            duplaId={dupla.id}
-            agendar={
-              souMentor && pendenteRegistro && precisaAgendar
-                ? {
-                    numero: proximoNumero,
-                    atual: encontroAlvo,
-                    sugerido: sugeridoProximo,
-                    piso: dupla.iniciada_em ?? undefined,
-                    jovemNome: primeiroNomeMentorado,
-                    item: `Agendar ${proximoNumero}º encontro`,
-                  }
-                : null
-            }
-            remarcar={
-              souMentor && podeAgendar && proximoJaAgendado && encontroAlvo?.data_hora
-                ? {
-                    numero: proximoNumero,
-                    atual: encontroAlvo,
-                    piso: dupla.iniciada_em ?? undefined,
-                    jovemNome: primeiroNomeMentorado,
-                    item: `Remarcar ${proximoNumero}º · ${rotuloSlot(encontroAlvo.data_hora)}`,
-                  }
-                : // a sessão nasce do pedido aceito — aqui só se move a
-                  // tentativa que já existe (numero = tentativa, não passo)
-                  souMentor && ehEsp && dupla.status === "ativa" && tentativaAgendada
-                  ? {
-                      numero: tentativaAgendada.numero,
-                      atual: tentativaAgendada,
-                      piso: dupla.iniciada_em ?? undefined,
-                      jovemNome: primeiroNomeMentorado,
-                      rotulo: "sessão de especialista",
-                      item: "Remarcar sessão",
-                    }
-                  : null
-            }
-            pedirApoio={
-              souMentor && (dupla.status === "ativa" || dupla.status === "pausada")
-            }
-            formulario={
-              souCoord &&
-              (dupla.status === "ativa" || dupla.status === "pausada")
-                ? {
-                    formularios: formulariosAtivos,
-                    mentor: {
-                      id: dupla.mentor.id,
-                      nome: dupla.mentor.nome_social ?? dupla.mentor.nome,
-                      whatsapp: dupla.mentor.whatsapp,
-                    },
-                    mentorado: {
-                      id: dupla.mentorado.id,
-                      nome: dupla.mentorado.nome_social ?? dupla.mentorado.nome,
-                      whatsapp: dupla.mentorado.whatsapp,
-                    },
-                  }
-                : null
-            }
-            solicitar={podeSolicitar ? { especialistas } : null}
-            sugerir={
-              podeSugerir
-                ? {
-                    mentoradoId: dupla.mentorado.id,
-                    nomeJovem: dupla.mentorado.nome_social ?? dupla.mentorado.nome,
-                    especialistas,
-                  }
-                : null
-            }
-            editar={podeEditarDupla ? dupla : null}
-            encerrar={podeEncerrarTrilha}
-            remanejar={
-              souCoord && (dupla.status === "ativa" || dupla.status === "pausada")
-                ? dupla
-                : null
-            }
-          />
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <DuplaMaisMenu
+              duplaId={dupla.id}
+              agendar={acaoAgendar}
+              remarcar={acaoRemarcar}
+              pedirApoio={podePedirApoio}
+              formulario={acaoFormulario}
+              solicitar={acaoSolicitar}
+              sugerir={acaoSugerir}
+              editar={podeEditarDupla ? dupla : null}
+              encerrar={podeEncerrarTrilha}
+              remanejar={acaoRemanejar}
+              secundarias={secundariasFicha}
+              primarioPresente={temPrimaria}
+            />
+          </div>
         </div>
       </header>
 
