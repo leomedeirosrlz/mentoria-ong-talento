@@ -35,7 +35,7 @@ describe("fonte única de instantes reservados", () => {
     expect(fontes[2]).toContain("ocupadosAgendados");
     expect(fontes[3]).toContain("ocupadosAgenda");
     expect(fontes[4]).toContain("ocupadosAgenda");
-    expect(readFileSync("src/components/agendar-encontro-dialog.tsx", "utf8")).toContain("ocupadosExtra={ocupados}");
+    expect(readFileSync("src/components/agendar-encontro-dialog.tsx", "utf8")).toContain("ocupadosExtra={ocupados?.filter");
     expect(readFileSync("src/components/seletor-dia-hora.tsx", "utf8")).toContain("ocupadosExtra");
   });
 });

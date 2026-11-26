@@ -110,7 +110,7 @@ describe("agendado vencido (507)", () => {
         rotulo="Sessão 2 com Sofia"
       />
     );
-    expect(botoes(alvo)).toContain("Aconteceu");
+    expect(botoes(alvo)).toContain("Já aconteceu");
     const itens = await itensDoMenu(alvo);
     expect(itens).toContain("Não aconteceu");
     expect(itens).not.toContain("Remarcar");
