@@ -208,13 +208,17 @@ export function RegistrarRetroativoDialog({
         onConfirmar={confirmar}
       >
         <label className="block space-y-1 text-sm">
-          <span className="font-medium">Por que está registrando agora?</span>
+          <span className="font-medium">Registrando com atraso?</span>
           <Input
             value={motivoTardio}
             onChange={(e) => setMotivoTardio(e.target.value)}
-            placeholder="Obrigatório depois de 7 dias do vencimento"
+            placeholder="Se passaram mais de 7 dias, conte o motivo"
             maxLength={140}
           />
+          <span className="block text-xs text-muted-foreground">
+            Depois de 7 dias do encontro o motivo é obrigatório e o registro
+            fica marcado como tardio.
+          </span>
         </label>
       </SeletorDiaHora>
     </>
