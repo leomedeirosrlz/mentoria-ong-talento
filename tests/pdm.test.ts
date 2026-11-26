@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { PdmDoc, PdmItem } from "@/lib/pdm";
 import {
   autorEdicaoItem,
+  dedupePdmItens,
+  expandeOrdemComOcultos,
+  itemMesmoTitulo,
   metasAtivas,
   montaArvorePdm,
+  normalizaTituloPdm,
   parseSubmetasLinhas,
   PDM_MAX_SUBITENS,
   progressoPdm,
@@ -76,6 +80,70 @@ describe("montaArvorePdm", () => {
       expect(no.id).toBe(id);
     }
     expect(no.filhos).toHaveLength(0);
+  });
+});
+
+describe("dedupe por título", () => {
+  it("normaliza acento, caixa, pontuação e espaços sem mudar o título exibido", () => {
+    expect(normalizaTituloPdm("  Álgebra: passar!  ")).toBe("algebra passar");
+    expect(normalizaTituloPdm("Passar em ÁLGEBRA")).toBe("passar em algebra");
+  });
+
+  it("manual × projetada na raiz vira uma linha só, com a projetada como principal", () => {
+    const r = dedupePdmItens([
+      item({ id: "manual", titulo: "Passar em álgebra!", ordem: 1, porque: "manual" }),
+      item({ id: "proj", titulo: "passar em algebra", ordem: 2, origem: "pdm", origemCampo: "meta_1", indicador: "média 7" }),
+      item({ id: "filha", parentId: "manual", titulo: "revisar apostila", ordem: 1 }),
+    ]);
+    expect(r.itens.map((i) => i.id)).toEqual(["proj", "filha"]);
+    expect(r.itens[0].porque).toBe("manual");
+    expect(r.itens[0].indicador).toBe("média 7");
+    expect(r.itens[1].parentId).toBe("proj");
+    expect(r.ocultosPorPrincipal.get("proj")).toEqual(["manual"]);
+  });
+
+  it("não mistura níveis nem títulos diferentes e ignora descartadas", () => {
+    const r = dedupePdmItens([
+      item({ id: "a", titulo: "Meta", ordem: 1 }),
+      item({ id: "b", parentId: "a", titulo: "Meta", ordem: 1 }),
+      item({ id: "c", titulo: "Outra", ordem: 2 }),
+      item({ id: "d", titulo: "Meta", status: "descartada", ordem: 3 }),
+    ]);
+    expect(r.itens.map((i) => i.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("é idempotente depois do merge", () => {
+    const base = [
+      item({ id: "manual", titulo: "Estudar!", ordem: 1 }),
+      item({ id: "proj", titulo: "estudar", ordem: 2, origem: "metas", origemCampo: "meta_1" }),
+    ];
+    const uma = dedupePdmItens(base);
+    const duas = dedupePdmItens(uma.itens);
+    expect(duas.itens.map((i) => i.id)).toEqual(uma.itens.map((i) => i.id));
+    expect(duas.ocultosPorPrincipal.size).toBe(0);
+  });
+
+  it("a ordem enviada à RPC carrega os ids ocultos ao lado da principal", () => {
+    const ocultos = new Map([["proj", ["manual"]]]);
+    expect(expandeOrdemComOcultos(["proj", "outra"], ocultos)).toEqual([
+      "proj",
+      "manual",
+      "outra",
+    ]);
+  });
+
+  it("itemMesmoTitulo encontra colisão de escrita manual no mesmo nível", () => {
+    const existente = item({
+      id: "proj",
+      titulo: "Conseguir jovem aprendiz!",
+      origem: "pdm",
+      origemCampo: "meta_1",
+    });
+    expect(
+      itemMesmoTitulo([existente], null, "conseguir jovem aprendiz")?.id
+    ).toBe("proj");
+    expect(itemMesmoTitulo([existente], "outro-pai", "conseguir jovem aprendiz"))
+      .toBeNull();
   });
 });
 

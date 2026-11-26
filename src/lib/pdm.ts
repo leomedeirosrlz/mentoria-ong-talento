@@ -43,6 +43,165 @@ export type PdmDoc = {
 
 export type PdmNo = PdmItem & { filhos: PdmNo[] };
 
+// ---------- dedupe por título ----------
+
+/** Título comparável do documento: sem acento, caixa e pontuação/símbolos,
+ *  com espaços dobrados colapsados. A forma exibida nunca muda — ela só
+ *  serve pra reconhecer "Estudar!" e "estudar" como a mesma linha. */
+export function normalizaTituloPdm(titulo: string): string {
+  return titulo
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[\p{P}\p{S}]+/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export type PdmDedupe = {
+  /** Documento de leitura sem a segunda linha da duplicata. Filhos de uma
+   *  linha escondida são religados à linha principal — nada some da árvore. */
+  itens: PdmItem[];
+  /** id da linha principal → ids escondidos no merge. A reordenação usa
+   *  esse mapa pra satisfazer a validação da RPC, que exige o conjunto
+   *  completo de irmãos ativos no banco. */
+  ocultosPorPrincipal: Map<string, string[]>;
+};
+
+function primarioDoGrupo(grupo: PdmItem[]): PdmItem {
+  return [...grupo].sort((a, b) => {
+    // a linha projetada vence: ela é a ponte viva com a resposta de origem
+    const pa = a.origem === "manual" ? 1 : 0;
+    const pb = b.origem === "manual" ? 1 : 0;
+    return pa - pb || a.ordem - b.ordem || a.titulo.localeCompare(b.titulo);
+  })[0];
+}
+
+function mesclaDuplicado(principal: PdmItem, outros: PdmItem[]): PdmItem {
+  const primeiroValor = <K extends keyof PdmItem>(campo: K): PdmItem[K] => {
+    if (principal[campo] != null) return principal[campo];
+    for (const item of outros) if (item[campo] != null) return item[campo];
+    return principal[campo];
+  };
+  const atingidaEm = [principal, ...outros]
+    .map((i) => i.atingidaEm)
+    .filter((v): v is string => v != null)
+    .sort()[0] ?? null;
+  const atualizadoEm = [principal, ...outros]
+    .map((i) => i.atualizadoEm)
+    .filter((v): v is string => v != null)
+    .sort()
+    .at(-1) ?? null;
+  const temAtingida = [principal, ...outros].some(
+    (i) => i.status === "atingida"
+  );
+  return {
+    ...principal,
+    titulo: principal.titulo,
+    porque: primeiroValor("porque"),
+    indicador: primeiroValor("indicador"),
+    areaVida: primeiroValor("areaVida"),
+    prazoAlvo: primeiroValor("prazoAlvo"),
+    status: temAtingida ? "atingida" : principal.status,
+    atingidaEm: temAtingida ? atingidaEm : primeiroValor("atingidaEm"),
+    ordem: Math.min(principal.ordem, ...outros.map((i) => i.ordem)),
+    criadoPor: principal.criadoPor ?? outros.find((i) => i.criadoPor)?.criadoPor ?? null,
+    atualizadoPor:
+      principal.atualizadoPor ?? outros.find((i) => i.atualizadoPor)?.atualizadoPor ?? null,
+    atualizadoEm,
+  };
+}
+
+/** Merge de leitura, sem escrita: colapsa linhas ativas com o mesmo título
+ *  normalizado dentro do mesmo nível (raiz com raiz, filhas do mesmo pai).
+ *  A linha principal é preferencialmente a projetada — assim a origem do
+ *  instrumento continua visível — e recebe campos/status/filhos da linha
+ *  escondida. A operação é idempotente: rodar de novo sobre o resultado
+ *  não cria nem remove mais nada. */
+export function dedupePdmItens(itens: PdmItem[]): PdmDedupe {
+  let trabalho = itens.map((i) => ({ ...i }));
+  const ocultosPorPrincipal = new Map<string, string[]>();
+  const RAIZ = "__raiz__";
+
+  for (let passo = 0; passo <= itens.length; passo += 1) {
+    const grupos = new Map<string, PdmItem[]>();
+    for (const item of trabalho) {
+      if (item.status === "descartada") continue;
+      const titulo = normalizaTituloPdm(item.titulo);
+      if (!titulo) continue;
+      const chave = `${item.parentId ?? RAIZ}::${titulo}`;
+      grupos.set(chave, [...(grupos.get(chave) ?? []), item]);
+    }
+
+    let mesclou = false;
+    for (const grupo of grupos.values()) {
+      if (grupo.length < 2) continue;
+      const principal = primarioDoGrupo(grupo);
+      const secundarios = grupo.filter((i) => i.id !== principal.id);
+      const secundarioIds = new Set(secundarios.map((i) => i.id));
+
+      const ocultosCarregados = secundarios.flatMap((i) => [
+        i.id,
+        ...(ocultosPorPrincipal.get(i.id) ?? []),
+      ]);
+      ocultosPorPrincipal.set(principal.id, [
+        ...(ocultosPorPrincipal.get(principal.id) ?? []),
+        ...ocultosCarregados.filter((id) => id !== principal.id),
+      ]);
+      for (const id of secundarioIds) ocultosPorPrincipal.delete(id);
+
+      const mesclado = mesclaDuplicado(principal, secundarios);
+      trabalho = trabalho
+        .filter((i) => !secundarioIds.has(i.id))
+        .map((i) => {
+          if (i.id === principal.id) return mesclado;
+          if (i.parentId != null && secundarioIds.has(i.parentId)) {
+            return { ...i, parentId: principal.id };
+          }
+          return i;
+        });
+      mesclou = true;
+    }
+    if (!mesclou) break;
+  }
+
+  return { itens: trabalho, ocultosPorPrincipal };
+}
+
+/** Expande a ordem visível com as linhas escondidas do dedupe. A RPC exige
+ *  todos os ids ativos do nível; as escondidas ficam adjacentes à principal,
+ *  então a ordem relativa das linhas visíveis é a ordem pedida pela pessoa. */
+export function expandeOrdemComOcultos(
+  idsVisiveis: string[],
+  ocultosPorPrincipal: Map<string, string[]>
+): string[] {
+  return idsVisiveis.flatMap((id) => [
+    id,
+    ...(ocultosPorPrincipal.get(id) ?? []),
+  ]);
+}
+
+/** Linha ativa do mesmo nível com o mesmo título normalizado — usada pela
+ *  action para transformar "criar duplicado" em merge/edição da linha que
+ *  já existe. O resultado vem do documento deduplicado, então colisões
+ *  anteriores convergem para a mesma linha principal. */
+export function itemMesmoTitulo(
+  itens: PdmItem[],
+  parentId: string | null,
+  titulo: string
+): PdmItem | null {
+  const normal = normalizaTituloPdm(titulo);
+  if (!normal) return null;
+  return (
+    dedupePdmItens(itens).itens.find(
+      (i) =>
+        i.status !== "descartada" &&
+        i.parentId === parentId &&
+        normalizaTituloPdm(i.titulo) === normal
+    ) ?? null
+  );
+}
+
 // ---------- constantes ----------
 
 export const PDM_MAX_METAS = 10;
@@ -83,10 +242,11 @@ export const PDM_AREAS_VIDA = [
  *  Órfãos (pai apagado entre fetch e render, ou dado quebrado) viram
  *  raízes — nunca somem da tela. `status` filtra por nível de vista. */
 export function montaArvorePdm(itens: PdmItem[]): PdmNo[] {
+  const itensUnicos = dedupePdmItens(itens).itens;
   const porId = new Map<string, PdmNo>();
   const raizes: PdmNo[] = [];
   // ordem estável da RPC (ordem, created_at) preservada pra desempates
-  const ordenados = [...itens].sort(
+  const ordenados = [...itensUnicos].sort(
     (a, b) => a.ordem - b.ordem || a.titulo.localeCompare(b.titulo)
   );
   for (const i of ordenados) porId.set(i.id, { ...i, filhos: [] });
@@ -106,7 +266,7 @@ export function montaArvorePdm(itens: PdmItem[]): PdmNo[] {
 /** Conta subitens não-descartados do doc inteiro (o teto de 20 é por
  *  documento, não por meta — o SQL trava o mesmo escopo). */
 export function subitensAtivos(itens: PdmItem[]): number {
-  return itens.filter(
+  return dedupePdmItens(itens).itens.filter(
     (i) => i.parentId != null && i.status !== "descartada"
   ).length;
 }
@@ -114,7 +274,7 @@ export function subitensAtivos(itens: PdmItem[]): number {
 /** Metas não-descartadas — o que a vista "ativas" mostra e o que conta no
  *  teto de 10 e na régua de progresso. */
 export function metasAtivas(itens: PdmItem[]): PdmItem[] {
-  return itens.filter(
+  return dedupePdmItens(itens).itens.filter(
     (i) => i.parentId == null && i.status !== "descartada"
   );
 }
