@@ -9,7 +9,11 @@ import {
   WifiSlash,
 } from "@phosphor-icons/react/dist/ssr";
 import { demoRole } from "@/lib/demo/mode";
-import { formularioPorToken } from "@/lib/forms/queries";
+import {
+  formularioPorToken,
+  linkFormularioMeta,
+} from "@/lib/forms/queries";
+import { getMe } from "@/lib/queries";
 import { larguraPublicaForm } from "@/lib/forms/instrumentos";
 import { formatDateTime } from "@/lib/ciclo";
 import { sharedOg } from "@/lib/og";
@@ -56,13 +60,37 @@ export default async function FormularioTokenPage({
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const [{ token }, demo] = await Promise.all([params, demoRole()]);
+  const [{ token }, demo, me] = await Promise.all([
+    params,
+    demoRole(),
+    getMe(),
+  ]);
 
   // demo: a página abre em leitura sobre os links do fixture — os estados
   // (respondido/expirado/encerrado) ficam todos demonstráveis e o submit
   // cai no DEMO_MSG da action, como toda escrita da demo
   const res = TOKEN_RE.test(token) ? await formularioPorToken(token) : null;
   const info = res?.kind === "ok" ? res.info : null;
+  const meta =
+    info?.formulario && TOKEN_RE.test(token)
+      ? await linkFormularioMeta(token)
+      : null;
+  // a saída é decidida no servidor: o jovem volta pra página dele; adulto
+  // autenticado volta pra ficha da dupla quando o link é dela (senão pro
+  // histórico do form na coordenação, ou pro início). Anônimo não recebe
+  // destino interno nenhum.
+  const destinoPosResposta = !me?.role
+    ? null
+    : me.role === "mentorado"
+      ? { href: "/jovem", label: "Voltar para minha página" }
+      : {
+          href: meta?.dupla_id
+            ? `/duplas/${meta.dupla_id}`
+            : me.role === "coordenacao" && meta?.formulario_id
+              ? `/formularios/${meta.formulario_id}`
+              : "/",
+          label: "Voltar",
+        };
 
   return (
     <div className="flex min-h-[100dvh] flex-col">
@@ -212,6 +240,7 @@ export default async function FormularioTokenPage({
                 destinatario={info.destinatario}
                 sistema={info.formulario.sistema}
                 contextoAvaliacao={info.contexto_avaliacao}
+                destinoPosResposta={destinoPosResposta}
               />
             </>
           )}

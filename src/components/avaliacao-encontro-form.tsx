@@ -21,6 +21,10 @@ import { FadeTroca } from "@/components/ui/etapa";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  CtaPosResposta,
+  type DestinoPosResposta,
+} from "@/components/cta-pos-resposta";
 
 const COMENTARIO_MAX = 2000;
 
@@ -41,6 +45,7 @@ export function AvaliacaoEncontroForm({
   primeiroNome,
   embutido = false,
   temMedia = true,
+  destinoPosResposta = null,
   onEnviado,
 }: {
   /** Caminho público /avaliar/<token>. */
@@ -56,6 +61,8 @@ export function AvaliacaoEncontroForm({
   /** Dentro de diálogo, o título já diz o encontro e a privacidade: o cabeçalho
    *  de contexto (saudação, título, privacidade) some e a pergunta 1 vem primeiro. */
   embutido?: boolean;
+  /** saída contextual do sucesso — vem do server; anônimo fica sem botão */
+  destinoPosResposta?: DestinoPosResposta | null;
   /** Dispara depois do sucesso — o host de dialog usa pra fechar; o envio
    *  em si já foi gravado quando ele roda. */
   onEnviado?: (resultado: { pedirApoio: boolean }) => void;
@@ -131,8 +138,9 @@ export function AvaliacaoEncontroForm({
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
             {pedidoAjuda
               ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""} por contar. A coordenação foi avisada na hora e fala com você. O combinado do programa é responder em 1 dia útil.`
-              : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. ${privacidadeAvaliacao(trilha, temMedia)} Pode fechar esta página.`}
+              : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. ${privacidadeAvaliacao(trilha, temMedia)}${destinoPosResposta ? "" : " Pode fechar esta página."}`}
           </p>
+          <CtaPosResposta destino={destinoPosResposta} />
         </div>
       ) : (
         <div className="space-y-3">

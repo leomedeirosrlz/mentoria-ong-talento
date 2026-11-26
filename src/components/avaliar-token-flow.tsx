@@ -6,6 +6,7 @@ import { EstadoCard } from "@/components/estado-card";
 import { FadeTroca } from "@/components/ui/etapa";
 import { AvaliacaoEncontroForm } from "@/components/avaliacao-encontro-form";
 import { privacidadeAvaliacao } from "@/lib/avaliacao-privacidade";
+import type { DestinoPosResposta } from "@/components/cta-pos-resposta";
 
 /** Tronco do /avaliar/[token] que decide entre o form e o "já registrada"
  *  NO CLIENT — o submit bem-sucedido revalida a rota e a próxima render
@@ -24,6 +25,7 @@ export function AvaliarTokenFlow({
   demo,
   retryHref,
   temMedia = true,
+  destinoPosResposta = null,
 }: {
   token: string;
   /** null = a leitura service-side do link falhou (rede) — o card de
@@ -46,6 +48,8 @@ export function AvaliarTokenFlow({
   /** A dupla já tem o lote da média (≥3) — a copy de privacidade não
    *  promete média que não existe (027/FR-003). */
   temMedia?: boolean;
+  /** saída contextual do sucesso — vem do server; anônimo fica sem botão */
+  destinoPosResposta?: DestinoPosResposta | null;
 }) {
   const [submeteu, setSubmeteu] = useState(false);
 
@@ -118,6 +122,7 @@ export function AvaliarTokenFlow({
             temMedia={temMedia}
             primeiroNome={primeiroNome}
             embutido
+            destinoPosResposta={destinoPosResposta}
             onEnviado={() => setSubmeteu(true)}
           />
         </>

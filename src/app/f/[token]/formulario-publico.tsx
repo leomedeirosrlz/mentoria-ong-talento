@@ -45,6 +45,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { InstrumentoFlow } from "@/components/instrumentos/flow";
+import {
+  CtaPosResposta,
+  type DestinoPosResposta,
+} from "@/components/cta-pos-resposta";
 
 /** Tipos de linha única que recebem enterKeyHint; o último deles leva
  *  "send" (fecha o teclado e envia em vez de saltar pra lugar nenhum).
@@ -85,6 +89,8 @@ export function FormularioPublico(props: {
   contextoAvaliacao?: ContextoAvaliacao | null;
   /** prévia na ficha da coordenação — campos vivos, envio desligado */
   preview?: boolean;
+  /** saída contextual do sucesso — vem do server; anônimo fica sem botão */
+  destinoPosResposta?: DestinoPosResposta | null;
 }) {
   const { sistema } = props;
   if (ehInstrumento(sistema)) {
@@ -105,6 +111,7 @@ function FormularioGenerico({
   sistema,
   contextoAvaliacao,
   preview = false,
+  destinoPosResposta = null,
 }: {
   token: string;
   titulo: string;
@@ -114,6 +121,7 @@ function FormularioGenerico({
   sistema?: FormularioSistema | null;
   contextoAvaliacao?: ContextoAvaliacao | null;
   preview?: boolean;
+  destinoPosResposta?: DestinoPosResposta | null;
 }) {
   const [enviado, setEnviado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -582,12 +590,12 @@ function FormularioGenerico({
             {ehIntake(sistema)
               ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}! Sua
             inscrição foi registrada e já está com a equipe do Realiza.vc,
-            que entra em contato pelos próximos passos. Pode fechar esta
-            página.`
+            que entra em contato pelos próximos passos.${destinoPosResposta ? "" : " Pode fechar esta página."}`
               : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. Sua resposta
             pra “${titulo}” foi registrada e já está com a equipe do
-            Realiza.vc. Pode fechar esta página.`}
+            Realiza.vc.${destinoPosResposta ? "" : " Pode fechar esta página."}`}
           </p>
+          <CtaPosResposta destino={destinoPosResposta} />
         </>
       ) : (
         <>
@@ -1185,7 +1193,7 @@ function CampoRenderer({
               </label>
             ))}
           </div>
-          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+          <div className="mt-1 flex justify-between text-xs text-muted-foreground sm:text-[11px]">
             <span>Nada satisfeito</span>
             <span>Muito satisfeito</span>
           </div>
