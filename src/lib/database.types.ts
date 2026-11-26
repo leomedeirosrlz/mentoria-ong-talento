@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.18"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -3407,9 +3412,11 @@ export type Database = {
           id: string
           link: string | null
           motivo_reagendamento: string | null
+          motivo_retroativo: string | null
           numero: number
           origem: string
           realizado_em: string | null
+          retroativo_tardio: boolean
           sessao_id: string | null
           status: Database["public"]["Enums"]["encontro_status"]
         }
@@ -3422,9 +3429,11 @@ export type Database = {
           id?: string
           link?: string | null
           motivo_reagendamento?: string | null
+          motivo_retroativo?: string | null
           numero: number
           origem?: string
           realizado_em?: string | null
+          retroativo_tardio?: boolean
           sessao_id?: string | null
           status?: Database["public"]["Enums"]["encontro_status"]
         }
@@ -3437,9 +3446,11 @@ export type Database = {
           id?: string
           link?: string | null
           motivo_reagendamento?: string | null
+          motivo_retroativo?: string | null
           numero?: number
           origem?: string
           realizado_em?: string | null
+          retroativo_tardio?: boolean
           sessao_id?: string | null
           status?: Database["public"]["Enums"]["encontro_status"]
         }
@@ -9019,7 +9030,12 @@ export type Database = {
         Returns: Json
       }
       registrar_retroativo_mentorado: {
-        Args: { p_data_hora: string; p_dupla: string; p_numero: number }
+        Args: {
+          p_data_hora: string
+          p_dupla: string
+          p_motivo_tardio?: string
+          p_numero: number
+        }
         Returns: Json
       }
       relatorio_ia_card_registrar: {
@@ -9349,4 +9365,3 @@ export const Constants = {
     },
   },
 } as const
-
