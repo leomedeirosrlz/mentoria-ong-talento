@@ -113,6 +113,7 @@ import {
 } from "@/lib/plano-roteiros-servico";
 import {
   gradesDaDupla,
+  ocupadosAgendados,
   sugestoesEncontroDaDupla,
 } from "@/lib/sugestoes-encontro-server";
 import { disponibilidadesDaDupla } from "@/lib/actions";
@@ -470,6 +471,10 @@ export default async function DuplaPage({
   const total = passos.length;
   const { proximoNumero, encontroAlvo, sugeridoProximo, faltantes } =
     alvoAgendamento(dupla, eventos);
+  const ocupadosAgenda = ocupadosAgendados(dupla.encontros, (e) => ({
+    rotulo: ehEsp ? `sessão ${passoEsp(e, dupla.encontros)}` : `${e.numero}º encontro`,
+    rotuloArtigo: ehEsp ? `a sessão ${passoEsp(e, dupla.encontros)}` : `o ${e.numero}º encontro`,
+  }));
   const jornada = jornadaDaDupla(dupla, passos);
   // catch-up plan (REALIZA-397): same journey derivation — the card only
   // shows at 2+ due steps; a single delay stays on the usual "Agendar Nº" CTA.
@@ -514,23 +519,7 @@ export default async function DuplaPage({
         agora,
         // staff não alcança as outras duplas do jovem — o choque aqui é só
         // com os encontros marcados da própria ficha
-        ocupados: dupla.encontros
-          .filter(
-            (e) =>
-              (e.status === "agendado" || e.status === "remarcado") &&
-              e.data_hora != null
-          )
-          .map((e) => ({
-            inicio: e.data_hora!,
-            // na trilha esp o numero é a tentativa — o rótulo de choque
-            // também lê o passo do guia, como o resto da ficha (REALIZA-498)
-            rotulo: ehEsp
-              ? `sessão ${passoEsp(e, dupla.encontros)}`
-              : `${e.numero}º encontro`,
-            rotuloArtigo: ehEsp
-              ? `a sessão ${passoEsp(e, dupla.encontros)}`
-              : `o ${e.numero}º encontro`,
-          })),
+        ocupados: ocupadosAgenda,
       }).catch(() => null)
     : null;
 
@@ -861,6 +850,7 @@ export default async function DuplaPage({
             sugerido={sugeridoProximo}
             piso={dupla.iniciada_em ?? undefined}
             jovemNome={primeiroNomeMentorado}
+            ocupados={ocupadosAgenda}
             trigger={
               <Button size="sm">Agendar {proximoNumero}º encontro</Button>
             }
@@ -1374,6 +1364,11 @@ export default async function DuplaPage({
         numeroGuiaAtual={passoAtual?.numero ?? null}
         recessos={recessosDaFicha}
         sugestoesPlano={sugestoesPlano}
+        reservaHero={
+          sugeridoProximo
+            ? { numero: proximoNumero, data: sugeridoProximo, hora: "19:00" }
+            : null
+        }
         roteiros={roteirosInfo && "ok" in roteirosInfo ? roteirosInfo.roteiros : []}
         baseUrl={siteUrl}
       />

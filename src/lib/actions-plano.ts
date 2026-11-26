@@ -62,6 +62,7 @@ function revalidarPlano(duplaId?: string) {
   revalidatePath("/");
   revalidatePath("/jovem");
   revalidatePath("/jovem/agenda");
+  revalidatePath("/agenda");
 }
 
 // ---------- aviso externo (518 FR-006) ----------

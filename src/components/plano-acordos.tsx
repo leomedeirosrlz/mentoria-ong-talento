@@ -28,6 +28,7 @@ import {
 import { DURACAO_SESSAO_MIN } from "@/lib/plano-em-dia.data";
 import {
   ocupadoEmChoque,
+  ocupadoReservaSugestao,
   partesSP,
   type OcupadoRotulado,
 } from "@/lib/sugestoes-encontro";
@@ -272,7 +273,16 @@ export function PlanoAcordosCard({
   ): string | null => {
     const c = ocupadoEmChoque(
       new Date(`${data}T${hora}:00-03:00`),
-      [...ocupadosRotulados, ...ocupadosSugs(numeros)],
+      [
+        ...ocupadosRotulados,
+        ...ocupadoReservaSugestao(
+          reservaHero,
+          numeros.includes(reservaHero?.numero ?? -1)
+            ? reservaHero?.numero
+            : null
+        ),
+        ...ocupadosSugs(numeros),
+      ],
       duracaoMin ?? 60
     );
     if (!c) return null;
@@ -383,9 +393,7 @@ export function PlanoAcordosCard({
         disponibilidade: sugestoes?.disponibilidade,
         ocupados: [
           ...ocupadosBase,
-          ...(reservaHero && reservaHero.numero !== p.numero
-            ? [`${reservaHero.data}T${reservaHero.hora}:00-03:00`]
-            : []),
+          ...ocupadoReservaSugestao(reservaHero, p.numero).map((o) => o.inicio),
           ...sugeridos,
         ],
         duracaoMin: sessao
@@ -857,13 +865,7 @@ export function PlanoAcordosCard({
             }),
             ocupados: [
               ...ocupadosRotulados,
-              ...(reservaHero && reservaHero.numero !== passoSeletor.numero
-                ? [{
-                    inicio: `${reservaHero.data}T${reservaHero.hora}:00-03:00`,
-                    rotulo: `sugestão do ${reservaHero.numero}º encontro`,
-                    rotuloArtigo: `a sugestão do ${reservaHero.numero}º encontro`,
-                  }]
-                : []),
+              ...ocupadoReservaSugestao(reservaHero, passoSeletor.numero),
               ...ocupadosSugs(seletor.grupo ?? [passoSeletor.numero]),
             ],
             janela,

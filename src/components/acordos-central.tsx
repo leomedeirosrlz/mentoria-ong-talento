@@ -27,6 +27,7 @@ export function AcordosCentral({
   numeroGuiaAtual,
   recessos = [],
   sugestoesPlano,
+  reservaHero,
   roteiros = [],
   baseUrl,
 }: {
@@ -42,6 +43,9 @@ export function AcordosCentral({
   /** pacote do motor pras linhas do combinado (482) — a ficha monta com
    *  o mesmo adaptador da agenda do jovem */
   sugestoesPlano?: SeletorSugestoes | null;
+  /** sugestão que o CTA de agendar da ficha/home expõe — reserva o instante
+   *  pros outros passos do plano (QA 1125b item 18) */
+  reservaHero?: { numero: number; data: string; hora: string } | null;
   /** roteiros do plano da dupla (020) — a ficha carrega com lazy */
   roteiros?: readonly DuplaPlanoRoteiro[];
   /** origem pública da requisição (server) — o convite de WhatsApp precisa
@@ -137,6 +141,7 @@ export function AcordosCentral({
               .map((e) => e.numero)}
             recessos={recessos}
             sugestoes={sugestoesPlano}
+            reservaHero={reservaHero}
             combinadoHref={`/duplas/${dupla.id}/combinado`}
             whatsappHref={
               souMentor || souStaff

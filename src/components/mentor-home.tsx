@@ -49,6 +49,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import { ocupadosAgendados } from "@/lib/sugestoes-encontro";
 import { CombinadoCheck } from "@/components/combinado-check";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
@@ -273,6 +274,10 @@ export async function MentorHome({
         // em cada frase, o substantivo sai do helper
         const comArtigo = (e: Encontro) =>
           `${ehEsp ? "A" : "O"} ${rotuloDe(e).charAt(0).toLowerCase()}${rotuloDe(e).slice(1)}`;
+        const ocupadosDupla = ocupadosAgendados(dupla.encontros, (e) => ({
+          rotulo: rotuloDe(e),
+          rotuloArtigo: comArtigo(e),
+        }));
 
         // máquina de estados do painel "O que fazer agora" — um primário por
         // dupla: pendência de registro vem antes de qualquer agendamento (a
@@ -630,6 +635,7 @@ export async function MentorHome({
                             mostrar o dialog era um CTA com erro garantido */}
                         {seguinteNumero != null && !ehEsp && (
                           <AgendarEncontroDialog
+                            ocupados={ocupadosDupla}
                             duplaId={dupla.id}
                             numero={seguinteNumero}
                             atual={encontroSeguinte}
@@ -681,6 +687,7 @@ export async function MentorHome({
                             </Link>
                           )}
                         <AgendarEncontroDialog
+                            ocupados={ocupadosDupla}
                           duplaId={dupla.id}
                           numero={proximoNumero}
                           atual={encontroAlvo}
@@ -716,6 +723,7 @@ export async function MentorHome({
                       </p>
                       <div className="mt-3 flex justify-end">
                         <AgendarEncontroDialog
+                            ocupados={ocupadosDupla}
                           duplaId={dupla.id}
                           numero={proximoNumero}
                           atual={encontroAlvo}

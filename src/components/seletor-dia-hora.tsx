@@ -193,6 +193,7 @@ export function SeletorDiaHora({
   rotuloEncontro = "Qual encontro?",
   inicial = null,
   sugestoes,
+  ocupadosExtra,
   modo = "futuro",
   hoje: hojeProp,
   piso,
@@ -232,6 +233,9 @@ export function SeletorDiaHora({
   inicial?: { data: string; hora: string; origem?: OrigemSugestao } | null;
   /** Pacote do motor — sem ele o seletor é o par de campos nativos (manual). */
   sugestoes?: SeletorSugestoes;
+  /** Reservas extras no modo manual — entram na mesma régua de choque
+   *  dos ocupados do pacote de sugestões. */
+  ocupadosExtra?: OcupadoRotulado[];
   /** "retroativo" inverte a janela civil: o campo aceita só passado (max =
    *  hoje por padrão) e o "Outro dia" pré-preenche em hoje, não amanhã. */
   modo?: "futuro" | "retroativo";
@@ -290,7 +294,17 @@ export function SeletorDiaHora({
     [datasOrdenadas]
   );
   const hoje = sugestoes?.hoje ?? hojeProp ?? toDateStr(new Date());
-  const ocupados = useMemo(() => sugestoes?.ocupados ?? [], [sugestoes?.ocupados]);
+  const ocupados = useMemo(() => {
+    const vistos = new Set<string>();
+    return [...(sugestoes?.ocupados ?? []), ...(ocupadosExtra ?? [])].filter(
+      (o) => {
+        const chave = `${o.inicio}|${o.rotulo}`;
+        if (vistos.has(chave)) return false;
+        vistos.add(chave);
+        return true;
+      }
+    );
+  }, [sugestoes?.ocupados, ocupadosExtra]);
   const ocupadosIso = useMemo(() => ocupados.map((o) => o.inicio), [ocupados]);
 
   // janela civil do campo de data — o piso/teto explícito ganha do modo;

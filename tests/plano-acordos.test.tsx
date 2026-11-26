@@ -233,4 +233,71 @@ describe("sugestões dos passos pendentes (507)", () => {
     expect(ocupadoChip?.getAttribute("aria-disabled")).toBe("true");
     desmontar();
   });
+
+  it("6º não toma o instante que o hero oferece pro 7º (QA 1125b)", async () => {
+    const { alvo, desmontar } = montar(
+      <PlanoAcordosCard
+        plano={planoCom([
+          { numero: 6, data: "2026-12-02" },
+          { numero: 7, data: "2026-12-02" },
+        ])}
+        podeResponder={false}
+        podeAplicar
+        sugestoes={SUGESTOES}
+        reservaHero={{ numero: 7, data: "2026-12-02", hora: "19:00" }}
+      />
+    );
+    // o 6º oficial cai no mesmo dia do hero do 7º: a sugestão dele já nasce
+    // no livre seguinte (19:00 e 19:30 chocam a janela de 60min do hero)
+    expect(linhas(alvo)[0].textContent).toContain("qua 02/12 às 20:00");
+    expect(linhas(alvo)[1].textContent).toContain("qua 02/12 às 19:00");
+
+    act(() => clicar(botao(linhas(alvo)[0], "Confirmar data")));
+    await assentar();
+    expect(aplicarPassoPlano).toHaveBeenCalledWith(
+      "pl1",
+      6,
+      "2026-12-02T20:00:00-03:00",
+      undefined,
+      undefined,
+      undefined
+    );
+    // depois de confirmar, o 7º segue com o instante que o hero ofereceu
+    expect(linhas(alvo)[1].textContent).toContain("qua 02/12 às 19:00");
+    desmontar();
+  });
+
+  it("o seletor do 6º marca indisponível a sugestão que o hero oferece pro 7º", async () => {
+    const { alvo, desmontar } = montar(
+      <PlanoAcordosCard
+        plano={planoCom([
+          { numero: 6, data: "2026-12-01" },
+          { numero: 7, data: "2026-12-02" },
+        ])}
+        podeResponder={false}
+        podeAplicar
+        sugestoes={SUGESTOES}
+        reservaHero={{ numero: 7, data: "2026-12-02", hora: "19:00" }}
+      />
+    );
+    await outraData(linhas(alvo)[0]);
+    const dlg = document.querySelector('[role="dialog"], [data-slot="sheet-content"]') ?? document.body;
+    act(() => clicar(botao(dlg as ParentNode, "Outro dia")));
+    await assentar();
+    act(() =>
+      digitar(
+        dlg.querySelector<HTMLInputElement>('input[type="date"]')!,
+        "2026-12-02"
+      )
+    );
+    await assentar();
+    const chip19 = [...dlg.querySelectorAll('[role="radio"]')].find(
+      (r) => r.getAttribute("aria-label")?.startsWith("19:00")
+    );
+    expect(chip19?.getAttribute("aria-label")).toContain("indisponível");
+    expect(chip19?.getAttribute("aria-label")).toContain("sugestão do 7º encontro");
+    expect(chip19?.getAttribute("aria-disabled")).toBe("true");
+    desmontar();
+  });
+
 });

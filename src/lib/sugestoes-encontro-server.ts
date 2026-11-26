@@ -12,6 +12,7 @@ import {
   type PerfilEncontros,
   type SugestaoData,
 } from "./sugestoes-encontro";
+export { ocupadosAgendados } from "./sugestoes-encontro";
 
 // ---------- adaptador server-side (REALIZA-480) ----------
 // Monta os inputs do motor puro a partir de dados que o render já

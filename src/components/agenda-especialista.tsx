@@ -39,6 +39,7 @@ import type {
 import { AgendaEspHorarios } from "@/components/agenda-especialista-horarios";
 import { SessaoEspAcoes } from "@/components/agenda-especialista-sessao-acoes";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import { ocupadosAgendados } from "@/lib/sugestoes-encontro";
 import { Avatar } from "@/components/avatar";
 import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -444,6 +445,10 @@ function LinhaSessao({
                 </a>
               ) : (
                 <AgendarEncontroDialog
+                  ocupados={ocupadosAgendados(dupla.encontros, (x) => ({
+                    rotulo: `sessão ${passoEsp(x, dupla.encontros)}`,
+                    rotuloArtigo: `a sessão ${passoEsp(x, dupla.encontros)}`,
+                  }))}
                   duplaId={dupla.id}
                   numero={e.numero}
                   atual={e}
