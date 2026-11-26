@@ -10,7 +10,6 @@ import {
 } from "@/components/acordos-acoes";
 import { rotuloIntervencao } from "@/lib/intervencoes";
 import type { Dupla, DuplaPlanoRoteiro } from "@/lib/types";
-import { SITE_URL } from "@/lib/site";
 import { waLink } from "@/lib/ciclo";
 import { quemCombinou } from "@/lib/sua-semana";
 import { msgPlanoCombinado } from "@/lib/whatsapp-msgs";
@@ -29,6 +28,7 @@ export function AcordosCentral({
   recessos = [],
   sugestoesPlano,
   roteiros = [],
+  baseUrl,
 }: {
   dupla: Dupla;
   souMentor: boolean;
@@ -44,6 +44,9 @@ export function AcordosCentral({
   sugestoesPlano?: SeletorSugestoes | null;
   /** roteiros do plano da dupla (020) — a ficha carrega com lazy */
   roteiros?: readonly DuplaPlanoRoteiro[];
+  /** origem pública da requisição (server) — o convite de WhatsApp precisa
+   *  de URL absoluta e não pode depender de env por ambiente */
+  baseUrl: string;
 }) {
   const planoVivo =
     (dupla.planos ?? []).find((p) =>
@@ -135,7 +138,7 @@ export function AcordosCentral({
                       paraNome:
                         dupla.mentorado.nome_social ?? dupla.mentorado.nome,
                       quem: souMentor ? null : quemPlano,
-                      href: `${SITE_URL}/jovem/combinado`,
+                      href: `${baseUrl}/jovem/combinado`,
                     })
                   )
                 : null

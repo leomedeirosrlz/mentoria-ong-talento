@@ -1293,6 +1293,7 @@ export default async function DuplaPage({
         recessos={recessosDaFicha}
         sugestoesPlano={sugestoesPlano}
         roteiros={roteirosInfo && "ok" in roteirosInfo ? roteirosInfo.roteiros : []}
+        baseUrl={siteUrl}
       />
 
       {/* com plano de recuperação na tela a decisão de recesso mora dentro
