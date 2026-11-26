@@ -116,7 +116,7 @@ import {
   sugestoesEncontroDaDupla,
 } from "@/lib/sugestoes-encontro-server";
 import { disponibilidadesDaDupla } from "@/lib/actions";
-import { SITE_URL } from "@/lib/site";
+import { baseUrlDaRequisicao } from "@/lib/base-url";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "@/lib/demo/mode";
 import { getDemoData, supervisionaDuplaDemo } from "@/lib/demo/data";
@@ -417,7 +417,7 @@ export default async function DuplaPage({
   const realizadosCount = dupla.encontros.filter(
     (e) => e.status === "realizado"
   ).length;
-  const siteUrl = SITE_URL;
+  const siteUrl = await baseUrlDaRequisicao();
   const podeSolicitar =
     !ehEsp &&
     dupla.status === "ativa" &&
