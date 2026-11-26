@@ -942,7 +942,7 @@ const NIVEL_PLANO: Record<
  *  sinal pra pedir a grade no chat antes de propor (dias_comuns 0 com os
  *  dois lados marcados = grades não se cruzam, a saída é sem_grade). */
 function gradeTexto(g: NonNullable<UiPlano["grade"]>): string | null {
-  if (g.sem_grade) return "Combinado sem a grade de disponibilidade.";
+  if (g.sem_grade) return "Plano sem a grade de disponibilidade.";
   if (!g.mentor && !g.jovem)
     return "Nenhum lado marcou a disponibilidade semanal ainda: dá pra pedir no chat ou combinar sem ela.";
   if (!g.mentor || !g.jovem)
@@ -1037,7 +1037,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
       meta={meta}
       rodape={
         <Rodape href={`${r.encontros(b.dupla_id)}#plano-em-dia`}>
-          {b.plano ? "Ver o combinado na ficha" : "Combinar o plano na ficha"}
+          {b.plano ? "Ver o plano na ficha" : "Combinar o plano na ficha"}
         </Rodape>
       }
     >
@@ -1163,7 +1163,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
             onClick={() => setDocAberto((v) => !v)}
             className="h-auto min-h-11 w-full items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold hover:bg-muted/50 active:not-aria-[haspopup]:scale-100 md:min-h-11"
           >
-            {docAberto ? "Fechar o combinado" : "Ler o combinado"}
+            {docAberto ? "Fechar o plano" : "Ler o plano"}
             <CaretDown
               size={14}
               weight="bold"
@@ -1235,7 +1235,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
       {b.plano && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2">
           <Pill tom={TOM_PLANO[b.plano.status] ?? "neutro"}>
-            Combinado {STATUS_PLANO[b.plano.status] ?? b.plano.status}
+            Plano {STATUS_PLANO[b.plano.status] ?? b.plano.status}
           </Pill>
           <span className="text-xs text-muted-foreground">
             {b.plano.versao > 1 ? `v${b.plano.versao}` : ""}
@@ -1297,7 +1297,7 @@ export function CardPlanoJovem({ b }: { b: UiPlanoJovem }) {
   const aplicados = new Map(b.passos_aplicados.map((p) => [p.numero, p]));
   return (
     <Cartao
-      titulo="O combinado"
+      titulo="O plano"
       meta={STATUS_PLANO[b.status] ?? b.status}
     >
       <p className="text-xs text-muted-foreground">

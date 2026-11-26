@@ -47,7 +47,7 @@ export function PlanoContestarButton({
         return;
       }
       setRespondido(true);
-      toast.success("Combinado contestado. A equipe foi avisada.");
+      toast.success("Plano contestado. A equipe foi avisada.");
       router.refresh();
     });
 
@@ -71,7 +71,7 @@ export function PlanoContestarButton({
             <DialogTitle>O plano não serve pra você?</DialogTitle>
           </DialogHeader>
           <DialogDescription className="leading-relaxed">
-            A contestação encerra esse combinado. A equipe é avisada e um
+            A contestação encerra esse plano. A equipe é avisada e um
             plano novo pode nascer da conversa de vocês.
           </DialogDescription>
           <DialogFooter>

@@ -167,11 +167,11 @@ export function materiaisComRoteiroPlano(
 
 const STATUS_DOC: Record<string, string> = {
   proposto: "a proposta espera um aceite da dupla pra valer",
-  aceito: "a proposta foi aceita: vale como combinado",
-  ativo: "o combinado está em prática",
+  aceito: "a proposta foi aceita: vale como plano",
+  ativo: "o plano está em prática",
   contestado: "a proposta foi contestada e esta versão encerrou",
   expirado: "a proposta expirou sem aceite",
-  concluido: "o combinado foi concluído",
+  concluido: "o plano foi concluído",
 };
 
 /** Doc do combinado: render determinístico do escopo — cabeçalho de
@@ -199,7 +199,7 @@ export function montarDocCombinado(input: {
       {
         kind: "callout",
         tom: "info",
-        html: "Esta versão não guardou os detalhes do combinado.",
+        html: "Esta versão não guardou os detalhes do plano.",
       },
     ];
   }
@@ -211,7 +211,7 @@ export function montarDocCombinado(input: {
         (input.propostoEm ? ` em ${escapeDocHtml(diaMes(input.propostoEm.slice(0, 10)))}` : "") +
         (input.versao > 1 ? `, na versão ${input.versao}` : "") +
         `. ${STATUS_DOC[input.status] ? escapeDocHtml(`Agora, ${STATUS_DOC[input.status]}.`) : ""}`
-      : `${escapeDocHtml(`Versão ${input.versao} do combinado.`)}` +
+      : `${escapeDocHtml(`Versão ${input.versao} do plano.`)}` +
         (STATUS_DOC[input.status] ? ` ${escapeDocHtml(`Agora, ${STATUS_DOC[input.status]}.`)}` : "");
   blocos.push({ kind: "par", html: intro });
 
@@ -226,7 +226,7 @@ export function montarDocCombinado(input: {
       `de ${e.janela?.inicio ? diaCurto(e.janela.inicio) : "agora"} a ${e.janela?.fim ? diaCurto(e.janela.fim) : "sem teto"}`
     );
   if (e.decisoes?.sem_grade)
-    ritmoBits.push("combinado sem a grade de disponibilidade");
+    ritmoBits.push("sem a grade de disponibilidade");
   if (e.decisoes?.ajuste_no_aceite)
     ritmoBits.push("a data do primeiro encontro fecha no aceite");
   blocos.push({ kind: "par", html: `${escapeDocHtml(ritmoBits.join(", "))}.` });
@@ -278,19 +278,19 @@ export function montarDocCombinado(input: {
   const regras: string[] = [];
   if (input.status === "proposto") {
     regras.push(
-      "Um aceite da dupla põe o combinado pra valer e avisa o outro lado.",
-      "Se não servir, contestar encerra esta versão. Um combinado novo pode nascer como versão nova.",
-      "Mesmo com encontro marcado, o combinado só vale depois do aceite."
+      "Um aceite da dupla põe o plano pra valer e avisa o outro lado.",
+      "Se não servir, contestar encerra esta versão. Um plano novo pode nascer como versão nova.",
+      "Mesmo com encontro marcado, o plano só vale depois do aceite."
     );
   } else if (input.status === "aceito" || input.status === "ativo") {
     regras.push(
-      "O combinado vale enquanto vocês seguem nele. Pra mudar, vocês combinam uma versão nova.",
-      "Os roteiros das semanas saem deste combinado.",
+      "O plano vale enquanto vocês seguem nele. Pra mudar, vocês combinam uma versão nova.",
+      "Os roteiros das semanas saem deste plano.",
       "Encontro feito é feito: versão nova não desmarca o que já aconteceu."
     );
   } else {
     regras.push(
-      "Esta versão não vale mais. Um combinado novo pode nascer como versão nova."
+      "Esta versão não vale mais. Um plano novo pode nascer como versão nova."
     );
   }
   if (input.aceites && input.nomes) {

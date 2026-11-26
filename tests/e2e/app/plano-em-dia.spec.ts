@@ -42,7 +42,7 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
   test.beforeEach(async ({ page }) => {
     if (DUPLA_ID) await limparEncontrosDaDupla(DUPLA_ID);
     // um 'aceito' pendurado (run anterior) cala a projeção do card — o
-    // teste lê "Combinado valendo" toda vez, então o piso é plano limpo
+    // teste lê "Plano valendo" toda vez, então o piso é plano limpo
     if (DUPLA_ID)
       await limparViaServiceRole("dupla_planos", `dupla_id=eq.${DUPLA_ID}`);
     if (DUPLA_ID) await convergirDuplaAtiva(DUPLA_ID);
@@ -141,7 +141,7 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     // mentor é lado: o combinado nasce valendo (aceito) e o jovem é
     // avisado — aceite único do 0225, não sobra pendência bilateral
     await expect(
-      page.getByText("Combinado valendo", { exact: false })
+      page.getByText("Plano valendo", { exact: false })
     ).toBeVisible({ timeout: 15_000 });
     const [vivo] = await buscarViaServiceRole<{ status: string }[]>(
       "dupla_planos",

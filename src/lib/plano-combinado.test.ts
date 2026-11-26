@@ -314,7 +314,7 @@ describe("fraseDoCombinado", () => {
     expect(f.texto).toMatch(/avisado em/);
     expect(f.texto).toMatch(/contestar/);
     expect(`${f.texto} ${f.cta} ${f.pill}`).not.toMatch(/aceit/i);
-    expect(f.cta).toBe("Ver o combinado");
+    expect(f.cta).toBe("Ver o plano");
   });
 
   it("valendo com o meu carimbo: segue o plano, sem falar de aceite", () => {

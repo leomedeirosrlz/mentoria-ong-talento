@@ -140,7 +140,7 @@ describe("SuaSemanaPlano — CTA e pill por estado", () => {
     desmontar();
   });
 
-  it("valendo sem o meu carimbo: 'Ver o combinado', sem pedir aceite nem data", () => {
+  it("valendo sem o meu carimbo: 'Ver o plano', sem pedir aceite nem data", () => {
     const semana = suaSemana({
       plano: planoCom({
         status: "aceito",
@@ -164,12 +164,12 @@ describe("SuaSemanaPlano — CTA e pill por estado", () => {
     expect(ls.some((l) => l.texto.startsWith("Ver e responder"))).toBe(false);
     expect(ls.some((l) => l.texto === "Confirmar data")).toBe(false);
     expect(
-      ls.find((l) => l.texto.startsWith("Ver o combinado"))?.href
+      ls.find((l) => l.texto.startsWith("Ver o plano"))?.href
     ).toBe("/jovem/agenda#plano");
     desmontar();
   });
 
-  it("ativo: 'Confirmar data' primário + 'Ver o combinado', sem falar em aceite", () => {
+  it("ativo: 'Confirmar data' primário + 'Ver o plano', sem falar em aceite", () => {
     const semana = suaSemana({
       plano: planoCom({ status: "ativo" }),
       meuLado: "mentor",
@@ -179,7 +179,7 @@ describe("SuaSemanaPlano — CTA e pill por estado", () => {
       <SuaSemanaPlano {...base} semana={semana} quem="Ricardo" />
     );
     expect(alvo.textContent).toContain(
-      "O 5º encontro é passo do combinado com Ricardo."
+      "O 5º encontro é passo do plano com Ricardo."
     );
     // nada pede aceite num combinado já valendo
     expect(alvo.textContent).not.toMatch(/aceit/i);
@@ -188,7 +188,7 @@ describe("SuaSemanaPlano — CTA e pill por estado", () => {
       "/duplas/d-1#acordos"
     );
     expect(
-      ls.find((l) => l.texto.startsWith("Ver o combinado"))?.href
+      ls.find((l) => l.texto.startsWith("Ver o plano"))?.href
     ).toBe("/duplas/d-1#plano-em-dia");
     desmontar();
   });

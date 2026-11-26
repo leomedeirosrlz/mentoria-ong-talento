@@ -81,8 +81,8 @@ async function avisoPlanoEmail(
     .filter((m): m is { to: string; link: string } => Boolean(m.to))
     .map((m) => ({
       to: m.to,
-      subject: "Tem um combinado pra você no Realiza",
-      html: `<p>Tem um combinado pra você no Realiza.</p><p><a href="${SITE_URL}${m.link}">Abrir o Realiza</a></p>`,
+      subject: "Tem um plano pra você no Realiza",
+      html: `<p>Tem um plano pra você no Realiza.</p><p><a href="${SITE_URL}${m.link}">Abrir o Realiza</a></p>`,
     }));
   if (!mensagens.length) return { enviados: 0, falhas: [] };
   try {

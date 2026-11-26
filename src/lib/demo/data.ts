@@ -2290,7 +2290,7 @@ function build(): DemoData {
   // texto no passo, no evento, na row (motivo_reagendamento) e na
   // remarcação do trigger; aqui a const segura a mesma amarra
   const MOTIVO_PASSO_5 =
-    "A terça encavalou de novo, a quinta fecha o ritmo do combinado";
+    "A terça encavalou de novo, a quinta fecha o ritmo do plano";
   // E o mesmo instante vai na row (data_hora = em(dia, "19:00") do
   // `agendado`), no passo (data_nova) e no evento (meta.data_nova)
   const DATA_NOVA_5 = em(addDias(diaEncontro(5), 9), "19:00");

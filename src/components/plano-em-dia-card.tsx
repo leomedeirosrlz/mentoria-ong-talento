@@ -261,7 +261,7 @@ export function PlanoEmDiaCard({
             href={`/duplas/${dupla.id}#acordos`}
             className={buttonVariants({ variant: "outline", size: "sm" })}
           >
-            Ver o combinado
+            Ver o plano
           </Link>
         ) : (
           <CombinarPlano duplaId={dupla.id} lado={lado} />

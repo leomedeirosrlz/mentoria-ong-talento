@@ -392,7 +392,7 @@ export const STATUS_TOOL: Record<string, string> = {
   plano_responder: "Preparando a resposta do plano…",
   plano_aplicar_passo: "Preparando o passo do plano…",
   resumo_dupla: "Lendo o resumo consolidado da dupla…",
-  meu_plano: "Vendo o combinado do plano…",
+  meu_plano: "Vendo o seu plano…",
   intervencao_sugerir: "Preparando a sugestão de intervenção…",
   guia_ajustar: "Preparando o ajuste do guia…",
   guia_limpar: "Preparando pra voltar ao guia…",

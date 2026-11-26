@@ -417,7 +417,7 @@ test.describe("roteiros do plano + doc do combinado (521)", () => {
     // peça que o aceite assina em cima
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
     await page.goto(`/duplas/${DUPLA}/combinado`);
-    await expect(page.getByText("Combinado da dupla")).toBeVisible({
+    await expect(page.getByText("Pra ficar em dia")).toBeVisible({
       timeout: 15_000,
     });
     await expect(

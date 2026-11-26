@@ -139,7 +139,7 @@ describe("faixa com plano vivo (FR-006)", () => {
     ).toBeNull();
     expect(alvo.querySelector("ol")).toBeNull();
     expect(alvo.textContent).not.toContain("vence no caminho");
-    // o gatilho "Combinar o plano" some — a saída é "Ver o combinado"
+    // o gatilho "Combinar o plano" some — a saída é "Ver o plano"
     // ("Combinar o plano" segue no texto de ajuda do recesso: é a superfície)
     expect(
       [...alvo.querySelectorAll("button")].some((b) =>
@@ -155,7 +155,7 @@ describe("faixa com plano vivo (FR-006)", () => {
     );
     expect(alvo.textContent).toContain("Antes de seguir o plano");
     expect(alvo.textContent).toContain("Recesso no caminho");
-    expect(link(alvo, "Ver o combinado")?.getAttribute("href")).toBe(
+    expect(link(alvo, "Ver o plano")?.getAttribute("href")).toBe(
       "/duplas/d-1#acordos"
     );
 
@@ -187,7 +187,7 @@ describe("faixa com plano vivo (FR-006)", () => {
     expect(alvo.textContent).toContain("Nem com 1 encontro por dia fecha");
     expect(alvo.textContent).toContain("Cabem 3 dos 5 encontros");
     expect(alvo.textContent).toContain("Falar com a coordenação");
-    expect(link(alvo, "Ver o combinado")).toBeDefined();
+    expect(link(alvo, "Ver o plano")).toBeDefined();
     desmontar();
   });
 

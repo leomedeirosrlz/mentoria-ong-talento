@@ -66,7 +66,7 @@ export function SuaSemanaPlano({
           combinado" — só quando o próximo é passo do plano */}
       {semana.vinculo != null && (
         <p className="hidden text-sm font-medium sm:block">
-          O {semana.vinculo}º encontro é passo do combinado com {quem}.
+          O {semana.vinculo}º encontro é passo do plano com {quem}.
         </p>
       )}
 
@@ -119,7 +119,7 @@ export function SuaSemanaPlano({
                 "group min-h-11 sm:min-h-8"
               )}
             >
-              Ver o combinado
+              Ver o plano
               <CaretRight
                 aria-hidden
                 className="transition-transform group-hover:translate-x-0.5"

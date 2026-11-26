@@ -13,7 +13,7 @@ import type { CicloEvento, Dupla } from "@/lib/types";
  *  `?v=N` lê uma versão fechada; sem parâmetro vale o plano em aberto. */
 
 export async function generateMetadata(): Promise<Metadata> {
-  return { title: "O combinado" };
+  return { title: "O plano" };
 }
 
 export default async function CombinadoPage({
@@ -45,9 +45,9 @@ export default async function CombinadoPage({
 
   return (
     <RoteiroDoc
-      kicker="Combinado da dupla"
+      kicker="Pra ficar em dia"
       titulo={doc.titulo}
-      destaque="O que a dupla combinou, por escrito. Muda quando a versão muda."
+      destaque="Aqui ficam o ritmo dos encontros, as datas combinadas e o que faz cada passo valer. Toda mudança vira uma versão nova."
       meta={doc.meta}
       blocos={doc.blocos}
       voltar={{ href: `/duplas/${id}#acordos`, rotulo: "Voltar pra ficha" }}

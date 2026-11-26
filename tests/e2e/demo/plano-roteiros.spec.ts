@@ -21,7 +21,7 @@ test.describe("documentos do plano na demo (521)", () => {
 
     // o documento do combinado — mesma render determinística do app
     await page.goto("/jovem/combinado");
-    await expect(page.getByText("Combinado da dupla")).toBeVisible({
+    await expect(page.getByText("Pra ficar em dia")).toBeVisible({
       timeout: 15_000,
     });
     await expect(

@@ -397,7 +397,7 @@ export function CombinarPlano({
           ? "Modo demo: nada é gravado de verdade."
           : r.status === "proposto"
             ? "Proposto. Falta um aceite da dupla."
-            : "Combinado valendo. O outro lado foi avisado."
+            : "Plano valendo. O outro lado foi avisado."
       );
       setOpen(false);
       onDone?.();
@@ -768,7 +768,7 @@ export function CombinarPlano({
         </p>
         <p className="text-sm text-muted-foreground">
           Dá pra compensar: a prática entra nas reflexões do registro e
-          do próprio combinado, na semana que sobrar.
+          do próprio plano, na semana que sobrar.
         </p>
         <Button
           type="button"
@@ -936,7 +936,7 @@ export function CombinarPlano({
         ))}
         {semGrade === true && (
           <li className="text-muted-foreground">
-            Combinado sem a grade. As datas podem cair fora dos períodos
+            Plano sem a grade. As datas podem cair fora dos períodos
             livres.
           </li>
         )}
@@ -965,7 +965,7 @@ export function CombinarPlano({
       {docPreview && (
         <Collapsible.Root className="mt-3 rounded-lg border border-border/60 px-3.5 py-2.5">
           <Collapsible.Trigger className="flex w-full cursor-pointer items-center justify-between gap-2 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring [&[aria-expanded=true]>svg]:rotate-180">
-            Ler o documento do combinado
+            Ler o documento do plano
             <CaretDown
               aria-hidden
               className="size-3.5 shrink-0 transition-transform"
@@ -1120,7 +1120,7 @@ export function CombinarPlano({
         </span>
         <div>
           <p className="text-sm font-semibold">
-            Já existe um combinado valendo pra essa dupla.
+            Já existe um plano valendo pra essa dupla.
           </p>
           <p className="mt-0.5 text-sm text-muted-foreground">
             O plano novo entra como versão só quando o atual for
@@ -1272,7 +1272,7 @@ export function CombinarPlano({
         <DialogHeader>
           <DialogTitle>Combinar o plano</DialogTitle>
           <DialogDescription>
-            Uma pergunta por vez. O combinado só sai no último passo.
+            Uma pergunta por vez. O plano só sai no último passo.
           </DialogDescription>
         </DialogHeader>
         {corpo}
@@ -1291,7 +1291,7 @@ export function CombinarPlano({
         <div className="pr-8">
           <SheetTitle>Combinar o plano</SheetTitle>
           <p className="mt-1 text-sm text-muted-foreground">
-            Uma pergunta por vez. O combinado só sai no último passo.
+            Uma pergunta por vez. O plano só sai no último passo.
           </p>
         </div>
         {/* sem min-h-0 (526): a caixa encolhia pra área livre e o conteúdo

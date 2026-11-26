@@ -216,7 +216,7 @@ export function fraseDoCombinado(
       tom: "atencao",
       pill: "Plano valendo",
       texto: `${outro} combinou um plano pra vocês ficarem em dia até ${diaMes(r.ate ?? "")}${r.propostoEm ? `. Você foi avisado em ${diaMes(r.propostoEm.slice(0, 10))}` : ""} Se não servir pra você, dá pra contestar.`,
-      cta: "Ver o combinado",
+      cta: "Ver o plano",
     };
   }
   if (r.proximo) {

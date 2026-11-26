@@ -151,7 +151,7 @@ test.describe("demo — plano pra ficar em dia (REALIZA-397)", () => {
     await expect(card).toBeVisible();
     await expect(card.getByText(/\d+ encontros? pra repor/)).toBeVisible();
     await expect(
-      card.getByRole("link", { name: "Ver o combinado" })
+      card.getByRole("link", { name: "Ver o plano" })
     ).toBeVisible();
     await expect(
       card.getByRole("button", { name: /Vamos (pausar|seguir)/ })

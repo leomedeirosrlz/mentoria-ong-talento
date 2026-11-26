@@ -501,7 +501,7 @@ export async function responderDemoIa(
       const ui = plano ? uiDaTool("meu_plano", plano) : null;
       return {
         content: plano
-          ? `Na demonstração o combinado é de exemplo — é o recorte que o jovem vê do plano "ficar em dia", sem os detalhes internos da equipe. Aceitar e confirmar datas valem pra você e pro seu mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`
+          ? `Na demonstração o plano é de exemplo — é o recorte do "ficar em dia" que o jovem vê, sem os detalhes internos da equipe. Aceitar e confirmar datas valem pra você e pro seu mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`
           : `Na demonstração a dupla ainda não tem um plano "ficar em dia". Ele aparece quando a equipe propõe e alguém da dupla aceita.${sugestoes(["Como tá minha jornada?"])}`,
         ui: ui ? [ui] : [],
       };
