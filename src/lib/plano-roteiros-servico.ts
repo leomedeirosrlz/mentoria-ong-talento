@@ -114,7 +114,7 @@ export async function carregarRoteirosDaDupla(input: {
     const roteiros = plano ? await roteirosDemo(dupla, plano) : [];
     return {
       ok: true,
-      lado: null,
+      lado: input.lado ?? null,
       dupla,
       plano,
       roteiros,

@@ -37,7 +37,12 @@ export default async function JovemRoteiroPage({
     null;
   if (!duplaDpp?.id) notFound();
 
-  const r = await carregarRoteirosDaDupla({ duplaId: duplaDpp.id });
+  // a rota é do jovem: o lado não se adivinha pelo contexto (na demo ele
+  // voltava null e o guia saía com preparação e nota ao mentor)
+  const r = await carregarRoteirosDaDupla({
+    duplaId: duplaDpp.id,
+    lado: "mentorado",
+  });
   if ("error" in r) notFound();
 
   return (
