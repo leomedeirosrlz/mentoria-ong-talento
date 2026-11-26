@@ -537,7 +537,7 @@ export function EncontroRow({
                   }
                 />
                 {lacunaAnterior != null && (
-                  <span className="max-w-56 text-right text-[11px] leading-snug text-muted-foreground">
+                  <span className="max-w-56 text-right text-xs leading-snug text-muted-foreground sm:text-[11px]">
                     o {lacunaAnterior}º ainda está pendente, mas você pode agendar
                     este mesmo assim
                   </span>

@@ -200,7 +200,7 @@ export function EscolherSelos({
                     <span className="line-clamp-2 text-xs leading-tight font-medium">
                       {o.titulo}
                     </span>
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground sm:text-[11px]">
                       {o.linha}
                     </span>
                     {marcado && (

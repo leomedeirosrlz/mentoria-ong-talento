@@ -248,7 +248,7 @@ export function TokensMcp({
           entrada (.animate-enter), não slide nem crossfade (spec 028) */}
       {tokenNovo && (
         <div className="animate-enter space-y-1.5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn-bg)]/40 p-2.5">
-          <p className="text-[11px] font-medium">
+          <p className="text-xs font-medium sm:text-[11px]">
             Copie agora, o token não aparece de novo:
           </p>
           <div className="flex items-center gap-1.5">
@@ -309,7 +309,7 @@ export function TokensMcp({
               />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{t.rotulo}</p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground sm:text-[11px]">
                   {metaTokenMcp(t)}
                 </p>
               </div>

@@ -621,7 +621,7 @@ export function SeletorDiaHora({
                 >
                   <span className="font-medium">{h.hora}</span>
                   {motivoOcupado && (
-                    <span className="max-w-28 text-[10px] leading-tight">
+                    <span className="max-w-28 text-xs leading-tight sm:text-[10px]">
                       {motivoOcupado}
                     </span>
                   )}

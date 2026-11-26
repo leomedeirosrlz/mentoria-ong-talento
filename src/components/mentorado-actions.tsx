@@ -403,7 +403,7 @@ export function MentoradoActions({
             <Trash size={16} data-icon="inline-start" aria-hidden /> Excluir
           </DropdownMenuItem>
           {temDupla && (
-            <p className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
+            <p className="px-2 pb-1 text-xs leading-snug text-muted-foreground sm:text-[11px]">
               Tem dupla no histórico: cadastro vinculado a uma dupla, mesmo encerrada, não pode ser excluído.
             </p>
           )}

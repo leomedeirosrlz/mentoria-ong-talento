@@ -274,7 +274,7 @@ export function AnexosPendentes({
               </span>
               <span
                 className={cn(
-                  "block truncate text-[11px]",
+                  "block truncate text-xs sm:text-[11px]",
                   a.status === "erro"
                     ? "text-destructive"
                     : "text-muted-foreground"

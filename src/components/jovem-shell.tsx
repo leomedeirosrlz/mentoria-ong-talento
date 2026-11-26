@@ -40,7 +40,9 @@ const NAV = [
   // FR-007 (010): o destino se chama Materiais — rótulo e ícone vestem
   // o que a página entrega (a estante de instrumentos + o Acervo)
   { href: "/jovem/materiais", label: "Materiais", icon: FolderOpen },
-  { href: "/jovem/especialistas", label: "Especialistas", icon: Sparkle },
+  // "Especialistas" não cabe na célula da bottom nav a 12px em 320px —
+  // `curto` vale só pra ela; sidebar, menu e aria-label seguem completos
+  { href: "/jovem/especialistas", label: "Especialistas", curto: "Espec.", icon: Sparkle },
   { href: "/jovem/pessoas", label: "Pessoas", icon: Users },
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },
   // REALIZA-345: a Ajuda do jovem — fora do MOBILE_PRIMEIRO, mora no Menu
@@ -258,12 +260,13 @@ export function JovemShell({
                   key={item.href}
                   href={item.href}
                   aria-current={at ? "page" : undefined}
+                  aria-label={"curto" in item ? item.label : undefined}
                   className={cn(
                     "relative flex flex-1 flex-col items-center gap-1 whitespace-nowrap py-2.5 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                     at
                       ? "font-semibold text-sidebar-foreground"
                       : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground",
-                    "text-[11px]"
+                    "text-xs"
                   )}
                 >
                   {at && (
@@ -275,7 +278,7 @@ export function JovemShell({
                     />
                   )}
                   <item.icon size={20} weight={at ? "fill" : "regular"} aria-hidden />
-                  {item.label}
+                  {"curto" in item ? item.curto : item.label}
                 </Link>
               );
             })}
@@ -287,7 +290,7 @@ export function JovemShell({
                   menuAtivo
                     ? "font-semibold text-sidebar-foreground"
                     : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground",
-                  "text-[11px]"
+                  "text-xs"
                 )}
               >
                 {/* a rota atual mora no menu → o indicador viaja pra

@@ -383,7 +383,7 @@ export function NotificacoesBell({
                             <span className={cn("line-clamp-2 text-sm leading-snug", !lida && "font-medium")}>
                               {n.titulo}
                             </span>
-                            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                            <span className="mt-0.5 block text-xs text-muted-foreground sm:text-[11px]">
                               {tempoRelativo(n.created_at, agoraMs)}
                             </span>
                           </span>

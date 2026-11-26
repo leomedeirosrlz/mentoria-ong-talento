@@ -183,7 +183,7 @@ export function RodaVida({
             key={ativo}
             className="min-w-0 flex-1 animate-in text-center fade-in duration-150"
           >
-            <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground">
+            <p className="text-xs font-semibold tracking-[0.08em] text-muted-foreground sm:text-[11px]">
               {quadAtivo ? `${quadAtivo} · ` : ""}Área {ativo + 1} de {total}
             </p>
             <h3 className="truncate text-[15px] font-bold leading-snug text-foreground">
@@ -305,7 +305,7 @@ export function RodaVida({
           <section key={q.nome || "geral"}>
             {/* sem uppercase via CSS: o nome acessível do heading segue o
                 texto transformado e quebraria quem espera "Pessoal" */}
-            <h3 className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground">
+            <h3 className="text-xs font-semibold tracking-[0.08em] text-muted-foreground sm:text-[11px]">
               {q.nome}
             </h3>
             <ul className="mt-1.5 space-y-0.5">

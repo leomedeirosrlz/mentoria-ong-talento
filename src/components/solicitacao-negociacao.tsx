@@ -268,7 +268,7 @@ export function ContraPropostaForm({
                   {compat && (
                     <span
                       aria-hidden
-                      className="mt-0.5 text-[10px] leading-none font-medium text-[var(--warn-text)]"
+                      className="mt-0.5 text-xs leading-none font-medium text-[var(--warn-text)] sm:text-[10px]"
                     >
                       encaixa
                     </span>
@@ -276,7 +276,7 @@ export function ContraPropostaForm({
                   {choque && (
                     <span
                       aria-hidden
-                      className="mt-0.5 text-[10px] leading-none font-medium text-muted-foreground"
+                      className="mt-0.5 text-xs leading-none font-medium text-muted-foreground sm:text-[10px]"
                     >
                       ocupado
                     </span>

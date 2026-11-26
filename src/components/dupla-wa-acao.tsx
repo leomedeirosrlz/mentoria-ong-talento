@@ -260,7 +260,7 @@ export function DuplaWaAcao({
                         <span className="block truncate text-sm font-medium">
                           {p.nome.split(" ")[0]}
                         </span>
-                        <span className="block text-[11px] text-muted-foreground">
+                        <span className="block text-xs text-muted-foreground sm:text-[11px]">
                           {papel === "mentorado" ? "mentorado(a)" : "mentor(a)"}
                           {p.telefone ? "" : " · sem WhatsApp"}
                         </span>
