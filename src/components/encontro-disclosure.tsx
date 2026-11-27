@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -174,7 +175,11 @@ export function JovemSecaoRecolhivel({
       document.removeEventListener("click", porLink);
     };
   }, [alvo]);
-  const aberto = forcado ?? hashBate;
+  // o refresh depois de um gesto (marcar combinado, avaliar) não pode
+  // fechar a seção que o hash abriu: uma vez aberta por âncora, fica aberta
+  const jaAbriu = useRef(hashBate);
+  if (hashBate) jaAbriu.current = true;
+  const aberto = forcado ?? (hashBate || jaAbriu.current);
 
   return (
     <section aria-labelledby={ancora} className={className}>

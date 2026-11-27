@@ -403,18 +403,15 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
       linhaEsp.getByRole("button", { name: /^Ações do/ })
     ).toHaveCount(0);
     await expect(
-      page.getByRole("menuitem", { name: "Remarcar" })
+      page.getByRole("menuitem", { name: /^(Remarcar|Outra data)/ })
     ).toHaveCount(0);
 
     // contraste: a linha DPP na mesma lista segue com o gesto — primário
     const linhaDpp = proximos
       .getByText(new RegExp("^8º encontro"))
       .locator("xpath=../..");
-    // a remarcação da linha DPP vive no ⋯ (a barra não expõe por linha)
-    await linhaDpp.getByRole("button", { name: /^Ações do/ }).click();
     await expect(
-      page.getByRole("menuitem", { name: "Remarcar" })
+      linhaDpp.getByRole("button", { name: "Remarcar" })
     ).toBeVisible();
-    await page.keyboard.press("Escape");
   });
 });

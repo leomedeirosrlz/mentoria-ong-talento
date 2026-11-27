@@ -359,12 +359,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     );
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
-      async () => {
-        await linha(proximos, 7)
-          .getByRole("button", { name: /^Ações do/ })
-          .click();
-        await page.getByRole("menuitem", { name: "Remarcar" }).click();
-      },
+      () => linha(proximos, 7).getByRole("button", { name: "Remarcar" }).click(),
       () => dialog.isVisible()
     );
 
@@ -416,12 +411,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     );
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
-      async () => {
-        await linha(proximos, 9)
-          .getByRole("button", { name: /^Ações do/ })
-          .click();
-        await page.getByRole("menuitem", { name: "Remarcar" }).click();
-      },
+      () => linha(proximos, 9).getByRole("button", { name: "Remarcar" }).click(),
       () => dialog.isVisible()
     );
 
@@ -574,10 +564,12 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     const corrigir = linha(historico, 7).getByRole("button", {
       name: "Corrigir",
     });
+    // o gesto mora no card "Precisa de você" ("Já aconteceu"), não na linha
     await agirComConfirma(
       () =>
-        linha(historico, 7)
-          .getByRole("button", { name: "Aconteceu", exact: true })
+        page
+          .getByRole("button", { name: "Já aconteceu" })
+          .first()
           .click({ timeout: 5_000 }),
       () => corrigir.isVisible()
     );
@@ -850,7 +842,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await agirComConfirma(
       () =>
         abrirMenuEncontro(page, linha(historico, 4)).then(() =>
-          page.getByRole("menuitem", { name: "Remarcar" }).click()
+          page.getByRole("menuitem", { name: /^(Remarcar|Outra data)/ }).click()
         ),
       () =>
         dialog.getByRole("heading", { name: "4º encontro" }).isVisible()
@@ -1068,6 +1060,11 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
           .isVisible()
     );
     await preencherDiaHora(dialog, emDias(-6));
+    // a correção também é um registro tardio (oficial venceu há semanas):
+    // o motivo acompanha o salvamento
+    await dialog
+      .getByPlaceholder(/Se passaram mais de 7 dias/)
+      .fill("Corrigindo a data combinada por fora.");
     await dialog
       .getByRole("button", { name: "Salvar correção" })
       .click();
@@ -1182,6 +1179,9 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
       p_dupla: DUPLA_ID,
       p_numero: 10,
       p_data_hora: new Date(Date.now() - 3600e3).toISOString(),
+      // 0242: o passo de outubro é tardio — com motivo a RPC chega no
+      // guard de status, que é o que este caso prova
+      p_motivo_tardio: "validando guard",
     });
     expect((await travado.json()).error).toContain("não realizado");
     const [r10] = await buscarViaServiceRole<{ status: string }[]>(
@@ -1218,6 +1218,9 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
       p_dupla: DUPLA_ID,
       p_numero: 9,
       p_data_hora: new Date(Date.now() - 86400e3).toISOString(),
+      // motivo presente pra chegar no guard de "row futura" (0242 cobra o
+      // motivo tardio antes)
+      p_motivo_tardio: "validando guard",
     });
     expect((await cedo9.json()).error).toContain("futuro");
     const [r9] = await buscarViaServiceRole<{ status: string }[]>(
@@ -1280,6 +1283,8 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
       dupla_id: DUPLA_ID,
       numero,
       data_hora: new Date(Date.now() - 3 * 86400e3).toISOString(),
+      // passo vencido há semanas: 0242 pede o motivo tardio também na prévia
+      motivo_tardio: "Combinamos por fora e registrei depois.",
     };
 
     // prévia → Confirmar do card → a 0207 escreve de verdade
@@ -1362,14 +1367,19 @@ test.describe("mentor — 'Agendar Nº' no ⋯ da ficha (R24)", () => {
       page.getByRole("link", { name: "Registrar 8º encontro" })
     ).toBeVisible();
 
-    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
-    await expect(mais).toBeVisible();
-    await mais.click();
-    const popup = page.locator('[data-slot="dropdown-menu-content"]');
-    await expect(popup).toBeVisible();
-    const item = popup.getByRole("menuitem", {
+    // a barra expõe até duas rotinas em linha: "Agendar Nº" pode estar ali
+    // (segunda vaga) ou no ⋯ quando as duas já estão ocupadas
+    const inlineAgendar = page.getByRole("button", {
       name: /^Agendar \d+º encontro$/,
     });
+    let item = inlineAgendar.first();
+    if (!(await inlineAgendar.count())) {
+      const mais = page.getByRole("button", { name: "Mais ações da dupla" });
+      await mais.click();
+      item = page
+        .locator('[data-slot="dropdown-menu-content"]')
+        .getByRole("menuitem", { name: /^Agendar \d+º encontro$/ });
+    }
     await expect(item).toBeVisible();
     const numero = (await item.innerText()).match(/(\d+)º/)?.[1];
     expect(numero).toBeTruthy();

@@ -252,16 +252,33 @@ test.describe("mentorado — shell /jovem", () => {
     // Checkbox é controlado: um clique pré-hidratação fica só no DOM e o
     // React desfaz ao ligar — repete até a action disparar o toast. O
     // click tem teto: o input desabilita enquanto a action roda
-    await agirComConfirma(
-      () =>
-        combinados
-          .locator("label", { hasText: COMBINADO_JOVEM })
-          .click({ timeout: 5_000 }),
-      () => page.getByText("Combinado marcado como feito.").isVisible()
-    );
-    await expect(
-      page.getByText("Combinado marcado como feito.")
-    ).toBeVisible({ timeout: 15_000 });
+    // espera a hidratação: clique antes dela é desfeito pelo React
+    await expect(combinados.getByText(COMBINADO_JOVEM)).toBeVisible({
+      timeout: 15_000,
+    });
+    // a confirmação é a mudança de estado (o item sai dos abertos e
+    // recolhe em "Ver N feitos"); o toast é passageiro e o refresh pode
+    // recolher a seção junto
+    const reabreCombinados = async () => {
+      const gatilho = combinados.getByRole("button", {
+        name: /Meus combinados/,
+      });
+      if ((await gatilho.getAttribute("aria-expanded")) === "false") {
+        await gatilho.click();
+      }
+    };
+    await expect(async () => {
+      // abre antes (o refresh pode recolher), clica se o item está à vista
+      await reabreCombinados();
+      const alvo = combinados.locator("label", { hasText: COMBINADO_JOVEM });
+      if (await alvo.isVisible().catch(() => false)) {
+        await alvo.click({ timeout: 5_000 }).catch(() => {});
+      }
+      await reabreCombinados();
+      expect(
+        await combinados.getByRole("button", { name: /Ver \d+ feito/ }).count()
+      ).toBeGreaterThan(0);
+    }).toPass({ timeout: 25_000 });
     // checked vem do server (RPC + router.refresh) — preview frio leva
     // mais que os 5s default; a suite já usa 15s pra roundtrip assim.
     // Redesign: o item sai da lista de abertos e recolhe em "Ver N feitos"
@@ -283,16 +300,23 @@ test.describe("mentorado — shell /jovem", () => {
     const recarregados = page.locator(
       'section[aria-labelledby="combinados-titulo"]'
     );
+    // depois do reload a seção pode nascer fechada (hash) — abre antes
+    const gatilhoReload = recarregados.getByRole("button", {
+      name: /Meus combinados/,
+    });
+    await expect(gatilhoReload).toBeVisible({ timeout: 15_000 });
+    if ((await gatilhoReload.getAttribute("aria-expanded")) === "false") {
+      await gatilhoReload.click();
+    }
+    const verFeitos = recarregados.getByRole("button", {
+      name: /Ver \d+ feito/,
+    });
+    await expect(verFeitos).toBeVisible({ timeout: 15_000 });
+    await verFeitos.click();
     const checkboxReload = recarregados
       .locator("label", { hasText: COMBINADO_JOVEM })
       .getByRole("checkbox");
-    await agirComConfirma(
-      () =>
-        recarregados
-          .getByRole("button", { name: /Ver \d+ feito/ })
-          .click({ timeout: 5_000 }),
-      () => checkboxReload.isVisible()
-    );
+    await expect(checkboxReload).toBeVisible({ timeout: 15_000 });
     await expect(checkboxReload).toBeChecked({ timeout: 15_000 });
   });
 
