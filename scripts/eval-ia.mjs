@@ -56,8 +56,8 @@ const casos = JSON.parse(
 const LIVE = process.argv.includes("--live");
 const GATE = process.argv.includes("--gate");
 
-const ok = (id, det = "", modelo) => ({ id, pass: true, det, modelo });
-const falha = (id, det = "", modelo) => ({ id, pass: false, det, modelo });
+const ok = (id, det = "", modelo, resposta) => ({ id, pass: true, det, modelo, resposta });
+const falha = (id, det = "", modelo, resposta) => ({ id, pass: false, det, modelo, resposta });
 // erro = infra quebrada (não é nota de rubrica): o gate reprova na hora,
 // porque com a plataforma no chão o veredito dos casos não vale nada
 const erroItem = (id, det = "", modelo) => ({
@@ -225,10 +225,13 @@ async function live() {
         for (const re of c.resposta_nao_contem ?? [])
           if (new RegExp(re, "i").test(texto))
             problemas.push(`resposta COM /${re}/`);
+        // EVAL_VERBOSO=1: imprime um trecho da resposta de cada caso — a
+        // leitura qualitativa que a rubrica sozinha não dá
+        const trecho = texto.replace(/\s+/g, " ").trim().slice(0, 280);
         resultados.push(
           problemas.length
-            ? falha(c.id, problemas.join("; "), modelo)
-            : ok(c.id, `tools: ${tools.join(",") || "—"}`, modelo)
+            ? falha(c.id, problemas.join("; "), modelo, trecho)
+            : ok(c.id, `tools: ${tools.join(",") || "—"}`, modelo, trecho)
         );
       } catch (e) {
         resultados.push(erroItem(c.id, String(e), modelo));
@@ -300,6 +303,8 @@ for (const r of resultados) {
   console.log(
     `${r.pass ? "PASS" : r.erro ? "ERRO" : "FAIL"} ${r.id}${modelo}${r.det ? ` — ${r.det}` : ""}`
   );
+  if (process.env.EVAL_VERBOSO && r.resposta)
+    console.log(`   resposta: "${r.resposta}${r.resposta.length >= 280 ? "…" : ""}"`);
 }
 
 if (LIVE) {
