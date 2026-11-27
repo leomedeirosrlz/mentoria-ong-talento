@@ -319,6 +319,9 @@ export async function POST(req: Request) {
       let dormindoUltimo = false;
       let demorouUltimo = false;
       let guiaChamado = false;
+      // o modelo inventou uma ferramenta: se ele já tinha respondido na
+      // mesma rodada, outra rodada só repete o texto (visto no panorama)
+      let toolInventada = false;
       // payloads de plano_em_dia desta resposta: viram a única fonte de
       // data permitida no texto (guarda numérica)
       const planos: Record<string, unknown>[] = [];
@@ -551,6 +554,9 @@ export async function POST(req: Request) {
               .finally(() => clearTimeout(timerPrazo));
             if (res === null) break;
             const resTool = res as ResultadoTool;
+            if (!resTool.ok && /desconhecida/i.test(resTool.erro ?? "")) {
+              toolInventada = true;
+            }
             if (resTool.ok) {
               // escrita em prévia (REALIZA-126): o envelope vai pro card
               // do usuário — a única via de approve — e o tool-result que
@@ -631,6 +637,18 @@ export async function POST(req: Request) {
         }
         if (erroEmitido || req.signal.aborted || fechado) break;
         if (Date.now() >= prazo) break;
+        // respondeu e ainda inventou uma ferramenta: o resultado dela não
+        // muda o texto que já saiu, e a próxima rodada reescreveria a
+        // mesma resposta (duplicava o panorama no chat) — fecha aqui
+        if (toolInventada && (msg.content?.trim().length ?? 0) > 0) {
+          send({
+            type: "done",
+            tools: toolsUsadas,
+            fontes: fontes.size ? [...fontes.values()] : undefined,
+          });
+          concluido = true;
+          break;
+        }
         // nudge: a partir da 2ª rodada, força o modelo a responder com o
         // que já tem em vez de seguir chamando ferramentas
         if (i >= 1 && !concluido) {
