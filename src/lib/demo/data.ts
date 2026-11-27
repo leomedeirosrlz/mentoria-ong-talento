@@ -3307,7 +3307,20 @@ function build(): DemoData {
   // d-t2b · Luiza × Laura — o "segundo ciclo" que a bio dela anuncia: depois
   // de concluir a jornada com a Isabela, voltou mentora na turma nova
   const encT2b: Encontro[] = [
-    agendado(uid(D.t2b), 1, diaE1T2, { link: MEET }),
+    // a terça já passou? então o 1º rolou e tem registro; senão fica
+    // agendado — a dupla "em dia" conta a mesma história em qualquer dia
+    e1T2Passou
+      ? comRegistro(
+          realizado(uid(D.t2b), 1, diaE1T2, { duracao: 60 }),
+          luiza, "Laura", "dpp",
+          {
+            reflexoes:
+              "Primeiro encontro da T2 com a Laura — retomada da jornada depois do ciclo anterior. Alinhamos expectativas e o combinado de participação.",
+            observacoes:
+              "Combinado: ela organiza a agenda da semana e traz as metas do ciclo novo no próximo encontro.",
+          }
+        )
+      : agendado(uid(D.t2b), 1, diaE1T2, { link: MEET }),
     agendado(uid(D.t2b), 2, diaEncontroT2(2), {}),
   ];
 

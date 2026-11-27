@@ -891,9 +891,14 @@ export function montarPlanoEmDia(input: {
       (dataLeve == null || dataLeve >= r.ini)
   );
   if (!emDia && recessoNoCaminho) {
-    const r = ritmoQueFecha(gap89, true);
-    if (r != null && (ritmoLeve == null || r < ritmoLeve)) {
-      alternativaRecesso = { ritmo: r, data: simular(r, true, gap89).dataRecuperacao! };
+    // a folga do 8→9 também vale aqui: procura o degrau mais leve que fecha
+    // seguindo no recesso (oficial → 7 → piso), não só o degrau do plano
+    for (const g of GAP_89_DEGRAUS) {
+      const r = ritmoQueFecha(g, true);
+      if (r != null && (ritmoLeve == null || r < ritmoLeve)) {
+        alternativaRecesso = { ritmo: r, data: simular(r, true, g).dataRecuperacao! };
+        break;
+      }
     }
   }
 
@@ -912,8 +917,10 @@ export function montarPlanoEmDia(input: {
     estado,
     pendenciasRegistro,
     // em dia não tem plano a listar: a caminhada de sondagem pode incluir
-    // futuros que estouram o encerramento, e eles não são dívida da dupla
-    passos: emDia ? [] : passosPlano,
+    // futuros que estouram o encerramento, e eles não são dívida da dupla.
+    // Os travados ficam — são compromissos já marcados (o aviso de recesso
+    // e a lista de encontros marcados dependem deles).
+    passos: emDia ? passosPlano.filter((p) => p.acao === "travado") : passosPlano,
     ritmo,
     dataRecuperacao: emDia ? null : s.dataRecuperacao,
     // "só em X" é evidência do conversa — pra quem já está em dia a

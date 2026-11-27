@@ -28,6 +28,9 @@ type Escrita = { tabela: string; op: "insert" | "update" | "delete"; payload: un
 function supaFake({ tabelas = {} }: { tabelas?: Record<string, unknown[]> } = {}) {
   const escritas: Escrita[] = [];
   const builder = (tabela: string) => {
+    // a checagem de "outro encontro no dia" usa gte+lt; nos testes a faixa
+    // responde vazia — o cenário de colisão tem teste próprio
+    let faixaVazia = false;
     const rows = () => tabelas[tabela] ?? [];
     const b: Record<string, unknown> = {
       select: () => b,
@@ -36,6 +39,10 @@ function supaFake({ tabelas = {} }: { tabelas?: Record<string, unknown[]> } = {}
       neq: () => b,
       gt: () => b,
       gte: () => b,
+      lt: () => {
+        faixaVazia = true;
+        return b;
+      },
       lte: () => b,
       order: () => b,
       limit: () => b,
@@ -57,7 +64,11 @@ function supaFake({ tabelas = {} }: { tabelas?: Record<string, unknown[]> } = {}
       then: (
         res: (v: unknown) => unknown,
         rej?: (e: unknown) => unknown
-      ) => Promise.resolve({ data: rows(), error: null }).then(res, rej),
+      ) =>
+        Promise.resolve({
+          data: faixaVazia ? [] : rows(),
+          error: null,
+        }).then(res, rej),
     };
     return b;
   };

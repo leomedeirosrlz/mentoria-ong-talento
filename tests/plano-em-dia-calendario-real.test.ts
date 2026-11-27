@@ -241,7 +241,9 @@ describe("513 — calendário: feriado, travado, fuso", () => {
   it("6 atrasos a 1 por dia fecham no limite; seguir no recesso alivia pra semana dupla", () => {
     const r = montar(dupla(4));
     expect(r.dataRecuperacao).toBe(ENCERRAMENTO);
-    expect(r.alternativaRecesso).toEqual({ ritmo: 2, data: expect.any(String) });
+    // com a folga oficial de 14 dias preservada, seguir no recesso pede
+    // semana tripla — a dupla só desce pra dupla comprimindo a folga
+    expect(r.alternativaRecesso).toEqual({ ritmo: 3, data: expect.any(String) });
     expect(r.alternativaRecesso!.data <= ENCERRAMENTO).toBe(true);
   });
 

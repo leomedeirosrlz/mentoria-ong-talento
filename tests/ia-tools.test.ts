@@ -74,6 +74,9 @@ function supaFake({
   let auditAwaited = false;
 
   const builder = (tabela: string) => {
+    // a checagem de "outro encontro no dia" usa gte+lt; nos testes a faixa
+    // responde vazia — o cenário de colisão tem teste próprio
+    let faixaVazia = false;
     const rows = () => tabelas[tabela] ?? [];
     const b: Record<string, unknown> = {
       select: (sel?: unknown) => {
@@ -89,6 +92,10 @@ function supaFake({
       neq: () => b,
       gt: () => b,
       gte: () => b,
+      lt: () => {
+        faixaVazia = true;
+        return b;
+      },
       lte: () => b,
       order: (campo: string, op?: unknown) => {
         orderCalls.push({ tabela, campo, op });
