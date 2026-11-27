@@ -205,7 +205,7 @@ export function PlanoEmDiaCard({
             <span className="tabular-nums">{formatDate(viavel.data!)}</span>
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Com {viavel.rotulo}
+            {viavel.rotulo.charAt(0).toUpperCase() + viavel.rotulo.slice(1)}
             {plano.encerramento
               ? `, antes do encerramento (${formatDate(plano.encerramento)})`
               : ""}

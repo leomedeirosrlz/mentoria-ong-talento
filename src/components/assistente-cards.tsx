@@ -992,8 +992,8 @@ function CaminhoPlano({
   const [resultado, setResultado] = useState<null | "ok" | { erro: string }>(
     null
   );
-  const [docAberto, setDocAberto] = useState(false);
-  const docId = useId();
+  const [aberto, setAberto] = useState(false);
+  const passosId = useId();
   const sessoes = agruparPassos(b.passos);
   const faltam = b.cabem_ate_encerramento?.faltam ?? b.passos.length;
 
@@ -1024,37 +1024,24 @@ function CaminhoPlano({
 
   return (
     <>
-      <div className="mt-1 rounded-lg bg-muted/50 px-3 py-2.5">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Caminho de menor fricção
-        </p>
-        <p className="mt-1 text-2xl font-semibold leading-none tracking-tight tabular-nums">
+      <div className="mt-1">
+        <p className="text-2xl font-semibold leading-tight tracking-tight tabular-nums">
+          <span className="text-sm font-normal text-muted-foreground">
+            Em dia em{" "}
+          </span>
           {valida(caminho.data) ? formatDate(caminho.data) : "data a definir"}
         </p>
-        <p className="mt-1.5 text-xs text-muted-foreground">
-          {caminho.sessoes}{" "}
-          {caminho.sessoes === 1 ? "sessão" : "sessões"} para {faltam}{" "}
-          {faltam === 1 ? "encontro" : "encontros"}
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {faltam} {faltam === 1 ? "encontro" : "encontros"}.
           {b.encerramento && valida(b.encerramento)
-            ? ` · antes do encerramento (${formatDate(b.encerramento)})`
+            ? ` O ciclo encerra em ${formatDate(b.encerramento)}.`
             : ""}
         </p>
-        {b.data_projetada &&
-          valida(b.data_projetada) &&
-          b.data_projetada !== caminho.data && (
-            <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-              Sem mudança, só em {formatDate(b.data_projetada)}
-              {b.encerramento && valida(b.encerramento)
-                ? `, depois do encerramento`
-                : ""}
-              .
-            </p>
-          )}
       </div>
 
       {caminho.exigencias.length > 0 && (
-        <div className="mt-2">
-          <p className="text-xs font-semibold">O que ele pede</p>
+        <div className="mt-2.5">
+          <p className="text-xs font-semibold">O que muda</p>
           <ul className="mt-1 flex flex-wrap gap-1.5">
             {caminho.exigencias.map((e) => (
               <li
@@ -1068,100 +1055,38 @@ function CaminhoPlano({
         </div>
       )}
 
-      {b.alternativas.some((a) => a.data && valida(a.data)) && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Mais rápido, com mais mudanças:{" "}
-          {b.alternativas
-            .filter((a) => a.data && valida(a.data))
-            .slice(0, 2)
-            .map((a) => `${a.rotulo} (${formatDate(a.data!)})`)
-            .join("; ")}
-          .
+      {b.recessos_pendentes.length > 0 && (
+        <p className="mt-2 text-xs text-[var(--warn-text)]">
+          A dupla precisa decidir{" "}
+          {b.recessos_pendentes.length === 1 ? "o recesso" : "os recessos"}
+          {b.recessos_pendentes[0].inicio &&
+          valida(b.recessos_pendentes[0].inicio)
+            ? ` (${diaMesCurto(b.recessos_pendentes[0].inicio)} a ${
+                valida(b.recessos_pendentes[0].fim)
+                  ? diaMesCurto(b.recessos_pendentes[0].fim)
+                  : "?"
+              })`
+            : ""}{" "}
+          antes de enviar.
         </p>
       )}
 
-      {!caminho && b.pendencias.length > 0 && (
-        <p className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground">
-          Antes do plano:{" "}
+      {b.pendencias.length > 0 && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
           {b.pendencias
             .map(
               (p) =>
-                `${p.numero}º ${p.estado === "limbo" ? "(confirmar se aconteceu)" : "(falta o registro)"}`
+                `O ${p.numero}º encontro ${p.estado === "limbo" ? "ainda não foi confirmado" : "não tem registro"}`
             )
-            .join(", ")}
+            .join(". ")}
           .
         </p>
       )}
 
-      {!caminho && b.recessos_pendentes.length > 0 && (
-        <div className="mt-2 rounded-lg bg-[var(--warn-bg)] px-2.5 py-2">
-          <p className="text-xs font-semibold text-[var(--warn-text)]">
-            A dupla decide sobre{" "}
-            {plural(b.recessos_pendentes.length, "o recesso", "os recessos")}{" "}
-            antes de propor
-          </p>
-          <ul className="mt-1 space-y-0.5">
-            {b.recessos_pendentes.map((rec) => (
-              <li
-                key={rec.ciclo_evento_id}
-                className="text-xs text-muted-foreground"
-              >
-                {rec.titulo}
-                {valida(rec.inicio)
-                  ? `, ${diaMesCurto(rec.inicio)} a ${valida(rec.fim) ? diaMesCurto(rec.fim) : "?"}`
-                  : ""}
-                : pausa ou segue nos encontros?
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {!caminho && b.grade && gradeTexto(b.grade) && (
-        <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
-          <Clock size={13} aria-hidden className="mt-0.5 shrink-0" />
+      {b.grade && gradeTexto(b.grade) && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
           {gradeTexto(b.grade)}
         </p>
-      )}
-
-      {!caminho && b.doc && b.doc.length > 0 && (
-        <div className="mt-2">
-          <AnimatePresence initial={false}>
-            {docAberto && (
-              <motion.div
-                id={docId}
-                key="doc"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={T.panel}
-                style={{ overflow: "clip" }}
-                className="space-y-3 rounded-lg border border-border/60 bg-background px-3 py-2.5 text-sm"
-              >
-                <DocBlocos blocos={b.doc} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <Button
-            type="button"
-            variant="ghost"
-            aria-expanded={docAberto}
-            aria-controls={docAberto ? docId : undefined}
-            onClick={() => setDocAberto((v) => !v)}
-            className="h-auto min-h-11 w-full items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold hover:bg-muted/50 active:not-aria-[haspopup]:scale-100 md:min-h-11"
-          >
-            {docAberto ? "Fechar o rascunho" : "Ler o rascunho do combinado"}
-            <CaretDown
-              size={14}
-              weight="bold"
-              aria-hidden
-              className={cn(
-                "shrink-0 text-muted-foreground transition-transform duration-200 ease-snappy",
-                docAberto && "rotate-180"
-              )}
-            />
-          </Button>
-        </div>
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -1180,7 +1105,7 @@ function CaminhoPlano({
             role="status"
             className="rounded-md bg-[var(--ok-bg)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ok-text)]"
           >
-            Proposta enviada. Um aceite da dupla já põe pra valer.
+            Plano enviado. Quando um dos dois aceitar, ele passa a valer.
           </p>
         ) : (
           <>
@@ -1192,7 +1117,7 @@ function CaminhoPlano({
               aria-busy={propondo}
               className="min-h-11 md:min-h-9"
             >
-              {propondo ? "Propondo…" : "Propor este caminho"}
+              {propondo ? "Enviando…" : "Enviar o plano"}
             </Button>
             <Link
               href={`${r.encontros(b.dupla_id)}#plano-em-dia`}
@@ -1213,54 +1138,82 @@ function CaminhoPlano({
       )}
 
       {b.passos.length > 0 && (
-        <p className="mt-3 text-xs font-semibold">Passo a passo</p>
-      )}
-      <ol className="mt-1 divide-y divide-border/60">
-        {sessoes.map((g) => (
-          <li key={g.data || "sem-data"} className="py-2 first:pt-0 last:pb-0">
-            <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
-              {valida(g.data) ? diaSemanaCurto(g.data) : "Sem data"}
-              {g.passos.length > 1 && (
-                <span className="rounded-full bg-[var(--destaque)]/25 px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
-                  mesma sessão
-                </span>
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-expanded={aberto}
+            aria-controls={aberto ? passosId : undefined}
+            onClick={() => setAberto((v) => !v)}
+            className="mt-2 h-auto min-h-11 w-full items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold hover:bg-muted/50 active:not-aria-[haspopup]:scale-100 md:min-h-11"
+          >
+            {aberto
+              ? "Ocultar os encontros"
+              : `Ver os ${b.passos.length} encontros`}
+            <CaretDown
+              size={14}
+              weight="bold"
+              aria-hidden
+              className={cn(
+                "shrink-0 text-muted-foreground transition-transform duration-200 ease-snappy",
+                aberto && "rotate-180"
               )}
-              {g.passos.some((p) => p.acao === "travado") && (
-                <span className="text-[10px] font-semibold text-[var(--ok-text)]">
-                  já marcado
-                </span>
-              )}
-            </p>
-            <ul className="mt-1 space-y-1">
-              {g.passos.map((p) => (
-                <li key={p.numero} className="flex items-baseline gap-2">
-                  <span className="w-4 shrink-0 text-right font-mono text-[11px] font-semibold tabular-nums text-muted-foreground">
-                    {p.numero}
-                  </span>
-                  <span className="min-w-0 text-sm leading-snug">
-                    {p.titulo}
-                    {p.acao === "remarcar" && (
-                      <span className="text-xs text-muted-foreground">
-                        {" "}
-                        · remarcar
-                      </span>
-                    )}
-                    {(p.precondicao || p.aviso) && (
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {p.precondicao
-                          ? `Precisa antes: ${p.precondicao}`
-                          : p.aviso}
-                      </span>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </li>
-        ))}
-      </ol>
-      {!caminho && b.passos.length === 0 && (
-        <Vazio>Nada a marcar: a dupla segue o calendário</Vazio>
+            />
+          </Button>
+          <AnimatePresence initial={false}>
+            {aberto && (
+              <motion.ol
+                id={passosId}
+                key="passos"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={T.panel}
+                style={{ overflow: "clip" }}
+                className="divide-y divide-border/60"
+              >
+                {sessoes.map((g) => (
+                  <li
+                    key={g.data || "sem-data"}
+                    className="py-2 first:pt-0 last:pb-0"
+                  >
+                    <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+                      {valida(g.data) ? diaSemanaCurto(g.data) : "Sem data"}
+                      {g.passos.length > 1 && (
+                        <span className="rounded-full bg-[var(--destaque)]/25 px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
+                          {g.passos.length} encontros juntos
+                        </span>
+                      )}
+                      {g.passos.some((p) => p.acao === "travado") && (
+                        <span className="text-[10px] font-semibold text-[var(--ok-text)]">
+                          já marcado
+                        </span>
+                      )}
+                    </p>
+                    <ul className="mt-1 space-y-1">
+                      {g.passos.map((p) => (
+                        <li key={p.numero} className="flex items-baseline gap-2">
+                          <span className="w-4 shrink-0 text-right font-mono text-[11px] font-semibold tabular-nums text-muted-foreground">
+                            {p.numero}
+                          </span>
+                          <span className="min-w-0 text-sm leading-snug">
+                            {p.titulo}
+                            {p.acao === "remarcar" && (
+                              <span className="text-xs text-muted-foreground">
+                                {" "}
+                                · remarcar
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </motion.ol>
+            )}
+          </AnimatePresence>
+        </>
       )}
     </>
   );
@@ -1289,7 +1242,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
 
   const meta =
     caminho
-      ? "menor fricção"
+      ? undefined
       : estado === "em_dia"
         ? "em dia"
         : conversa && !melhor
@@ -1461,7 +1414,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </div>
       )}
 
-      {b.pendencias.length > 0 && (
+      {!caminho && b.pendencias.length > 0 && (
         <p className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground">
           Antes do plano: {b.pendencias.map((p) => (
             `${p.numero}º ${p.estado === "limbo" ? "(confirmar se aconteceu)" : "(falta o registro)"}`
@@ -1471,12 +1424,11 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
 
       {/* o que trava a proposta (527): recesso sem decisão e grade
           faltando leem junto do plano — a plano_propor recusa os dois */}
-      {b.recessos_pendentes.length > 0 && (
+      {!caminho && b.recessos_pendentes.length > 0 && (
         <div className="mt-2 rounded-lg bg-[var(--warn-bg)] px-2.5 py-2">
           <p className="text-xs font-semibold text-[var(--warn-text)]">
-            A dupla decide sobre{" "}
-            {plural(b.recessos_pendentes.length, "o recesso", "os recessos")}{" "}
-            antes de propor
+            Antes de enviar, a dupla precisa decidir{" "}
+            {b.recessos_pendentes.length === 1 ? "o recesso" : "os recessos"}
           </p>
           <ul className="mt-1 space-y-0.5">
             {b.recessos_pendentes.map((rec) => (
@@ -1495,7 +1447,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </div>
       )}
 
-      {b.grade && gradeTexto(b.grade) && (
+      {!caminho && b.grade && gradeTexto(b.grade) && (
         <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
           <Clock size={13} aria-hidden className="mt-0.5 shrink-0" />
           {gradeTexto(b.grade)}
@@ -1504,7 +1456,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
 
       {/* rascunho do combinado — a dupla lê o que a proposta grava antes
           de pedir pra publicar (mesma montagem do wizard da aba Agora) */}
-      {b.doc && b.doc.length > 0 && (
+      {!caminho && b.doc && b.doc.length > 0 && (
         <div className="mt-2">
           <AnimatePresence initial={false}>
             {docAberto && (

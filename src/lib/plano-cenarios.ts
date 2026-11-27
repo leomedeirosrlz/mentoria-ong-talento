@@ -67,20 +67,24 @@ export function friccaoDoCenario(c: CenarioPlano): number {
   );
 }
 
-/** O que o caminho exige, em frases curtas pra interface. */
+/** O que o caminho pede da dupla, em frases curtas pra interface. */
 export function exigenciasDoCenario(c: CenarioPlano): string[] {
   const out: string[] = [];
-  if (c.decisaoRecesso === "segue") out.push("seguir com encontros no recesso");
-  if (c.decisaoRecesso === "pausa") out.push("pausar no recesso");
-  if (c.fusao.length === 1) out.push("fundir um par de encontros");
+  if (c.decisaoRecesso === "segue")
+    out.push("continuar se encontrando no recesso");
+  if (c.decisaoRecesso === "pausa") out.push("parar no recesso");
+  if (c.fusao.length === 1)
+    out.push("juntar 2 encontros numa sessão só");
   else if (c.fusao.length > 1)
     out.push(
-      `fundir ${c.fusao.length} pares (${c.fusao.map((g) => g.join("+")).join(", ")})`
+      `juntar ${c.fusao.length} pares de encontros (${c.fusao.map((g) => g.join("+")).join(", ")})`
     );
-  if (c.ritmo >= 7) out.push("1 encontro por dia");
+  if (c.ritmo >= 7) out.push("com 1 encontro por dia");
   else if (c.ritmo > 1) out.push(`${c.ritmo} encontros por semana`);
   if (c.praticaFlex && c.praticaFlex.dias < c.praticaFlex.oficial)
-    out.push(`folga de prática em ${c.praticaFlex.dias} dias`);
+    out.push(
+      `esperar só ${c.praticaFlex.dias} dias de prática entre dois encontros`
+    );
   return out;
 }
 
@@ -205,7 +209,7 @@ export function simularCenariosPlano(
   }[] = [
     {
       id: "base",
-      rotulo: "como está",
+      rotulo: "do jeito que está",
       dupla: input.dupla,
       decisaoRecesso: null,
     },
@@ -217,41 +221,41 @@ export function simularCenariosPlano(
     },
     {
       id: "recesso_pausa",
-      rotulo: "recesso: pausar",
+      rotulo: "parando no recesso",
       dupla: comDecisaoRecesso(input.dupla, recesso, true),
       decisaoRecesso: "pausa",
     },
     {
       id: "fusao_par",
-      rotulo: "fusão do próximo par",
+      rotulo: "juntando 2 encontros",
       dupla: input.dupla,
       fusao: primeiroPar,
       decisaoRecesso: null,
     },
     {
       id: "fusao_pares",
-      rotulo: "fusão em pares",
+      rotulo: "juntando todos os pares",
       dupla: input.dupla,
       fusao: pares,
       decisaoRecesso: null,
     },
     {
       id: "recesso_segue_fusao",
-      rotulo: "recesso: seguir · fusão em pares",
+      rotulo: "seguindo no recesso e juntando todos os pares",
       dupla: comDecisaoRecesso(input.dupla, recesso, false),
       fusao: pares,
       decisaoRecesso: "segue",
     },
     {
       id: "ritmo_1_por_dia",
-      rotulo: "1 encontro por dia",
+      rotulo: "com 1 encontro por dia",
       dupla: input.dupla,
       ritmo: 7,
       decisaoRecesso: null,
     },
     {
       id: "recesso_segue_ritmo",
-      rotulo: "recesso: seguir · 1 por dia",
+      rotulo: "seguindo no recesso, com 1 encontro por dia",
       dupla: comDecisaoRecesso(input.dupla, recesso, false),
       ritmo: 7,
       decisaoRecesso: "segue",
@@ -264,7 +268,10 @@ export function simularCenariosPlano(
     const grupos = pares.slice(0, k);
     definicoes.push({
       id: `fusao_${k}`,
-      rotulo: `fusão em ${k} ${k === 1 ? "par" : "pares"}`,
+      rotulo:
+        k === 1
+          ? "juntando 2 encontros"
+          : `juntando ${k} pares de encontros`,
       dupla: input.dupla,
       fusao: grupos,
       decisaoRecesso: null,
@@ -272,7 +279,10 @@ export function simularCenariosPlano(
     if (recesso) {
       definicoes.push({
         id: `recesso_segue_fusao_${k}`,
-        rotulo: `recesso: seguir · fusão em ${k} ${k === 1 ? "par" : "pares"}`,
+        rotulo:
+          k === 1
+            ? "seguindo no recesso e juntando 2 encontros"
+            : `seguindo no recesso e juntando ${k} pares de encontros`,
         dupla: comDecisaoRecesso(input.dupla, recesso, false),
         fusao: grupos,
         decisaoRecesso: "segue",
@@ -308,8 +318,8 @@ export function simularCenariosPlano(
     const observacao = viavel
       ? undefined
       : r.sugestao.includes("seguir encontros no recesso")
-        ? "Só fecha com a decisão do recesso."
-        : "Nem com este caminho fecha antes do encerramento.";
+        ? "Só fecha se a dupla decidir seguir no recesso."
+        : "Nem assim fecha antes do encerramento.";
 
     chaveDoCenario.set(def.id, chave);
     cenarios.push({

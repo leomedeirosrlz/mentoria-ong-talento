@@ -512,7 +512,7 @@ export async function responderDemoIa(
         content = r.emDia
           ? `Na demonstração a dupla ${rotulo} já está em dia, então não existe plano de recuperação pra ela.${ui ? " O card acima faz a mesma conta da ficha e mostra os encontros marcados." : " Com os seus dados a ficha faz essa mesma conta."}${sugestoes(["Resumo da semana"])}`
           : r.estado === "conversa" && matriz.menorFriccao
-            ? `Na demonstração o caminho completo da dupla ${rotulo} fecha em ${matriz.menorFriccao.cenario.data ? new Date(`${matriz.menorFriccao.cenario.data}T12:00:00`).toLocaleDateString("pt-BR") : "data a definir"} com ${matriz.menorFriccao.cenario.rotulo}. O card acima mostra o que ele pede e os ${matriz.menorFriccao.passos.length} passos.${sugestoes(["Resumo da semana"])}`
+            ? `Na demonstração a dupla ${rotulo} fica em dia em ${matriz.menorFriccao.cenario.data ? new Date(`${matriz.menorFriccao.cenario.data}T12:00:00`).toLocaleDateString("pt-BR") : "data a definir"} ${matriz.menorFriccao.cenario.rotulo}. O card acima mostra o que muda e os ${matriz.menorFriccao.passos.length} encontros.${sugestoes(["Resumo da semana"])}`
             : ui
               ? textoPlano
               : `Na demonstração a conta da dupla ${rotulo} não fecha antes do encerramento. ${r.sugestao ?? "Nem com 1 encontro por dia o plano fecha."}${sugestoes(["Resumo da semana"])}`;

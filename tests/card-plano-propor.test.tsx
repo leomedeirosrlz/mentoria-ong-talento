@@ -76,7 +76,7 @@ const bloco = (): UiPlano => ({
       [8, 9],
     ],
     decisao_recesso: "segue",
-    exigencias: ["fundir 2 pares (6+7, 8+9)", "2 encontros por semana"],
+    exigencias: ["juntar 2 pares (6+7, 8+9)", "2 encontros por semana"],
     passos: [
       passo(5, futuro(0), "travado"),
       passo(6, futuro(7)),
@@ -96,23 +96,37 @@ const botao = (alvo: HTMLElement, texto: string) =>
 describe("CardPlano: propor o caminho (1126)", () => {
   beforeEach(() => vi.mocked(combinarPlano).mockClear());
 
-  it("mostra data, o que pede, sessões e o botão de propor", () => {
+  it("mostra o essencial: data, o que muda e o botão de enviar", () => {
     const { alvo, desmontar } = montar(<CardPlano b={bloco()} />);
     const texto = alvo.textContent ?? "";
-    expect(texto).toContain("Caminho de menor fricção");
-    expect(texto).toContain("O que ele pede");
-    expect(texto).toContain("fundir 2 pares (6+7, 8+9)");
-    expect(texto).toContain("mesma sessão"); // 6 e 7 dividem a data
-    expect(texto).toContain("já marcado"); // o 5º travado
-    expect(texto).toContain("Passo a passo");
-    expect(texto).toContain("3 sessões para 12 encontros");
-    expect(botao(alvo, "Propor este caminho")).toBeTruthy();
+    expect(texto).toContain("Em dia em");
+    expect(texto).toContain("O que muda");
+    expect(texto).toContain("juntar 2 pares (6+7, 8+9)");
+    expect(texto).toContain("12 encontros. O ciclo encerra em");
+    expect(texto).toContain("A dupla precisa decidir o recesso");
+    expect(botao(alvo, "Enviar o plano")).toBeTruthy();
+    // detalhe fechado: nada de 4 linhas de encontro antes do clique
+    expect(texto).not.toContain("Encontro 6");
+    expect(texto).not.toContain("Caminho de menor fricção");
     desmontar();
   });
 
-  it("propõe com ritmo, fusão e a decisão do recesso do caminho", async () => {
+  it("abre os encontros sob demanda, com sessão e travado marcados", () => {
     const { alvo, desmontar } = montar(<CardPlano b={bloco()} />);
-    const b = botao(alvo, "Propor este caminho")!;
+    act(() => {
+      botao(alvo, "Ver os 4 encontros")!.dispatchEvent(
+        new MouseEvent("click", { bubbles: true })
+      );
+    });
+    expect(alvo.textContent).toContain("2 encontros juntos"); // 6 e 7
+    expect(alvo.textContent).toContain("já marcado"); // 5º travado
+    expect(alvo.textContent).toContain("Encontro 6");
+    desmontar();
+  });
+
+  it("envia com ritmo, fusão e a decisão do recesso do caminho", async () => {
+    const { alvo, desmontar } = montar(<CardPlano b={bloco()} />);
+    const b = botao(alvo, "Enviar o plano")!;
     await act(async () => {
       b.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
@@ -124,7 +138,7 @@ describe("CardPlano: propor o caminho (1126)", () => {
       ],
       decisoes: [{ cicloEventoId: "r1", usa: false }],
     });
-    expect(alvo.textContent).toContain("Proposta enviada");
+    expect(alvo.textContent).toContain("Plano enviado");
     desmontar();
   });
 
@@ -134,12 +148,12 @@ describe("CardPlano: propor o caminho (1126)", () => {
     });
     const { alvo, desmontar } = montar(<CardPlano b={bloco()} />);
     await act(async () => {
-      botao(alvo, "Propor este caminho")!.dispatchEvent(
+      botao(alvo, "Enviar o plano")!.dispatchEvent(
         new MouseEvent("click", { bubbles: true })
       );
     });
     expect(alvo.textContent).toContain("A dupla precisa decidir o recesso");
-    expect(alvo.textContent).toContain("Caminho de menor fricção");
+    expect(alvo.textContent).toContain("O que muda");
     desmontar();
   });
 });

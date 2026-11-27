@@ -206,7 +206,7 @@ describe("faixa com plano vivo (FR-006)", () => {
         souMentor
         planoVivo
         melhor={{
-          rotulo: "recesso: seguir · fusão em pares",
+          rotulo: "seguindo no recesso e juntando 3 pares de encontros",
           data: "2026-12-28",
           sessoes: 6,
           decisaoRecesso: "segue",
@@ -215,7 +215,9 @@ describe("faixa com plano vivo (FR-006)", () => {
       />
     );
     expect(alvo.textContent).toContain("Em dia em");
-    expect(alvo.textContent).toContain("recesso: seguir · fusão em pares");
+    expect(alvo.textContent).toContain(
+      "Seguindo no recesso e juntando 3 pares de encontros"
+    );
     expect(alvo.textContent).toContain("Seguindo no recesso");
     expect(alvo.textContent).not.toContain("Nem com 1 encontro por dia fecha");
     expect(alvo.textContent).not.toContain("conversar com a coordenação");

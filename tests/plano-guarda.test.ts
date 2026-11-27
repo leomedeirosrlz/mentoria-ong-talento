@@ -186,7 +186,7 @@ describe("guarda numérica do plano", () => {
       passos: [{ numero: 5, acao: "agendar", data_sugerida: "2027-02-25" }],
     };
     const texto = respostaDeterministica(semCaminho);
-    expect(texto).toContain("Nenhum caminho fecha");
+    expect(texto).toContain("Nenhum jeito fecha");
     expect(texto).toContain("15/01/2027");
     expect(validarRespostaPlano(texto, semCaminho).ok).toBe(true);
   });

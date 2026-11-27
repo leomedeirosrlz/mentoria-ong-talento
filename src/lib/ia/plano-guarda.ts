@@ -179,20 +179,16 @@ export function respostaDeterministica(plano: FatosPlano): string {
   const partes: string[] = [];
 
   if (caminho?.data) {
-    // a pergunta "como a dupla fica em dia?" responde pelo caminho
-    // completo de menor fricção — o mais rápido é alternativa, não a
-    // recomendação
+    // "como a dupla fica em dia?" responde pelo plano que fecha com menos
+    // mudanças — a data primeiro, depois o que precisa mudar
+    const ex = caminho.exigencias ?? [];
     partes.push(
-      `O caminho completo de menor fricção é ${caminho.rotulo}: a dupla fica em dia em ${br(caminho.data)}${
-        caminho.exigencias?.length
-          ? `, com ${caminho.exigencias.join("; ")}`
-          : ""
-      }.`
+      `A dupla fica em dia em ${br(caminho.data)}.${ex.length ? ` O que muda: ${ex.join("; ")}.` : ""}`
     );
     const rapido = melhor && melhor.data && melhor.data !== caminho.data;
     if (rapido) {
       partes.push(
-        `O mais rápido é ${melhor!.rotulo}, em ${br(melhor!.data)} (mais mudanças).`
+        `Dá para fechar antes, em ${br(melhor!.data)}, mas com mais mudanças: ${melhor!.rotulo}.`
       );
     }
   } else if (melhor) {
@@ -216,19 +212,19 @@ export function respostaDeterministica(plano: FatosPlano): string {
     }
   } else {
     partes.push(
-      `Nenhum caminho fecha antes do encerramento${encerramento ? ` (${br(encerramento)})` : ""}. O caminho é a coordenação.`
+      `Nenhum jeito fecha antes do encerramento${encerramento ? ` (${br(encerramento)})` : ""}. A coordenação precisa entrar.`
     );
     const naoViaveis = cenarios.filter((c) => !c.viavel && c.data);
     if (naoViaveis.length) {
       partes.push(
-        `A projeção mais curta é ${br(naoViaveis[0].data)} (${naoViaveis[0].rotulo}).`
+        `A data mais próxima seria ${br(naoViaveis[0].data)}.`
       );
     }
   }
 
   if (pendentes.length) {
     partes.push(
-      `Falta a decisão da dupla sobre ${pendentes
+      `Falta a dupla decidir sobre ${pendentes
         .map((p) => `${p.titulo} (${br(p.inicio)} a ${br(p.fim)})`)
         .join(", ")}.`
     );
@@ -239,10 +235,10 @@ export function respostaDeterministica(plano: FatosPlano): string {
     | undefined;
   if (grade?.mentor && grade?.jovem) {
     partes.push(
-      `A grade dos dois lados já está combinada (${grade.dias_comuns ?? 0} dia${grade.dias_comuns === 1 ? "" : "s"} em comum): a proposta pode ser fechada na aba Agora.`
+      `Os dois já marcaram a disponibilidade (${grade.dias_comuns ?? 0} dia${grade.dias_comuns === 1 ? "" : "s"} em comum). Dá para enviar o plano pela aba Agora.`
     );
   } else if (grade && (!grade.mentor || !grade.jovem)) {
-    partes.push("Antes de propor, falta a grade de um dos lados.");
+    partes.push("Antes de enviar, falta a disponibilidade de um dos lados.");
   }
 
   return partes.join(" ");
