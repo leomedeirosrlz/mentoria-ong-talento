@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { SeletorDiaHora } from "@/components/seletor-dia-hora";
 
 /** "YYYY-MM-DDTHH:mm" local → par civil pro seletor. */
@@ -107,6 +108,8 @@ export function AgendarEncontroDialog({
   const open = openProp ?? openInterno;
   const [pending, start] = useTransition();
   const [aviso, setAviso] = useState<string | null>(null);
+  const [motivoTardio, setMotivoTardio] = useState("");
+  const [motivoPedido, setMotivoPedido] = useState(false);
   const linkRef = useRef<HTMLInputElement | null>(null);
   // overlap com sessão da OUTRA dupla do mesmo jovem — warning, não bloqueio.
   // Guardado com a data consultada: resposta atrasada de data que já mudou
@@ -275,8 +278,21 @@ export function AgendarEncontroDialog({
     start(async () => {
       try {
         if (retroativo) {
-          const res = await registrarEncontroRetroativo(duplaId, n, local);
+          // o motivo só existe quando o passo venceu há mais de 7 dias: o
+          // servidor pede na primeira tentativa e o campo aparece aqui,
+          // sem cobrar explicação de um registro de ontem
+          if (motivoPedido && !motivoTardio.trim()) {
+            setAviso("Conte o motivo do registro estar sendo feito agora.");
+            return;
+          }
+          const res = await registrarEncontroRetroativo(
+            duplaId,
+            n,
+            local,
+            motivoTardio
+          );
           if (res?.error) {
+            if (/conte por que/i.test(res.error)) setMotivoPedido(true);
             setAviso(res.error);
             return;
           }
@@ -340,6 +356,8 @@ export function AgendarEncontroDialog({
       setConflito(null);
       setGrades(null);
       setValorData(defaultValue);
+      setMotivoTardio("");
+      setMotivoPedido(false);
     }
   }
 
@@ -511,6 +529,25 @@ export function AgendarEncontroDialog({
             )}{" "}
             Quer {atual ? "remarcar" : "agendar"} mesmo assim?
           </p>
+        )}
+        {/* registro que venceu há mais de 7 dias pede o motivo (0242); o
+            campo fica no próprio gesto pra não travar num aviso sem saída */}
+        {ehRetroativo && motivoPedido && (
+          <div className="space-y-2">
+            <Label htmlFor="motivo-tardio">
+              Por que o registro está sendo feito agora?
+            </Label>
+            <Textarea
+              id="motivo-tardio"
+              value={motivoTardio}
+              onChange={(e) => setMotivoTardio(e.target.value)}
+              rows={2}
+              placeholder="Ex.: o encontro aconteceu no dia 26 e o registro ficou pra depois."
+            />
+            <p className="text-xs text-muted-foreground">
+              Obrigatório quando o encontro venceu há mais de 7 dias.
+            </p>
+          </div>
         )}
         {/* link não se aplica a encontro que já aconteceu — nasce "externo"
             e sem link de chamada. Esconder evita campo mentiroso. */}

@@ -14,6 +14,7 @@ import {
   UFS,
   cronogramaVigente,
   coberturaDoRegistro,
+  formatDate,
   inicioDefaultDupla,
   maxEncontros,
   normLinkExterno,
@@ -84,7 +85,11 @@ import { demoAtivo, demoLidas, demoRole, limparDemo, marcarDemoLidas, marcarDemo
 import { DEMO_MSG } from "./demo/shared";
 import { getDemoData } from "./demo/data";
 import { demoNotificacoes } from "./demo/queries";
-import { avaliarRetroativo, motivoTardioOk } from "./retroativo-guarda";
+import {
+  avaliarRetroativo,
+  diasDeAtraso,
+  motivoTardioOk,
+} from "./retroativo-guarda";
 
 /** Normaliza o embed `profile_papeis` pro `papeis` efetivo — união do role
  *  primário com as linhas do embed (o primário também vive lá; o dedupe
@@ -3252,7 +3257,13 @@ export async function registrarEncontroRetroativo(
   if (regra.bloqueado) return { error: regra.bloqueado };
   const motivoLimpo = motivoTardio?.trim() ?? "";
   if (regra.tardio && !motivoTardioOk(motivoLimpo)) {
-    return { error: "Já passaram mais de 7 dias. Conte por que esse registro está sendo feito agora." };
+    // a régua compara com a data OFICIAL do passo, não com o dia do
+    // registro: dizer qual é a data e quantos dias passaram evita a
+    // leitura "faz 7 dias que estou registrando"
+    const dias = diasDeAtraso(oficial, hojeStr);
+    return {
+      error: `O ${numero}º encontro venceu em ${formatDate(oficial)} (${dias} dias atrás). Conte por que o registro está sendo feito agora.`,
+    };
   }
 
   // na trilha especialista o número é o ordinal da tentativa — quem decide é
