@@ -56,8 +56,6 @@ const IDS = {
 
 const MENTORADOS_JOVEM = `${IDS.mentorado},${IDS.mentoradoSemDpp}`;
 
-const cardHome = (page: Page) =>
-  page.locator('section[aria-labelledby="esp-titulo"]');
 const secaoPedidos = (page: Page) => page.locator("section#pedidos");
 
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
@@ -223,14 +221,11 @@ test.describe("WP6-R2 — encaixa e autor da sugestão", () => {
     await loginComSenha(page, ANA_EMAIL, DEMO_SENHA);
 
     await page.goto("/jovem");
-    const card = cardHome(page);
-    // o card inteiro é o link — título "1 sugestão esperando você", sub
-    // com o primeiro nome do autor resolvido via jovem_contatos
+    // a sugestão virou pendência no "Para fazer agora", com o autor
+    // resolvido via jovem_contatos
+    const paraFazer = page.locator('section[aria-labelledby="fazer-titulo"]');
     await expect(
-      card.getByText("1 sugestão esperando você")
-    ).toBeVisible();
-    await expect(
-      card.getByText(/Otávio sugeriu um especialista pra você/)
+      paraFazer.getByText(/Otávio sugeriu um especialista/)
     ).toBeVisible();
 
     await page.goto("/jovem/especialistas");

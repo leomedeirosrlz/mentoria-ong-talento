@@ -35,16 +35,18 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
     await expect(
       card.getByRole("heading", { name: "Especialistas" })
     ).toBeVisible();
-    // sugestão > trilha > pedido > convite: a do Ricardo está esperando
-    // resposta — ganha do "em andamento" da Sofia. O card inteiro é o
-    // link (uma ação por contexto): o título conta o N e o corpo diz quem
-    const link = card.getByRole("link", {
-      name: /1 sugestão esperando você/,
-    });
-    await expect(link).toBeVisible();
+    // a sugestão do mentor não fica mais no card: virou pendência no
+    // "Para fazer agora" (a home não repete a mesma linha duas vezes)
     await expect(
-      card.getByText(/Ricardo sugeriu um especialista pra você/)
+      card.getByRole("link", { name: /1 sugestão esperando você/ })
+    ).toHaveCount(0);
+    const paraFazer = page.locator('section[aria-labelledby="fazer-titulo"]');
+    await expect(
+      paraFazer.getByText(/Ricardo sugeriu um especialista/)
     ).toBeVisible();
+    const link = paraFazer
+      .getByRole("link", { name: "Ver especialista" })
+      .first();
     await expect(link).toHaveAttribute("href", "/jovem/especialistas");
 
     // o clique leva pra página — a sugestão aparece na seção própria

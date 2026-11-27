@@ -201,19 +201,15 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     // fallback "Seu mentor sugeriu…" — este assert trava o bug.
     await relogar(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem");
-    const cardHome = page.locator('section[aria-labelledby="esp-titulo"]');
-    // o card inteiro é o link — título "1 sugestão esperando você", sub
-    // com o primeiro nome do autor ("Mentor sugeriu…", o stitch do RLS)
+    // a sugestão vive no "Para fazer agora" — e precisa nomear o autor
+    // ("Mentor sugeriu…", o stitch do RLS); sem o stitch cai em "Seu mentor"
+    const paraFazer = page.locator('section[aria-labelledby="fazer-titulo"]');
     await expect(
-      cardHome.getByText("1 sugestão esperando você")
+      paraFazer.getByText(/Mentor sugeriu um especialista/)
     ).toBeVisible();
     await expect(
-      cardHome.getByText(/Mentor sugeriu um especialista pra você/)
-    ).toBeVisible();
-    await expect(cardHome.getByRole("link")).toHaveAttribute(
-      "href",
-      "/jovem/especialistas"
-    );
+      paraFazer.getByRole("link", { name: "Ver especialista" }).first()
+    ).toHaveAttribute("href", "/jovem/especialistas");
 
     await page.goto("/jovem/especialistas");
     await expect(
@@ -239,10 +235,11 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     // cai pra trilha em andamento sem horário (pedido dirigido aberto
     // apareceria na negociação, mas a trilha viva com o Esp E2E ganha)
     await page.goto("/jovem");
+    const cardEsp = page.locator('section[aria-labelledby="esp-titulo"]');
     await expect(
-      cardHome.getByText(/A sessão \d ainda precisa de horário/)
+      cardEsp.getByText(/A sessão \d ainda precisa de horário/)
     ).toBeVisible();
-    await expect(cardHome.getByRole("link")).toHaveAttribute(
+    await expect(cardEsp.getByRole("link").first()).toHaveAttribute(
       "href",
       "/jovem/especialistas#trilhas"
     );
