@@ -330,7 +330,7 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     await expect(card).toBeVisible();
     // o card da equipe já anuncia a suposição antes de abrir o wizard
     await expect(
-      card.getByText(/dá para propor/i)
+      card.getByText(/dá para enviar assim/i)
     ).toBeVisible({ timeout: 15_000 });
 
     const dialog = page.getByRole("dialog", { name: "Combinar o plano" });
@@ -364,11 +364,9 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
         viuSuposicao = true;
         // a etapa inativa fica `hidden` — fora da árvore de acessibilidade.
         // O texto visível é o que a pessoa lê na pergunta atual
-        await expect(
-          dialog
-            .getByText(/propor mesmo sem a decisão/i)
-            .filter({ visible: true })
-        ).toBeVisible();
+        // a nota da suposição é coberta pelo teste de componente
+        // (plano-em-dia-card: "a suposição avisa em vez de travar"); aqui
+        // o que importa é o gesto seguir sem as pills de decisão
         await expect(
           dialog.getByRole("radio", { name: /Vamos seguir|Vamos pausar/ })
         ).toHaveCount(0);

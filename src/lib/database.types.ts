@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.18"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -8921,7 +8916,12 @@ export type Database = {
         Returns: Json
       }
       plano_responder: {
-        Args: { p_acao: string; p_motivo?: string; p_plano: string }
+        Args: {
+          p_acao: string
+          p_decisoes?: Json
+          p_motivo?: string
+          p_plano: string
+        }
         Returns: Json
       }
       plano_substituir: {
@@ -9365,3 +9365,4 @@ export const Constants = {
     },
   },
 } as const
+

@@ -973,6 +973,22 @@ export function CombinarPlano({
           </li>
         ))}
       </ul>
+      {faltaDecisao &&
+        (notaSuposicao ? (
+          <p
+            role="status"
+            className="animate-enter mt-2 text-sm text-muted-foreground"
+          >
+            {notaSuposicao}
+          </p>
+        ) : (
+          <p
+            role="status"
+            className="animate-enter mt-2 text-sm text-[var(--warn-text)]"
+          >
+            Falta a dupla confirmar o recesso.
+          </p>
+        ))}
       {/* o documento do combinado (020): a dupla lê por escrito o que
           vai propor — a mesma montagem do doc persistido, com o escopo
           projetado do wizard */}
@@ -997,19 +1013,6 @@ export function CombinarPlano({
       {avisoPratica}
       {/* recesso sem resposta: staff lê a suposição como aviso calmo;
           pra dupla a decisão continua prévia e o tom é de atenção */}
-      {faltaDecisao &&
-        (notaSuposicao ? (
-          <p
-            role="status"
-            className="animate-enter mt-2 text-sm text-muted-foreground"
-          >
-            {notaSuposicao}
-          </p>
-        ) : (
-          <p role="status" className="animate-enter mt-2 text-sm text-[var(--warn-text)]">
-            Falta a dupla confirmar o recesso.
-          </p>
-        ))}
       {aplicavel && !aplicavel.emDia && aplicavel.dataRecuperacao == null && (
         <p role="status" className="animate-enter mt-2 text-sm text-[var(--warn-text)]">
           {ritmoNum != null
