@@ -398,6 +398,8 @@ export async function responderDemoIa(
         mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
         mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
         trilha: d.trilha,
+        // quem pergunta (0245) — o mesmo campo que a tool real devolve
+        lado: STAFF.includes(role) ? "staff" : "mentor",
         aplicavel: true,
         em_dia: r.emDia,
         estado: r.estado,

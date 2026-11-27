@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   avaliacaoCobreNumero,
   avaliacoesPendentesPorSessao,
@@ -10,8 +10,9 @@ import {
   passosCobertosCandidatos,
   recessosAlterados,
   sessaoJaAplicada,
+  toDateStr,
 } from "./ciclo";
-import { montarPlanoEmDia } from "./plano-em-dia";
+import { escopoDaProposta, montarPlanoEmDia } from "./plano-em-dia";
 import { planoContestavel } from "./plano-combinado";
 import { sessaoGrupoDaSessao } from "./registro-contexto";
 import { relerPlanoPropostoDeMembro } from "./notificar";
@@ -20,11 +21,80 @@ import type {
   CicloEvento,
   Disponibilidade,
   Dupla,
+  DuplaPlano,
+  DuplaRecesso,
   Encontro,
   EncontroStatus,
   Notificacao,
 } from "./types";
 import type { PassoGuia } from "./ciclo";
+import { comDecisoesRecesso } from "./plano-servico";
+
+// ---------- mocks da fatia actions-plano (0245) ----------
+// As describes do fim do arquivo chamam combinarPlano/responderPlano de
+// verdade — só as fronteiras de infra são stubbed (supabase da sessão,
+// queries, contextoPlano, e-mail, eventos de produto, demo). As suítes
+// acima não importam actions-plano: os módulos que elas usam seguem
+// reais e os mocks só trocam o que é chamado por elas.
+const mPlano = vi.hoisted(() => ({
+  rpc: vi.fn(),
+  contextoPlano: vi.fn(),
+  getCicloEventos: vi.fn(),
+  getDupla: vi.fn(),
+  enviarEmails: vi.fn(),
+  emitirEvento: vi.fn(),
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+  updateTag: vi.fn(),
+  refresh: vi.fn(),
+  revalidateTag: vi.fn(),
+  cacheLife: vi.fn(),
+  cacheTag: vi.fn(),
+  unstable_cache: (f: unknown) => f,
+}));
+// Nos módulos de domínio o vi.mock é sempre importOriginal + override:
+// o vitest embrulha o mock num Proxy que LANÇA quando um export ausente
+// é lido — e o grafo real (ia/tools, plano-servico, relatorios/*) importa
+// dezenas de nomes de ./queries, ./email e cia que o teste nunca chama.
+vi.mock("@/lib/supabase/server", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/supabase/server")>();
+  return { ...real, createClient: async () => ({ rpc: mPlano.rpc }) };
+});
+vi.mock("@/lib/queries", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/queries")>();
+  return {
+    ...real,
+    getCicloEventos: mPlano.getCicloEventos,
+    getDupla: mPlano.getDupla,
+  };
+});
+vi.mock("@/lib/demo/mode", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/demo/mode")>();
+  return { ...real, demoAtivo: async () => false, demoRole: async () => null };
+});
+// Único consumidor de "./actions" no grafo é a própria actions-plano —
+// o mock parcial cobre o único nome que ela lê.
+vi.mock("@/lib/actions", () => ({
+  disponibilidadesDaDupla: vi.fn(async () => ({ mentor: null, jovem: null })),
+}));
+vi.mock("@/lib/email", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/email")>();
+  return { ...real, enviarEmailsIndividuais: mPlano.enviarEmails };
+});
+vi.mock("@/lib/produto-eventos-server", async (importOriginal) => {
+  const real =
+    await importOriginal<typeof import("@/lib/produto-eventos-server")>();
+  return { ...real, emitirProdutoEvento: mPlano.emitirEvento };
+});
+vi.mock("@/lib/plano-servico", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/plano-servico")>();
+  return { ...real, contextoPlano: mPlano.contextoPlano };
+});
+
+const { combinarPlano, responderPlano, responderPlanoComRecesso } =
+  await import("./actions-plano");
 
 // Relógio fixo: segunda-feira 12/01/2026 — todas as datas derivam dela.
 const HOJE = new Date("2026-01-12T12:00:00Z");
@@ -563,5 +633,411 @@ describe("relerPlanoPropostoDeMembro — 'Fulano combinou' (P1-6)", () => {
     );
     expect(consultou).toBe(false);
     expect(out).toHaveLength(1);
+  });
+});
+
+// ---------- proposta com suposição de recesso (0245) ----------
+// Contrato: a EQUIPE nunca declara recesso — suposições viajam no escopo
+// com origem "proposta", a RPC carimba escopo.assumido e o e-mail avisa o
+// que foi assumido. A DUPLA declara de verdade (origem "dupla") e o aceite
+// grava as respostas pendentes via p_decisoes da plano_responder — sem
+// declarar_recesso quando a data não muda.
+
+const AGORA_0245 = new Date("2026-01-12T12:00:00-03:00"); // seg — toDateStr dá 2026-01-12
+const REC_0245 = "ev-recesso-0245";
+
+// dois devidos + um recesso pendente à frente: a caminhada cobre o 1º em
+// 13/01 (o cursor abre em hoje+1) e o 2º na semana seguinte — alvo > hoje
+// faz o plano fechar (estado "recuperacao"), o recesso segue sem resposta.
+const eventos0245: CicloEvento[] = [
+  ev("encontro", "2026-01-05", { numero: 1, titulo: "Encontro 1" }),
+  ev("encontro", "2026-01-07", { numero: 2, titulo: "Encontro 2" }),
+  ev("recesso", "2026-02-02", {
+    id: REC_0245,
+    data_fim: "2026-02-06",
+    titulo: "Recesso de férias",
+  }),
+  ev("evento_encerramento", "2026-12-01", { titulo: "Encerramento" }),
+];
+
+const recessoRow0245 = (usa: boolean): DuplaRecesso => ({
+  id: "rec-row-1",
+  dupla_id: "d-1",
+  ciclo_evento_id: REC_0245,
+  usa,
+  declarado_por: "m-1",
+  declarado_em: "2026-01-05T12:00:00Z",
+});
+
+const ctxPlano0245 = (lado: "mentor" | "mentorado" | "staff", d: Dupla) => ({
+  ok: true as const,
+  lado,
+  dupla: d,
+  eventos: eventos0245,
+  gradeMentor: null,
+  gradeJovem: null,
+  combinada: null,
+  diasComuns: 0,
+  emails: { mentor: "mentor@realiza.test", jovem: "jovem@realiza.test" },
+});
+
+const planoVivo0245 = (
+  id: string,
+  escopo: DuplaPlano["escopo"],
+  over: Partial<DuplaPlano> = {}
+): DuplaPlano => ({
+  id,
+  dupla_id: "d-1",
+  status: "proposto",
+  escopo,
+  versao: 1,
+  proposto_por: "staff-1",
+  proposto_via: "app",
+  aprovado_por: null,
+  aprovado_lado: null,
+  aprovado_em: null,
+  contestado_por: null,
+  contestado_motivo: null,
+  contestado_em: null,
+  expira_em: "2026-02-01",
+  concluido_em: null,
+  created_at: "2026-01-12T00:00:00Z",
+  updated_at: "2026-01-12T00:00:00Z",
+  ...over,
+});
+
+const chamadasRpc0245 = (fn: string) =>
+  mPlano.rpc.mock.calls.filter((c) => c[0] === fn).map((c) => c[1]);
+
+const htmlAviso0245 = () =>
+  (mPlano.enviarEmails.mock.calls[0]?.[0].mensagens ?? [])
+    .map((m: { html: string }) => m.html)
+    .join("\n");
+
+describe("combinarPlano — proposta da equipe com suposição (0245)", () => {
+  beforeEach(() => {
+    vi.setSystemTime(AGORA_0245);
+    mPlano.rpc.mockReset().mockResolvedValue({ data: {}, error: null });
+    mPlano.contextoPlano.mockReset();
+    mPlano.getCicloEventos.mockReset().mockResolvedValue(eventos0245);
+    mPlano.getDupla.mockReset().mockResolvedValue(null);
+    mPlano.enviarEmails
+      .mockReset()
+      .mockResolvedValue({ enviados: 2, falhas: [] });
+    mPlano.emitirEvento.mockReset().mockResolvedValue(undefined);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("pendente vira suposição 'proposta' usa=true — staff nunca declara recesso", async () => {
+    mPlano.contextoPlano.mockResolvedValue(
+      ctxPlano0245("staff", dupla({ recessos: [] }))
+    );
+    const r = await combinarPlano("d-1", { ritmo: 1 });
+    expect(r).toMatchObject({ ok: true });
+    expect(chamadasRpc0245("declarar_recesso")).toHaveLength(0);
+    const propor = chamadasRpc0245("plano_propor");
+    expect(propor).toHaveLength(1);
+    const escopo = propor[0].p_escopo as DuplaPlano["escopo"];
+    expect(escopo.decisoes?.recessos).toEqual([
+      { cicloEventoId: REC_0245, usa: true, origem: "proposta" },
+    ]);
+    // e-mail avisa o que foi assumido + CTA de revisão
+    const html = htmlAviso0245();
+    expect(html).toContain(
+      "A proposta considera pausa no recesso; confirme ou troque antes de aceitar."
+    );
+    expect(html).toContain("Revisar o plano");
+    expect(mPlano.emitirEvento.mock.calls[0][1].meta).toMatchObject({
+      assumido: true,
+    });
+  });
+
+  it("suposição usa=false da equipe destrava o recesso e o e-mail diz 'seguir'", async () => {
+    mPlano.contextoPlano.mockResolvedValue(
+      ctxPlano0245("staff", dupla({ recessos: [] }))
+    );
+    const r = await combinarPlano("d-1", {
+      ritmo: 1,
+      decisoes: [{ cicloEventoId: REC_0245, usa: false }],
+    });
+    expect(r).toMatchObject({ ok: true });
+    expect(chamadasRpc0245("declarar_recesso")).toHaveLength(0);
+    const escopo = chamadasRpc0245("plano_propor")[0]
+      .p_escopo as DuplaPlano["escopo"];
+    expect(escopo.decisoes?.recessos).toEqual([
+      { cicloEventoId: REC_0245, usa: false, origem: "proposta" },
+    ]);
+    expect(htmlAviso0245()).toContain("seguir no recesso");
+    expect(mPlano.emitirEvento.mock.calls[0][1].meta).toMatchObject({
+      assumido: true,
+    });
+  });
+
+  it("resposta que repete a vigente viaja como 'dupla' — sem suposição nem carimbo", async () => {
+    mPlano.contextoPlano.mockResolvedValue(
+      ctxPlano0245("staff", dupla({ recessos: [recessoRow0245(true)] }))
+    );
+    const r = await combinarPlano("d-1", {
+      ritmo: 1,
+      decisoes: [{ cicloEventoId: REC_0245, usa: true }],
+    });
+    expect(r).toMatchObject({ ok: true });
+    expect(chamadasRpc0245("declarar_recesso")).toHaveLength(0);
+    const escopo = chamadasRpc0245("plano_propor")[0]
+      .p_escopo as DuplaPlano["escopo"];
+    expect(escopo.decisoes?.recessos).toEqual([
+      { cicloEventoId: REC_0245, usa: true, origem: "dupla" },
+    ]);
+    const html = htmlAviso0245();
+    expect(html).not.toContain("considera");
+    expect(html).toContain("Abrir o Realiza");
+    expect(mPlano.emitirEvento.mock.calls[0][1].meta).toMatchObject({
+      assumido: false,
+    });
+  });
+
+  it("a equipe não troca a resposta já declarada pela dupla", async () => {
+    mPlano.contextoPlano.mockResolvedValue(
+      ctxPlano0245("staff", dupla({ recessos: [recessoRow0245(true)] }))
+    );
+    const r = await combinarPlano("d-1", {
+      ritmo: 1,
+      decisoes: [{ cicloEventoId: REC_0245, usa: false }],
+    });
+    expect(r).toMatchObject({ error: expect.stringContaining("já decidiu") });
+    expect(mPlano.rpc).not.toHaveBeenCalled();
+    expect(mPlano.enviarEmails).not.toHaveBeenCalled();
+  });
+});
+
+describe("combinarPlano — proposta da dupla (0245)", () => {
+  beforeEach(() => {
+    vi.setSystemTime(AGORA_0245);
+    mPlano.rpc.mockReset().mockResolvedValue({ data: {}, error: null });
+    mPlano.contextoPlano.mockReset();
+    mPlano.getCicloEventos.mockReset().mockResolvedValue(eventos0245);
+    mPlano.getDupla.mockReset().mockResolvedValue(null);
+    mPlano.enviarEmails
+      .mockReset()
+      .mockResolvedValue({ enviados: 2, falhas: [] });
+    mPlano.emitirEvento.mockReset().mockResolvedValue(undefined);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("a dupla declara de verdade e a decisão viaja com origem 'dupla'", async () => {
+    mPlano.contextoPlano.mockResolvedValue(
+      ctxPlano0245("mentor", dupla({ recessos: [] }))
+    );
+    const r = await combinarPlano("d-1", {
+      ritmo: 1,
+      decisoes: [{ cicloEventoId: REC_0245, usa: false }],
+    });
+    expect(r).toMatchObject({ ok: true });
+    const decl = chamadasRpc0245("declarar_recesso");
+    expect(decl).toHaveLength(1);
+    expect(decl[0]).toMatchObject({
+      p_dupla: "d-1",
+      p_evento: REC_0245,
+      p_usa: false,
+    });
+    const escopo = chamadasRpc0245("plano_propor")[0]
+      .p_escopo as DuplaPlano["escopo"];
+    expect(escopo.decisoes?.recessos).toEqual([
+      { cicloEventoId: REC_0245, usa: false, origem: "dupla" },
+    ]);
+    // sem suposição: e-mail é o aviso comum e assumido=false
+    expect(htmlAviso0245()).toContain("Abrir o Realiza");
+    expect(mPlano.emitirEvento.mock.calls[0][1].meta).toMatchObject({
+      assumido: false,
+    });
+  });
+});
+
+describe("responderPlano — p_decisoes no aceite (0245)", () => {
+  beforeEach(() => {
+    vi.setSystemTime(AGORA_0245);
+    mPlano.rpc.mockReset().mockResolvedValue({ data: {}, error: null });
+    mPlano.contextoPlano.mockReset();
+    mPlano.enviarEmails
+      .mockReset()
+      .mockResolvedValue({ enviados: 2, falhas: [] });
+    mPlano.emitirEvento.mockReset().mockResolvedValue(undefined);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("encaminha as respostas sem a marca origem — a RPC persiste com a autoria de quem aceitou", async () => {
+    mPlano.contextoPlano.mockResolvedValue(
+      ctxPlano0245("mentor", dupla({ recessos: [] }))
+    );
+    const r = await responderPlano("pl-1", "aceitar", undefined, "d-1", [
+      { cicloEventoId: REC_0245, usa: true, origem: "proposta" },
+    ]);
+    expect(r).toMatchObject({ ok: true });
+    const resp = chamadasRpc0245("plano_responder");
+    expect(resp).toHaveLength(1);
+    expect(resp[0]).toEqual({
+      p_plano: "pl-1",
+      p_acao: "aceitar",
+      p_motivo: null,
+      p_decisoes: [{ cicloEventoId: REC_0245, usa: true }],
+    });
+  });
+
+  it("sem decisões o payload é exatamente o de antes — sem p_decisoes", async () => {
+    mPlano.contextoPlano.mockResolvedValue(
+      ctxPlano0245("mentor", dupla({ recessos: [] }))
+    );
+    await responderPlano("pl-1", "aceitar", undefined, "d-1");
+    const resp = chamadasRpc0245("plano_responder");
+    expect(resp).toHaveLength(1);
+    expect(resp[0]).toEqual({
+      p_plano: "pl-1",
+      p_acao: "aceitar",
+      p_motivo: null,
+    });
+    expect("p_decisoes" in resp[0]).toBe(false);
+  });
+});
+
+describe("responderPlanoComRecesso — aceite confirma a suposição (0245)", () => {
+  beforeEach(() => {
+    vi.setSystemTime(AGORA_0245);
+    mPlano.rpc.mockReset().mockResolvedValue({ data: {}, error: null });
+    mPlano.contextoPlano.mockReset();
+    mPlano.getCicloEventos.mockReset().mockResolvedValue(eventos0245);
+    mPlano.enviarEmails
+      .mockReset()
+      .mockResolvedValue({ enviados: 2, falhas: [] });
+    mPlano.emitirEvento.mockReset().mockResolvedValue(undefined);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("decisão que não muda data: aceite puro — p_decisoes viaja, nada de declarar/substituir", async () => {
+    const decisoes = [{ cicloEventoId: REC_0245, usa: true }];
+    // escopo gravado = a mesma simulação que a action refaz → mesmaDatas
+    const sim = montarPlanoEmDia({
+      dupla: comDecisoesRecesso(dupla({ recessos: [] }), decisoes),
+      eventos: eventos0245,
+      ritmo: 1,
+      hoje: AGORA_0245,
+    });
+    if (!sim.aplicavel || sim.dataRecuperacao == null)
+      throw new Error("fixture inválido: simulação não fecha");
+    const e = escopoDaProposta(sim, toDateStr(AGORA_0245));
+    if ("erro" in e) throw new Error(e.erro);
+    const planoVivo = planoVivo0245("pl-1", {
+      ...e.escopo,
+      decisoes: {
+        recessos: [
+          { cicloEventoId: REC_0245, usa: true, origem: "proposta" },
+        ],
+        sem_grade: false,
+      },
+      assumido: true,
+    });
+    mPlano.contextoPlano.mockResolvedValue(
+      ctxPlano0245(
+        "mentor",
+        dupla({ recessos: [], planos: [planoVivo] })
+      )
+    );
+    const r = await responderPlanoComRecesso(
+      "pl-1",
+      "aceitar",
+      decisoes,
+      "d-1"
+    );
+    expect(r).toMatchObject({ ok: true });
+    expect(chamadasRpc0245("declarar_recesso")).toHaveLength(0);
+    expect(chamadasRpc0245("plano_substituir")).toHaveLength(0);
+    const resp = chamadasRpc0245("plano_responder");
+    expect(resp).toHaveLength(1);
+    expect(resp[0]).toEqual({
+      p_plano: "pl-1",
+      p_acao: "aceitar",
+      p_motivo: null,
+      p_decisoes: [{ cicloEventoId: REC_0245, usa: true }],
+    });
+  });
+
+  it("decisão que MUDA data: declara de verdade e substitui a versão (origem 'dupla')", async () => {
+    const decisoes = [{ cicloEventoId: REC_0245, usa: false }];
+    // escopo gravado com datas que a re-simulação não reproduz → recalcula
+    const planoVivo = planoVivo0245("pl-1", {
+      numeros: [1],
+      ritmo: 1,
+      janela: { inicio: "2026-01-12", fim: "2026-12-01" },
+      passos: [{ numero: 1, data: "2030-01-01", acao: "agendar" }],
+      decisoes: {
+        recessos: [
+          { cicloEventoId: REC_0245, usa: true, origem: "proposta" },
+        ],
+        sem_grade: false,
+      },
+      assumido: true,
+    });
+    mPlano.contextoPlano.mockResolvedValue(
+      ctxPlano0245(
+        "mentor",
+        dupla({ recessos: [], planos: [planoVivo] })
+      )
+    );
+    const r = await responderPlanoComRecesso(
+      "pl-1",
+      "aceitar",
+      decisoes,
+      "d-1"
+    );
+    expect(r).toMatchObject({ ok: true, novaVersao: true });
+    const decl = chamadasRpc0245("declarar_recesso");
+    expect(decl).toHaveLength(1);
+    expect(decl[0]).toMatchObject({
+      p_dupla: "d-1",
+      p_evento: REC_0245,
+      p_usa: false,
+    });
+    const sub = chamadasRpc0245("plano_substituir");
+    expect(sub).toHaveLength(1);
+    expect(sub[0]).toMatchObject({
+      p_plano: "pl-1",
+      p_dupla: "d-1",
+      p_via: "app",
+    });
+    const escopo = sub[0].p_escopo as DuplaPlano["escopo"];
+    expect(escopo.decisoes?.recessos).toEqual([
+      { cicloEventoId: REC_0245, usa: false, origem: "dupla" },
+    ]);
+    expect(escopo.decisoes?.ajuste_no_aceite).toBe(true);
+    // a declaração autoral sai ANTES de fechar a versão velha
+    const iDecl = mPlano.rpc.mock.calls.findIndex(
+      (c) => c[0] === "declarar_recesso"
+    );
+    const iSub = mPlano.rpc.mock.calls.findIndex(
+      (c) => c[0] === "plano_substituir"
+    );
+    expect(iDecl).toBeGreaterThanOrEqual(0);
+    expect(iDecl).toBeLessThan(iSub);
+  });
+
+  it("contestar nunca declara recesso — nem via p_decisoes", async () => {
+    mPlano.contextoPlano.mockResolvedValue(
+      ctxPlano0245("mentor", dupla({ recessos: [] }))
+    );
+    const r = await responderPlanoComRecesso(
+      "pl-1",
+      "contestar",
+      [{ cicloEventoId: REC_0245, usa: false }],
+      "d-1"
+    );
+    expect(r).toMatchObject({ ok: true });
+    expect(chamadasRpc0245("declarar_recesso")).toHaveLength(0);
+    const resp = chamadasRpc0245("plano_responder");
+    expect(resp).toHaveLength(1);
+    expect(resp[0]).toEqual({
+      p_plano: "pl-1",
+      p_acao: "contestar",
+      p_motivo: null,
+    });
+    expect("p_decisoes" in resp[0]).toBe(false);
   });
 });

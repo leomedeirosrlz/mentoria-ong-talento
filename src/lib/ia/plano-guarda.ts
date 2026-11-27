@@ -223,10 +223,18 @@ export function respostaDeterministica(plano: FatosPlano): string {
   }
 
   if (pendentes.length) {
+    const nomes = pendentes
+      .map((p) => `${p.titulo} (${br(p.inicio)} a ${br(p.fim)})`)
+      .join(", ");
+    // a pendência trava só a proposta da DUPLA (0245): pra equipe a
+    // proposta já pode ir com a suposição de pausa e a dupla confirma
+    // ou troca no aceite
     partes.push(
-      `Falta a dupla decidir sobre ${pendentes
-        .map((p) => `${p.titulo} (${br(p.inicio)} a ${br(p.fim)})`)
-        .join(", ")}.`
+      plano.lado === "staff"
+        ? `A proposta pode ir com pausa ${
+            pendentes.length === 1 ? "no recesso" : "nos recessos"
+          } (${pendentes.map((p) => `${br(p.inicio)} a ${br(p.fim)}`).join(", ")}); a dupla confirma ou troca no aceite.`
+        : `Falta a dupla decidir sobre ${nomes}.`
     );
   }
 
@@ -278,6 +286,9 @@ export function fatosParaCorrecao(plano: FatosPlano): string {
           }
         : null,
       recessos_pendentes: plano.recessos_pendentes,
+      // quem perguntou (0245): pendente de recesso bloqueia a dupla,
+      // mas pra equipe a proposta já vai com pausa assumida
+      lado: plano.lado,
       grade: plano.grade,
       passos: (plano.passos as { numero: number; acao: string; data_sugerida: string | null }[] | undefined)?.map(
         (p) => ({

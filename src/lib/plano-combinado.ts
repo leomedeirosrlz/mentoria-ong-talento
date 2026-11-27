@@ -147,6 +147,18 @@ export type PlanoCombinado = {
   escopo?: {
     ritmo?: number | null;
     janela?: { inicio: string; fim: string } | null;
+    /** Carimbo da proposta com suposição de recesso (0245). */
+    assumido?: boolean;
+    /** Snapshot das decisões do gesto; recessos com origem "proposta"
+     *  ainda esperam a resposta autoral da dupla no aceite. */
+    decisoes?: {
+      recessos?: {
+        cicloEventoId: string;
+        usa: boolean;
+        origem?: "dupla" | "proposta";
+      }[];
+      [k: string]: unknown;
+    };
     passos?: {
       numero: number;
       data: string;
@@ -256,6 +268,17 @@ export function combinadoDoJovem(p: {
   proposto_via?: string | null;
   expira_em?: string;
   concluido_em?: string | null;
+  /** Recorte jsonb do escopo (0245) — a RPC do jovem passa a devolver
+   *  pra suposição de recesso chegar ao aceite dele também. */
+  decisoes?: {
+    recessos?: {
+      cicloEventoId: string;
+      usa: boolean;
+      origem?: "dupla" | "proposta";
+    }[];
+    [k: string]: unknown;
+  } | null;
+  assumido?: boolean | null;
   passos_aplicados?: { numero: number; data_nova: string }[] | null;
 }): PlanoCombinado {
   return {
@@ -273,6 +296,8 @@ export function combinadoDoJovem(p: {
     janela: p.janela ?? null,
     escopo: {
       ritmo: p.ritmo == null ? null : Number(p.ritmo) || null,
+      ...(p.assumido != null ? { assumido: p.assumido } : {}),
+      ...(p.decisoes ? { decisoes: p.decisoes } : {}),
       passos: (p.passos ?? []).map((s) => ({
         numero: s.numero,
         data: s.data,

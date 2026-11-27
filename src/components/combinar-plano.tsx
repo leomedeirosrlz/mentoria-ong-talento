@@ -65,8 +65,11 @@ import { useDesktop } from "@/lib/use-desktop";
 // commit antes do "Combinar" final: as respostas viajam juntas pra
 // combinarPlano, que declara os recessos e propõe na mesma chamada.
 // Proposta de lado da dupla já nasce valendo; a da equipe espera um
-// aceite. A decisão de recesso é só da dupla — staff vê o estado e o
-// "Combinar" espera a resposta deles (a RPC recusa com o motivo honesto).
+// aceite. A decisão de recesso é só da dupla — staff vê o estado e
+// propõe mesmo assim: a proposta carrega a suposição (pausa, o padrão
+// do calendário, a menos que a dupla já tenha decidido seguir) e ela
+// confirma ou troca no aceite. Nada é escrito em nome da dupla na
+// proposta — a RPC valida a suposição no escopo.
 
 type PassoId = "ritmo" | "recesso" | "grade" | "sessao" | "confirmar";
 type Sim = Extract<SimulacaoPlano, { ok: true }>;
@@ -321,6 +324,15 @@ export function CombinarPlano({
   const pendentes =
     sim?.recessos.filter((r) => recessoUsa(r) == null) ?? [];
   const faltaDecisao = pendentes.length > 0;
+  // staff propõe com suposição quando falta a resposta da dupla: o
+  // pendente vira pausa (o padrão do calendário) e a decisão de seguir
+  // que ela já deu viaja junto — ela confirma ou troca antes de aceitar
+  const notaSuposicao = (() => {
+    if (lado !== "staff" || !faltaDecisao || sim == null) return null;
+    const recObj = pendentes.length > 1 ? "os recessos" : "o recesso";
+    const recLoc = pendentes.length > 1 ? "nos recessos" : "no recesso";
+    return `A dupla ainda não decidiu ${recObj}. Dá para enviar assim: a proposta considera pausa ${recLoc}, e ela confirma ou troca no aceite.`;
+  })();
   const algumaGrade = Boolean(sim?.grade.mentor || sim?.grade.jovem);
   // 519: "usar a grade" só existe quando os DOIS lados marcaram — com um
   // lado só não há "em comum" e a simulação já roda sem grade no servidor
@@ -357,7 +369,9 @@ export function CombinarPlano({
     !simulando &&
     !enviando &&
     ritmoNum != null &&
-    !faltaDecisao &&
+    // staff propõe com suposição (pausa) quando falta a resposta — pra
+    // dupla a decisão continua prévia ao combinado
+    (lado === "staff" || !faltaDecisao) &&
     (!gradePerguntada || semGrade != null) &&
     aplicavel != null &&
     !aplicavel.emDia &&
@@ -981,11 +995,21 @@ export function CombinarPlano({
         </Collapsible.Root>
       )}
       {avisoPratica}
-      {faltaDecisao && (
-        <p role="status" className="animate-enter mt-2 text-sm text-[var(--warn-text)]">
-          Falta a dupla confirmar o recesso.
-        </p>
-      )}
+      {/* recesso sem resposta: staff lê a suposição como aviso calmo;
+          pra dupla a decisão continua prévia e o tom é de atenção */}
+      {faltaDecisao &&
+        (notaSuposicao ? (
+          <p
+            role="status"
+            className="animate-enter mt-2 text-sm text-muted-foreground"
+          >
+            {notaSuposicao}
+          </p>
+        ) : (
+          <p role="status" className="animate-enter mt-2 text-sm text-[var(--warn-text)]">
+            Falta a dupla confirmar o recesso.
+          </p>
+        ))}
       {aplicavel && !aplicavel.emDia && aplicavel.dataRecuperacao == null && (
         <p role="status" className="animate-enter mt-2 text-sm text-[var(--warn-text)]">
           {ritmoNum != null

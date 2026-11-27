@@ -40,6 +40,7 @@ import {
 import { exigenciasDoCenario, simularCenariosPlano } from "@/lib/plano-cenarios";
 import { montarDocCombinado } from "@/lib/plano-roteiros";
 import { aceitesDoPlano } from "@/lib/plano-combinado";
+import type { DecisaoRecesso } from "@/lib/actions-plano";
 import {
   comDecisoesRecesso,
   contextoPlanoCom,
@@ -516,8 +517,63 @@ type PlanoEmDiaArgs = {
 
 /** Args do plano_propor — o escopo sai do mesmo planner; as decisões de
  *  recesso são gravadas pela dupla na mesma proposta (snapshot no
- *  escopo.decisoes, como o wizard da aba Agora). */
+ *  escopo.decisoes, como o wizard da aba Agora). A equipe propõe sem
+ *  gravar decisão — manda suposição "proposta" no escopo (0245). */
 type PlanoProporArgs = PlanoEmDiaArgs;
+
+/** As decisões efetivas de uma proposta da EQUIPE pela Liza (0245 —
+ *  mesma régua da decisoesDaPropostaStaff do combinarPlano; a cópia
+ *  existe porque a action não exporta o privado e a tool não pode
+ *  importar server-action): staff nunca declara recesso — "propor não
+ *  é decidir pela dupla". Entrada que repete a resposta vigente viaja
+ *  como "dupla" (o snapshot ecoa a autoria real); entrada que diverge
+ *  dela é recusada, porque só a dupla troca a própria resposta; entrada
+ *  pra recesso ainda pendente e todo pendente que o input não cobriu
+ *  viram suposição "proposta" — o default conservador é `usa: true`
+ *  (pausa, o que o calendário já faz) e a RPC carimba `escopo.assumido`
+ *  pra dupla revisar no aceite. `pendentes` vem da simulação com as
+ *  entradas já aplicadas. */
+function decisoesDaPropostaStaffIa(
+  vigentes: readonly { ciclo_evento_id: string; usa: boolean }[],
+  input: readonly DecisaoRecesso[] | undefined,
+  pendentes: readonly { cicloEventoId: string }[]
+): { decisoes: DecisaoRecesso[] } | { erro: string } {
+  const decididos = new Map(vigentes.map((r) => [r.ciclo_evento_id, r.usa]));
+  const decisoes: DecisaoRecesso[] = [];
+  const cobertos = new Set<string>();
+  for (const d of input ?? []) {
+    if (cobertos.has(d.cicloEventoId)) continue;
+    const atual = decididos.get(d.cicloEventoId);
+    if (atual != null) {
+      if (atual !== d.usa)
+        return {
+          erro: "A dupla já decidiu esse recesso. Só ela pode trocar a resposta.",
+        };
+      decisoes.push({
+        cicloEventoId: d.cicloEventoId,
+        usa: d.usa,
+        origem: "dupla",
+      });
+    } else {
+      decisoes.push({
+        cicloEventoId: d.cicloEventoId,
+        usa: d.usa,
+        origem: "proposta",
+      });
+    }
+    cobertos.add(d.cicloEventoId);
+  }
+  for (const p of pendentes) {
+    if (cobertos.has(p.cicloEventoId)) continue;
+    decisoes.push({
+      cicloEventoId: p.cicloEventoId,
+      usa: true,
+      origem: "proposta",
+    });
+    cobertos.add(p.cicloEventoId);
+  }
+  return { decisoes };
+}
 
 /** Saída do resumo_semana a partir das duplas vivas — pura, pra a demo
  *  (/demo, dataset em memória) responder pelo MESMO caminho da tool. */
@@ -911,7 +967,7 @@ export const IA_TOOLS = {
   plano_em_dia: {
     nome: "plano_em_dia",
     descricao:
-      "Plano de recuperação de uma dupla DPP atrasada ('ficar em dia'): passo a passo determinístico com data sugerida por encontro, no ritmo mais leve que fecha antes do encerramento (1 por semana, até 2, até 3 ou até 1 por dia), respeitando os intervalos de prática/tarefa do guia, os recessos, os feriados nacionais, a grade de disponibilidade combinada da dupla (quando os dois lados já marcaram) e o encerramento do ciclo. Devolve o estado (em_dia, recuperacao ou conversa: nem 1 por dia fecha, o caminho é a coordenação), cada passo com a ação (agendar, remarcar ou já marcado; vence_no_caminho = oficial que vence enquanto a dupla recupera), pendências de registro que vêm antes de qualquer plano, os recessos ainda sem decisão que travam a proposta, o estado da grade dos dois lados, a data em que a dupla volta pro calendário oficial, quantos encontros cabem até o encerramento, o efeito de seguir no recesso e qual degrau da folga de prática 8→9 o plano usou (pratica_flex: oficial, 7 dias ou piso). alternativa_recesso é um caminho viável quando a data cabe antes do encerramento — apresente-o em vez de dizer que não fecha. O retorno SEMPRE traz a matriz de cenários (ritmo, fusão em pares, recesso seguir/pausar, 1 por dia) ordenada, com 'melhor' = data mais cedo e 'caminho' = o plano que fecha com menos mudanças (data, o que muda e os encontros): em 'como a dupla fica em dia?' responda pelo caminho; nas demais, abra por 'melhor'; cite as datas literais; só diga que não fecha quando 'melhor' for null. Quando houver mais de um cenário viável, não chame nenhum de único. Os argumentos simulam o combinado SEM GRAVAR: ritmo pedido, sem_grade (combinar sem a disponibilidade), fusao (encontros juntos na mesma sessão) e decisoes_recesso ('e se a dupla decidir X?'). Use pra 'como a dupla X fica em dia?', 'ela começou atrasada, o que fazer?', 'monta um plano de recuperação', 'dá pra adiantar encontro?'. null quando a dupla não existe ou está fora do alcance do papel.",
+      "Plano de recuperação de uma dupla DPP atrasada ('ficar em dia'): passo a passo determinístico com data sugerida por encontro, no ritmo mais leve que fecha antes do encerramento (1 por semana, até 2, até 3 ou até 1 por dia), respeitando os intervalos de prática/tarefa do guia, os recessos, os feriados nacionais, a grade de disponibilidade combinada da dupla (quando os dois lados já marcaram) e o encerramento do ciclo. Devolve o estado (em_dia, recuperacao ou conversa: nem 1 por dia fecha, o caminho é a coordenação), cada passo com a ação (agendar, remarcar ou já marcado; vence_no_caminho = oficial que vence enquanto a dupla recupera), pendências de registro que vêm antes de qualquer plano, os recessos ainda sem decisão (travam a proposta da dupla; pra equipe viram suposição de pausa na proposta — a dupla confirma ou troca no aceite), o estado da grade dos dois lados, a data em que a dupla volta pro calendário oficial, quantos encontros cabem até o encerramento, o efeito de seguir no recesso e qual degrau da folga de prática 8→9 o plano usou (pratica_flex: oficial, 7 dias ou piso). alternativa_recesso é um caminho viável quando a data cabe antes do encerramento — apresente-o em vez de dizer que não fecha. O retorno SEMPRE traz a matriz de cenários (ritmo, fusão em pares, recesso seguir/pausar, 1 por dia) ordenada, com 'melhor' = data mais cedo e 'caminho' = o plano que fecha com menos mudanças (data, o que muda e os encontros): em 'como a dupla fica em dia?' responda pelo caminho; nas demais, abra por 'melhor'; cite as datas literais; só diga que não fecha quando 'melhor' for null. Quando houver mais de um cenário viável, não chame nenhum de único. Os argumentos simulam o combinado SEM GRAVAR: ritmo pedido, sem_grade (combinar sem a disponibilidade), fusao (encontros juntos na mesma sessão) e decisoes_recesso ('e se a dupla decidir X?'). Use pra 'como a dupla X fica em dia?', 'ela começou atrasada, o que fazer?', 'monta um plano de recuperação', 'dá pra adiantar encontro?'. null quando a dupla não existe ou está fora do alcance do papel.",
     schema: z
       .object({
         dupla_id: z.uuid().describe("id da dupla (uuid)"),
@@ -1080,6 +1136,10 @@ export const IA_TOOLS = {
       return {
         dupla_id: a.dupla_id,
         trilha: d.trilha,
+        // quem perguntou (0245) — recesso pendente trava a proposta da
+        // dupla, mas pra equipe vira suposição de pausa que a dupla
+        // confirma ou troca no aceite; a guarda lê pra falar certo
+        lado: cx.lado,
         caminho,
         // a dupla já vem carregada — o card nomeia sem nova query (026)
         mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
@@ -1151,7 +1211,7 @@ export const IA_TOOLS = {
   plano_propor: {
     nome: "plano_propor",
     descricao:
-      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP: o escopo sai do mesmo planner do plano_em_dia — encontros devidos e os que vencem no caminho, janela até o encerramento, ritmo combinado e o nível calculado — e a proposta fica persistida pra dupla aceitar ou contestar. O aceite é ÚNICO: o primeiro lado da dupla que aceita já põe o plano pra valer (mentor ou jovem que propõe já conta como o aceite desse lado) e o outro é avisado. Sem ritmo, usa o mais leve que fecha; o mínimo é 1 encontro por semana. As decisões do plano (recessos, grade, fusão) entram na proposta: decisoes_recesso declara cada recesso antes de propor (só a dupla declara — a equipe com recesso pendente é recusada), sem_grade combina sem a disponibilidade e fusao junta encontros na mesma sessão. Dupla em dia ou em 'conversa' (nem 1 por dia fecha) não tem proposta: aí o caminho é a coordenação. Só um plano aberto por dupla — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
+      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP: o escopo sai do mesmo planner do plano_em_dia — encontros devidos e os que vencem no caminho, janela até o encerramento, ritmo combinado e o nível calculado — e a proposta fica persistida pra dupla aceitar ou contestar. O aceite é ÚNICO: o primeiro lado da dupla que aceita já põe o plano pra valer (mentor ou jovem que propõe já conta como o aceite desse lado) e o outro é avisado. Sem ritmo, usa o mais leve que fecha; o mínimo é 1 encontro por semana. As decisões do plano (recessos, grade, fusão) entram na proposta: decisoes_recesso leva a resposta sobre cada recesso pendente — pra mentor e jovem é a decisão autoral da dupla (grava junto), pra equipe é suposição e cada pendente sem resposta entra como pausa (usa=true), com a dupla confirmando ou trocando no aceite; sem_grade combina sem a disponibilidade e fusao junta encontros na mesma sessão. Dupla em dia ou em 'conversa' (nem 1 por dia fecha) não tem proposta: aí o caminho é a coordenação. Só um plano aberto por dupla — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -1178,11 +1238,12 @@ export const IA_TOOLS = {
             })
           )
           .optional()
-          .describe("decisão da dupla sobre cada recesso pendente — recessos_pendentes do plano_em_dia lista os ids; só a dupla declara"),
+          .describe("resposta sobre cada recesso pendente — recessos_pendentes do plano_em_dia lista os ids; pra mentor e jovem é a decisão autoral da dupla (grava junto), pra equipe é suposição que a dupla confirma ou troca no aceite"),
       })
       .strict(),
     // o jovem propõe pelo app (wizard da aba Agora) e pela RPC — paridade
-    // no chat (527); equipe propõe sem poder declarar recesso
+    // no chat (527); equipe propõe sem poder declarar recesso — manda
+    // suposição no escopo e a dupla confirma ou troca no aceite (0245)
     roles: ["coordenacao", "supervisor", "mentor_dpp", "mentorado"],
     escreve: true,
     resumo: async (a: { dupla_id: string; ritmo?: number }, supabase) => {
@@ -1204,28 +1265,66 @@ export const IA_TOOLS = {
         cicloEventoId: x.ciclo_evento_id,
         usa: x.usa,
       }));
-      // a decisão de recesso é só da dupla — o mesmo gesto do combinarPlano
-      // (518): só o que MUDOU viaja (a RPC é upsert cego e regravar a mesma
-      // resposta roubaria a autoria) e staff que tenta declarar recebe a
-      // recusa honesta do banco
-      for (const dec of recessosAlterados(cx.dupla.recessos ?? [], decisoes)) {
-        await rpcEscreve(ctx, "declarar_recesso", {
-          p_dupla: a.dupla_id,
-          p_evento: dec.cicloEventoId,
-          p_usa: dec.usa,
-        });
-      }
-      const dupla = comDecisoesRecesso(cx.dupla, decisoes);
       const agora = new Date();
-      const r = montarPlanoEmDia({
-        dupla,
+      const base = {
         eventos,
         ritmo: a.ritmo,
         disponibilidade: a.sem_grade === true ? null : cx.combinada,
         fusao: a.fusao,
         hoje: agora,
-      });
+      };
+      // a decisão de recesso é só da dupla (0245 — mesma régua do
+      // combinarPlano): a EQUIPE nunca declara — manda suposições no
+      // escopo (origem "proposta") e todo pendente que o input não
+      // cobriu entra com o default conservador "pausa"; a RPC carimba
+      // escopo.assumido e a dupla confirma ou troca no aceite. A DUPLA
+      // declara o que mudou (só o que MUDOU viaja — a RPC é upsert cego
+      // e regravar a mesma resposta roubaria a autoria) e a resposta
+      // viaja com origem "dupla", sem suposição automática: pendência
+      // que sobrar segue bloqueando a proposta.
+      let decisoesEscopo: DecisaoRecesso[];
+      if (cx.lado === "staff") {
+        // a pendência real sai da simulação — o primeiro passe com as
+        // entradas já aplicadas mede o que a equipe não cobriu
+        const pre = montarPlanoEmDia({
+          dupla: comDecisoesRecesso(cx.dupla, decisoes),
+          ...base,
+        });
+        if (!pre.aplicavel) throw new ErroTool(pre.motivo);
+        const mont = decisoesDaPropostaStaffIa(
+          cx.dupla.recessos ?? [],
+          decisoes,
+          pre.recessosPendentes
+        );
+        if ("erro" in mont) throw new ErroTool(mont.erro);
+        decisoesEscopo = mont.decisoes;
+      } else {
+        for (const dec of recessosAlterados(
+          cx.dupla.recessos ?? [],
+          decisoes
+        )) {
+          await rpcEscreve(ctx, "declarar_recesso", {
+            p_dupla: a.dupla_id,
+            p_evento: dec.cicloEventoId,
+            p_usa: dec.usa,
+          });
+        }
+        decisoesEscopo = decisoes.map(
+          (d): DecisaoRecesso => ({
+            cicloEventoId: d.cicloEventoId,
+            usa: d.usa,
+            origem: "dupla",
+          })
+        );
+      }
+      // a simulação final aplica as decisões efetivas: suposição usa=false
+      // da equipe destrava o recesso nas datas como a decisão da dupla
+      // faria
+      const dupla = comDecisoesRecesso(cx.dupla, decisoesEscopo);
+      const r = montarPlanoEmDia({ dupla, ...base });
       if (!r.aplicavel) throw new ErroTool(r.motivo);
+      // staff não cai aqui — as suposições default cobrem toda pendência;
+      // o bloqueio sobra pra dupla que tenta propor sem decidir tudo
       if (r.recessosPendentes.length) {
         throw new ErroTool("Falta a dupla confirmar o recesso.");
       }
@@ -1240,9 +1339,12 @@ export const IA_TOOLS = {
       const escopo = {
         ...e.escopo,
         // snapshot das decisões do gesto (518) — o aceite compara pra
-        // detectar "a resposta mudou depois da proposta"
+        // detectar "a resposta mudou depois da proposta". O snapshot leva
+        // a autoria de cada resposta (0245): "dupla" é o que a dupla
+        // declarou, "proposta" é suposição da equipe que o aceite
+        // confirma (a RPC usa pra carimbar escopo.assumido)
         decisoes: {
-          recessos: decisoes,
+          recessos: decisoesEscopo,
           sem_grade: a.sem_grade === true,
           ...(gs.grupos.length
             ? {
@@ -1268,6 +1370,9 @@ export const IA_TOOLS = {
           ritmo: escopo.ritmo,
           nivel: r.nivel,
           sem_grade: a.sem_grade === true,
+          // 0245: a proposta carregava suposição de recesso da equipe —
+          // a dupla confirma ou troca antes de o plano valer
+          recesso_assumido: decisoesEscopo.some((d) => d.origem === "proposta"),
         },
       });
       return res;

@@ -177,6 +177,22 @@ describe("guarda numérica do plano", () => {
     expect(validarRespostaPlano(texto, PLANO).ok).toBe(true);
   });
 
+  it("recesso pendente: pra dupla pede a decisão, pra equipe avisa que a proposta já pode ir com pausa (0245)", () => {
+    // sem lado no payload (payload antigo) o texto trata como dupla —
+    // a pendência continua sendo a decisão autoral dela
+    expect(respostaDeterministica(PLANO)).toContain(
+      "Falta a dupla decidir sobre Recesso de fim de ano (16/12/2026 a 04/01/2027)"
+    );
+    const dupla = respostaDeterministica({ ...PLANO, lado: "mentor" });
+    expect(dupla).toContain("Falta a dupla decidir");
+    const staff = respostaDeterministica({ ...PLANO, lado: "staff" });
+    expect(staff).toContain(
+      "A proposta pode ir com pausa no recesso (16/12/2026 a 04/01/2027)"
+    );
+    expect(staff).toContain("a dupla confirma ou troca no aceite");
+    expect(staff).not.toContain("Falta a dupla decidir");
+  });
+
   it("sem caminho viável, a determinística diz que é coordenação", () => {
     const semCaminho = {
       ...PLANO,

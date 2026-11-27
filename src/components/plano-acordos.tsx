@@ -197,6 +197,45 @@ export function PlanoAcordosCard({
   const contestavel = planoContestavel(plano.escopo?.passos, realizados);
   const propostaPor =
     plano.proposto_via === "liza" ? "A Liza" : "A equipe";
+  // suposição de recesso da equipe (0245): viaja no jsonb do escopo
+  // (origem "proposta", ou o carimbo `assumido` nos itens sem origem) —
+  // nunca em nome da dupla. A projeção mínima não declara os campos, a
+  // leitura tolera as duas formas e só conta recesso visível no card
+  const escopoMarcado = plano.escopo as
+    | {
+        assumido?: boolean;
+        decisoes?: {
+          recessos?: {
+            cicloEventoId: string;
+            usa: boolean;
+            origem?: "dupla" | "proposta";
+          }[];
+        };
+      }
+    | null
+    | undefined;
+  const recessosVisiveis = new Set(recessos.map((r) => r.cicloEventoId));
+  const assumidos = (escopoMarcado?.decisoes?.recessos ?? []).filter(
+    (d) =>
+      recessosVisiveis.has(d.cicloEventoId) &&
+      (d.origem === "proposta" ||
+        (d.origem == null && escopoMarcado?.assumido === true))
+  );
+  const suposicaoAceite = (() => {
+    if (assumidos.length === 0) return null;
+    const recTxt = assumidos.length > 1 ? "nos recessos" : "no recesso";
+    const pausaN = assumidos.filter((d) => d.usa).length;
+    const segueN = assumidos.length - pausaN;
+    const considera =
+      segueN === 0
+        ? `pausa ${recTxt}`
+        : pausaN === 0
+          ? `seguir ${recTxt}`
+          : `pausa em ${pausaN === 1 ? "um recesso" : `${pausaN} recessos`} e seguir ${
+              segueN === 1 ? "no outro" : "nos demais"
+            }`;
+    return `A proposta considera ${considera}; confirme ou troque antes de aceitar.`;
+  })();
   const statusTexto: Record<string, string> = {
     proposto: "Proposto, falta um aceite da dupla",
     aceito: "Valendo",
@@ -702,7 +741,9 @@ export function PlanoAcordosCard({
 
       {/* repensar o recesso antes do aceite (518, US3.5): a decisão é
           da dupla, e se a resposta nova mudar as datas o combinado
-          recalcula no mesmo gesto */}
+          recalcula no mesmo gesto. Quando a proposta saiu com suposição
+          da equipe (0245), a frase diz o que ela considera — o aceite
+          confirma ou troca, nada vale como resposta dela antes */}
       {aberto &&
         podeResponder &&
         meuLado != null &&
@@ -715,9 +756,15 @@ export function PlanoAcordosCard({
                 ? "Os recessos no caminho"
                 : "O recesso no caminho"}
             </p>
+            {suposicaoAceite && (
+              <p className="text-xs font-medium text-foreground">
+                {suposicaoAceite}
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
-              Podem repensar a resposta antes de aceitar. Se as datas
-              mudarem, o plano recalcula junto.
+              {suposicaoAceite
+                ? "Se as datas mudarem, o plano recalcula junto."
+                : "Podem repensar a resposta antes de aceitar. Se as datas mudarem, o plano recalcula junto."}
             </p>
             <RecessoDecisao
               duplaId={duplaId}

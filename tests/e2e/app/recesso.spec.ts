@@ -13,10 +13,12 @@ import {
 
 // REALIZA-462/518 — recesso opcional por dupla (migrations 0218/0225). O
 // e2e cobre a fronteira real em staging:
-//   · a RPC declarar_recesso é a ÚNICA porta de escrita — a 0225
-//     restringiu a decisão aos DOIS lados da dupla: mentor e mentorado
-//     declaram; coordenação, mentor de outra dupla e insert direto
-//     levam a recusa de domínio;
+//   · a escrita continua só da dupla, por DOIS caminhos: declarar_recesso
+//     (o gesto — a 0225 restringiu aos DOIS lados: mentor e mentorado
+//     declaram; coordenação, mentor de outra dupla e insert direto levam
+//     a recusa de domínio) e, desde a 0245, o aceite do plano que grava
+//     a suposição pendente da proposta da equipe com a autoria de quem
+//     aceitou;
 //   · (dupla, evento) é único — a última declaração vale, com autoria;
 //   · a leitura é escopada: o jovem lê a decisão da própria dupla pela
 //     tabela (RLS) e as janelas pela jovem_recessos — usa null é o

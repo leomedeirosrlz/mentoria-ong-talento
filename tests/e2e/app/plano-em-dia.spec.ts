@@ -9,6 +9,7 @@ import {
   limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
+  relogar,
   test,
 } from "../helpers";
 
@@ -19,6 +20,8 @@ import {
 
 const EMAIL = process.env.E2E_MENTOR_EMAIL ?? "";
 const SENHA = process.env.E2E_MENTOR_PASSWORD ?? "";
+const COORD_EMAIL = process.env.E2E_COORD_EMAIL ?? "e2e-coord@realiza.test";
+const COORD_SENHA = process.env.E2E_COORD_PASSWORD ?? "";
 const DUPLA_ID = process.env.E2E_DUPLA_ID ?? "";
 const MENTOR_PROFILE = "e2e00000-0000-4000-8000-000000000010";
 
@@ -105,8 +108,9 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
       .fill("7");
 
     // as perguntas seguintes dependem do cronograma: recesso pendente
-    // exige resposta da dupla; grade em falta vira pergunta — responde o
-    // que aparecer até o gesto final
+    // exige resposta da dupla — o mentor logado é lado (staff passaria
+    // sem responder, suposição 0245 coberta no teste abaixo); grade em
+    // falta vira pergunta — responde o que aparecer até o gesto final
     const combinar = dialog.getByRole("button", {
       name: "Combinar",
       exact: true,
@@ -277,5 +281,141 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     await expect(
       linha6.getByRole("button", { name: "Registrar o 7º também" })
     ).toHaveCount(0);
+  });
+
+  test("a equipe combina sem a decisão do recesso — a proposta sai com suposição", async ({
+    page,
+  }) => {
+    // 0245 "propor não é decidir pela dupla": com pendência aberta o
+    // passo do recesso é leitura + aviso pra equipe (a suposição é pausa,
+    // não resposta dela) e o gesto fecha sem ela — pra DUPLA a decisão
+    // continua prévia (o fluxo do mentor acima responde as pills). A
+    // pendência segue a régua do recessosPendentes do planner: período
+    // do cronograma dela sem row e com fim no futuro
+    test.skip(!DUPLA_ID, "sem E2E_DUPLA_ID — piso do spec ausente");
+    const [duplaRow] = await buscarViaServiceRole<
+      { cronograma_id: string | null }[]
+    >("duplas", `select=cronograma_id&id=eq.${DUPLA_ID}&limit=1`);
+    const cronogramaId = duplaRow?.cronograma_id ?? "";
+    test.skip(
+      !cronogramaId,
+      "dupla fixture sem cronograma — o wizard não tem recesso pra assumir"
+    );
+    // o cenário é a pendência: decisão declarada de run anterior não pesa
+    await limparViaServiceRole("dupla_recessos", `dupla_id=eq.${DUPLA_ID}`);
+    const evs = await buscarViaServiceRole<
+      { id: string; data: string | null; data_fim: string | null }[]
+    >(
+      "ciclo_eventos",
+      `cronograma_id=eq.${cronogramaId}&tipo=eq.recesso&data=not.is.null&select=id,data,data_fim`
+    );
+    const hojeStr = new Date().toLocaleDateString("en-CA", {
+      timeZone: "America/Sao_Paulo",
+    });
+    const pendentes = evs.filter((e) => (e.data_fim ?? e.data)! >= hojeStr);
+    test.skip(
+      pendentes.length === 0,
+      "recesso da fixture já passou — sem pendência o wizard não tem suposição pra mostrar"
+    );
+
+    // mesmo piso do fluxo do mentor: 2 passos remarcáveis
+    await convergirDuplaEmDia(DUPLA_ID, MENTOR_PROFILE, { exceto: [3, 4] });
+    await criarEncontro(3, "nao_aconteceu", -7);
+    await criarEncontro(4, "nao_aconteceu", -5);
+    // o piso do arquivo já logou o mentor — a equipe propõe pelo mesmo gesto
+    await relogar(page, COORD_EMAIL, COORD_SENHA);
+    await page.goto(`/duplas/${DUPLA_ID}?aba=agora`);
+
+    const card = page.getByRole("region", { name: "Para ficar em dia" });
+    await expect(card).toBeVisible();
+    // o card da equipe já anuncia a suposição antes de abrir o wizard
+    await expect(
+      card.getByText(/dá para propor/i)
+    ).toBeVisible({ timeout: 15_000 });
+
+    const dialog = page.getByRole("dialog", { name: "Combinar o plano" });
+    await agirComConfirma(
+      () => card.getByRole("button", { name: "Combinar o plano" }).click(),
+      () => dialog.isVisible()
+    );
+    await expect(
+      dialog.getByText("Quantos encontros por semana")
+    ).toBeVisible({ timeout: 15_000 });
+
+    // ritmo livre — o mesmo atalho do fluxo do mentor
+    await dialog
+      .locator("label", {
+        has: page.locator('input[name="ritmo"][value="outro"]'),
+      })
+      .click();
+    await dialog
+      .getByLabel("Outro número de encontros por semana")
+      .fill("7");
+
+    // o passo do recesso pra equipe é leitura + aviso: as pills da
+    // decisão nem montam pro staff — o wizard avança sem resposta dela
+    const combinar = dialog.getByRole("button", {
+      name: "Combinar",
+      exact: true,
+    });
+    let viuSuposicao = false;
+    for (let i = 0; i < 5 && !(await combinar.isVisible()); i++) {
+      if (await dialog.getByText(/recesso no caminho/i).isVisible()) {
+        viuSuposicao = true;
+        // a etapa inativa fica `hidden` — fora da árvore de acessibilidade.
+        // O texto visível é o que a pessoa lê na pergunta atual
+        await expect(
+          dialog
+            .getByText(/propor mesmo sem a decisão/i)
+            .filter({ visible: true })
+        ).toBeVisible();
+        await expect(
+          dialog.getByRole("radio", { name: /Vamos seguir|Vamos pausar/ })
+        ).toHaveCount(0);
+      }
+      const semGrade = dialog.locator("label", {
+        hasText: "Combinar sem a grade",
+      });
+      if (await semGrade.isVisible()) await semGrade.click();
+      const avancar = dialog.getByRole("button", { name: "Avançar" });
+      await expect(avancar).toBeEnabled({ timeout: 15_000 });
+      await avancar.click();
+    }
+    await expect(combinar).toBeEnabled({ timeout: 15_000 });
+    expect(viuSuposicao).toBe(true);
+    await combinar.click();
+
+    // a proposta sai assumida: nasce "proposto" esperando o aceite da
+    // dupla — e NENHUMA linha entra em dupla_recessos
+    await expect(
+      page.getByText(/Falta um aceite da dupla/i)
+    ).toBeVisible({ timeout: 15_000 });
+    const [vivo] = await buscarViaServiceRole<
+      {
+        status: string;
+        escopo: {
+          decisoes?: {
+            recessos?: { cicloEventoId: string; origem?: string }[];
+          };
+        };
+      }[]
+    >(
+      "dupla_planos",
+      `dupla_id=eq.${DUPLA_ID}&status=in.(proposto,aceito,ativo)&order=created_at.desc&limit=1&select=status,escopo`
+    );
+    expect(vivo.status).toBe("proposto");
+    // a suposição viaja no escopo e é o que o aceite resolve depois —
+    // toda pendência sai marcada 'proposta' (o carimbo `assumido` em si
+    // a RPC só liga quando o período cruza a janela do plano, o que é
+    // sazonal; a cobertura cheia é o assert do acordo.spec)
+    const sup = vivo.escopo.decisoes?.recessos ?? [];
+    expect(sup.length).toBeGreaterThanOrEqual(1);
+    expect(sup.every((d) => d.origem === "proposta")).toBe(true);
+    expect(
+      await buscarViaServiceRole(
+        "dupla_recessos",
+        `dupla_id=eq.${DUPLA_ID}&select=id`
+      )
+    ).toHaveLength(0);
   });
 });

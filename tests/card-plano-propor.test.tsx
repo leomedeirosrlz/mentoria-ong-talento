@@ -103,7 +103,13 @@ describe("CardPlano: propor o caminho (1126)", () => {
     expect(texto).toContain("O que muda");
     expect(texto).toContain("juntar 2 pares (6+7, 8+9)");
     expect(texto).toContain("12 encontros. O ciclo encerra em");
-    expect(texto).toContain("A dupla precisa decidir o recesso");
+    // recesso sem resposta não trava o envio: o aviso diz a suposição
+    // que a proposta carrega (a do caminho declara seguir) e quem
+    // confirma ou troca — nada de "precisa decidir antes de enviar"
+    expect(texto).toContain("A dupla ainda não decidiu o recesso");
+    expect(texto).toContain("a proposta considera seguir no recesso");
+    expect(texto).toContain("ela confirma ou troca no aceite");
+    expect(texto).not.toContain("precisa decidir o recesso antes de enviar");
     expect(botao(alvo, "Enviar o plano")).toBeTruthy();
     // detalhe fechado: nada de 4 linhas de encontro antes do clique
     expect(texto).not.toContain("Encontro 6");
@@ -121,6 +127,17 @@ describe("CardPlano: propor o caminho (1126)", () => {
     expect(alvo.textContent).toContain("2 encontros juntos"); // 6 e 7
     expect(alvo.textContent).toContain("já marcado"); // 5º travado
     expect(alvo.textContent).toContain("Encontro 6");
+    desmontar();
+  });
+
+  it("sem declaração de seguir no caminho, a suposição é pausa", () => {
+    const b = bloco();
+    b.caminho = { ...b.caminho!, recesso: { ciclo_evento_id: "r1", usa: true } };
+    const { alvo, desmontar } = montar(<CardPlano b={b} />);
+    const texto = alvo.textContent ?? "";
+    expect(texto).toContain("a proposta considera pausa no recesso");
+    expect(texto).not.toContain("precisa decidir o recesso antes de enviar");
+    expect(botao(alvo, "Enviar o plano")).toBeTruthy();
     desmontar();
   });
 

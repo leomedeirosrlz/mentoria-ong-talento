@@ -996,6 +996,27 @@ function CaminhoPlano({
   const passosId = useId();
   const sessoes = agruparPassos(b.passos);
   const faltam = b.cabem_ate_encerramento?.faltam ?? b.passos.length;
+  // a suposição que a proposta carrega por recesso pendente: o que o
+  // caminho declara segue a usa dele; o resto vira pausa, o padrão do
+  // calendário — a dupla confirma ou troca antes de aceitar
+  const declRecesso = caminho.recesso;
+  const nPend = b.recessos_pendentes.length;
+  const recPendTxt = nPend > 1 ? "nos recessos" : "no recesso";
+  const consideraRecesso =
+    nPend === 1
+      ? declRecesso?.usa === false
+        ? "seguir no recesso"
+        : "pausa no recesso"
+      : "pausa nos recessos";
+  const periodoPend =
+    b.recessos_pendentes.length === 1 &&
+    valida(b.recessos_pendentes[0].inicio)
+      ? ` (${diaMesCurto(b.recessos_pendentes[0].inicio)} a ${
+          valida(b.recessos_pendentes[0].fim)
+            ? diaMesCurto(b.recessos_pendentes[0].fim)
+            : "?"
+        })`
+      : "";
 
   async function propor() {
     if (propondo) return;
@@ -1055,22 +1076,6 @@ function CaminhoPlano({
         </div>
       )}
 
-      {b.recessos_pendentes.length > 0 && (
-        <p className="mt-2 text-xs text-[var(--warn-text)]">
-          A dupla precisa decidir{" "}
-          {b.recessos_pendentes.length === 1 ? "o recesso" : "os recessos"}
-          {b.recessos_pendentes[0].inicio &&
-          valida(b.recessos_pendentes[0].inicio)
-            ? ` (${diaMesCurto(b.recessos_pendentes[0].inicio)} a ${
-                valida(b.recessos_pendentes[0].fim)
-                  ? diaMesCurto(b.recessos_pendentes[0].fim)
-                  : "?"
-              })`
-            : ""}{" "}
-          antes de enviar.
-        </p>
-      )}
-
       {b.pendencias.length > 0 && (
         <p className="mt-1.5 text-xs text-muted-foreground">
           {b.pendencias
@@ -1086,6 +1091,16 @@ function CaminhoPlano({
       {b.grade && gradeTexto(b.grade) && (
         <p className="mt-1.5 text-xs text-muted-foreground">
           {gradeTexto(b.grade)}
+        </p>
+      )}
+
+      {/* recesso sem resposta não trava o envio: a proposta sai com a
+          suposição declarada e a dupla confirma ou troca no aceite */}
+      {nPend > 0 && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          A dupla ainda não decidiu {nPend === 1 ? "o recesso" : "os recessos"}.
+          Dá para enviar assim: a proposta considera {consideraRecesso}
+          {periodoPend}, e ela confirma ou troca no aceite.
         </p>
       )}
 
@@ -1422,13 +1437,15 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </p>
       )}
 
-      {/* o que trava a proposta (527): recesso sem decisão e grade
-          faltando leem junto do plano — a plano_propor recusa os dois */}
+      {/* recesso sem decisão não trava a proposta: ela sai com a
+          suposição de pausa no escopo e a dupla confirma ou troca no
+          aceite — a lista mantém o que ainda falta ela responder */}
       {!caminho && b.recessos_pendentes.length > 0 && (
-        <div className="mt-2 rounded-lg bg-[var(--warn-bg)] px-2.5 py-2">
-          <p className="text-xs font-semibold text-[var(--warn-text)]">
-            Antes de enviar, a dupla precisa decidir{" "}
-            {b.recessos_pendentes.length === 1 ? "o recesso" : "os recessos"}
+        <div className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2">
+          <p className="text-xs font-semibold text-foreground">
+            {b.recessos_pendentes.length === 1
+              ? "A dupla ainda não decidiu o recesso"
+              : "A dupla ainda não decidiu os recessos"}
           </p>
           <ul className="mt-1 space-y-0.5">
             {b.recessos_pendentes.map((rec) => (
@@ -1444,6 +1461,13 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
               </li>
             ))}
           </ul>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Dá para enviar assim: a proposta considera pausa{" "}
+            {b.recessos_pendentes.length === 1
+              ? "no recesso"
+              : "nos recessos"}
+            , e ela confirma ou troca no aceite.
+          </p>
         </div>
       )}
 

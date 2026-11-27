@@ -290,11 +290,20 @@ export function PlanoEmDiaCard({
         </div>
       )}
 
+      {/* pra dupla a decisão continua prévia ao combinado; staff lê o
+          mesmo quadro como acompanhamento — a proposta sai com a
+          suposição de pausa e a dupla confirma ou troca no aceite */}
       {plano.recessosPendentes.length > 0 && (
         <p className="mt-3 text-xs text-muted-foreground">
-          {plano.recessosPendentes.length === 1
-            ? "Falta 1 decisão da dupla pra fechar a proposta."
-            : `Faltam ${plano.recessosPendentes.length} decisões da dupla pra fechar a proposta.`}
+          {souMentor
+            ? plano.recessosPendentes.length === 1
+              ? "Falta a decisão do recesso pra fechar a proposta."
+              : `Faltam ${plano.recessosPendentes.length} decisões de recesso pra fechar a proposta.`
+            : `${plano.recessosPendentes.length === 1 ? "Falta a dupla decidir o recesso." : `Falta a dupla decidir ${plano.recessosPendentes.length} recessos.`} Dá para enviar assim: a proposta considera pausa ${
+                plano.recessosPendentes.length === 1
+                  ? "no recesso"
+                  : "nos recessos"
+              }, e a dupla confirma ou troca no aceite.`}
         </p>
       )}
 

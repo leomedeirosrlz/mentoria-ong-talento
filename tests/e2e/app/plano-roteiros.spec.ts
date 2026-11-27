@@ -68,8 +68,11 @@ const rpc = (jwt: string, fn: string, body: unknown) =>
   ) as Promise<{ ok?: boolean; error?: string; id?: string; versao?: number }>;
 
 /** A 0225 exige decisão da dupla pra cada recesso do cronograma que
- *  cruza a janela — `usa:false` é "seguimos nos encontrando", o que
- *  libera as datas sugeridas dentro dele. */
+ *  cruza a janela — a 0245 só releva a pendência quando a proposta da
+ *  EQUIPE carrega suposição origem 'proposta' no escopo, e os escopos
+ *  daqui não carregam: a decisão real segue exigida, seja quem propõe.
+ *  `usa:false` é "seguimos nos encontrando", o que libera as datas
+ *  sugeridas dentro dele. */
 async function decidirRecessos(
   jwt: string,
   dupla: string,
@@ -94,7 +97,9 @@ async function decidirRecessos(
 }
 
 const propor = async (jwt: string, esc = escopo([3, 4])) => {
-  // a decisão de recesso é do lado — quem propõe pode ser a equipe
+  // a decisão de recesso é do lado — quem propõe pode ser a equipe, mas
+  // os escopos daqui não levam suposição (0245), então a resposta real
+  // segue exigida mesmo pra proposta da coordenação
   const jwtLado = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
   await decidirRecessos(jwtLado, DUPLA, esc.janela.inicio, esc.janela.fim);
   return rpc(jwt, "plano_propor", {

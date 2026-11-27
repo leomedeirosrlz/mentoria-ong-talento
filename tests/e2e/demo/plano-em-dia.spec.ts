@@ -55,7 +55,7 @@ test.describe("demo — plano pra ficar em dia (REALIZA-397)", () => {
     await expect(card.getByText("A decisão é da dupla.")).toBeVisible();
     await expect(card.getByText("a dupla ainda não decidiu")).toBeVisible();
     await expect(
-      card.getByText("Falta 1 decisão da dupla pra fechar a proposta.")
+      card.getByText("Falta a decisão do recesso pra fechar a proposta.")
     ).toBeVisible();
     await expect(
       card.getByRole("button", { name: /Vamos (pausar|seguir)/ })

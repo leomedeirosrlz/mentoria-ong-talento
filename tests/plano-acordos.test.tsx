@@ -22,13 +22,19 @@ const aplicarPassoPlano = vi.fn(async (..._args: unknown[]) => ({
 }));
 vi.mock("@/lib/actions-plano", () => ({
   aplicarPassoPlano: (...args: unknown[]) => aplicarPassoPlano(...args),
+  aplicarSessaoPlano: vi.fn(async () => ({ ok: true })),
   responderPlano: vi.fn(async () => ({ ok: true })),
+  responderPlanoComRecesso: vi.fn(async () => ({ ok: true })),
+}));
+vi.mock("@/lib/actions-recesso", () => ({
+  declararRecesso: vi.fn(async () => ({ ok: true })),
 }));
 
 import {
   PlanoAcordosCard,
   type PlanoCombinado,
 } from "@/components/plano-acordos";
+import type { RecessoDaFicha } from "@/components/recesso-dupla-card";
 import type { SeletorSugestoes } from "@/components/seletor-dia-hora";
 import { perfilDeEncontros } from "@/lib/sugestoes-encontro";
 import { assentar, botao, clicar, digitar, montar } from "./dom";
@@ -300,4 +306,134 @@ describe("sugestões dos passos pendentes (507)", () => {
     desmontar();
   });
 
+});
+
+// 0245 — a proposta pode sair com suposição de recesso da equipe: o
+// escopo marca cada item (origem "proposta") ou o plano inteiro
+// (`assumido`), nunca uma decisão gravada em nome da dupla. No aceite o
+// card diz o que a proposta considera junto do bloco de recesso — calmo,
+// não alarme — e ela confirma ou troca antes de valer.
+const RECESSO_PENDENTE: RecessoDaFicha = {
+  cicloEventoId: "ce-1",
+  titulo: "Recesso de fim de ano",
+  inicio: "2026-12-22",
+  fim: "2027-01-04",
+  usa: null,
+  declaradoEm: null,
+  autorNome: null,
+};
+
+/** escopo com o snapshot novo da action: a projeção mínima não declara
+ *  `decisoes`/`assumido`, então a fixture passa pelo mesmo elenco que o
+ *  card faz na leitura. */
+const planoProposto = (
+  escopoExtra: Record<string, unknown> = {}
+): PlanoCombinado => ({
+  id: "pl1",
+  status: "proposto",
+  versao: 1,
+  aprovado_lado: null,
+  janela: JANELA,
+  escopo: {
+    ritmo: 2,
+    passos: [{ numero: 5, data: "2026-12-01", acao: "agendar" }],
+    ...escopoExtra,
+  } as PlanoCombinado["escopo"],
+  passos: [],
+});
+
+const cardDupla = (p: PlanoCombinado) => (
+  <PlanoAcordosCard
+    plano={p}
+    duplaId="d-1"
+    podeResponder
+    podeAplicar={false}
+    meuLado="mentor"
+    recessos={[RECESSO_PENDENTE]}
+  />
+);
+
+describe("suposição de recesso no aceite (0245)", () => {
+  it("origem proposta + pausa: o aviso diz o que ela considera", () => {
+    const { alvo, desmontar } = montar(
+      cardDupla(
+        planoProposto({
+          decisoes: {
+            recessos: [
+              { cicloEventoId: "ce-1", usa: true, origem: "proposta" },
+            ],
+          },
+        })
+      )
+    );
+    const texto = alvo.textContent ?? "";
+    expect(texto).toContain(
+      "A proposta considera pausa no recesso; confirme ou troque antes de aceitar."
+    );
+    expect(texto).toContain("O recesso no caminho");
+    expect(texto).toContain("Se as datas mudarem, o plano recalcula junto.");
+    // a linha de repensar não duplica: a suposição já pede confirmar/trocar
+    expect(texto).not.toContain("Podem repensar a resposta antes de aceitar");
+    desmontar();
+  });
+
+  it("origem proposta + seguir: o aviso diz seguir no recesso", () => {
+    const { alvo, desmontar } = montar(
+      cardDupla(
+        planoProposto({
+          decisoes: {
+            recessos: [
+              { cicloEventoId: "ce-1", usa: false, origem: "proposta" },
+            ],
+          },
+        })
+      )
+    );
+    expect(alvo.textContent).toContain(
+      "A proposta considera seguir no recesso; confirme ou troque antes de aceitar."
+    );
+    desmontar();
+  });
+
+  it("carimbo assumido cobre itens sem origem (forma alternativa)", () => {
+    const { alvo, desmontar } = montar(
+      cardDupla(
+        planoProposto({
+          assumido: true,
+          decisoes: {
+            recessos: [{ cicloEventoId: "ce-1", usa: true }],
+          },
+        })
+      )
+    );
+    expect(alvo.textContent).toContain(
+      "A proposta considera pausa no recesso; confirme ou troque antes de aceitar."
+    );
+    desmontar();
+  });
+
+  it("decisão da própria dupla não lê como suposição", () => {
+    const { alvo, desmontar } = montar(
+      cardDupla(
+        planoProposto({
+          decisoes: {
+            recessos: [{ cicloEventoId: "ce-1", usa: true, origem: "dupla" }],
+          },
+        })
+      )
+    );
+    const texto = alvo.textContent ?? "";
+    expect(texto).not.toContain("A proposta considera");
+    expect(texto).toContain("Podem repensar a resposta antes de aceitar");
+    desmontar();
+  });
+
+  it("escopo sem as marcas segue com o bloco de sempre", () => {
+    const { alvo, desmontar } = montar(cardDupla(planoProposto()));
+    const texto = alvo.textContent ?? "";
+    expect(texto).toContain("O recesso no caminho");
+    expect(texto).toContain("Podem repensar a resposta antes de aceitar");
+    expect(texto).not.toContain("A proposta considera");
+    desmontar();
+  });
 });
