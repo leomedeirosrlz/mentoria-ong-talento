@@ -82,6 +82,7 @@ test.describe("navegação do celular", () => {
       "Materiais",
       "Especialistas",
       "Pessoas",
+      "Minha dupla",
       "Perfil",
       "Ajuda",
     ]);

@@ -358,7 +358,12 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     );
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
-      () => linha(proximos, 7).getByRole("button", { name: "Remarcar" }).click(),
+      async () => {
+        await linha(proximos, 7)
+          .getByRole("button", { name: "Ações do encontro" })
+          .click();
+        await page.getByRole("menuitem", { name: "Remarcar" }).click();
+      },
       () => dialog.isVisible()
     );
 
