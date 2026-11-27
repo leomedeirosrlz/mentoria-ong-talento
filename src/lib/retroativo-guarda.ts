@@ -20,16 +20,3 @@ export function avaliarRetroativo({
   return { bloqueado: null, tardio: ms > 7 * 24 * 60 * 60 * 1000 };
 }
 
-export function motivoTardioOk(motivo: string | null | undefined): boolean {
-  return (motivo?.trim().length ?? 0) >= 2;
-}
-
-/** Dias entre a data oficial e hoje (fuso do programa) — a mensagem do
- *  retroativo tardio usa isso pra dizer desde quando o passo venceu. */
-export function diasDeAtraso(base: string | null, hoje: string): number {
-  if (!base) return 0;
-  const ms =
-    new Date(`${hoje}T00:00:00-03:00`).getTime() -
-    new Date(`${base}T00:00:00-03:00`).getTime();
-  return Math.max(0, Math.round(ms / 86_400_000));
-}

@@ -62,7 +62,6 @@ export function RegistrarRetroativoDialog({
   const [openInterno, setOpenInterno] = useState(false);
   const open = openProp ?? openInterno;
   const [aviso, setAviso] = useState<string | null>(null);
-  const [motivoTardio, setMotivoTardio] = useState("");
   // id do card recém-criado — o efeito abaixo rola até ele quando o refresh
   // termina (router.push com hash não rola: o card não existia no DOM velho)
   const scrollTarget = useRef<string | null>(null);
@@ -132,7 +131,7 @@ export function RegistrarRetroativoDialog({
     const local = `${data}T${hora}`;
     start(async () => {
       try {
-        const res = await registrarEncontroRetroativo(duplaId, n, local, motivoTardio);
+        const res = await registrarEncontroRetroativo(duplaId, n, local);
         if (res?.error) {
           setAviso(res.error);
         } else {
@@ -207,19 +206,6 @@ export function RegistrarRetroativoDialog({
         onAviso={setAviso}
         onConfirmar={confirmar}
       >
-        <label className="block space-y-1 text-sm">
-          <span className="font-medium">Registrando com atraso?</span>
-          <Input
-            value={motivoTardio}
-            onChange={(e) => setMotivoTardio(e.target.value)}
-            placeholder="Se passaram mais de 7 dias, conte o motivo"
-            maxLength={140}
-          />
-          <span className="block text-xs text-muted-foreground">
-            Depois de 7 dias do encontro o motivo é obrigatório e o registro
-            fica marcado como tardio.
-          </span>
-        </label>
       </SeletorDiaHora>
     </>
   );

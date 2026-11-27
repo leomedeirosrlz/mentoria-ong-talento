@@ -14,7 +14,6 @@ import {
   UFS,
   cronogramaVigente,
   coberturaDoRegistro,
-  formatDate,
   inicioDefaultDupla,
   maxEncontros,
   normLinkExterno,
@@ -85,11 +84,7 @@ import { demoAtivo, demoLidas, demoRole, limparDemo, marcarDemoLidas, marcarDemo
 import { DEMO_MSG } from "./demo/shared";
 import { getDemoData } from "./demo/data";
 import { demoNotificacoes } from "./demo/queries";
-import {
-  avaliarRetroativo,
-  diasDeAtraso,
-  motivoTardioOk,
-} from "./retroativo-guarda";
+import { avaliarRetroativo } from "./retroativo-guarda";
 
 /** Normaliza o embed `profile_papeis` pro `papeis` efetivo — união do role
  *  primário com as linhas do embed (o primário também vive lá; o dedupe
@@ -3255,16 +3250,9 @@ export async function registrarEncontroRetroativo(
     return { error: "Esse encontro não faz parte do guia oficial." };
   }
   if (regra.bloqueado) return { error: regra.bloqueado };
-  const motivoLimpo = motivoTardio?.trim() ?? "";
-  if (regra.tardio && !motivoTardioOk(motivoLimpo)) {
-    // a régua compara com a data OFICIAL do passo, não com o dia do
-    // registro: dizer qual é a data e quantos dias passaram evita a
-    // leitura "faz 7 dias que estou registrando"
-    const dias = diasDeAtraso(oficial, hojeStr);
-    return {
-      error: `O ${numero}º encontro venceu em ${formatDate(oficial)} (${dias} dias atrás). Conte por que o registro está sendo feito agora.`,
-    };
-  }
+  // atraso não pede justificativa: a maioria das duplas registra depois
+  // da data oficial, e o motivo virava atrito sem uso. O flag continua
+  // gravado pra leitura de aderência.
 
   // na trilha especialista o número é o ordinal da tentativa — quem decide é
   // o servidor (max + 1), nunca o cliente: o passo do guia sai do rank entre
@@ -3316,9 +3304,7 @@ export async function registrarEncontroRetroativo(
       created_by: eu.id,
       // colunas da 0242 — o cast cobre a janela até database.types ser
       // regenerado pelo lead depois de aplicar a migration
-      ...(regra.tardio
-        ? { motivo_retroativo: motivoLimpo, retroativo_tardio: true }
-        : {}),
+      ...(regra.tardio ? { retroativo_tardio: true } : {}),
     } as Database["public"]["Tables"]["encontros"]["Insert"])
     .select("id")
     .single();

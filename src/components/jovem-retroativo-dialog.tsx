@@ -59,7 +59,6 @@ export function JovemRetroativoDialog({
   const [openInterno, setOpenInterno] = useState(false);
   const open = openProp ?? openInterno;
   const [aviso, setAviso] = useState<string | null>(null);
-  const [motivoTardio, setMotivoTardio] = useState("");
   const [pending, start] = useTransition();
   const router = useRouter();
   const numeroFixo = atual?.numero ?? null;
@@ -140,7 +139,7 @@ export function JovemRetroativoDialog({
     const local = `${data}T${hora}`;
     start(async () => {
       try {
-        const res = await registrarRetroativoJovem(duplaId, n, local, motivoTardio);
+        const res = await registrarRetroativoJovem(duplaId, n, local);
         if (res?.error) {
           setAviso(res.error);
           return;
@@ -188,19 +187,6 @@ export function JovemRetroativoDialog({
         onAviso={setAviso}
         onConfirmar={confirmar}
       >
-        <label className="block space-y-1 text-sm">
-          <span className="font-medium">Registrando com atraso?</span>
-          <Input
-            value={motivoTardio}
-            onChange={(e) => setMotivoTardio(e.target.value)}
-            placeholder="Se passaram mais de 7 dias, conte o motivo"
-            maxLength={140}
-          />
-          <span className="block text-xs text-muted-foreground">
-            Depois de 7 dias do encontro o motivo é obrigatório e o registro
-            fica marcado como tardio.
-          </span>
-        </label>
       </SeletorDiaHora>
     </>
   );
