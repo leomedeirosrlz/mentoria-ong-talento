@@ -4,7 +4,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -177,9 +176,12 @@ export function JovemSecaoRecolhivel({
   }, [alvo]);
   // o refresh depois de um gesto (marcar combinado, avaliar) não pode
   // fechar a seção que o hash abriu: uma vez aberta por âncora, fica aberta
-  const jaAbriu = useRef(hashBate);
-  if (hashBate) jaAbriu.current = true;
-  const aberto = forcado ?? (hashBate || jaAbriu.current);
+  const [jaAbriu, setJaAbriu] = useState(false);
+  useEffect(() => {
+    // abre por âncora no load: fixa fora do ciclo de render (microtask)
+    if (window.location.hash === alvo) queueMicrotask(() => setJaAbriu(true));
+  }, [alvo]);
+  const aberto = forcado ?? (hashBate || jaAbriu);
 
   return (
     <section aria-labelledby={ancora} className={className}>
