@@ -107,6 +107,7 @@ import { PlanoEmDiaCard } from "@/components/plano-em-dia-card";
 import { AcordosCentral } from "@/components/acordos-central";
 import { RecessoDuplaCard } from "@/components/recesso-dupla-card";
 import { montarPlanoEmDia } from "@/lib/plano-em-dia";
+import { simularCenariosPlano } from "@/lib/plano-cenarios";
 import {
   carregarRoteirosDaDupla,
   planoVigente,
@@ -490,6 +491,16 @@ export default async function DuplaPage({
     hoje: agora,
     disponibilidade: gradesDaDupla(gradeMentor, gradeJovem),
   });
+  // 1126: mesma matriz de cenários da Liza — o card da ficha abre pelo
+  // caminho viável em vez de mandar a dupla pra coordenação
+  const cenariosPlano = planoEmDia.aplicavel
+    ? simularCenariosPlano({
+        dupla,
+        eventos,
+        hoje: agora,
+        disponibilidade: gradesDaDupla(gradeMentor, gradeJovem),
+      })
+    : null;
   const passosAgendaveis = planoEmDia.aplicavel
     ? planoEmDia.passos.filter((p) => p.acao !== "travado")
     : [];
@@ -1351,6 +1362,11 @@ export default async function DuplaPage({
           souStaff={souStaff}
           planoVivo={planoVivoFicha != null}
           recessos={recessosDaFicha}
+          melhor={
+            cenariosPlano?.menorFriccao?.cenario ??
+            cenariosPlano?.melhor ??
+            null
+          }
         />
       )}
 

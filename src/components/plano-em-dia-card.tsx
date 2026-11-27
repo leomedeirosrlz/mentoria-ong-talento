@@ -82,6 +82,7 @@ export function PlanoEmDiaCard({
   souStaff = false,
   planoVivo = false,
   recessos = [],
+  melhor = null,
 }: {
   plano: Extract<PlanoEmDia, { aplicavel: true }>;
   dupla: Dupla;
@@ -94,8 +95,21 @@ export function PlanoEmDiaCard({
   planoVivo?: boolean;
   /** Recessos vigentes/futuros do cronograma — estado tri-estado. */
   recessos?: RecessoDaFicha[];
+  /** Motor de cenários (1126): caminho viável mais cedo quando a
+   *  simulação base não fecha — o card abre por ele em vez de dizer que
+   *  só a coordenação resolve. */
+  melhor?: {
+    rotulo: string;
+    data: string | null;
+    sessoes: number;
+    decisaoRecesso: "pausa" | "segue" | null;
+    fusao: number[][];
+  } | null;
 }) {
   const conversa = plano.estado === "conversa";
+  // 1126: "conversa" é o veredito da simulação base, não do calendário —
+  // com caminho viável o card promete a data do caminho
+  const viavel = conversa && melhor?.data ? melhor : null;
   // 518: o card é leitura pra todo mundo — "mentor vs staff" só sobra na
   // copy ("vocês" vs "a dupla") e no registro de pendências, que segue
   // do lado do mentor
@@ -159,7 +173,17 @@ export function PlanoEmDiaCard({
               Para ficar em dia
             </h2>
             {conversa ? (
-              <PillPlano tom="risco">Não fecha até o encerramento</PillPlano>
+              viavel ? (
+                <PillPlano tom="atencao">
+                  {viavel.decisaoRecesso === "segue"
+                    ? "Seguindo no recesso"
+                    : viavel.fusao.length > 0
+                      ? "Com fusão"
+                      : "Com ajuste"}
+                </PillPlano>
+              ) : (
+                <PillPlano tom="risco">Não fecha até o encerramento</PillPlano>
+              )
             ) : (
               <PillPlano tom="atencao">{rotuloRitmo(plano.ritmo)}</PillPlano>
             )}
@@ -174,7 +198,30 @@ export function PlanoEmDiaCard({
         <ComoCalcula />
       </div>
 
-      {conversa ? (
+      {conversa && viavel ? (
+        <div className="mt-4">
+          <p className="text-2xl font-semibold tracking-tight">
+            Em dia em{" "}
+            <span className="tabular-nums">{formatDate(viavel.data!)}</span>
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Com {viavel.rotulo}
+            {plano.encerramento
+              ? `, antes do encerramento (${formatDate(plano.encerramento)})`
+              : ""}
+            .
+          </p>
+          {plano.dataProjetada && (
+            <p className="mt-1 text-sm tabular-nums text-muted-foreground">
+              Sem mudança, só em {formatDate(plano.dataProjetada)}
+              {plano.cabemAteEncerramento
+                ? ` — cabem ${plano.cabemAteEncerramento.cabem} dos ${plano.cabemAteEncerramento.faltam} encontros`
+                : ""}
+              .
+            </p>
+          )}
+        </div>
+      ) : conversa ? (
         <div className="mt-4">
           <p className="text-2xl font-semibold tracking-tight">
             Nem com 1 encontro por dia fecha
@@ -266,7 +313,7 @@ export function PlanoEmDiaCard({
         ) : (
           <CombinarPlano duplaId={dupla.id} lado={lado} />
         )}
-        {conversa && podeChamar && (
+        {conversa && !viavel && podeChamar && (
           <NovoChamadoDialog
             papel={souMentor ? "mentor_dpp" : "coordenacao"}
             duplaId={dupla.id}

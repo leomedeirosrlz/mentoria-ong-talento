@@ -30,9 +30,13 @@ export type CenarioPlano = {
   cabem: { cabem: number; faltam: number } | null;
   /** Sessões distintas que o plano pede (fusão reduz). */
   sessoes: number;
+  /** Encontros por semana que o planner escolheu neste caminho. */
+  ritmo: number;
   /** Pares fundidos usados neste cenário. */
   fusao: number[][];
   decisaoRecesso: "pausa" | "segue" | null;
+  /** Recesso que a decisão declara (null quando não há recesso no ciclo). */
+  recesso: { cicloEventoId: string; usa: boolean } | null;
   praticaFlex: { dias: number; oficial: number } | null;
   /** Por que não fecha / o que o caminho custa. */
   observacao?: string;
@@ -40,9 +44,45 @@ export type CenarioPlano = {
 
 export type ResultadoCenarios = {
   cenarios: CenarioPlano[];
-  /** Caminho recomendado: viável, mais cedo e com menos mudanças. */
+  /** Caminho mais cedo entre os viáveis. */
   melhor: CenarioPlano | null;
+  /** Caminho COMPLETO de menor fricção (o que menos muda o combinado) —
+   *  é ele que responde "como a dupla fica em dia?". */
+  menorFriccao: {
+    cenario: CenarioPlano;
+    passos: PlanoAplicavel["passos"];
+  } | null;
 };
+
+/** Custo de mudança do caminho: fusão, decisão de seguir no recesso e
+ *  ritmo acima de 1/semana (os prompts de fricção da dupla). */
+export function friccaoDoCenario(c: CenarioPlano): number {
+  // ritmo pesa pelo degrau: 2/semana é um ajuste, 1/dia é outro regime
+  const ritmo = c.ritmo >= 7 ? 3 : c.ritmo >= 3 ? 2 : c.ritmo > 1 ? 1 : 0;
+  return (
+    c.fusao.length +
+    (c.decisaoRecesso === "segue" ? 2 : 0) +
+    ritmo +
+    (c.praticaFlex && c.praticaFlex.dias < c.praticaFlex.oficial ? 1 : 0)
+  );
+}
+
+/** O que o caminho exige, em frases curtas pra interface. */
+export function exigenciasDoCenario(c: CenarioPlano): string[] {
+  const out: string[] = [];
+  if (c.decisaoRecesso === "segue") out.push("seguir com encontros no recesso");
+  if (c.decisaoRecesso === "pausa") out.push("pausar no recesso");
+  if (c.fusao.length === 1) out.push("fundir um par de encontros");
+  else if (c.fusao.length > 1)
+    out.push(
+      `fundir ${c.fusao.length} pares (${c.fusao.map((g) => g.join("+")).join(", ")})`
+    );
+  if (c.ritmo >= 7) out.push("1 encontro por dia");
+  else if (c.ritmo > 1) out.push(`${c.ritmo} encontros por semana`);
+  if (c.praticaFlex && c.praticaFlex.dias < c.praticaFlex.oficial)
+    out.push(`folga de prática em ${c.praticaFlex.dias} dias`);
+  return out;
+}
 
 type EntradaCenarios = {
   dupla: Dupla;
@@ -110,7 +150,9 @@ function vazio(dupla: Dupla, motivo: string): CenarioPlano {
     cabem: null,
     sessoes: 0,
     fusao: [],
+    ritmo: 0,
     decisaoRecesso: null,
+    recesso: null,
     praticaFlex: null,
     observacao: motivo,
   };
@@ -143,7 +185,12 @@ export function simularCenariosPlano(
   };
 
   const base = rodar({});
-  if (!base.aplicavel) return { cenarios: [vazio(input.dupla, base.motivo)], melhor: null };
+  if (!base.aplicavel)
+    return {
+      cenarios: [vazio(input.dupla, base.motivo)],
+      melhor: null,
+      menorFriccao: null,
+    };
 
   const pares = paresMoviveis(base.passos);
   const primeiroPar = pares.slice(0, 1);
@@ -211,8 +258,32 @@ export function simularCenariosPlano(
     },
   ];
 
+  // fusão em k pares (k crescente): a menor fricção que fecha costuma ser
+  // "fundir só o necessário", não "fundir tudo" nem "1 por dia"
+  for (let k = 1; k <= Math.min(pares.length, 6); k++) {
+    const grupos = pares.slice(0, k);
+    definicoes.push({
+      id: `fusao_${k}`,
+      rotulo: `fusão em ${k} ${k === 1 ? "par" : "pares"}`,
+      dupla: input.dupla,
+      fusao: grupos,
+      decisaoRecesso: null,
+    });
+    if (recesso) {
+      definicoes.push({
+        id: `recesso_segue_fusao_${k}`,
+        rotulo: `recesso: seguir · fusão em ${k} ${k === 1 ? "par" : "pares"}`,
+        dupla: comDecisaoRecesso(input.dupla, recesso, false),
+        fusao: grupos,
+        decisaoRecesso: "segue",
+      });
+    }
+  }
+
+  const chaveDoCenario = new Map<string, string>();
   const vistos = new Set<string>();
   const cenarios: CenarioPlano[] = [];
+  const passosPorChave = new Map<string, PlanoAplicavel["passos"]>();
   for (const def of definicoes) {
     const r = rodar({
       dupla: def.dupla,
@@ -231,6 +302,7 @@ export function simularCenariosPlano(
     ].join("|");
     if (vistos.has(chave)) continue;
     vistos.add(chave);
+    passosPorChave.set(chave, r.passos);
 
     const fusaoAtiva = def.fusao?.filter((g) => g.length > 1) ?? [];
     const observacao = viavel
@@ -239,6 +311,7 @@ export function simularCenariosPlano(
         ? "Só fecha com a decisão do recesso."
         : "Nem com este caminho fecha antes do encerramento.";
 
+    chaveDoCenario.set(def.id, chave);
     cenarios.push({
       id: def.id,
       rotulo: def.rotulo,
@@ -247,8 +320,16 @@ export function simularCenariosPlano(
       data,
       cabem: r.cabemAteEncerramento,
       sessoes: sessoesDe(r.passos),
+      ritmo: r.ritmo,
       fusao: fusaoAtiva,
       decisaoRecesso: def.decisaoRecesso,
+      recesso:
+        def.decisaoRecesso && recesso
+          ? {
+              cicloEventoId: recesso.id,
+              usa: def.decisaoRecesso === "pausa",
+            }
+          : null,
       praticaFlex: r.praticaFlex,
       observacao,
     });
@@ -265,5 +346,31 @@ export function simularCenariosPlano(
     return custo(a) - custo(b);
   });
 
-  return { cenarios, melhor: cenarios.find((c) => c.viavel) ?? null };
+  // menor fricção: entre os viáveis, o que menos muda (fusão/recesso/
+  // ritmo/prática); no empate, o mais cedo
+  const viaveis = cenarios.filter((c) => c.viavel);
+  const escolhido = [...viaveis].sort((a, b) => {
+    const fa = friccaoDoCenario(a);
+    const fb = friccaoDoCenario(b);
+    if (fa !== fb) return fa - fb;
+    const da = a.data ?? "9999-12-31";
+    const db = b.data ?? "9999-12-31";
+    if (da !== db) return da < db ? -1 : 1;
+    // empate de fricção e data: menos encontros por semana antes de mais
+    // fusões (a agenda pesa mais que juntar dois encontros)
+    if (a.ritmo !== b.ritmo) return a.ritmo - b.ritmo;
+    return a.fusao.length - b.fusao.length;
+  })[0];
+  const menorFriccao = escolhido
+    ? {
+        cenario: escolhido,
+        passos: passosPorChave.get(chaveDoCenario.get(escolhido.id) ?? "") ?? [],
+      }
+    : null;
+
+  return {
+    cenarios,
+    melhor: cenarios.find((c) => c.viavel) ?? null,
+    menorFriccao,
+  };
 }

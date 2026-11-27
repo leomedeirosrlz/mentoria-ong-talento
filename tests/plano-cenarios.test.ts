@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { simularCenariosPlano } from "@/lib/plano-cenarios";
+import {
+  exigenciasDoCenario,
+  friccaoDoCenario,
+  simularCenariosPlano,
+} from "@/lib/plano-cenarios";
 import { CICLO_16, dt, encRealizado, mkDupla, mkEvento } from "./helpers";
 
 // mesma régua do calendário real: 4 feitos, 12 a fazer, encerramento curto
@@ -51,6 +55,27 @@ describe("simularCenariosPlano", () => {
     expect(
       r.melhor!.decisaoRecesso != null || r.melhor!.fusao.length > 0
     ).toBe(true);
+  });
+
+  it("menor fricção: o caminho que menos muda, com todos os passos", () => {
+    const r = simularCenariosPlano({
+      dupla: dupla4(),
+      eventos: EVENTOS,
+      hoje: new Date("2025-11-25T12:00:00-03:00"),
+    });
+    expect(r.menorFriccao).not.toBeNull();
+    const c = r.menorFriccao!.cenario;
+    expect(c.viavel).toBe(true);
+    expect(r.menorFriccao!.passos.length).toBeGreaterThan(0);
+    expect(r.menorFriccao!.passos[0].data).toBeTruthy();
+    const menor = Math.min(
+      ...r.cenarios.filter((x) => x.viavel).map(friccaoDoCenario)
+    );
+    expect(friccaoDoCenario(c)).toBe(menor);
+    expect(c.data! <= "2026-01-20").toBe(true);
+    // exigencias nomeiam só o que o caminho realmente pede
+    const ex = exigenciasDoCenario(c);
+    expect(ex.every((x) => typeof x === "string")).toBe(true);
   });
 
   it("a fusão reduz sessões e aparece no cenário", () => {

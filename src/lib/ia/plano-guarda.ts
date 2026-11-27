@@ -167,9 +167,35 @@ export function respostaDeterministica(plano: FatosPlano): string {
     | { titulo: string; inicio: string; fim: string }[]
     | undefined) ?? [];
 
+  const caminho = plano.caminho as
+    | {
+        rotulo?: string;
+        data?: string;
+        exigencias?: string[];
+      }
+    | null
+    | undefined;
+
   const partes: string[] = [];
 
-  if (melhor) {
+  if (caminho?.data) {
+    // a pergunta "como a dupla fica em dia?" responde pelo caminho
+    // completo de menor fricção — o mais rápido é alternativa, não a
+    // recomendação
+    partes.push(
+      `O caminho completo de menor fricção é ${caminho.rotulo}: a dupla fica em dia em ${br(caminho.data)}${
+        caminho.exigencias?.length
+          ? `, com ${caminho.exigencias.join("; ")}`
+          : ""
+      }.`
+    );
+    const rapido = melhor && melhor.data && melhor.data !== caminho.data;
+    if (rapido) {
+      partes.push(
+        `O mais rápido é ${melhor!.rotulo}, em ${br(melhor!.data)} (mais mudanças).`
+      );
+    }
+  } else if (melhor) {
     const cabem = melhor.cabem;
     const alvo = cabem
       ? `${cabem.faltam} encontro${cabem.faltam === 1 ? "" : "s"} até o encerramento`
@@ -248,6 +274,13 @@ export function fatosParaCorrecao(plano: FatosPlano): string {
           }
         : null,
       cenarios,
+      caminho: plano.caminho
+        ? {
+            caminho: (plano.caminho as { rotulo?: string }).rotulo,
+            data: (plano.caminho as { data?: string }).data,
+            exigencias: (plano.caminho as { exigencias?: string[] }).exigencias,
+          }
+        : null,
       recessos_pendentes: plano.recessos_pendentes,
       grade: plano.grade,
       passos: (plano.passos as { numero: number; acao: string; data_sugerida: string | null }[] | undefined)?.map(

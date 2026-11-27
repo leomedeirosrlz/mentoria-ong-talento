@@ -20,6 +20,7 @@ import {
   montarPlanoEmDia,
   type PlanoAplicavel,
 } from "@/lib/plano-em-dia";
+import { exigenciasDoCenario, simularCenariosPlano } from "@/lib/plano-cenarios";
 import { montarDocCombinado } from "@/lib/plano-roteiros";
 import { gradeCombinada, toDateStr } from "@/lib/ciclo";
 import type {
@@ -366,6 +367,14 @@ export async function responderDemoIa(
     };
     const uiPlano = (d: DuplaIa, r: PlanoAplicavel) => {
       const g = gradeDe(d);
+      // mesma matriz de cenários da rota real: o card do demo abre pelo
+      // caminho viável em vez de mandar pra coordenação (1126)
+      const matriz = simularCenariosPlano({
+        dupla: d as unknown as Dupla,
+        eventos,
+        hoje: new Date(),
+        disponibilidade: g.combinada,
+      });
       const hojeStr = toDateStr(new Date());
       const e =
         r.estado === "recuperacao" ? escopoDaProposta(r, hojeStr) : null;
@@ -373,6 +382,17 @@ export async function responderDemoIa(
         r.recessosPendentes.map((x) => x.cicloEventoId)
       );
       const evPorId = new Map(eventos.map((ev) => [ev.id, ev]));
+      const passoPayload = (p2: (typeof r.passos)[number]) => ({
+        numero: p2.numero,
+        titulo: p2.titulo,
+        acao: p2.acao,
+        encontro_id: p2.encontroId,
+        data_sugerida: p2.data,
+        data_oficial: p2.dataOficial,
+        vence_no_caminho: p2.venceNoCaminho === true,
+        precondicao: p2.precondicao ?? null,
+        aviso: p2.aviso ?? null,
+      });
       return uiDaTool("plano_em_dia", {
         dupla_id: d.id,
         mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
@@ -438,17 +458,16 @@ export async function responderDemoIa(
           estado: p2.estado,
           data_hora: p2.dataHora,
         })),
-        passos: r.passos.map((p2) => ({
-          numero: p2.numero,
-          titulo: p2.titulo,
-          acao: p2.acao,
-          encontro_id: p2.encontroId,
-          data_sugerida: p2.data,
-          data_oficial: p2.dataOficial,
-          vence_no_caminho: p2.venceNoCaminho === true,
-          precondicao: p2.precondicao ?? null,
-          aviso: p2.aviso ?? null,
-        })),
+        passos: r.passos.map(passoPayload),
+        cenarios: matriz.cenarios,
+        melhor: matriz.melhor,
+        caminho: matriz.menorFriccao
+          ? {
+              ...matriz.menorFriccao.cenario,
+              exigencias: exigenciasDoCenario(matriz.menorFriccao.cenario),
+              passos: matriz.menorFriccao.passos.map(passoPayload),
+            }
+          : null,
         data_recuperacao: r.dataRecuperacao,
         data_projetada: r.dataProjetada,
         cabem_ate_encerramento: r.cabemAteEncerramento,
@@ -484,11 +503,19 @@ export async function responderDemoIa(
           jovem === "a dupla"
             ? jovem
             : `d${jovem.endsWith("a") ? "a" : "o"} ${jovem}`;
+        const matriz = simularCenariosPlano({
+          dupla: nomeada as unknown as Dupla,
+          eventos,
+          disponibilidade: gradeDe(nomeada).combinada,
+          hoje: new Date(),
+        });
         content = r.emDia
           ? `Na demonstração a dupla ${rotulo} já está em dia, então não existe plano de recuperação pra ela.${ui ? " O card acima faz a mesma conta da ficha e mostra os encontros marcados." : " Com os seus dados a ficha faz essa mesma conta."}${sugestoes(["Resumo da semana"])}`
-          : ui
-            ? textoPlano
-            : `Na demonstração a conta da dupla ${rotulo} não fecha antes do encerramento. ${r.sugestao ?? "Nem com 1 encontro por dia o plano fecha."}${sugestoes(["Resumo da semana"])}`;
+          : r.estado === "conversa" && matriz.menorFriccao
+            ? `Na demonstração o caminho completo da dupla ${rotulo} fecha em ${matriz.menorFriccao.cenario.data ? new Date(`${matriz.menorFriccao.cenario.data}T12:00:00`).toLocaleDateString("pt-BR") : "data a definir"} com ${matriz.menorFriccao.cenario.rotulo}. O card acima mostra o que ele pede e os ${matriz.menorFriccao.passos.length} passos.${sugestoes(["Resumo da semana"])}`
+            : ui
+              ? textoPlano
+              : `Na demonstração a conta da dupla ${rotulo} não fecha antes do encerramento. ${r.sugestao ?? "Nem com 1 encontro por dia o plano fecha."}${sugestoes(["Resumo da semana"])}`;
       }
     } else {
       for (const d of duplas) {

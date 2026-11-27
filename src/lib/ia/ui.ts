@@ -281,6 +281,46 @@ export type UiPlano = {
    *  fecha antes do encerramento, o card não promete a data. */
   estado: "em_dia" | "recuperacao" | "conversa" | null;
   sugestao: string | null;
+  /** Motor de cenários (1126): o caminho viável mais cedo quando a
+   *  simulação base não fecha. O card abre por ele em vez de dizer que só
+   *  a coordenação resolve. */
+  melhor: {
+    id: string;
+    rotulo: string;
+    data: string | null;
+    sessoes: number;
+    decisao_recesso: "pausa" | "segue" | null;
+    fusao: number[][];
+  } | null;
+  /** os outros caminhos viáveis (sem repetir o melhor) — até 3 */
+  alternativas: { rotulo: string; data: string | null }[];
+  /** Caminho completo de menor fricção (1126): quando a simulação base é
+   *  "conversa", o card mostra ESTE caminho, com todos os passos dele. */
+  caminho: {
+    rotulo: string;
+    data: string | null;
+    sessoes: number;
+    ritmo: number;
+    fusao: number[][];
+    decisao_recesso: "pausa" | "segue" | null;
+    /** o que a dupla precisa aceitar pra esse caminho fechar */
+    exigencias: string[];
+    passos: UiPlano["passos"];
+  } | null;
+  /** TODOS os cenários do motor (1126) — a interface do simulador: cada
+   *  opção tem data, sessões, ritmo e o que precisa ser decidido pra
+   *  propor aquele caminho. */
+  cenarios: {
+    id: string;
+    rotulo: string;
+    viavel: boolean;
+    data: string | null;
+    sessoes: number;
+    ritmo: number;
+    fusao: number[][];
+    decisao_recesso: "pausa" | "segue" | null;
+    recesso: { ciclo_evento_id: string; usa: boolean } | null;
+  }[];
   /** Plano persistido vivo (0219) — quando existe, o card mostra o
    *  combinado (status/versão/quem aprovou) em vez de só a proposta. */
   plano: {
@@ -606,19 +646,47 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
     }
     case "plano_em_dia": {
       if (!str(d.dupla_id) || d.aplicavel !== true) return null;
-      const passos = arr(d.passos)
-        .map((p) => ({
-          numero: num(p.numero),
-          titulo: String(p.titulo ?? ""),
-          acao: p.acao as UiPlano["passos"][number]["acao"],
-          encontro_id: str(p.encontro_id),
-          data: String(p.data_sugerida ?? ""),
-          data_oficial: String(p.data_oficial ?? ""),
-          vence_no_caminho: p.vence_no_caminho === true,
-          precondicao: str(p.precondicao),
-          aviso: str(p.aviso),
-        }))
-        .filter((p) => p.numero > 0);
+      const mapaPasso = (p: Record<string, unknown>) => ({
+        numero: num(p.numero),
+        titulo: String(p.titulo ?? ""),
+        acao: p.acao as UiPlano["passos"][number]["acao"],
+        encontro_id: str(p.encontro_id),
+        data: String(p.data_sugerida ?? ""),
+        data_oficial: String(p.data_oficial ?? ""),
+        vence_no_caminho: p.vence_no_caminho === true,
+        precondicao: str(p.precondicao),
+        aviso: str(p.aviso),
+      });
+      const passos = arr(d.passos).map(mapaPasso).filter((p) => p.numero > 0);
+      // caminho completo de menor fricção (1126): quando a simulação base
+      // é "conversa", o card mostra ESTE caminho — data, exigências e todos
+      // os passos dele
+      const caminhoBruto = obj(d.caminho);
+      const caminho = caminhoBruto
+        ? {
+            rotulo: String(caminhoBruto.rotulo ?? ""),
+            data: str(caminhoBruto.data),
+            sessoes: num(caminhoBruto.sessoes),
+            ritmo: num(caminhoBruto.ritmo),
+            fusao: (Array.isArray(caminhoBruto.fusao)
+              ? caminhoBruto.fusao
+              : []) as number[][],
+            decisao_recesso: (caminhoBruto.decisaoRecesso === "pausa" ||
+            caminhoBruto.decisaoRecesso === "segue"
+              ? caminhoBruto.decisaoRecesso
+              : null) as "pausa" | "segue" | null,
+            exigencias: (Array.isArray(caminhoBruto.exigencias)
+              ? caminhoBruto.exigencias
+              : []
+            ).map((x) => String(x)),
+            passos: arr(caminhoBruto.passos)
+              .map(mapaPasso)
+              .filter((p) => p.numero > 0),
+          }
+        : null;
+      const usaCaminho =
+        d.estado === "conversa" && (caminho?.passos.length ?? 0) > 0;
+      const passosEfetivos = usaCaminho ? caminho!.passos : passos;
       const pendencias = arr(d.pendencias_registro).map((p) => ({
         numero: num(p.numero),
         estado: (str(p.estado) === "limbo" ? "limbo" : "pendente_registro") as
@@ -629,7 +697,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
       // travados): o veredito positivo ainda vira card — o silêncio lia
       // como card quebrado (026)
       if (
-        !passos.length &&
+        !passosEfetivos.length &&
         !pendencias.length &&
         d.em_dia !== true &&
         d.estado !== "em_dia"
@@ -646,24 +714,76 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           ? nivelStr
           : null;
       const cabem = obj(d.cabem_ate_encerramento);
+      // motor de cenários (1126): melhor caminho viável + alternativas
+      const melhorBruto = obj(d.melhor);
+      const melhor =
+        melhorBruto && melhorBruto.viavel === true
+          ? {
+              id: String(melhorBruto.id ?? ""),
+              rotulo: String(melhorBruto.rotulo ?? ""),
+              data: str(melhorBruto.data),
+              sessoes: num(melhorBruto.sessoes),
+              decisao_recesso: (melhorBruto.decisaoRecesso === "pausa" ||
+              melhorBruto.decisaoRecesso === "segue"
+                ? melhorBruto.decisaoRecesso
+                : null) as "pausa" | "segue" | null,
+              fusao: (Array.isArray(melhorBruto.fusao)
+                ? melhorBruto.fusao
+                : []) as number[][],
+            }
+          : null;
+      const alternativas = arr(d.cenarios)
+        .filter(
+          (c) =>
+            c.viavel === true &&
+            (!melhorBruto || c.id !== melhorBruto.id) &&
+            str(c.data) != null
+        )
+        .slice(0, 3)
+        .map((c) => ({ rotulo: String(c.rotulo ?? ""), data: str(c.data) }));
+      const cenarios = arr(d.cenarios).map((c) => {
+        const rec = obj(c.recesso);
+        return {
+          id: String(c.id ?? ""),
+          rotulo: String(c.rotulo ?? ""),
+          viavel: c.viavel === true,
+          data: str(c.data),
+          sessoes: num(c.sessoes),
+          ritmo: num(c.ritmo),
+          fusao: (Array.isArray(c.fusao) ? c.fusao : []) as number[][],
+          decisao_recesso: (c.decisaoRecesso === "pausa" ||
+          c.decisaoRecesso === "segue"
+            ? c.decisaoRecesso
+            : null) as "pausa" | "segue" | null,
+          recesso: rec
+            ? {
+                ciclo_evento_id: String(rec.cicloEventoId ?? ""),
+                usa: rec.usa === true,
+              }
+            : null,
+        };
+      });
       return {
         kind: "plano",
         dupla_id: String(d.dupla_id),
         mentor: str(d.mentor),
         mentorado: str(d.mentorado),
         em_dia: d.em_dia === true,
-        data_recuperacao: str(d.data_recuperacao),
+        data_recuperacao: usaCaminho
+          ? caminho!.data
+          : str(d.data_recuperacao),
         data_projetada: str(d.data_projetada),
         cabem_ate_encerramento: cabem
           ? { cabem: num(cabem.cabem), faltam: num(cabem.faltam) }
           : null,
         encerramento: str(d.encerramento),
-        ritmo:
-          num(d.ritmo) ||
-          (nivel ? RITMO_DO_NIVEL[nivel] : 0) ||
-          (plano ? num(plano.ritmo) : 0) ||
-          null,
-        passos,
+        ritmo: usaCaminho
+          ? caminho!.ritmo
+          : num(d.ritmo) ||
+            (nivel ? RITMO_DO_NIVEL[nivel] : 0) ||
+            (plano ? num(plano.ritmo) : 0) ||
+            null,
+        passos: passosEfetivos,
         pendencias,
         recessos_pendentes: arr(d.recessos_pendentes)
           .map((r) => ({
@@ -685,14 +805,19 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
         avisos: (Array.isArray(d.avisos) ? d.avisos : [])
           .map((a) => str(a))
           .filter((a): a is string => a != null),
-        nivel,
-        estado:
-          d.estado === "em_dia" ||
-          d.estado === "recuperacao" ||
-          d.estado === "conversa"
+        nivel: usaCaminho ? null : nivel,
+        estado: usaCaminho
+          ? "recuperacao"
+          : d.estado === "em_dia" ||
+              d.estado === "recuperacao" ||
+              d.estado === "conversa"
             ? d.estado
             : null,
         sugestao: str(d.sugestao),
+        melhor,
+        alternativas,
+        cenarios,
+        caminho,
         plano: plano
           ? {
               id: String(plano.id ?? ""),

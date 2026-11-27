@@ -464,6 +464,77 @@ describe("uiDaTool — plano_em_dia (026/FR-004)", () => {
     expect(p.vence_no_caminho).toBe(true);
   });
 
+  it("melhor caminho e alternativas do motor de cenários (1126)", () => {
+    const b = uiDaTool("plano_em_dia", {
+      ...payload,
+      melhor: {
+        id: "recesso_segue_fusao",
+        rotulo: "recesso: seguir · fusão em pares",
+        viavel: true,
+        data: "2026-12-28",
+        sessoes: 6,
+        decisaoRecesso: "segue",
+        fusao: [[6, 7]],
+        cabem: { cabem: 12, faltam: 12 },
+      },
+      cenarios: [
+        { id: "recesso_segue_fusao", rotulo: "recesso: seguir · fusão em pares", viavel: true, data: "2026-12-28" },
+        { id: "fusao_pares", rotulo: "fusão em pares", viavel: true, data: "2027-01-05" },
+        { id: "recesso_pausa", rotulo: "recesso: pausar", viavel: false, data: "2027-01-29" },
+      ],
+    }) as UiPlano;
+    expect(b.melhor?.data).toBe("2026-12-28");
+    expect(b.melhor?.decisao_recesso).toBe("segue");
+    expect(b.melhor?.fusao).toEqual([[6, 7]]);
+    expect(b.alternativas).toEqual([
+      { rotulo: "fusão em pares", data: "2027-01-05" },
+    ]);
+  });
+
+  it("caminho de menor fricção substitui a simulação base conversa (1126)", () => {
+    const passo = (numero: number, dia: string) => ({
+      numero,
+      titulo: `Encontro ${numero}`,
+      acao: "agendar",
+      encontro_id: null,
+      data_sugerida: dia,
+      data_oficial: "2026-12-01",
+      vence_no_caminho: false,
+      precondicao: null,
+      aviso: null,
+    });
+    const b = uiDaTool("plano_em_dia", {
+      ...payload,
+      estado: "conversa",
+      data_recuperacao: null,
+      caminho: {
+        rotulo: "fusão em 2 pares",
+        data: "2026-12-20",
+        sessoes: 8,
+        ritmo: 1,
+        fusao: [
+          [6, 7],
+          [8, 9],
+        ],
+        decisaoRecesso: null,
+        exigencias: ["fundir 2 pares (6+7, 8+9)"],
+        passos: [passo(6, "2026-12-20"), passo(7, "2026-12-20")],
+      },
+    }) as UiPlano;
+    expect(b.estado).toBe("recuperacao");
+    expect(b.data_recuperacao).toBe("2026-12-20");
+    expect(b.ritmo).toBe(1);
+    expect(b.passos.map((p) => p.numero)).toEqual([6, 7]);
+    expect(b.caminho?.exigencias).toEqual(["fundir 2 pares (6+7, 8+9)"]);
+    expect(b.nivel).toBeNull();
+  });
+
+  it("sem matriz no payload, melhor fica null (retrocompatível)", () => {
+    const b = uiDaTool("plano_em_dia", payload) as UiPlano;
+    expect(b.melhor).toBeNull();
+    expect(b.alternativas).toEqual([]);
+  });
+
   it("ritmo deriva do nível quando a tool não serializa", () => {
     const b = uiDaTool("plano_em_dia", payload) as UiPlano;
     expect(b.ritmo).toBe(7); // conversa_coord → melhor simulação (1/dia)

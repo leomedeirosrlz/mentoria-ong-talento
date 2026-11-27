@@ -192,6 +192,36 @@ describe("faixa com plano vivo (FR-006)", () => {
     desmontar();
   });
 
+  it("com caminho viável, abre pela data do caminho em vez da coordenação (1126)", () => {
+    const { alvo, desmontar } = montar(
+      <PlanoEmDiaCard
+        plano={plano({
+          estado: "conversa",
+          dataRecuperacao: null,
+          dataProjetada: "2027-01-29",
+          cabemAteEncerramento: { cabem: 11, faltam: 12 },
+          sugestao: "O caminho é conversar com a coordenação sobre os caminhos.",
+        })}
+        dupla={dupla()}
+        souMentor
+        planoVivo
+        melhor={{
+          rotulo: "recesso: seguir · fusão em pares",
+          data: "2026-12-28",
+          sessoes: 6,
+          decisaoRecesso: "segue",
+          fusao: [[6, 7]],
+        }}
+      />
+    );
+    expect(alvo.textContent).toContain("Em dia em");
+    expect(alvo.textContent).toContain("recesso: seguir · fusão em pares");
+    expect(alvo.textContent).toContain("Seguindo no recesso");
+    expect(alvo.textContent).not.toContain("Nem com 1 encontro por dia fecha");
+    expect(alvo.textContent).not.toContain("conversar com a coordenação");
+    desmontar();
+  });
+
   it("'não fecha' segue na faixa — alerta que o combinado não carrega", () => {
     const { alvo, desmontar } = montar(
       <PlanoEmDiaCard

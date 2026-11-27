@@ -284,3 +284,110 @@ describe("UiCard: conteúdo", () => {
     expect(fontes).toContain('aria-expanded="false"');
   });
 });
+
+// 1126: o card do plano não manda pra coordenação quando o motor de
+// cenários achou caminho viável — ele abre pelo caminho e mostra a data
+describe("UiCard: plano com caminho viável (1126)", () => {
+  const futuro = (dias: number) =>
+    new Date(Date.now() + dias * 86_400_000).toISOString().slice(0, 10);
+  const bloco = (extra: Partial<Extract<UiBloco, { kind: "plano" }>> = {}) =>
+    ({
+      kind: "plano",
+      dupla_id: "d1",
+      mentor: "Rogério",
+      mentorado: "Jhonatan",
+      em_dia: false,
+      data_recuperacao: null,
+      data_projetada: futuro(60),
+      cabem_ate_encerramento: { cabem: 11, faltam: 12 },
+      encerramento: futuro(50),
+      ritmo: 7,
+      passos: [
+        {
+          numero: 5,
+          titulo: "Acompanhamento das primeiras submetas",
+          acao: "agendar",
+          encontro_id: null,
+          data: futuro(1),
+          data_oficial: futuro(-20),
+          vence_no_caminho: false,
+          precondicao: null,
+          aviso: null,
+        },
+      ],
+      pendencias: [],
+      recessos_pendentes: [],
+      grade: null,
+      doc: null,
+      avisos: [],
+      nivel: "conversa_coord",
+      estado: "conversa",
+      sugestao: "O caminho é conversar com a coordenação para revisar o ciclo.",
+      melhor: {
+        rotulo: "recesso: seguir · fusão em pares",
+        data: futuro(30),
+        sessoes: 6,
+        decisao_recesso: "segue",
+        fusao: [[6, 7]],
+      },
+      alternativas: [{ rotulo: "fusão em pares", data: futuro(38) }],
+      cenarios: [],
+      caminho: null,
+      plano: null,
+      ...extra,
+    }) as Extract<UiBloco, { kind: "plano" }>;
+
+  it("abre pelo caminho que fecha em vez da coordenação", () => {
+    const out = html(bloco());
+    expect(out).toContain("recesso: seguir · fusão em pares");
+    expect(out).toContain("Seguindo no recesso");
+    expect(out).toContain("Também fecha:");
+    expect(out).not.toContain("Conversa com a coordenação");
+    expect(out).not.toContain("conversar com a coordenação");
+  });
+
+  it("caminho completo de menor fricção: exigências e todos os passos", () => {
+    const passos = Array.from({ length: 8 }, (_, i) => ({
+      numero: i + 5,
+      titulo: `Encontro ${i + 5}`,
+      acao: "agendar" as const,
+      encontro_id: null,
+      data: futuro(30 + i),
+      data_oficial: futuro(-20 + i),
+      vence_no_caminho: false,
+      precondicao: null,
+      aviso: null,
+    }));
+    const out = html(
+      bloco({
+        melhor: null,
+        alternativas: [{ rotulo: "1 por dia", data: futuro(10) }],
+        caminho: {
+          rotulo: "fusão em 2 pares",
+          data: futuro(30),
+          sessoes: 8,
+          ritmo: 1,
+          fusao: [
+            [6, 7],
+            [8, 9],
+          ],
+          decisao_recesso: null,
+          exigencias: ["fundir 2 pares (6+7, 8+9)"],
+          passos,
+        },
+        passos,
+      })
+    );
+    expect(out).toContain("Caminho de menor fricção");
+    expect(out).toContain("Pede: fundir 2 pares (6+7, 8+9).");
+    expect(out).toContain("Os 8 passos do caminho");
+    expect(out).not.toContain("Ver mais");
+    expect(out).not.toContain("conversar com a coordenação");
+  });
+
+  it("sem caminho viável, continua apontando a coordenação", () => {
+    const out = html(bloco({ melhor: null, alternativas: [] }));
+    expect(out).toContain("Conversa com a coordenação");
+    expect(out).toContain("conversar com a coordenação");
+  });
+});

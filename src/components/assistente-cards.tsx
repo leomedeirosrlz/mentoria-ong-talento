@@ -971,18 +971,29 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
   const docId = useId();
   const estado = b.estado ?? (b.em_dia ? "em_dia" : "recuperacao");
   const conversa = estado === "conversa";
+  // motor de cenários (1126): a base "conversa" não é sentença — quando
+  // existe caminho viável, o card abre por ele e só cita a coordenação se
+  // nenhum caminho fechar
+  const melhor = b.melhor && b.melhor.data && valida(b.melhor.data) ? b.melhor : null;
+  // caminho completo de menor fricção (1126): a resposta de "como a dupla
+  // fica em dia?" — o card mostra a data, o que ele exige e os passos dele
+  const caminho = b.caminho;
   const marcados = b.passos.filter((p) => p.acao === "travado").length;
   const aMarcar = b.passos.length - marcados;
-  const resto = b.passos.slice(PASSOS_DOBRA);
+  // caminho completo: os 12 passos aparecem de uma vez (a pergunta é
+  // "como a dupla fica em dia?", não "me dá um resumo")
+  const resto = caminho ? [] : b.passos.slice(PASSOS_DOBRA);
 
   const meta =
     estado === "em_dia"
       ? "em dia"
-      : conversa
+      : conversa && !melhor
         ? "não fecha até o encerramento"
-        : b.data_recuperacao && valida(b.data_recuperacao)
-          ? `em dia ${quandoTexto(b.data_recuperacao, agora)}`
-          : undefined;
+        : conversa && melhor && melhor.data
+          ? `em dia ${quandoTexto(melhor.data, agora)}`
+          : b.data_recuperacao && valida(b.data_recuperacao)
+            ? `em dia ${quandoTexto(b.data_recuperacao, agora)}`
+            : undefined;
 
   const resumo = [
     aMarcar > 0 && plural(aMarcar, "passo a marcar", "passos a marcar"),
@@ -1041,7 +1052,11 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
       meta={meta}
       rodape={
         <Rodape href={`${r.encontros(b.dupla_id)}#plano-em-dia`}>
-          {b.plano ? "Ver o plano na ficha" : "Combinar o plano na ficha"}
+          {b.plano
+            ? "Ver o plano na ficha"
+            : caminho
+              ? "Propor este caminho na ficha"
+              : "Combinar o plano na ficha"}
         </Rodape>
       }
     >
@@ -1063,9 +1078,18 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
           e das pendências — ninguém descobre pré-requisito só ao abrir */}
       {(b.nivel || resumo) && (
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-          {b.nivel && (
+          {b.nivel && !(melhor && b.nivel === "conversa_coord") && (
             <Pill tom={NIVEL_PLANO[b.nivel].tom}>
               {NIVEL_PLANO[b.nivel].rotulo(b.ritmo)}
+            </Pill>
+          )}
+          {conversa && melhor && (
+            <Pill tom="atencao">
+              {melhor.decisao_recesso === "segue"
+                ? "Seguindo no recesso"
+                : melhor.fusao.length > 0
+                  ? "Com fusão"
+                  : "Com ajuste"}
             </Pill>
           )}
           {resumo && (
@@ -1074,26 +1098,80 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </div>
       )}
 
-      {conversa && (
+      {caminho && (
         <div className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2">
-          <p className="text-sm font-semibold leading-snug">
-            {b.data_projetada && valida(b.data_projetada)
-              ? `Em dia só em ${formatDate(b.data_projetada)}`
-              : "Nem com 1 encontro por dia fecha"}
-            {b.encerramento && valida(b.encerramento)
-              ? `, depois do encerramento (${formatDate(b.encerramento)})`
-              : ""}
-            .
+          <p className="text-xs font-semibold">Caminho de menor fricção</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {caminho.exigencias.length > 0
+              ? `Pede: ${caminho.exigencias.join("; ")}.`
+              : "Sem mudar o combinado atual."}
           </p>
-          {b.cabem_ate_encerramento && (
-            <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-              Cabem {b.cabem_ate_encerramento.cabem} dos{" "}
-              {b.cabem_ate_encerramento.faltam} encontros que faltam
-              {b.encerramento && valida(b.encerramento)
-                ? " até o encerramento"
-                : ""}
+          {b.alternativas.some((a) => a.data && valida(a.data)) && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Mais rápido, com mais mudanças:{" "}
+              {b.alternativas
+                .filter((a) => a.data && valida(a.data))
+                .slice(0, 2)
+                .map((a) => `${a.rotulo} (${formatDate(a.data!)})`)
+                .join("; ")}
               .
             </p>
+          )}
+        </div>
+      )}
+
+      {conversa && (
+        <div className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2">
+          {melhor ? (
+            <>
+              <p className="text-sm font-semibold leading-snug">
+                Com {melhor.rotulo}, em dia{" "}
+                {quandoTexto(melhor.data!, agora)}.
+              </p>
+              {b.data_projetada && valida(b.data_projetada) && (
+                <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                  Sem mudança, só em {formatDate(b.data_projetada)}
+                  {b.encerramento && valida(b.encerramento)
+                    ? `, depois do encerramento (${formatDate(b.encerramento)})`
+                    : ""}
+                  {b.cabem_ate_encerramento
+                    ? ` — cabem ${b.cabem_ate_encerramento.cabem} dos ${b.cabem_ate_encerramento.faltam} encontros`
+                    : ""}
+                  .
+                </p>
+              )}
+              {b.alternativas.length > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Também fecha:{" "}
+                  {b.alternativas
+                    .map((a) => `${a.rotulo} (${formatDate(a.data!)})`)
+                    .join("; ")}
+                  .
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold leading-snug">
+                {b.data_projetada && valida(b.data_projetada)
+                  ? `Em dia só em ${formatDate(b.data_projetada)}`
+                  : "Nem com 1 encontro por dia fecha"}
+                {b.encerramento && valida(b.encerramento)
+                  ? `, depois do encerramento (${formatDate(b.encerramento)})`
+                  : ""}
+                .
+              </p>
+              {b.cabem_ate_encerramento && (
+                <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                  Cabem {b.cabem_ate_encerramento.cabem} dos{" "}
+                  {b.cabem_ate_encerramento.faltam} encontros que faltam
+                  {b.encerramento && valida(b.encerramento)
+                    ? " até o encerramento"
+                    : ""}
+                  .
+                </p>
+              )}
+            </>
           )}
         </div>
       )}
@@ -1181,9 +1259,16 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </div>
       )}
 
+      {caminho && b.passos.length > 0 && (
+        <p className="mt-2 text-xs font-semibold">
+          Os {b.passos.length} passos do caminho
+        </p>
+      )}
       {b.passos.length > 0 && (
         <ol className="mt-1 divide-y divide-border/60">
-          {b.passos.slice(0, PASSOS_DOBRA).map(passoLi)}
+          {b.passos
+            .slice(0, caminho ? b.passos.length : PASSOS_DOBRA)
+            .map(passoLi)}
         </ol>
       )}
       {resto.length > 0 && (
@@ -1231,7 +1316,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         <Vazio>Nada a marcar: a dupla segue o calendário</Vazio>
       )}
 
-      {b.sugestao && (
+      {b.sugestao && !(conversa && melhor) && !caminho && (
         <p className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
           {b.sugestao}
         </p>
