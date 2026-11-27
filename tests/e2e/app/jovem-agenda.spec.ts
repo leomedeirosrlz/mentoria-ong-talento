@@ -361,7 +361,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await agirComConfirma(
       async () => {
         await linha(proximos, 7)
-          .getByRole("button", { name: "Ações do encontro" })
+          .getByRole("button", { name: /^Ações do/ })
           .click();
         await page.getByRole("menuitem", { name: "Remarcar" }).click();
       },
@@ -418,7 +418,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await agirComConfirma(
       async () => {
         await linha(proximos, 9)
-          .getByRole("button", { name: "Ações do encontro" })
+          .getByRole("button", { name: /^Ações do/ })
           .click();
         await page.getByRole("menuitem", { name: "Remarcar" }).click();
       },

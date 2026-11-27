@@ -197,10 +197,13 @@ test.describe("mentorado — shell /jovem", () => {
     // a seção nasce recolhida (hash abre; se o roteador reescrever antes da
     // hidratação, o trigger é o caminho)
     const itemCombinado = combinados.getByText(COMBINADO_JOVEM);
-    if (!(await itemCombinado.isVisible().catch(() => false))) {
-      await combinados
-        .getByRole("button", { name: /Meus combinados/ })
-        .click();
+    // o hash abre a seção; só clica no trigger se ela estiver FECHADA
+    // (clicar numa seção aberta pelo hash fecha)
+    const gatilhoCombinados = combinados.getByRole("button", {
+      name: /Meus combinados/,
+    });
+    if ((await gatilhoCombinados.getAttribute("aria-expanded")) === "false") {
+      await gatilhoCombinados.click();
     }
     await expect(itemCombinado).toBeVisible({ timeout: 15_000 });
     await expect(combinados.getByText(COMBINADO_JOVEM)).toBeVisible();

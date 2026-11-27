@@ -400,7 +400,7 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
       linhaEsp.getByRole("button", { name: "Desmarcar" })
     ).toBeVisible();
     await expect(
-      linhaEsp.getByRole("button", { name: "Ações do encontro" })
+      linhaEsp.getByRole("button", { name: /^Ações do/ })
     ).toHaveCount(0);
     await expect(
       page.getByRole("menuitem", { name: "Remarcar" })
@@ -411,7 +411,7 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
       .getByText(new RegExp("^8º encontro"))
       .locator("xpath=../..");
     // a remarcação da linha DPP vive no ⋯ (a barra não expõe por linha)
-    await linhaDpp.getByRole("button", { name: "Ações do encontro" }).click();
+    await linhaDpp.getByRole("button", { name: /^Ações do/ }).click();
     await expect(
       page.getByRole("menuitem", { name: "Remarcar" })
     ).toBeVisible();
