@@ -408,10 +408,13 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
 
     // contraste: a linha DPP na mesma lista segue com o gesto — primário
     const linhaDpp = proximos
-      .getByText("8º encontro", { exact: true })
+      .getByText(new RegExp("^8º encontro"))
       .locator("xpath=../..");
+    // a remarcação da linha DPP vive no ⋯ (a barra não expõe por linha)
+    await linhaDpp.getByRole("button", { name: "Ações do encontro" }).click();
     await expect(
-      linhaDpp.getByRole("button", { name: "Remarcar" })
+      page.getByRole("menuitem", { name: "Remarcar" })
     ).toBeVisible();
+    await page.keyboard.press("Escape");
   });
 });

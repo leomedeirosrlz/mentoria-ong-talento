@@ -194,6 +194,15 @@ test.describe("mentorado — shell /jovem", () => {
     const combinados = page.locator(
       'section[aria-labelledby="combinados-titulo"]'
     );
+    // a seção nasce recolhida (hash abre; se o roteador reescrever antes da
+    // hidratação, o trigger é o caminho)
+    const itemCombinado = combinados.getByText(COMBINADO_JOVEM);
+    if (!(await itemCombinado.isVisible().catch(() => false))) {
+      await combinados
+        .getByRole("button", { name: /Meus combinados/ })
+        .click();
+    }
+    await expect(itemCombinado).toBeVisible({ timeout: 15_000 });
     await expect(combinados.getByText(COMBINADO_JOVEM)).toBeVisible();
     // o filtro é da view (responsavel='mentorado'): nem no DOM entra
     await expect(combinados.getByText(COMBINADO_MENTOR)).toHaveCount(0);

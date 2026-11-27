@@ -72,8 +72,9 @@ function naTerca(min: number, hora = "19:00") {
  *  dois níveis (texto → row com botões e badge). O `exact` é o que separa
  *  o 6º do 16º. */
 function linha(secao: Locator, n: number) {
+  // o rótulo pode ganhar sufixo ("· adiantado") — prefixo casa os dois
   return secao
-    .getByText(`${n}º encontro`, { exact: true })
+    .getByText(new RegExp(`^${n}º encontro`))
     .locator("xpath=../..");
 }
 
@@ -231,7 +232,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await dialog.getByRole("combobox", { name: "Qual encontro?" }).click();
     await page.getByRole("option", { name: /^6º encontro/ }).click();
 
-    await preencherDiaHora(dialog, emDias(7));
+    await preencherDiaHora(dialog, emDias(9));
     await dialog
       .getByRole("button", { name: "Confirmar agendamento" })
       .click();
@@ -415,7 +416,12 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     );
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
-      () => linha(proximos, 9).getByRole("button", { name: "Remarcar" }).click(),
+      async () => {
+        await linha(proximos, 9)
+          .getByRole("button", { name: "Ações do encontro" })
+          .click();
+        await page.getByRole("menuitem", { name: "Remarcar" }).click();
+      },
       () => dialog.isVisible()
     );
 
@@ -952,6 +958,11 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
     await dialog.locator("#retro-numero-select").click();
     await page.getByRole("option", { name: "6º encontro" }).click();
     await preencherDiaHora(dialog, emDias(-3));
+    // 0242: passaram mais de 7 dias do vencimento oficial — o motivo é
+    // obrigatório e o registro nasce marcado como tardio
+    await dialog
+      .getByPlaceholder(/Se passaram mais de 7 dias/)
+      .fill("Combinamos por fora e registrei depois.");
     await dialog
       .getByRole("button", { name: "Registrar encontro" })
       .click();
