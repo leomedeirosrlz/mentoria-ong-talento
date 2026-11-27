@@ -534,6 +534,9 @@ export type ResultadoStream =
       fallback?: boolean;
       abortado?: boolean;
       dormindo?: boolean;
+      /** estourou o tempo (orçamento da rota ou timeout de rede) — a UI
+       *  troca "dormindo" por "demorou" e oferece tentar de novo */
+      demorou?: boolean;
     };
 
 /** Delta de tool_call como o OpenAI manda no stream: id/name vêm uma vez,
@@ -805,6 +808,11 @@ export async function chamarModeloStream(
         };
       }
       console.error(`chamarModeloStream: ${cadeia[i] ?? "env"}`, e);
+      // signal da rota abortado sem ser o cliente = orçamento estourado;
+      // erro de timeout do fetch também é demora, não provider fora
+      const nome = (e as { name?: string } | null)?.name;
+      const estourouTempo =
+        opts.signal.aborted || nome === "TimeoutError" || nome === "AbortError";
       // não avança quando: o signal da rota abortou sem ser o cliente
       // (timeout combinado — o orçamento acabou), é o último modelo da
       // cadeia, byte útil já saiu na tela (repetir duplicaria texto) ou
@@ -824,6 +832,7 @@ export async function chamarModeloStream(
           // são falha do provider; exceção não-transitória segue erro real
           dormindo:
             erroTransitorio(e) || opts.signal.aborted || undefined,
+          demorou: estourouTempo || undefined,
         };
       }
       esperaMs = RETRY_BACKOFF_MS;

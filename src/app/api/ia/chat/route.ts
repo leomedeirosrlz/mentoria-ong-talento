@@ -302,15 +302,22 @@ export async function POST(req: Request) {
       // provider — vai na telemetria do 'resposta' pra medir quanto o
       // teto de tokens ainda aperta
       let truncouFinal = false;
-      const sendErro = (e: string, dormindo?: boolean) => {
-        // dormindo: falha do provider (429/cota/5xx/timeout) → o cliente
-        // mostra a Liza dormindo em vez do erro genérico (REALIZA-363)
-        send({ type: "error", e, ...(dormindo ? { dormindo: true } : {}) });
+      const sendErro = (e: string, dormindo?: boolean, demorou?: boolean) => {
+        // dormindo: falha do provider (429/cota/5xx) → o cliente mostra a
+        // Liza dormindo; demorou: estourou o tempo → "demorou para
+        // responder" com tentar de novo (não é cota)
+        send({
+          type: "error",
+          e,
+          ...(dormindo ? { dormindo: true } : {}),
+          ...(demorou ? { demorou: true } : {}),
+        });
         erroEmitido = true;
       };
       // o último resultado do provider decide a cara do erro de orçamento
       // esgotado: provider lento/atolado dorme, ferramenta nossa lenta não
       let dormindoUltimo = false;
+      let demorouUltimo = false;
       let guiaChamado = false;
       // payloads de plano_em_dia desta resposta: viram a única fonte de
       // data permitida no texto (guarda numérica)
@@ -410,6 +417,7 @@ export async function POST(req: Request) {
           break; // usuário fechou/stop — sai do loop sem erro
         } else if (r.fallback) {
           dormindoUltimo = Boolean(r.dormindo);
+          demorouUltimo = Boolean(r.demorou);
           // provider recusou SSE ou o stream morreu no meio: a rodada
           // refaz em JSON — mas é uma GERAÇÃO NOVA, sem prefixo comum com
           // o que já saiu. Se algo já foi emitido, `reset` manda a bolha
@@ -440,7 +448,7 @@ export async function POST(req: Request) {
             }
           }
         } else {
-          sendErro(r.erro, r.dormindo);
+          sendErro(r.erro, r.dormindo, r.demorou);
           break;
         }
 
@@ -635,7 +643,7 @@ export async function POST(req: Request) {
       }
 
       if (!concluido && !erroEmitido && !req.signal.aborted && !fechado) {
-        sendErro(MSG_FALHA, dormindoUltimo);
+        sendErro(MSG_FALHA, dormindoUltimo, demorouUltimo);
       }
 
       // evento-resumo da request (sdd D4): um 'resposta' por mensagem com
