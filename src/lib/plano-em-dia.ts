@@ -539,6 +539,17 @@ export function montarPlanoEmDia(input: {
     let prevNumero: number | null = null;
     let prevData: string | null = null;
 
+    // fusão (018): passos da mesma sessão compartilham a data; o intervalo
+    // de prática passa a contar UMA vez, depois do último passo do grupo —
+    // sem isso a fusão era só etiqueta e não encurtava a projeção
+    const gruposFusao = new Map<number, number[]>();
+    for (const g of input.fusao ?? []) {
+      const ord = [...new Set(g)].sort((a, b) => a - b);
+      if (ord.length < 2) continue;
+      for (const n of ord) gruposFusao.set(n, ord);
+    }
+    const dataDaSessao = new Map<number, string>();
+
     for (const passo of sequencia) {
       const meta = META_PASSOS_PLANO[passo.numero];
       const guia = passoPorNumero.get(passo.numero);
@@ -576,6 +587,36 @@ export function montarPlanoEmDia(input: {
           aviso: avisoTravado,
         });
         continue;
+      }
+
+      // membro seguinte de uma sessão fundida: mesma data do primeiro,
+      // sem consumir semana, cursor nem piso de novo
+      const grupoFusao = gruposFusao.get(passo.numero);
+      if (grupoFusao && grupoFusao[0] !== passo.numero) {
+        const dataSessao = dataDaSessao.get(grupoFusao[0]);
+        if (dataSessao) {
+          cobertura.set(passo.numero, dataSessao);
+          if (passo.numero === grupoFusao[grupoFusao.length - 1]) {
+            sobePiso(passo.numero, dataSessao);
+            prevNumero = passo.numero;
+            prevData = dataSessao;
+          }
+          itens.push({
+            ...base,
+            origem: passo.acao === "futuro" ? "futuro" : "devido",
+            acao:
+              passo.acao === "futuro"
+                ? passo.encontroId
+                  ? "remarcar"
+                  : "agendar"
+                : passo.acao,
+            encontroId: passo.encontroId,
+            data: dataSessao,
+            dataOficial: passo.oficialData,
+            aviso: "Nesta data, dois passos na mesma sessão (fusão).",
+          });
+          continue;
+        }
       }
 
       // earliest slot: tomorrow's cursor, the running gap floor, recess
@@ -638,7 +679,15 @@ export function montarPlanoEmDia(input: {
       ocupados.add(data);
       somarSemana(data);
 
-      sobePiso(passo.numero, data);
+      if (grupoFusao) {
+        // primeiro da sessão: registra a data; o piso sobe no último membro
+        dataDaSessao.set(grupoFusao[0], data);
+        if (passo.numero === grupoFusao[grupoFusao.length - 1]) {
+          sobePiso(passo.numero, data);
+        }
+      } else {
+        sobePiso(passo.numero, data);
+      }
       cobertura.set(passo.numero, data);
       prevNumero = passo.numero;
       prevData = data;

@@ -96,6 +96,26 @@ function datasValidas(r: PlanoAplicavel, recessoValendo: boolean) {
   }
 }
 
+describe("018 — fusão encurta a projeção", () => {
+  it("5º+6º na mesma sessão antecipa o 7º em uma semana", () => {
+    const sem = montar(dupla(4), dt("2026-11-27"));
+    const com = montarPlanoEmDia({
+      dupla: dupla(4),
+      eventos: CALENDARIO,
+      hoje: dt("2026-11-27"),
+      fusao: [[5, 6]],
+    });
+    if (!com.aplicavel) throw new Error(com.motivo);
+    const data = (n: number) => com.passos.find((p) => p.numero === n)!.data;
+    expect(data(6)).toBe(data(5));
+    const diff =
+      (new Date(sem.passos.find((p) => p.numero === 7)!.data).getTime() -
+        new Date(data(7)).getTime()) /
+      86_400_000;
+    expect(diff).toBe(7);
+  });
+});
+
 describe("513 — recesso pendente com caminho que fecha (QA 1126)", () => {
   it("a sugestão abre pelo caminho do recesso em vez de condenar a dupla", () => {
     // 4 feitos e o 5º ainda sem data; sem a decisão do recesso o walk não
