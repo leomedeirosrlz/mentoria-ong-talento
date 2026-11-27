@@ -902,14 +902,24 @@ export function montarPlanoEmDia(input: {
     }
   }
 
+  // o recesso sem decisão NÃO é sentença: quando seguir no recesso fecha
+  // antes do encerramento, esse é o caminho — e a resposta (card e Liza)
+  // precisa abrir por ele, não afirmar que "não fecha"
+  const caminhoRecesso =
+    alternativaRecesso != null &&
+    (!encerramento || alternativaRecesso.data <= encerramento)
+      ? ` Se a dupla decidir seguir encontros no recesso, fica em dia em ${fmtData(alternativaRecesso.data)} — antes do encerramento.`
+      : "";
   const sugestao =
     estado === "em_dia"
       ? "A dupla está em dia: tudo o que o calendário oficial já cobrou está feito ou marcado. Não há recuperação a fazer."
       : estado === "recuperacao"
         ? `Com ${rotuloRitmo(ritmoLeve!)}, a dupla fica em dia em ${fmtData(dataLeve!)}${encerramento ? `, antes do encerramento (${fmtData(encerramento)})` : ""}. Combinem as datas juntos.`
-        : s.dataProjetada != null
-          ? `Em dia só em ${fmtData(s.dataProjetada)}${encerramento ? `, depois do encerramento (${fmtData(encerramento)})` : ""}. Nem 1 encontro por dia fecha antes. ${CAMINHOS_COORD}`
-          : `Nem com 1 encontro por dia o plano fecha${encerramento ? ` antes do encerramento (${fmtData(encerramento)})` : ""}. ${CAMINHOS_COORD}`;
+        : caminhoRecesso
+          ? `Sem a decisão do recesso o plano não fecha${encerramento ? ` antes do encerramento (${fmtData(encerramento)})` : ""}.${caminhoRecesso} ${CAMINHOS_COORD}`
+          : s.dataProjetada != null
+            ? `Em dia só em ${fmtData(s.dataProjetada)}${encerramento ? `, depois do encerramento (${fmtData(encerramento)})` : ""}. Nem 1 encontro por dia fecha antes. ${CAMINHOS_COORD}`
+            : `Nem com 1 encontro por dia o plano fecha${encerramento ? ` antes do encerramento (${fmtData(encerramento)})` : ""}. ${CAMINHOS_COORD}`;
 
   return {
     aplicavel: true,
