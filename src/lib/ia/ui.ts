@@ -306,6 +306,8 @@ export type UiPlano = {
     /** o que a dupla precisa aceitar pra esse caminho fechar */
     exigencias: string[];
     passos: UiPlano["passos"];
+    /** recesso que a proposta precisa declarar junto (quando há) */
+    recesso: { ciclo_evento_id: string; usa: boolean } | null;
   } | null;
   /** TODOS os cenários do motor (1126) — a interface do simulador: cada
    *  opção tem data, sessões, ritmo e o que precisa ser decidido pra
@@ -682,6 +684,15 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
             passos: arr(caminhoBruto.passos)
               .map(mapaPasso)
               .filter((p) => p.numero > 0),
+            recesso: (() => {
+              const rec = obj(caminhoBruto.recesso);
+              return rec
+                ? {
+                    ciclo_evento_id: String(rec.cicloEventoId ?? ""),
+                    usa: rec.usa === true,
+                  }
+                : null;
+            })(),
           }
         : null;
       const usaCaminho =

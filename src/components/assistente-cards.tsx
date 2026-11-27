@@ -89,6 +89,7 @@ import {
   InstrumentoEmblema,
   ehInstrumentoChave,
 } from "@/components/instrumento-icone";
+import { combinarPlano } from "@/lib/actions-plano";
 import { T } from "@/components/motion";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { BarraSegmentada } from "@/components/viz";
@@ -963,6 +964,308 @@ function gradeTexto(g: NonNullable<UiPlano["grade"]>): string | null {
  *  pra dupla revisar antes de pedir pra publicar. Combinado gravado
  *  vira pill com o aceite único. Quem agenda é a dupla, por isso o
  *  rodapé leva à ficha (a Liza propõe, nunca grava cronograma). */
+/** Sessões do caminho: passos consecutivos na mesma data leem como UMA
+ *  sessão — sem isso a fusão parece dois encontros no mesmo dia. */
+function agruparPassos(passos: UiPlano["passos"]) {
+  const out: { data: string; passos: UiPlano["passos"] }[] = [];
+  for (const p of passos) {
+    const ultimo = out[out.length - 1];
+    if (ultimo && ultimo.data === p.data) ultimo.passos.push(p);
+    else out.push({ data: p.data, passos: [p] });
+  }
+  return out;
+}
+
+/** O caminho completo de menor fricção (1126) — a resposta de "como a
+ *  dupla fica em dia?": data em destaque, o que ele pede, os bloqueios, o
+ *  botão de propor e as sessões com todos os passos. */
+function CaminhoPlano({
+  b,
+  caminho,
+  r,
+}: {
+  b: UiPlano;
+  caminho: NonNullable<UiPlano["caminho"]>;
+  r: Rotas;
+}) {
+  const [propondo, setPropondo] = useState(false);
+  const [resultado, setResultado] = useState<null | "ok" | { erro: string }>(
+    null
+  );
+  const [docAberto, setDocAberto] = useState(false);
+  const docId = useId();
+  const sessoes = agruparPassos(b.passos);
+  const faltam = b.cabem_ate_encerramento?.faltam ?? b.passos.length;
+
+  async function propor() {
+    if (propondo) return;
+    setPropondo(true);
+    setResultado(null);
+    try {
+      const r2 = await combinarPlano(b.dupla_id, {
+        ritmo: caminho.ritmo || 1,
+        fusao: caminho.fusao.length ? caminho.fusao : undefined,
+        decisoes: caminho.recesso
+          ? [
+              {
+                cicloEventoId: caminho.recesso.ciclo_evento_id,
+                usa: caminho.recesso.usa,
+              },
+            ]
+          : undefined,
+      });
+      setResultado("error" in r2 ? { erro: r2.error } : "ok");
+    } catch {
+      setResultado({ erro: "Não consegui enviar agora. Tente de novo." });
+    } finally {
+      setPropondo(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="mt-1 rounded-lg bg-muted/50 px-3 py-2.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Caminho de menor fricção
+        </p>
+        <p className="mt-1 text-2xl font-semibold leading-none tracking-tight tabular-nums">
+          {valida(caminho.data) ? formatDate(caminho.data) : "data a definir"}
+        </p>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {caminho.sessoes}{" "}
+          {caminho.sessoes === 1 ? "sessão" : "sessões"} para {faltam}{" "}
+          {faltam === 1 ? "encontro" : "encontros"}
+          {b.encerramento && valida(b.encerramento)
+            ? ` · antes do encerramento (${formatDate(b.encerramento)})`
+            : ""}
+        </p>
+        {b.data_projetada &&
+          valida(b.data_projetada) &&
+          b.data_projetada !== caminho.data && (
+            <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+              Sem mudança, só em {formatDate(b.data_projetada)}
+              {b.encerramento && valida(b.encerramento)
+                ? `, depois do encerramento`
+                : ""}
+              .
+            </p>
+          )}
+      </div>
+
+      {caminho.exigencias.length > 0 && (
+        <div className="mt-2">
+          <p className="text-xs font-semibold">O que ele pede</p>
+          <ul className="mt-1 flex flex-wrap gap-1.5">
+            {caminho.exigencias.map((e) => (
+              <li
+                key={e}
+                className="rounded-full border border-border/70 bg-background px-2 py-1 text-xs text-foreground"
+              >
+                {e}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {b.alternativas.some((a) => a.data && valida(a.data)) && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Mais rápido, com mais mudanças:{" "}
+          {b.alternativas
+            .filter((a) => a.data && valida(a.data))
+            .slice(0, 2)
+            .map((a) => `${a.rotulo} (${formatDate(a.data!)})`)
+            .join("; ")}
+          .
+        </p>
+      )}
+
+      {!caminho && b.pendencias.length > 0 && (
+        <p className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground">
+          Antes do plano:{" "}
+          {b.pendencias
+            .map(
+              (p) =>
+                `${p.numero}º ${p.estado === "limbo" ? "(confirmar se aconteceu)" : "(falta o registro)"}`
+            )
+            .join(", ")}
+          .
+        </p>
+      )}
+
+      {!caminho && b.recessos_pendentes.length > 0 && (
+        <div className="mt-2 rounded-lg bg-[var(--warn-bg)] px-2.5 py-2">
+          <p className="text-xs font-semibold text-[var(--warn-text)]">
+            A dupla decide sobre{" "}
+            {plural(b.recessos_pendentes.length, "o recesso", "os recessos")}{" "}
+            antes de propor
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            {b.recessos_pendentes.map((rec) => (
+              <li
+                key={rec.ciclo_evento_id}
+                className="text-xs text-muted-foreground"
+              >
+                {rec.titulo}
+                {valida(rec.inicio)
+                  ? `, ${diaMesCurto(rec.inicio)} a ${valida(rec.fim) ? diaMesCurto(rec.fim) : "?"}`
+                  : ""}
+                : pausa ou segue nos encontros?
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {!caminho && b.grade && gradeTexto(b.grade) && (
+        <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+          <Clock size={13} aria-hidden className="mt-0.5 shrink-0" />
+          {gradeTexto(b.grade)}
+        </p>
+      )}
+
+      {!caminho && b.doc && b.doc.length > 0 && (
+        <div className="mt-2">
+          <AnimatePresence initial={false}>
+            {docAberto && (
+              <motion.div
+                id={docId}
+                key="doc"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={T.panel}
+                style={{ overflow: "clip" }}
+                className="space-y-3 rounded-lg border border-border/60 bg-background px-3 py-2.5 text-sm"
+              >
+                <DocBlocos blocos={b.doc} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-expanded={docAberto}
+            aria-controls={docAberto ? docId : undefined}
+            onClick={() => setDocAberto((v) => !v)}
+            className="h-auto min-h-11 w-full items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold hover:bg-muted/50 active:not-aria-[haspopup]:scale-100 md:min-h-11"
+          >
+            {docAberto ? "Fechar o rascunho" : "Ler o rascunho do combinado"}
+            <CaretDown
+              size={14}
+              weight="bold"
+              aria-hidden
+              className={cn(
+                "shrink-0 text-muted-foreground transition-transform duration-200 ease-snappy",
+                docAberto && "rotate-180"
+              )}
+            />
+          </Button>
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {b.plano ? (
+          <Link
+            href={`${r.encontros(b.dupla_id)}#plano-em-dia`}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "min-h-11 md:min-h-9"
+            )}
+          >
+            Ver o plano na ficha
+          </Link>
+        ) : resultado === "ok" ? (
+          <p
+            role="status"
+            className="rounded-md bg-[var(--ok-bg)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ok-text)]"
+          >
+            Proposta enviada. Um aceite da dupla já põe pra valer.
+          </p>
+        ) : (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              onClick={propor}
+              disabled={propondo}
+              aria-busy={propondo}
+              className="min-h-11 md:min-h-9"
+            >
+              {propondo ? "Propondo…" : "Propor este caminho"}
+            </Button>
+            <Link
+              href={`${r.encontros(b.dupla_id)}#plano-em-dia`}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "min-h-11 md:min-h-9"
+              )}
+            >
+              Ver na ficha
+            </Link>
+          </>
+        )}
+      </div>
+      {resultado && typeof resultado === "object" && (
+        <p role="alert" className="mt-1 text-xs text-destructive">
+          {resultado.erro}
+        </p>
+      )}
+
+      {b.passos.length > 0 && (
+        <p className="mt-3 text-xs font-semibold">Passo a passo</p>
+      )}
+      <ol className="mt-1 divide-y divide-border/60">
+        {sessoes.map((g) => (
+          <li key={g.data || "sem-data"} className="py-2 first:pt-0 last:pb-0">
+            <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+              {valida(g.data) ? diaSemanaCurto(g.data) : "Sem data"}
+              {g.passos.length > 1 && (
+                <span className="rounded-full bg-[var(--destaque)]/25 px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
+                  mesma sessão
+                </span>
+              )}
+              {g.passos.some((p) => p.acao === "travado") && (
+                <span className="text-[10px] font-semibold text-[var(--ok-text)]">
+                  já marcado
+                </span>
+              )}
+            </p>
+            <ul className="mt-1 space-y-1">
+              {g.passos.map((p) => (
+                <li key={p.numero} className="flex items-baseline gap-2">
+                  <span className="w-4 shrink-0 text-right font-mono text-[11px] font-semibold tabular-nums text-muted-foreground">
+                    {p.numero}
+                  </span>
+                  <span className="min-w-0 text-sm leading-snug">
+                    {p.titulo}
+                    {p.acao === "remarcar" && (
+                      <span className="text-xs text-muted-foreground">
+                        {" "}
+                        · remarcar
+                      </span>
+                    )}
+                    {(p.precondicao || p.aviso) && (
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {p.precondicao
+                          ? `Precisa antes: ${p.precondicao}`
+                          : p.aviso}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ol>
+      {!caminho && b.passos.length === 0 && (
+        <Vazio>Nada a marcar: a dupla segue o calendário</Vazio>
+      )}
+    </>
+  );
+}
+
 export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
   const agora = useAgora();
   const [aberto, setAberto] = useState(false);
@@ -985,9 +1288,11 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
   const resto = caminho ? [] : b.passos.slice(PASSOS_DOBRA);
 
   const meta =
-    estado === "em_dia"
-      ? "em dia"
-      : conversa && !melhor
+    caminho
+      ? "menor fricção"
+      : estado === "em_dia"
+        ? "em dia"
+        : conversa && !melhor
         ? "não fecha até o encerramento"
         : conversa && melhor && melhor.data
           ? `em dia ${quandoTexto(melhor.data, agora)}`
@@ -1051,13 +1356,11 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
       titulo="Para ficar em dia"
       meta={meta}
       rodape={
-        <Rodape href={`${r.encontros(b.dupla_id)}#plano-em-dia`}>
-          {b.plano
-            ? "Ver o plano na ficha"
-            : caminho
-              ? "Propor este caminho na ficha"
-              : "Combinar o plano na ficha"}
-        </Rodape>
+        caminho ? undefined : (
+          <Rodape href={`${r.encontros(b.dupla_id)}#plano-em-dia`}>
+            {b.plano ? "Ver o plano na ficha" : "Combinar o plano na ficha"}
+          </Rodape>
+        )
       }
     >
       {/* a dupla do plano — o card diz de quem é e leva à ficha (026) */}
@@ -1074,9 +1377,13 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         />
       </Link>
 
+      {caminho && (
+        <CaminhoPlano b={b} caminho={caminho} r={r} />
+      )}
+
       {/* resumo do custo sempre visível: nível em pill, conta dos passos
           e das pendências — ninguém descobre pré-requisito só ao abrir */}
-      {(b.nivel || resumo) && (
+      {!caminho && (b.nivel || resumo) && (
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
           {b.nivel && !(melhor && b.nivel === "conversa_coord") && (
             <Pill tom={NIVEL_PLANO[b.nivel].tom}>
@@ -1098,29 +1405,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </div>
       )}
 
-      {caminho && (
-        <div className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2">
-          <p className="text-xs font-semibold">Caminho de menor fricção</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {caminho.exigencias.length > 0
-              ? `Pede: ${caminho.exigencias.join("; ")}.`
-              : "Sem mudar o combinado atual."}
-          </p>
-          {b.alternativas.some((a) => a.data && valida(a.data)) && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Mais rápido, com mais mudanças:{" "}
-              {b.alternativas
-                .filter((a) => a.data && valida(a.data))
-                .slice(0, 2)
-                .map((a) => `${a.rotulo} (${formatDate(a.data!)})`)
-                .join("; ")}
-              .
-            </p>
-          )}
-        </div>
-      )}
-
-      {conversa && (
+      {conversa && !caminho && (
         <div className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2">
           {melhor ? (
             <>
@@ -1259,16 +1544,9 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </div>
       )}
 
-      {caminho && b.passos.length > 0 && (
-        <p className="mt-2 text-xs font-semibold">
-          Os {b.passos.length} passos do caminho
-        </p>
-      )}
-      {b.passos.length > 0 && (
+      {!caminho && b.passos.length > 0 && (
         <ol className="mt-1 divide-y divide-border/60">
-          {b.passos
-            .slice(0, caminho ? b.passos.length : PASSOS_DOBRA)
-            .map(passoLi)}
+          {b.passos.slice(0, PASSOS_DOBRA).map(passoLi)}
         </ol>
       )}
       {resto.length > 0 && (

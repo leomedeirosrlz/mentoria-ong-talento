@@ -374,13 +374,16 @@ describe("UiCard: plano com caminho viável (1126)", () => {
           decisao_recesso: null,
           exigencias: ["fundir 2 pares (6+7, 8+9)"],
           passos,
+          recesso: null,
         },
         passos,
       })
     );
     expect(out).toContain("Caminho de menor fricção");
-    expect(out).toContain("Pede: fundir 2 pares (6+7, 8+9).");
-    expect(out).toContain("Os 8 passos do caminho");
+    expect(out).toContain("O que ele pede");
+    expect(out).toContain("fundir 2 pares (6+7, 8+9)");
+    expect(out).toContain("Passo a passo");
+    expect(out).toContain("Propor este caminho");
     expect(out).not.toContain("Ver mais");
     expect(out).not.toContain("conversar com a coordenação");
   });
