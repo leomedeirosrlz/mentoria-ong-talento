@@ -37,6 +37,7 @@ import {
   montarPlanoEmDia,
   rotuloRitmo,
 } from "@/lib/plano-em-dia";
+import { simularCenariosPlano } from "@/lib/plano-cenarios";
 import { montarDocCombinado } from "@/lib/plano-roteiros";
 import { aceitesDoPlano } from "@/lib/plano-combinado";
 import {
@@ -510,6 +511,7 @@ type PlanoEmDiaArgs = {
   sem_grade?: boolean;
   fusao?: number[][];
   decisoes_recesso?: { ciclo_evento_id: string; usa: boolean }[];
+  cenarios?: boolean;
 };
 
 /** Args do plano_propor — o escopo sai do mesmo planner; as decisões de
@@ -909,7 +911,7 @@ export const IA_TOOLS = {
   plano_em_dia: {
     nome: "plano_em_dia",
     descricao:
-      "Plano de recuperação de uma dupla DPP atrasada ('ficar em dia'): passo a passo determinístico com data sugerida por encontro, no ritmo mais leve que fecha antes do encerramento (1 por semana, até 2, até 3 ou até 1 por dia), respeitando os intervalos de prática/tarefa do guia, os recessos, os feriados nacionais, a grade de disponibilidade combinada da dupla (quando os dois lados já marcaram) e o encerramento do ciclo. Devolve o estado (em_dia, recuperacao ou conversa: nem 1 por dia fecha, o caminho é a coordenação), cada passo com a ação (agendar, remarcar ou já marcado; vence_no_caminho = oficial que vence enquanto a dupla recupera), pendências de registro que vêm antes de qualquer plano, os recessos ainda sem decisão que travam a proposta, o estado da grade dos dois lados, a data em que a dupla volta pro calendário oficial, quantos encontros cabem até o encerramento, o efeito de seguir no recesso e qual degrau da folga de prática 8→9 o plano usou (pratica_flex: oficial, 7 dias ou piso). alternativa_recesso é um caminho viável quando a data cabe antes do encerramento — apresente-o em vez de dizer que não fecha. Os argumentos simulam o combinado SEM GRAVAR: ritmo pedido, sem_grade (combinar sem a disponibilidade), fusao (encontros juntos na mesma sessão) e decisoes_recesso ('e se a dupla decidir X?'). Use pra 'como a dupla X fica em dia?', 'ela começou atrasada, o que fazer?', 'monta um plano de recuperação', 'dá pra adiantar encontro?'. null quando a dupla não existe ou está fora do alcance do papel.",
+      "Plano de recuperação de uma dupla DPP atrasada ('ficar em dia'): passo a passo determinístico com data sugerida por encontro, no ritmo mais leve que fecha antes do encerramento (1 por semana, até 2, até 3 ou até 1 por dia), respeitando os intervalos de prática/tarefa do guia, os recessos, os feriados nacionais, a grade de disponibilidade combinada da dupla (quando os dois lados já marcaram) e o encerramento do ciclo. Devolve o estado (em_dia, recuperacao ou conversa: nem 1 por dia fecha, o caminho é a coordenação), cada passo com a ação (agendar, remarcar ou já marcado; vence_no_caminho = oficial que vence enquanto a dupla recupera), pendências de registro que vêm antes de qualquer plano, os recessos ainda sem decisão que travam a proposta, o estado da grade dos dois lados, a data em que a dupla volta pro calendário oficial, quantos encontros cabem até o encerramento, o efeito de seguir no recesso e qual degrau da folga de prática 8→9 o plano usou (pratica_flex: oficial, 7 dias ou piso). alternativa_recesso é um caminho viável quando a data cabe antes do encerramento — apresente-o em vez de dizer que não fecha. Com cenarios=true o motor compara de uma vez os caminhos (ritmo, fusão em pares, recesso seguir/pausar, 1 por dia) e devolve a lista ordenada com o 'melhor' viável — use isto antes de concluir que não fecha e cite as datas literais. Os argumentos simulam o combinado SEM GRAVAR: ritmo pedido, sem_grade (combinar sem a disponibilidade), fusao (encontros juntos na mesma sessão) e decisoes_recesso ('e se a dupla decidir X?'). Use pra 'como a dupla X fica em dia?', 'ela começou atrasada, o que fazer?', 'monta um plano de recuperação', 'dá pra adiantar encontro?'. null quando a dupla não existe ou está fora do alcance do papel.",
     schema: z
       .object({
         dupla_id: z.uuid().describe("id da dupla (uuid)"),
@@ -936,6 +938,12 @@ export const IA_TOOLS = {
           )
           .optional()
           .describe("simula 'e se a dupla decidir X sobre o recesso' sem gravar — recessos_pendentes lista os ids"),
+        cenarios: z
+          .boolean()
+          .optional()
+          .describe(
+            "true = roda o motor de cenários: compara ritmo, fusão e decisão de recesso de uma vez e devolve 'cenarios' ordenados + 'melhor' caminho viável"
+          ),
       })
       .strict(),
     // DPP-only tool: especialista track has no official calendar to catch
@@ -1039,6 +1047,14 @@ export const IA_TOOLS = {
               ],
             })
           : null;
+      const cenarios = a.cenarios
+        ? simularCenariosPlano({
+            dupla: duplaSim,
+            eventos,
+            hoje: agora,
+            disponibilidade: a.sem_grade === true ? null : cx.combinada,
+          })
+        : null;
       return {
         dupla_id: a.dupla_id,
         trilha: d.trilha,
@@ -1046,6 +1062,9 @@ export const IA_TOOLS = {
         mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
         mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
         aplicavel: true,
+        ...(cenarios
+          ? { cenarios: cenarios.cenarios, melhor: cenarios.melhor }
+          : {}),
         em_dia: r.emDia,
         estado: r.estado,
         nivel: r.nivel,
