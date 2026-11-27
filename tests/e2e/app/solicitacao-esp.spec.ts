@@ -257,15 +257,22 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     // review 21/11 (#9): uma primária + ⋯ — "Solicitar" virou menuitem que
     // abre o dialog irmão (REALIZA-157). O gesto composto é seguro de
     // repetir: menu fechado → mais.click() abre; item ausente → catch
-    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
-    const item = page.getByRole("menuitem", {
+    // a barra mostra até duas rotinas em linha; "Solicitar" fica em linha
+    // quando cabe e no ⋯ quando as duas vagas estão ocupadas
+    const inline = page.getByRole("button", {
       name: "Solicitar mentor especialista",
     });
+    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
       async () => {
-        await mais.click();
-        await item.click();
+        if (await inline.count()) await inline.first().click();
+        else {
+          await mais.click();
+          await page
+            .getByRole("menuitem", { name: "Solicitar mentor especialista" })
+            .click();
+        }
       },
       () => dialog.isVisible()
     );

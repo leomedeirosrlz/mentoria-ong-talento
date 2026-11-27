@@ -204,6 +204,9 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     // a sugestão vive no "Para fazer agora" — e precisa nomear o autor
     // ("Mentor sugeriu…", o stitch do RLS); sem o stitch cai em "Seu mentor"
     const paraFazer = page.locator('section[aria-labelledby="fazer-titulo"]');
+    // a sugestão pode estar no "e mais N" (a seção mostra 3 por vez)
+    const maisItens = paraFazer.getByRole("button", { name: /^e mais \d+/ });
+    if (await maisItens.count()) await maisItens.first().click();
     await expect(
       paraFazer.getByText(/Mentor sugeriu um especialista/)
     ).toBeVisible();
