@@ -103,8 +103,15 @@ function paresMoviveis(passos: PlanoAplicavel["passos"]): number[][] {
     .filter((p) => p.acao !== "travado")
     .map((p) => p.numero);
   const pares: number[][] = [];
-  for (let i = 0; i + 1 < numeros.length; i += 2) {
-    pares.push([numeros[i], numeros[i + 1]]);
+  // só vizinhos de verdade: com o 8º marcado, 7 e 9 não viram um "par" só
+  // porque o 8 saiu da lista — a régua de sessão exige números consecutivos
+  for (let i = 0; i + 1 < numeros.length; ) {
+    if (numeros[i + 1] === numeros[i] + 1) {
+      pares.push([numeros[i], numeros[i + 1]]);
+      i += 2;
+    } else {
+      i += 1;
+    }
   }
   return pares;
 }

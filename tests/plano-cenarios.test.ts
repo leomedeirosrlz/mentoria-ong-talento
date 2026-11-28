@@ -4,7 +4,14 @@ import {
   friccaoDoCenario,
   simularCenariosPlano,
 } from "@/lib/plano-cenarios";
-import { CICLO_16, dt, encRealizado, mkDupla, mkEvento } from "./helpers";
+import {
+  CICLO_16,
+  dt,
+  encAgendado,
+  encRealizado,
+  mkDupla,
+  mkEvento,
+} from "./helpers";
 
 // mesma régua do calendário real: 4 feitos, 12 a fazer, encerramento curto
 // e o recesso do fixture entre o 12º e o 13º
@@ -76,6 +83,30 @@ describe("simularCenariosPlano", () => {
     // exigencias nomeiam só o que o caminho realmente pede
     const ex = exigenciasDoCenario(c);
     expect(ex.every((x) => typeof x === "string")).toBe(true);
+  });
+
+  it("fusão só junta números vizinhos: 8º marcado não vira par 7+9", () => {
+    const dupla = mkDupla({
+      iniciada_em: "2025-10-01",
+      encontros: [
+        ...[1, 2, 3, 4].map((n, i) =>
+          encRealizado(n, CICLO_16.filter((e) => e.tipo === "encontro")[i].data!)
+        ),
+        // o 8º já está marcado: fica travado e não entra na fusão
+        encAgendado(8, "2026-01-08"),
+      ],
+    });
+    const r = simularCenariosPlano({
+      dupla,
+      eventos: EVENTOS,
+      hoje: new Date("2025-11-25T12:00:00-03:00"),
+    });
+    for (const c of r.cenarios)
+      for (const g of c.fusao)
+        expect(g[1]).toBe(g[0] + 1);
+    expect(
+      r.cenarios.some((c) => c.fusao.some((g) => g.includes(7) && g.includes(9)))
+    ).toBe(false);
   });
 
   it("a fusão reduz sessões e aparece no cenário", () => {
