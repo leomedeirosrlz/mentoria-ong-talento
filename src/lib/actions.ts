@@ -28,6 +28,7 @@ import { reconciliaCombinados } from "@/lib/combinados";
 import type { CombinadoEnviado } from "@/lib/combinados";
 import { snapshotDuplaHoje } from "@/lib/jobs";
 import { temPapel } from "@/lib/types";
+import type { Database } from "@/lib/database.types";
 import type { AppRole, ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, SituacaoMentorado, Trilha } from "@/lib/types";
 import {
   emailValido,
@@ -83,6 +84,7 @@ import { demoAtivo, demoLidas, demoRole, limparDemo, marcarDemoLidas, marcarDemo
 import { DEMO_MSG } from "./demo/shared";
 import { getDemoData } from "./demo/data";
 import { demoNotificacoes } from "./demo/queries";
+import { avaliarRetroativo } from "./retroativo-guarda";
 
 /** Normaliza o embed `profile_papeis` pro `papeis` efetivo — união do role
  *  primário com as linhas do embed (o primário também vive lá; o dedupe
@@ -3185,6 +3187,7 @@ export async function registrarEncontroRetroativo(
   duplaId: string,
   numero: number,
   dataHora: string,
+  motivoTardio?: string | null,
 ): Promise<{ error?: string; ok?: boolean; encontroId?: string }> {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -3198,8 +3201,8 @@ export async function registrarEncontroRetroativo(
     .from("duplas").select("status, iniciada_em, trilha, cronograma_id").eq("id", duplaId).single();
   if (!d) return { error: "Dupla não encontrada." };
   // fechada (encerrada/concluída) não ganha encontro novo — a jornada acabou
-  if (d.status === "encerrada" || d.status === "concluida") {
-    return { error: "Essa dupla já está encerrada." };
+  if (d.status !== "ativa") {
+    return { error: "Essa dupla não está ativa." };
   }
   // DPP sem cronograma não tem calendário pra medir teto/piso — aponta a
   // correção em vez de registrar contra nada
@@ -3233,6 +3236,23 @@ export async function registrarEncontroRetroativo(
   if (piso && quando < new Date(`${piso}T00:00:00-03:00`)) {
     return { error: "A data não pode ser antes do início da mentoria." };
   }
+
+  // passo vencido é o portão do retroativo; depois de 7 dias o motivo é
+  // obrigatório. Na especialista não há ciclo_eventos: a régua mede a
+  // data da própria sessão informada.
+  const oficial = evs?.find((e) => e.numero === numero)?.data ?? null;
+  const hojeStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const regra = avaliarRetroativo({
+    base: ehEspecialista ? quando.toISOString().slice(0, 10) : oficial,
+    hoje: hojeStr,
+  });
+  if (!ehEspecialista && !oficial) {
+    return { error: "Esse encontro não faz parte do guia oficial." };
+  }
+  if (regra.bloqueado) return { error: regra.bloqueado };
+  // atraso não pede justificativa: a maioria das duplas registra depois
+  // da data oficial, e o motivo virava atrito sem uso. O flag continua
+  // gravado pra leitura de aderência.
 
   // na trilha especialista o número é o ordinal da tentativa — quem decide é
   // o servidor (max + 1), nunca o cliente: o passo do guia sai do rank entre
@@ -3282,7 +3302,10 @@ export async function registrarEncontroRetroativo(
       status: "realizado",
       origem: "externo",
       created_by: eu.id,
-    })
+      // colunas da 0242 — o cast cobre a janela até database.types ser
+      // regenerado pelo lead depois de aplicar a migration
+      ...(regra.tardio ? { retroativo_tardio: true } : {}),
+    } as Database["public"]["Tables"]["encontros"]["Insert"])
     .select("id")
     .single();
   if (error) {

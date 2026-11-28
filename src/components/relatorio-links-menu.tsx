@@ -190,7 +190,7 @@ export function RelatorioLinksMenu({
             <PopoverTitle className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Links · {links.length}
             </PopoverTitle>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground sm:text-[11px]">
               revogar tira o ar na hora
             </span>
           </div>
@@ -242,7 +242,7 @@ export function RelatorioLinksMenu({
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       {cfg ? resumoRecorteLink(cfg) : "recorte indisponível"}
                     </p>
-                    <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-muted-foreground">
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted-foreground sm:text-[11px]">
                       <span>
                         {l.acessos} acesso{l.acessos === 1 ? "" : "s"}
                         {l.ultimo_acesso
@@ -416,7 +416,7 @@ export function RelatorioLinksMenu({
             </button>
           </div>
 
-          <p className="flex items-center gap-1.5 border-t border-border px-3.5 py-2 text-[11px] text-muted-foreground">
+          <p className="flex items-center gap-1.5 border-t border-border px-3.5 py-2 text-xs text-muted-foreground sm:text-[11px]">
             <Lock size={11} aria-hidden />
             Só dados operacionais saem por link. Respostas de instrumentos
             nunca.
@@ -536,7 +536,7 @@ function AcessosDialog({
                       · {tituloDe.get(a.slug) ?? a.slug}
                     </span>
                   </p>
-                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground sm:text-[11px]">
                     <span>{formatDateTime(a.acessado_em)}</span>
                     {a.origem && <span>origem {a.origem}</span>}
                     {a.user_agent && (

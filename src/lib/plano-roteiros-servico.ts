@@ -114,7 +114,7 @@ export async function carregarRoteirosDaDupla(input: {
     const roteiros = plano ? await roteirosDemo(dupla, plano) : [];
     return {
       ok: true,
-      lado: null,
+      lado: input.lado ?? null,
       dupla,
       plano,
       roteiros,
@@ -306,7 +306,7 @@ export async function docCombinadoProps(
     titulo:
       nomes.mentor && nomes.jovem
         ? `${nomes.mentor} × ${nomes.jovem}`
-        : "O combinado da dupla",
+        : "O plano da dupla",
     meta: `Versão ${plano.versao} · ${STATUS_ROTULO[plano.status] ?? plano.status}`,
     blocos,
   };

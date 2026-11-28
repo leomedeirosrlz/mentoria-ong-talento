@@ -200,9 +200,23 @@ test.describe("diretório do jovem (spec 023 / 0239)", () => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem/pessoas");
 
+    // o diretório abre agrupado por papel (onda 4) — seções nomeadas com
+    // a contagem na ordem do staff; "Minha rede" fica fora por ser lente
+    for (const rotulo of [/^Mentores/, /^Colegas/, /^Equipe/]) {
+      await expect(
+        page.getByRole("heading", { name: rotulo })
+      ).toBeVisible();
+    }
+
     // a ficha dele existe no diretório (mentorados.nome, não o login) —
-    // e dentro da faceta "Minha rede" por ser colega de turma
+    // e dentro da faceta "Minha rede" por ser colega de turma. A lente é
+    // transversal: grade plana, sem seção paralela
     await aplicarFaceta(page, "Minha rede");
+    await expect(
+      page.getByRole("heading", {
+        name: /^(Mentores|Especialistas|Colegas|Equipe) \(\d+\)/,
+      })
+    ).toHaveCount(0);
     await expect(cardDe(page, "Jovem E2E Sem DPP")).toBeVisible();
     await expect(cardDe(page, "Mentor E2E")).toBeVisible();
     await expect(cardDe(page, "Coordenação E2E")).toBeVisible();

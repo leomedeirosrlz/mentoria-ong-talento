@@ -10,9 +10,10 @@ import { cn } from "@/lib/utils";
 import { ChamadoDetalhe } from "@/components/chamado-detalhe";
 import { ChamadoStatusBadge, UrgenciaMarca, relTempo } from "@/components/chamados-shared";
 
-/** "Meus pedidos" do jovem dentro do perfil (0084): os chamados dele com a
- *  conversa pública — sem comentário interno, sem nome de quem respondeu,
- *  sem existir na fila do mentor. A ação de abrir fica na home dele. */
+/** "Meus pedidos" do jovem na home (0084): os chamados dele com a conversa
+ *  pública — sem comentário interno, sem nome de quem respondeu, sem existir
+ *  na fila do mentor. A seção é a âncora `#apoio` da home — links antigos de
+ *  `/jovem/perfil?c=<id>` são redirecionados pra cá pela página do perfil. */
 export function JovemChamados({
   itens,
   detalhe,
@@ -38,8 +39,9 @@ export function JovemChamados({
   }
   return (
     <section
+      id="apoio"
       aria-labelledby="jovem-chamados-titulo"
-      className="rounded-xl bg-card p-5 shadow-[var(--shadow-border)] sm:p-6"
+      className="scroll-mt-20 rounded-xl bg-card p-5 shadow-[var(--shadow-border)] sm:p-6"
     >
       <div className="flex items-center gap-2.5">
         <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)]/30 text-foreground">
@@ -65,7 +67,7 @@ export function JovemChamados({
             chamado={detalhe.chamado}
             timeline={detalhe.timeline}
             equipe={detalhe.equipe}
-            onVoltar={() => router.push("/jovem/perfil")}
+            onVoltar={() => router.push("/jovem#apoio")}
             // aqui o detalhe substitui a lista — o voltar precisa existir
             // no desktop também, senão não há caminho de volta
             voltarDesktop
@@ -89,7 +91,7 @@ export function JovemChamados({
                   a categoria — o "dupla de" da fila repetiria o nome dele.
                   O número CHA não aparece: é ruído de protocolo */}
               <Link
-                href={`/jovem/perfil?c=${c.id}`}
+                href={`/jovem?c=${c.id}#apoio`}
                 prefetch={false}
                 aria-current={cSel === c.id ? "true" : undefined}
                 className={cn(

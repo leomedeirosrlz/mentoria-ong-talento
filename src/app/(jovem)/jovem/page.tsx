@@ -3,30 +3,27 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
-  ArrowSquareOut,
   CaretDown,
-  BookOpen,
   ClockCounterClockwise,
   FileArrowDown,
   Flag,
   FolderOpen,
   Handshake,
   HourglassMedium,
-  LinkSimple,
   ListChecks,
   Megaphone,
-  PuzzlePiece,
   ShareNetwork,
   Signature,
   Siren,
   Star,
-  WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
-import { Avatar } from "@/components/avatar";
 import { JovemAvaliacoes } from "@/components/jovem-avaliacoes";
+import { JovemChamados } from "@/components/jovem-chamados";
+import { ContatoLinha } from "@/components/jovem-rede";
 import { JovemCombinados } from "@/components/jovem-combinados";
 import { JovemRetroativoDialog } from "@/components/jovem-retroativo-dialog";
 import { JovemEspecialistas } from "@/components/jovem-especialistas";
+import { JovemSecaoRecolhivel } from "@/components/encontro-disclosure";
 import {
   JovemParaFazer,
   type EncontroCtx,
@@ -48,7 +45,6 @@ import {
   progressoTrilha,
   rotuloEncontro as rotuloDoEncontro,
   toDateStr,
-  waLink,
 } from "@/lib/ciclo";
 import { hrefMaterial } from "@/lib/materiais";
 import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
@@ -57,7 +53,6 @@ import {
   encCorrenteDe,
   materialLiberadoParaJovem,
 } from "@/lib/jornada";
-import { avatarPublicUrl } from "@/lib/avatar";
 import {
   getJovemAssinaturas,
   getJovemContatos,
@@ -75,16 +70,16 @@ import {
   sugestoesEncontroDaDupla,
 } from "@/lib/sugestoes-encontro-server";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
-import { getChamados } from "@/lib/queries-chamados";
+import { getChamados, getChamadoDetalhe } from "@/lib/queries-chamados";
 import { chamadoPendencia, derivarPendencias } from "@/lib/pendencias-jovem";
 import {
   combinadoDoJovem,
   propostoEmDoPlano,
 } from "@/lib/plano-combinado";
+import { encontrosPrevistos } from "@/lib/proximo-encontro";
 import { getRoteirosPlanos } from "@/lib/queries";
 import { materiaisComRoteiroPlano } from "@/lib/plano-roteiros";
 import { quemCombinou, suaSemana } from "@/lib/sua-semana";
-import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
 import { materiaisDoNumero } from "@/lib/materiais";
 import { PlanoContestarButton } from "@/components/plano-contestar";
 import { SuaSemanaPlano } from "@/components/sua-semana-plano";
@@ -111,18 +106,24 @@ const PRIORIDADE = {
   normal: null,
 } as const;
 
-const TIPO_ICONE_MATERIAL = {
-  guia: BookOpen,
-  template: Signature,
-  conteudo: PuzzlePiece,
-  link: LinkSimple,
-} as const;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Ordem da home: o encontro primeiro (hero), o que fazer agora, a jornada,
-// os adultos, e por fim o que é consulta (especialistas só com ação,
-// avaliações, combinados, documentos, avisos e materiais).
-export default async function JovemHome() {
-  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp, planoJovem, jornada, meusChamados] =
+// Ordem da home (onda de superfícies): o núcleo "agora" no topo — hero do
+// encontro, o que fazer, a linha de ajuda ciente do pedido e a seção #apoio
+// (os "Meus pedidos" migraram do perfil pra cá); depois jornada e mentoria
+// compactas; e por fim o que é consulta recolhível (combinados, avaliações,
+// documentos) — com avisos e o cartão-resumo de materiais fechando a página.
+export default async function JovemHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ c?: string }>;
+}) {
+  const { c } = await searchParams;
+  // ?c=<id> abre o detalhe do pedido na âncora #apoio — destino dos e-mails
+  // (0084) e do redirect do /jovem/perfil?c= legado; lixo vira lista
+  const cSel = c && UUID_RE.test(c) ? c : null;
+  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp, planoJovem, jornada, meusChamados, detalheApoio] =
     await Promise.all([
       getMe(),
       getJovemPerfil(),
@@ -141,9 +142,11 @@ export default async function JovemHome() {
       // auto-cura da jornada — chamar na visita da home já dispara a
       // emissão do que a data oficial abriu (0123)
       getJovemJornada().catch(() => null),
-      // os chamados dele (489) — mesma leitura cacheada do perfil; pro
-      // mentorado a RLS entrega só os próprios
+      // os chamados dele (489) — pro mentorado a RLS entrega só os próprios;
+      // o detalhe reaproveita a linha da fila (React.cache) em vez de
+      // esperar a lista terminar
       getChamados(),
+      cSel ? getChamadoDetalhe(cSel) : Promise.resolve(null),
     ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
@@ -216,17 +219,16 @@ export default async function JovemHome() {
   const supervisores = porPapel("supervisor");
   const coordenacao = porPapel("coordenacao");
 
-  const futuros = encontros
-    .filter(
-      (e) =>
-        (e.status === "agendado" || e.status === "remarcado") &&
-        e.data_hora != null &&
-        new Date(e.data_hora) >= agora
-    )
-    .sort(
-      (a, b) =>
-        new Date(a.data_hora!).getTime() - new Date(b.data_hora!).getTime()
-    );
+  // a régua única do "próximo encontro" (QA 25/11): por data, com fila
+  // por dupla — a pendência do 5º da DPP não marca a sessão do
+  // especialista; o adiantado sai marcado em vez de ler fora de ordem
+  const futuros = encontrosPrevistos(encontros, agora, {
+    fila: (e) => e.dupla_id,
+    numerosOficiais: (fila) =>
+      jornada?.dupla_id === fila
+        ? datasOficiaisDe(jornada.cronograma).map((o) => o.numero)
+        : [],
+  });
   const proximo = futuros[0] ?? null;
 
   // trilha por dupla (a view jovem_duplas entrega — a tabela `duplas` não é
@@ -469,6 +471,12 @@ export default async function JovemHome() {
   const oficialPorNumero = new Map(
     oficiaisRetro.map((e) => [e.numero, e.data])
   );
+  // chamados projetados uma vez: alimentam o motor (andamento da equipe)
+  // e a linha "Pedir ajuda" (o vivo em curso)
+  const chamadosMotor = meusChamados.itens.map(chamadoPendencia);
+  const chamadosVivos = meusChamados.itens
+    .filter((c) => c.status === "aberto" || c.status === "em_atendimento")
+    .map(chamadoPendencia);
   const ctxPorEncontro: Record<string, EncontroCtx> = Object.fromEntries(
     encontros.map((e) => [
       e.id,
@@ -546,8 +554,18 @@ export default async function JovemHome() {
     // a pendência de chamado nasce da trilha pública: "respondeu" só com
     // atualização da equipe; com dono sem resposta vira "cuidando"; aberto
     // sem dono e resolvido são espera/desfecho, não tarefa (régua no mapper)
-    chamados: meusChamados.itens.map(chamadoPendencia),
+    chamados: chamadosMotor,
   });
+
+  // a linha "Pedir ajuda" é ciente do pedido em curso: o vivo mais
+  // relevante pela mesma régua do motor (resposta > cuidando > espera em
+  // aberto — o "aberto sem dono" devolve andamento null, então o vivo se
+  // filtra pelo status antes de projetar)
+  const pedidoApoio =
+    chamadosVivos.find((c) => c.andamento === "resposta") ??
+    chamadosVivos.find((c) => c.andamento === "cuidando") ??
+    chamadosVivos[0] ??
+    null;
 
   // o lápis "trocar link" do próximo encontro — mesmo recorte da agenda:
   // agendado de dupla ativa e DPP (a RPC do jovem não escreve na trilha esp)
@@ -684,6 +702,58 @@ export default async function JovemHome() {
   const concluida =
     duplaAtual?.status === "concluida" && duplaAtual.trilha !== "especialista";
 
+  // "Minha mentoria" compacta: no máximo 3 adultos, o mentor da dupla
+  // atual primeiro — a rede inteira segue em /jovem/pessoas?papel=rede
+  const priorizaAtual = (lista: JovemContato[]) =>
+    [...lista].sort(
+      (a, b) =>
+        Number(b.dupla_id === duplaAtual?.id) -
+        Number(a.dupla_id === duplaAtual?.id)
+    );
+  const contatosResumo = [
+    ...priorizaAtual(mentores),
+    ...priorizaAtual(especialistas),
+    ...priorizaAtual(supervisores),
+    ...priorizaAtual(coordenacao),
+  ].slice(0, 3);
+  const contatosTotal =
+    mentores.length +
+    especialistas.length +
+    supervisores.length +
+    coordenacao.length;
+  const rotuloContato = (papel: string | null | undefined) =>
+    papel === "mentor"
+      ? "Seu mentor"
+      : papel === "especialista"
+        ? "Seu especialista"
+        : papel === "supervisor"
+          ? "Auxiliar executivo(a) da dupla"
+          : "Coordenação do programa";
+
+  // resumo sempre à vista no header recolhível: o que pede gesto fica
+  // legível com a seção fechada; sem pendência o caret basta
+  const combinadosAbertos = encaminhamentos.filter(
+    (c) => c.status !== "feito"
+  ).length;
+  const resumoCombinados =
+    combinadosAbertos > 0
+      ? combinadosAbertos === 1
+        ? "1 em aberto"
+        : `${combinadosAbertos} em aberto`
+      : null;
+  const resumoAvaliacoes =
+    avaliacoesPendentes.length > 0
+      ? avaliacoesPendentes.length === 1
+        ? "1 esperando"
+        : `${avaliacoesPendentes.length} esperando`
+      : null;
+  const resumoDocs =
+    docsPendentes.length > 0
+      ? docsPendentes.length === 1
+        ? "1 pendente"
+        : `${docsPendentes.length} pendentes`
+      : null;
+
   return (
     <div className="grid grid-cols-1 gap-5">
       <header>
@@ -692,8 +762,10 @@ export default async function JovemHome() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {duplaEmCurso
-            ? `Sua mentoria ${duplaAtual.trilha === "especialista" ? "com o especialista" : "do programa"} está em curso.`
-            : "Sua jornada de mentoria por aqui."}
+            ? duplaAtual.trilha === "especialista"
+              ? "Seus encontros com o especialista, combinados e próximos passos."
+              : "Seus encontros, combinados e próximos passos, num lugar só."
+            : "Seus encontros, combinados e próximos passos."}
         </p>
       </header>
 
@@ -701,6 +773,11 @@ export default async function JovemHome() {
           saudação, com uma única ação conforme o estado */}
       <ProximoEncontro
         proximo={proximo}
+        adiantado={
+          proximo != null &&
+          proximo.adiantado &&
+          trilhaPorDupla.get(proximo.dupla_id) !== "especialista"
+        }
         rotulo={proximo ? rotuloEncontro(proximo) : null}
         sessao={
           proximo != null
@@ -754,56 +831,92 @@ export default async function JovemHome() {
         mediaPorDupla={mediaPorDupla}
       />
 
-      {/* canal de segurança sempre à mão, sem competir com o encontro: uma
-          linha discreta logo abaixo do que fazer agora */}
-      <PedirAjudaLinha equipe={coordenacao} nomeJovem={primeiroNome} />
+      {/* canal de segurança sempre à mão, sem competir com o encontro: a
+          linha é ciente do pedido em curso e leva pra conversa em #apoio */}
+      <PedirAjudaLinha
+        equipe={coordenacao}
+        nomeJovem={primeiroNome}
+        pedido={pedidoApoio}
+      />
+
+      {/* "Meus pedidos" (0084): a trilha pública dos chamados dele mora na
+          home, na âncora #apoio — sem pedidos a seção nem ocupa a tela */}
+      <JovemChamados
+        itens={meusChamados.itens}
+        meuId={me.id}
+        meuNome={nomeTela}
+        cSel={cSel}
+        detalhe={
+          detalheApoio?.chamado
+            ? {
+                chamado: detalheApoio.chamado,
+                timeline: detalheApoio.timeline,
+                equipe: detalheApoio.equipe,
+              }
+            : null
+        }
+      />
 
       {(temDpp || feitosEsp > 0) && (
         <section
           aria-labelledby="jornada-titulo"
-          className="animate-enter space-y-2.5"
+          className="animate-enter"
           style={{ "--i": 2 } as CSSProperties}
         >
-          <div className="flex items-center justify-between gap-3">
-            <h2 id="jornada-titulo" className="font-semibold">
-              Sua jornada
-            </h2>
-            <Link
-              href="/jovem/materiais"
-              className="group inline-flex min-h-11 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Ver materiais
-              <ArrowRight
-                size={14}
-                aria-hidden
-                className="transition-transform group-hover:translate-x-0.5"
-              />
-            </Link>
-          </div>
-          <div
-            role="progressbar"
-            aria-label={jornadaTexto}
-            aria-valuemin={0}
-            aria-valuemax={jornadaMeta}
-            aria-valuenow={jornadaAtual}
-            className="h-2 overflow-hidden rounded-full bg-muted"
-          >
-            <div
-              className="fill-grow h-full rounded-full bg-[var(--destaque)]"
-              style={{ width: `${jornadaPct}%` }}
-            />
-          </div>
-          <p className="text-sm">{jornadaTexto}</p>
+          {/* jornada compacta: o progresso inteiro num card de uma linha —
+              contexto bom, mas nunca o assunto da visita */}
+          <Card>
+            <CardContent className="px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <h2 id="jornada-titulo" className="text-sm font-semibold">
+                  Sua jornada
+                </h2>
+                <Link
+                  href="/jovem/materiais"
+                  className="group inline-flex min-h-11 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Ver materiais
+                  <ArrowRight
+                    size={14}
+                    aria-hidden
+                    className="transition-transform group-hover:translate-x-0.5"
+                  />
+                </Link>
+              </div>
+              <div
+                role="progressbar"
+                aria-label={jornadaTexto}
+                aria-valuemin={0}
+                aria-valuemax={jornadaMeta}
+                aria-valuenow={jornadaAtual}
+                className="mt-2 h-2 overflow-hidden rounded-full bg-muted"
+              >
+                <div
+                  className="fill-grow h-full rounded-full bg-[var(--destaque)]"
+                  style={{ width: `${jornadaPct}%` }}
+                />
+              </div>
+              <p className="mt-1.5 text-sm">{jornadaTexto}</p>
+            </CardContent>
+          </Card>
         </section>
       )}
 
-      {/* Minha dupla — os adultos que caminham com o jovem. Lista compacta:
-          uma linha por pessoa e WhatsApp com alvo de 44px. */}
+      {/* Minha mentoria compacta — os 3 adultos mais pertinentes (mentor da
+          dupla atual primeiro); a rede inteira segue em /jovem/pessoas. */}
       <section aria-labelledby="dupla-titulo">
-        <h2 id="dupla-titulo" className="mb-2.5 flex items-center gap-2 font-semibold">
-          <Handshake size={18} className="text-muted-foreground" aria-hidden />
-          Minha mentoria
-        </h2>
+        <div className="mb-2.5 flex items-center justify-between gap-3">
+          <h2 id="dupla-titulo" className="flex items-center gap-2 font-semibold">
+            <Handshake size={18} className="text-muted-foreground" aria-hidden />
+            Minha mentoria
+          </h2>
+          <Link
+            href="/jovem/minha-dupla"
+            className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Ver minha dupla
+          </Link>
+        </div>
         {!duplaAtual ? (
           <Card>
             <CardContent className="py-8 text-center">
@@ -837,69 +950,84 @@ export default async function JovemHome() {
                 </p>
               )}
               <ul className="divide-y divide-border/60">
-                {mentores.map((c) => (
+                {contatosResumo.map((c) => (
                   <ContatoLinha
                     key={`${c.papel}-${c.id ?? c.nome}`}
                     c={c}
-                    papel="Seu mentor"
+                    vinculo={rotuloContato(c.papel)}
                     nomeJovem={nomeTela}
+                    compacto
                   />
                 ))}
-                {especialistas.map((c) => (
-                  <ContatoLinha
-                    key={`${c.papel}-${c.id ?? c.nome}`}
-                    c={c}
-                    papel="Seu especialista"
-                    nomeJovem={nomeTela}
-                  />
-                ))}
-                {supervisores.map((c) => (
-                  <ContatoLinha
-                    key={`${c.papel}-${c.id ?? c.nome}`}
-                    c={c}
-                    papel="Auxiliar executivo(a) da dupla"
-                    nomeJovem={nomeTela}
-                  />
-                ))}
-                {coordenacao.map((c) => (
-                  <ContatoLinha
-                    key={`${c.papel}-${c.id ?? c.nome}`}
-                    c={c}
-                    papel="Coordenação do programa"
-                    nomeJovem={nomeTela}
-                  />
-                ))}
-                {!mentores.length && !especialistas.length && !supervisores.length && !coordenacao.length && (
+                {!contatosResumo.length && (
                   <li className="py-3 text-sm text-muted-foreground">
                     A equipe aparece aqui quando a coordenação conectar seu
                     cadastro à plataforma.
                   </li>
                 )}
               </ul>
+              {contatosTotal > contatosResumo.length && (
+                <Link
+                  href="/jovem/pessoas?papel=rede"
+                  className="group inline-flex min-h-11 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Ver toda a rede
+                  <ArrowRight
+                    size={14}
+                    aria-hidden
+                    className="transition-transform group-hover:translate-x-0.5"
+                  />
+                </Link>
+              )}
             </CardContent>
           </Card>
         )}
       </section>
 
-      {/* Especialistas: só quando pede ação (sugestão, negociação ou sessão
-          sem horário). O catálogo segue no menu. */}
+      {/* Especialistas: só quando pede ação dos casos que o motor não cobre
+          (contraproposta ou sessão sem horário) — a sugestão do mentor já
+          virou pendência "Ver especialista" no Para fazer, e a home não
+          repete a mesma linha duas vezes */}
       <JovemEspecialistas
         disponivel={perfil != null}
-        solicitacoes={pedidosEsp.solicitacoes}
+        solicitacoes={pedidosEsp.solicitacoes.filter(
+          (s) => s.status !== "sugerida"
+        )}
         trilha={trilhaResumo}
       />
+
+      {/* Combinados — a lista que o jovem controla, agora recolhida: a
+          pendência que pede gesto já está no Para fazer; o contador fica
+          no header e a âncora #combinados-titulo abre a seção sozinha */}
+      <JovemSecaoRecolhivel
+        ancora="combinados-titulo"
+        titulo="Meus combinados"
+        icone={<ListChecks size={18} className="text-muted-foreground" aria-hidden />}
+        resumo={resumoCombinados}
+      >
+        <Card>
+          <CardContent className="px-4 py-0 sm:px-5">
+            <JovemCombinados
+              itens={encaminhamentos}
+              hoje={hoje}
+              duplaId={duplaEmCurso ? (duplaAtual?.id ?? null) : null}
+            />
+          </CardContent>
+        </Card>
+      </JovemSecaoRecolhivel>
 
       {/* Suas avaliações (0071) — as pendentes e as duas últimas respondidas;
           o resto recolhe em "Ver todas as avaliações" dentro do componente.
           Com dupla viva a seção entra mesmo vazia: o rodapé explica por que
           um encontro já acontecido pode não aparecer aqui (REALIZA-428) */}
       {(avaliacoesPendentes.length > 0 || avaliacoesFeitas.length > 0 || duplaEmCurso) && (
-        <section aria-labelledby="avaliacoes-titulo">
-          <h2 id="avaliacoes-titulo" className="mb-2.5 flex items-center gap-2 font-semibold">
-            <Star size={18} className="text-muted-foreground" aria-hidden />
-            Suas avaliações
-          </h2>
-          <Card className="animate-enter">
+        <JovemSecaoRecolhivel
+          ancora="avaliacoes-titulo"
+          titulo="Suas avaliações"
+          icone={<Star size={18} className="text-muted-foreground" aria-hidden />}
+          resumo={resumoAvaliacoes}
+        >
+          <Card>
             <CardContent className="p-0">
               <JovemAvaliacoes
                 pendentes={avaliacoesPendentes}
@@ -924,36 +1052,20 @@ export default async function JovemHome() {
               )}
             </CardContent>
           </Card>
-        </section>
+        </JovemSecaoRecolhivel>
       )}
 
-      {/* Combinados — a lista que o jovem controla: abertos à vista, feitos
-          recolhidos */}
-      <section aria-labelledby="combinados-titulo">
-        <h2 id="combinados-titulo" className="mb-2.5 flex items-center gap-2 font-semibold">
-          <ListChecks size={18} className="text-muted-foreground" aria-hidden />
-          Meus combinados
-        </h2>
-        <Card className="animate-enter">
-          <CardContent className="px-4 py-0 sm:px-5">
-            <JovemCombinados
-              itens={encaminhamentos}
-              hoje={hoje}
-              duplaId={duplaEmCurso ? (duplaAtual?.id ?? null) : null}
-            />
-          </CardContent>
-        </Card>
-      </section>
-
       {/* Documentos pra assinar — o termo é do jovem; a autorização vai pro
-          responsável (link tokenizado funciona logado ou não, 0070). O que
-          está pendente fica à vista; o resto recolhe numa linha. */}
-      <section aria-labelledby="docs-titulo">
-        <h2 id="docs-titulo" className="mb-2.5 flex items-center gap-2 font-semibold">
-          <Signature size={18} className="text-muted-foreground" aria-hidden />
-          Documentos
-        </h2>
-        <Card className="animate-enter">
+          responsável (link tokenizado funciona logado ou não, 0070). A seção
+          nasce recolhida: a pendência já está no Para fazer e o contador
+          fica no header; pendente à vista, o resto recolhe numa linha. */}
+      <JovemSecaoRecolhivel
+        ancora="docs-titulo"
+        titulo="Documentos"
+        icone={<Signature size={18} className="text-muted-foreground" aria-hidden />}
+        resumo={resumoDocs}
+      >
+        <Card>
           <CardContent className="p-0">
             {assinaturas.length === 0 ? (
               <p className="px-4 py-3 text-sm text-muted-foreground">
@@ -1068,7 +1180,7 @@ export default async function JovemHome() {
             )}
           </CardContent>
         </Card>
-      </section>
+      </JovemSecaoRecolhivel>
 
       {/* Avisos da coordenação (audiência 'todos' — a RLS já entrega só o
           que o jovem pode ler). Urgente e importante ficam à vista; os
@@ -1113,80 +1225,38 @@ export default async function JovemHome() {
         </section>
       )}
 
-      {/* Materiais oficiais — idem: só 'todos' chega pelo RLS, e o gate
-          progressivo (REALIZA-160) segura o que é de encontro futuro. Até três
-          itens; o resto fica em "Ver todos". */}
+      {/* Materiais viram um cartão-resumo: a home só diz quantos existem e
+          manda pra estante — ler material é consulta, não o "agora". O gate
+          progressivo (REALIZA-160) segue na contagem (não anuncia o que o
+          acervo ainda não liberou). */}
       {materiaisVisiveis.length > 0 && (
-        <section aria-labelledby="materiais-titulo">
-          <div className="mb-2.5 flex items-center justify-between gap-3">
-            <h2 id="materiais-titulo" className="flex items-center gap-2 font-semibold">
-              <FolderOpen size={18} className="text-muted-foreground" aria-hidden />
-              Materiais de apoio
-            </h2>
+        <Card className="animate-enter">
+          <CardContent className="p-0">
             <Link
               href="/jovem/materiais"
-              className="group inline-flex min-h-11 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="group flex min-h-11 items-center gap-3 px-4 py-3 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             >
-              Ver todos
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
+                <FolderOpen size={15} aria-hidden />
+              </span>
+              <p className="min-w-0 flex-1 text-sm">
+                <span className="font-medium">Materiais de apoio</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {materiaisVisiveis.length}{" "}
+                  {materiaisVisiveis.length === 1
+                    ? "material liberado"
+                    : "materiais liberados"}
+                </span>
+              </p>
               <ArrowRight
-                size={13}
+                size={14}
                 aria-hidden
-                className="transition-transform group-hover:translate-x-0.5"
+                className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
               />
             </Link>
-          </div>
-          <Card className="animate-enter">
-            <CardContent className="divide-y divide-border/60 p-0">
-              {materiaisVisiveis.slice(0, 3).map((m) => {
-                const Icone = TIPO_ICONE_MATERIAL[m.tipo];
-                const href = hrefMaterial(m, "/jovem/materiais/documento");
-                const interno = (
-                  <>
-                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
-                      <Icone size={15} aria-hidden />
-                    </span>
-                    <p className="min-w-0 flex-1 truncate text-sm font-medium">
-                      {m.titulo}
-                    </p>
-                  </>
-                );
-                return (
-                  <div
-                    key={m.id}
-                    className={cn(
-                      "flex items-center pr-4 transition-colors",
-                      href && "hover:bg-muted/50"
-                    )}
-                  >
-                    {href ? (
-                      <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Abrir ${m.titulo}`}
-                        title={m.titulo}
-                        className="flex min-h-11 min-w-0 flex-1 items-center gap-3 px-4 py-2 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                      >
-                        {interno}
-                      </a>
-                    ) : (
-                      <div className="flex min-h-11 min-w-0 flex-1 items-center gap-3 px-4 py-2">
-                        {interno}
-                      </div>
-                    )}
-                    {href && (
-                      <ArrowSquareOut
-                        size={15}
-                        className="shrink-0 text-muted-foreground"
-                        aria-hidden
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </section>
+          </CardContent>
+        </Card>
       )}
 
       {/* vazio honesto: sem dupla, sem nada — a home segue útil pelo pedido
@@ -1199,51 +1269,5 @@ export default async function JovemHome() {
         </p>
       )}
     </div>
-  );
-}
-
-function ContatoLinha({
-  c,
-  papel,
-  nomeJovem,
-}: {
-  c: JovemContato;
-  papel: string;
-  nomeJovem: string;
-}) {
-  const wa = waLink(c.whatsapp, msgApresentacaoJovem(nomeJovem));
-  return (
-    <li className="flex items-center gap-2 py-0.5">
-      <Link
-        href={`/jovem/pessoas/${c.id}`}
-        prefetch={false}
-        className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
-        <Avatar
-          nome={c.nome_social || c.nome || "?"}
-          src={c.avatar_path ? avatarPublicUrl(c.avatar_path) : null}
-          size={32}
-        />
-        <p className="min-w-0 text-sm">
-          <span className="font-medium">{c.nome_social || c.nome}</span>
-          <span className="text-muted-foreground"> · {papel}</span>
-        </p>
-      </Link>
-      {wa && (
-        <a
-          href={wa}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="WhatsApp"
-          aria-label={`Conversar com ${c.nome_social || c.nome} no WhatsApp (abre em nova aba)`}
-          className={cn(
-            buttonVariants({ variant: "outline", size: "icon" }),
-            "shrink-0"
-          )}
-        >
-          <WhatsappLogo size={18} aria-hidden />
-        </a>
-      )}
-    </li>
   );
 }

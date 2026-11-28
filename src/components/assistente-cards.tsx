@@ -25,6 +25,7 @@ import {
 } from "@phosphor-icons/react";
 import type {
   UiAgenda,
+  UiAgregado,
   UiBloco,
   UiCapacidade,
   UiChamados,
@@ -88,6 +89,7 @@ import {
   InstrumentoEmblema,
   ehInstrumentoChave,
 } from "@/components/instrumento-icone";
+import { combinarPlano } from "@/lib/actions-plano";
 import { T } from "@/components/motion";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { BarraSegmentada } from "@/components/viz";
@@ -346,7 +348,8 @@ function rotas(jovem: boolean) {
         ficha: () => "/jovem",
         encontros: () => "/jovem/agenda",
         instrumentos: () => "/jovem",
-        chamados: () => "/jovem/perfil",
+        // "Meus pedidos" mora na âncora #apoio da home do jovem
+        chamados: (c?: string) => `/jovem${c ? `?c=${c}` : ""}#apoio`,
         agenda: "/jovem/agenda",
       }
     : {
@@ -384,6 +387,8 @@ export function UiCard({ bloco, jovem }: { bloco: UiBloco; jovem?: boolean }) {
       return <CardCapacidade b={bloco} />;
     case "pessoas":
       return <CardPessoas b={bloco} />;
+    case "agregado":
+      return <CardAgregado b={bloco} />;
     case "chamados":
       return <CardChamados b={bloco} r={r} />;
     case "instrumentos":
@@ -942,7 +947,7 @@ const NIVEL_PLANO: Record<
  *  sinal pra pedir a grade no chat antes de propor (dias_comuns 0 com os
  *  dois lados marcados = grades não se cruzam, a saída é sem_grade). */
 function gradeTexto(g: NonNullable<UiPlano["grade"]>): string | null {
-  if (g.sem_grade) return "Combinado sem a grade de disponibilidade.";
+  if (g.sem_grade) return "Plano sem a grade de disponibilidade.";
   if (!g.mentor && !g.jovem)
     return "Nenhum lado marcou a disponibilidade semanal ainda: dá pra pedir no chat ou combinar sem ela.";
   if (!g.mentor || !g.jovem)
@@ -959,6 +964,276 @@ function gradeTexto(g: NonNullable<UiPlano["grade"]>): string | null {
  *  pra dupla revisar antes de pedir pra publicar. Combinado gravado
  *  vira pill com o aceite único. Quem agenda é a dupla, por isso o
  *  rodapé leva à ficha (a Liza propõe, nunca grava cronograma). */
+/** Sessões do caminho: passos consecutivos na mesma data leem como UMA
+ *  sessão — sem isso a fusão parece dois encontros no mesmo dia. */
+function agruparPassos(passos: UiPlano["passos"]) {
+  const out: { data: string; passos: UiPlano["passos"] }[] = [];
+  for (const p of passos) {
+    const ultimo = out[out.length - 1];
+    if (ultimo && ultimo.data === p.data) ultimo.passos.push(p);
+    else out.push({ data: p.data, passos: [p] });
+  }
+  return out;
+}
+
+/** O caminho completo de menor fricção (1126) — a resposta de "como a
+ *  dupla fica em dia?": data em destaque, o que ele pede, os bloqueios, o
+ *  botão de propor e as sessões com todos os passos. */
+function CaminhoPlano({
+  b,
+  caminho,
+  r,
+}: {
+  b: UiPlano;
+  caminho: NonNullable<UiPlano["caminho"]>;
+  r: Rotas;
+}) {
+  const [propondo, setPropondo] = useState(false);
+  const [resultado, setResultado] = useState<null | "ok" | { erro: string }>(
+    null
+  );
+  const [aberto, setAberto] = useState(false);
+  const passosId = useId();
+  const sessoes = agruparPassos(b.passos);
+  const faltam = b.cabem_ate_encerramento?.faltam ?? b.passos.length;
+  // a suposição que a proposta carrega por recesso pendente: o que o
+  // caminho declara segue a usa dele; o resto vira pausa, o padrão do
+  // calendário — a dupla confirma ou troca antes de aceitar
+  const declRecesso = caminho.recesso;
+  const nPend = b.recessos_pendentes.length;
+  const recPendTxt = nPend > 1 ? "nos recessos" : "no recesso";
+  const consideraRecesso =
+    nPend === 1
+      ? declRecesso?.usa === false
+        ? "seguir no recesso"
+        : "pausa no recesso"
+      : "pausa nos recessos";
+  const periodoPend =
+    b.recessos_pendentes.length === 1 &&
+    valida(b.recessos_pendentes[0].inicio)
+      ? ` (${diaMesCurto(b.recessos_pendentes[0].inicio)} a ${
+          valida(b.recessos_pendentes[0].fim)
+            ? diaMesCurto(b.recessos_pendentes[0].fim)
+            : "?"
+        })`
+      : "";
+
+  async function propor() {
+    if (propondo) return;
+    setPropondo(true);
+    setResultado(null);
+    try {
+      const r2 = await combinarPlano(b.dupla_id, {
+        ritmo: caminho.ritmo || 1,
+        fusao: caminho.fusao.length ? caminho.fusao : undefined,
+        decisoes: caminho.recesso
+          ? [
+              {
+                cicloEventoId: caminho.recesso.ciclo_evento_id,
+                usa: caminho.recesso.usa,
+              },
+            ]
+          : undefined,
+      });
+      setResultado("error" in r2 ? { erro: r2.error } : "ok");
+    } catch {
+      setResultado({ erro: "Não consegui enviar agora. Tente de novo." });
+    } finally {
+      setPropondo(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="mt-1">
+        <p className="text-2xl font-semibold leading-tight tracking-tight tabular-nums">
+          <span className="text-sm font-normal text-muted-foreground">
+            Em dia em{" "}
+          </span>
+          {valida(caminho.data) ? formatDate(caminho.data) : "data a definir"}
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {faltam} {faltam === 1 ? "encontro" : "encontros"}.
+          {b.encerramento && valida(b.encerramento)
+            ? ` O ciclo encerra em ${formatDate(b.encerramento)}.`
+            : ""}
+        </p>
+      </div>
+
+      {caminho.exigencias.length > 0 && (
+        <div className="mt-2.5">
+          <p className="text-xs font-semibold">O que muda</p>
+          <ul className="mt-1 flex flex-wrap gap-1.5">
+            {caminho.exigencias.map((e) => (
+              <li
+                key={e}
+                className="rounded-full border border-border/70 bg-background px-2 py-1 text-xs text-foreground"
+              >
+                {e}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {b.pendencias.length > 0 && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {b.pendencias
+            .map(
+              (p) =>
+                `O ${p.numero}º encontro ${p.estado === "limbo" ? "ainda não foi confirmado" : "não tem registro"}`
+            )
+            .join(". ")}
+          .
+        </p>
+      )}
+
+      {b.grade && gradeTexto(b.grade) && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {gradeTexto(b.grade)}
+        </p>
+      )}
+
+      {/* recesso sem resposta não trava o envio: a proposta sai com a
+          suposição declarada e a dupla confirma ou troca no aceite */}
+      {nPend > 0 && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          A dupla ainda não decidiu {nPend === 1 ? "o recesso" : "os recessos"}.
+          Dá para enviar assim: a proposta considera {consideraRecesso}
+          {periodoPend}, e ela confirma ou troca no aceite.
+        </p>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {b.plano ? (
+          <Link
+            href={`${r.encontros(b.dupla_id)}#plano-em-dia`}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "min-h-11 md:min-h-9"
+            )}
+          >
+            Ver o plano na ficha
+          </Link>
+        ) : resultado === "ok" ? (
+          <p
+            role="status"
+            className="rounded-md bg-[var(--ok-bg)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ok-text)]"
+          >
+            Plano enviado. Quando um dos dois aceitar, ele passa a valer.
+          </p>
+        ) : (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              onClick={propor}
+              disabled={propondo}
+              aria-busy={propondo}
+              className="min-h-11 md:min-h-9"
+            >
+              {propondo ? "Enviando…" : "Enviar o plano"}
+            </Button>
+            <Link
+              href={`${r.encontros(b.dupla_id)}#plano-em-dia`}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "min-h-11 md:min-h-9"
+              )}
+            >
+              Ver na ficha
+            </Link>
+          </>
+        )}
+      </div>
+      {resultado && typeof resultado === "object" && (
+        <p role="alert" className="mt-1 text-xs text-destructive">
+          {resultado.erro}
+        </p>
+      )}
+
+      {b.passos.length > 0 && (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-expanded={aberto}
+            aria-controls={aberto ? passosId : undefined}
+            onClick={() => setAberto((v) => !v)}
+            className="mt-2 h-auto min-h-11 w-full items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold hover:bg-muted/50 active:not-aria-[haspopup]:scale-100 md:min-h-11"
+          >
+            {aberto
+              ? "Ocultar os encontros"
+              : `Ver os ${b.passos.length} encontros`}
+            <CaretDown
+              size={14}
+              weight="bold"
+              aria-hidden
+              className={cn(
+                "shrink-0 text-muted-foreground transition-transform duration-200 ease-snappy",
+                aberto && "rotate-180"
+              )}
+            />
+          </Button>
+          <AnimatePresence initial={false}>
+            {aberto && (
+              <motion.ol
+                id={passosId}
+                key="passos"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={T.panel}
+                style={{ overflow: "clip" }}
+                className="divide-y divide-border/60"
+              >
+                {sessoes.map((g) => (
+                  <li
+                    key={g.data || "sem-data"}
+                    className="py-2 first:pt-0 last:pb-0"
+                  >
+                    <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+                      {valida(g.data) ? diaSemanaCurto(g.data) : "Sem data"}
+                      {g.passos.length > 1 && (
+                        <span className="rounded-full bg-[var(--destaque)]/25 px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
+                          {g.passos.length} encontros juntos
+                        </span>
+                      )}
+                      {g.passos.some((p) => p.acao === "travado") && (
+                        <span className="text-[10px] font-semibold text-[var(--ok-text)]">
+                          já marcado
+                        </span>
+                      )}
+                    </p>
+                    <ul className="mt-1 space-y-1">
+                      {g.passos.map((p) => (
+                        <li key={p.numero} className="flex items-baseline gap-2">
+                          <span className="w-4 shrink-0 text-right font-mono text-[11px] font-semibold tabular-nums text-muted-foreground">
+                            {p.numero}
+                          </span>
+                          <span className="min-w-0 text-sm leading-snug">
+                            {p.titulo}
+                            {p.acao === "remarcar" && (
+                              <span className="text-xs text-muted-foreground">
+                                {" "}
+                                · remarcar
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </motion.ol>
+            )}
+          </AnimatePresence>
+        </>
+      )}
+    </>
+  );
+}
+
 export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
   const agora = useAgora();
   const [aberto, setAberto] = useState(false);
@@ -967,18 +1242,31 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
   const docId = useId();
   const estado = b.estado ?? (b.em_dia ? "em_dia" : "recuperacao");
   const conversa = estado === "conversa";
+  // motor de cenários (1126): a base "conversa" não é sentença — quando
+  // existe caminho viável, o card abre por ele e só cita a coordenação se
+  // nenhum caminho fechar
+  const melhor = b.melhor && b.melhor.data && valida(b.melhor.data) ? b.melhor : null;
+  // caminho completo de menor fricção (1126): a resposta de "como a dupla
+  // fica em dia?" — o card mostra a data, o que ele exige e os passos dele
+  const caminho = b.caminho;
   const marcados = b.passos.filter((p) => p.acao === "travado").length;
   const aMarcar = b.passos.length - marcados;
-  const resto = b.passos.slice(PASSOS_DOBRA);
+  // caminho completo: os 12 passos aparecem de uma vez (a pergunta é
+  // "como a dupla fica em dia?", não "me dá um resumo")
+  const resto = caminho ? [] : b.passos.slice(PASSOS_DOBRA);
 
   const meta =
-    estado === "em_dia"
-      ? "em dia"
-      : conversa
+    caminho
+      ? undefined
+      : estado === "em_dia"
+        ? "em dia"
+        : conversa && !melhor
         ? "não fecha até o encerramento"
-        : b.data_recuperacao && valida(b.data_recuperacao)
-          ? `em dia ${quandoTexto(b.data_recuperacao, agora)}`
-          : undefined;
+        : conversa && melhor && melhor.data
+          ? `em dia ${quandoTexto(melhor.data, agora)}`
+          : b.data_recuperacao && valida(b.data_recuperacao)
+            ? `em dia ${quandoTexto(b.data_recuperacao, agora)}`
+            : undefined;
 
   const resumo = [
     aMarcar > 0 && plural(aMarcar, "passo a marcar", "passos a marcar"),
@@ -1036,9 +1324,11 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
       titulo="Para ficar em dia"
       meta={meta}
       rodape={
-        <Rodape href={`${r.encontros(b.dupla_id)}#plano-em-dia`}>
-          {b.plano ? "Ver o combinado na ficha" : "Combinar o plano na ficha"}
-        </Rodape>
+        caminho ? undefined : (
+          <Rodape href={`${r.encontros(b.dupla_id)}#plano-em-dia`}>
+            {b.plano ? "Ver o plano na ficha" : "Combinar o plano na ficha"}
+          </Rodape>
+        )
       }
     >
       {/* a dupla do plano — o card diz de quem é e leva à ficha (026) */}
@@ -1055,13 +1345,26 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         />
       </Link>
 
+      {caminho && (
+        <CaminhoPlano b={b} caminho={caminho} r={r} />
+      )}
+
       {/* resumo do custo sempre visível: nível em pill, conta dos passos
           e das pendências — ninguém descobre pré-requisito só ao abrir */}
-      {(b.nivel || resumo) && (
+      {!caminho && (b.nivel || resumo) && (
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-          {b.nivel && (
+          {b.nivel && !(melhor && b.nivel === "conversa_coord") && (
             <Pill tom={NIVEL_PLANO[b.nivel].tom}>
               {NIVEL_PLANO[b.nivel].rotulo(b.ritmo)}
+            </Pill>
+          )}
+          {conversa && melhor && (
+            <Pill tom="atencao">
+              {melhor.decisao_recesso === "segue"
+                ? "Seguindo no recesso"
+                : melhor.fusao.length > 0
+                  ? "Com fusão"
+                  : "Com ajuste"}
             </Pill>
           )}
           {resumo && (
@@ -1070,31 +1373,63 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </div>
       )}
 
-      {conversa && (
+      {conversa && !caminho && (
         <div className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2">
-          <p className="text-sm font-semibold leading-snug">
-            {b.data_projetada && valida(b.data_projetada)
-              ? `Em dia só em ${formatDate(b.data_projetada)}`
-              : "Nem com 1 encontro por dia fecha"}
-            {b.encerramento && valida(b.encerramento)
-              ? `, depois do encerramento (${formatDate(b.encerramento)})`
-              : ""}
-            .
-          </p>
-          {b.cabem_ate_encerramento && (
-            <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-              Cabem {b.cabem_ate_encerramento.cabem} dos{" "}
-              {b.cabem_ate_encerramento.faltam} encontros que faltam
-              {b.encerramento && valida(b.encerramento)
-                ? " até o encerramento"
-                : ""}
-              .
-            </p>
+          {melhor ? (
+            <>
+              <p className="text-sm font-semibold leading-snug">
+                Com {melhor.rotulo}, em dia{" "}
+                {quandoTexto(melhor.data!, agora)}.
+              </p>
+              {b.data_projetada && valida(b.data_projetada) && (
+                <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                  Sem mudança, só em {formatDate(b.data_projetada)}
+                  {b.encerramento && valida(b.encerramento)
+                    ? `, depois do encerramento (${formatDate(b.encerramento)})`
+                    : ""}
+                  {b.cabem_ate_encerramento
+                    ? ` — cabem ${b.cabem_ate_encerramento.cabem} dos ${b.cabem_ate_encerramento.faltam} encontros`
+                    : ""}
+                  .
+                </p>
+              )}
+              {b.alternativas.length > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Também fecha:{" "}
+                  {b.alternativas
+                    .map((a) => `${a.rotulo} (${formatDate(a.data!)})`)
+                    .join("; ")}
+                  .
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold leading-snug">
+                {b.data_projetada && valida(b.data_projetada)
+                  ? `Em dia só em ${formatDate(b.data_projetada)}`
+                  : "Nem com 1 encontro por dia fecha"}
+                {b.encerramento && valida(b.encerramento)
+                  ? `, depois do encerramento (${formatDate(b.encerramento)})`
+                  : ""}
+                .
+              </p>
+              {b.cabem_ate_encerramento && (
+                <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                  Cabem {b.cabem_ate_encerramento.cabem} dos{" "}
+                  {b.cabem_ate_encerramento.faltam} encontros que faltam
+                  {b.encerramento && valida(b.encerramento)
+                    ? " até o encerramento"
+                    : ""}
+                  .
+                </p>
+              )}
+            </>
           )}
         </div>
       )}
 
-      {b.pendencias.length > 0 && (
+      {!caminho && b.pendencias.length > 0 && (
         <p className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground">
           Antes do plano: {b.pendencias.map((p) => (
             `${p.numero}º ${p.estado === "limbo" ? "(confirmar se aconteceu)" : "(falta o registro)"}`
@@ -1102,14 +1437,15 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </p>
       )}
 
-      {/* o que trava a proposta (527): recesso sem decisão e grade
-          faltando leem junto do plano — a plano_propor recusa os dois */}
-      {b.recessos_pendentes.length > 0 && (
-        <div className="mt-2 rounded-lg bg-[var(--warn-bg)] px-2.5 py-2">
-          <p className="text-xs font-semibold text-[var(--warn-text)]">
-            A dupla decide sobre{" "}
-            {plural(b.recessos_pendentes.length, "o recesso", "os recessos")}{" "}
-            antes de propor
+      {/* recesso sem decisão não trava a proposta: ela sai com a
+          suposição de pausa no escopo e a dupla confirma ou troca no
+          aceite — a lista mantém o que ainda falta ela responder */}
+      {!caminho && b.recessos_pendentes.length > 0 && (
+        <div className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2">
+          <p className="text-xs font-semibold text-foreground">
+            {b.recessos_pendentes.length === 1
+              ? "A dupla ainda não decidiu o recesso"
+              : "A dupla ainda não decidiu os recessos"}
           </p>
           <ul className="mt-1 space-y-0.5">
             {b.recessos_pendentes.map((rec) => (
@@ -1125,10 +1461,17 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
               </li>
             ))}
           </ul>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Dá para enviar assim: a proposta considera pausa{" "}
+            {b.recessos_pendentes.length === 1
+              ? "no recesso"
+              : "nos recessos"}
+            , e ela confirma ou troca no aceite.
+          </p>
         </div>
       )}
 
-      {b.grade && gradeTexto(b.grade) && (
+      {!caminho && b.grade && gradeTexto(b.grade) && (
         <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
           <Clock size={13} aria-hidden className="mt-0.5 shrink-0" />
           {gradeTexto(b.grade)}
@@ -1137,7 +1480,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
 
       {/* rascunho do combinado — a dupla lê o que a proposta grava antes
           de pedir pra publicar (mesma montagem do wizard da aba Agora) */}
-      {b.doc && b.doc.length > 0 && (
+      {!caminho && b.doc && b.doc.length > 0 && (
         <div className="mt-2">
           <AnimatePresence initial={false}>
             {docAberto && (
@@ -1163,7 +1506,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
             onClick={() => setDocAberto((v) => !v)}
             className="h-auto min-h-11 w-full items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold hover:bg-muted/50 active:not-aria-[haspopup]:scale-100 md:min-h-11"
           >
-            {docAberto ? "Fechar o combinado" : "Ler o combinado"}
+            {docAberto ? "Fechar o plano" : "Ler o plano"}
             <CaretDown
               size={14}
               weight="bold"
@@ -1177,7 +1520,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </div>
       )}
 
-      {b.passos.length > 0 && (
+      {!caminho && b.passos.length > 0 && (
         <ol className="mt-1 divide-y divide-border/60">
           {b.passos.slice(0, PASSOS_DOBRA).map(passoLi)}
         </ol>
@@ -1227,7 +1570,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         <Vazio>Nada a marcar: a dupla segue o calendário</Vazio>
       )}
 
-      {b.sugestao && (
+      {b.sugestao && !(conversa && melhor) && !caminho && (
         <p className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
           {b.sugestao}
         </p>
@@ -1235,7 +1578,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
       {b.plano && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2">
           <Pill tom={TOM_PLANO[b.plano.status] ?? "neutro"}>
-            Combinado {STATUS_PLANO[b.plano.status] ?? b.plano.status}
+            Plano {STATUS_PLANO[b.plano.status] ?? b.plano.status}
           </Pill>
           <span className="text-xs text-muted-foreground">
             {b.plano.versao > 1 ? `v${b.plano.versao}` : ""}
@@ -1297,7 +1640,7 @@ export function CardPlanoJovem({ b }: { b: UiPlanoJovem }) {
   const aplicados = new Map(b.passos_aplicados.map((p) => [p.numero, p]));
   return (
     <Cartao
-      titulo="O combinado"
+      titulo="O plano"
       meta={STATUS_PLANO[b.status] ?? b.status}
     >
       <p className="text-xs text-muted-foreground">
@@ -1608,6 +1951,80 @@ export function CardPessoas({ b }: { b: UiPessoas }) {
           </li>
         ))}
       </ul>
+    </Cartao>
+  );
+}
+
+// ---------- agregado (BI de pessoas, onda 5) ----------
+
+/** Paleta categórica das séries da casa (--chart-N): cor de dado, não de
+ *  status — a fatia "não informado" sai do ciclo e desenha o hatch
+ *  neutro (buraco nomeado, mesma régua da BarraSegmentada). */
+const CHART_CLS = [
+  "bg-[var(--chart-1)]",
+  "bg-[var(--chart-2)]",
+  "bg-[var(--chart-3)]",
+  "bg-[var(--chart-4)]",
+  "bg-[var(--chart-5)]",
+];
+
+/** Linha por grupo da dimensão: rótulo + "n · pct%" e a barra fina do
+ *  recorte. O denominador é o TOTAL de pessoas (a proporção desenhada é
+ *  a do número ao lado — a régua da FunilEtapas), então em papel/trilha,
+ *  que contam participação, cada barra segue lendo a fatia da pessoa. */
+export function CardAgregado({ b }: { b: UiAgregado }) {
+  return (
+    <Cartao
+      titulo={b.titulo}
+      meta={plural(b.total, "pessoa", "pessoas")}
+      rodape={<Rodape href="/pessoas">Abrir Pessoas</Rodape>}
+    >
+      {b.recorte && <p className={EYEBROW}>Recorte: {b.recorte}</p>}
+      <ul className="mt-2 space-y-2.5">
+        {b.itens.map((g, i) => (
+          <li key={g.chave} style={passo(i + 1)} className="animate-enter">
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate font-medium">{g.rotulo}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                <b className="font-semibold text-foreground">{g.n}</b>
+                {` · ${g.pct}%`}
+              </span>
+            </div>
+            <BarraSegmentada
+              className="mt-1"
+              altura="sm"
+              animate
+              i={Math.min(i, 3)}
+              denominador={b.total}
+              segmentos={[
+                {
+                  valor: g.n,
+                  rotulo: g.rotulo,
+                  ...(g.chave === "__nao_informado"
+                    ? {}
+                    : { cls: CHART_CLS[i % CHART_CLS.length] }),
+                },
+              ]}
+              ariaLabel={`${g.rotulo}: ${g.n} de ${b.total} (${g.pct}%)`}
+            />
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2.5 text-xs text-muted-foreground">
+        {[
+          b.outros
+            ? `outros: ${plural(b.outros.pessoas, "pessoa", "pessoas")} em ${plural(b.outros.grupos, "grupo", "grupos")}`
+            : null,
+          b.universo === "pessoas cadastradas"
+            ? "inclui inativas, desistentes e concluídas"
+            : "só pessoas ativas",
+          b.participacao_multipla
+            ? "uma pessoa pode contar em mais de uma linha"
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </p>
     </Cartao>
   );
 }

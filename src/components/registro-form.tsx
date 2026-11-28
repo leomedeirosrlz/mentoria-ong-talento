@@ -1012,7 +1012,7 @@ export function RegistroForm({
                         ? " Marque se a mesma sessão cobriu mais passos do guia."
                         : ""
                     }`
-                  : "Marque os encontros que esta mesma sessão cobriu. Todos ficam realizados e este registro vale pelos dois — o conteúdo aparece uma vez só, no primeiro deles."}
+                  : "Marque os encontros que esta mesma sessão cobriu. Todos ficam realizados e este registro vale pelos dois. O conteúdo aparece uma vez só, no primeiro deles."}
               </p>
               <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
                 {(sessaoGrupo ?? []).map((g) => (

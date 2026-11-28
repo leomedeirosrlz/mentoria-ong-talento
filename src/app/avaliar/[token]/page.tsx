@@ -6,6 +6,7 @@ import {
   WifiSlash,
 } from "@phosphor-icons/react/dist/ssr";
 import { demoRole } from "@/lib/demo/mode";
+import { getMe } from "@/lib/queries";
 import {
   avaliacaoPorToken,
   linkAvaliacaoMeta,
@@ -57,7 +58,11 @@ export default async function AvaliarTokenPage({
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const [{ token }, demo] = await Promise.all([params, demoRole()]);
+  const [{ token }, demo, me] = await Promise.all([
+    params,
+    demoRole(),
+    getMe(),
+  ]);
 
   const res = TOKEN_RE.test(token) ? await avaliacaoPorToken(token) : null;
   const info = res?.kind === "ok" ? res.info : null;
@@ -76,6 +81,16 @@ export default async function AvaliarTokenPage({
   // data+dia do encontro pra contextualizar — "terça-feira, 14/10 às 19:00"
   const quando =
     info?.encontro?.realizado_em ?? info?.encontro?.data_hora ?? null;
+  // mesma régua do /f/<token>: destino interno só depois de reconhecer a
+  // sessão; anônimo fica com a copy honesta e sem botão morto.
+  const destinoPosResposta = !me?.role
+    ? null
+    : me.role === "mentorado"
+      ? { href: "/jovem", label: "Voltar para minha página" }
+      : {
+          href: meta?.dupla_id ? `/duplas/${meta.dupla_id}` : "/",
+          label: "Voltar",
+        };
 
   return (
     <div className="flex min-h-[100dvh] flex-col">
@@ -171,6 +186,7 @@ export default async function AvaliarTokenPage({
               sessao={meta?.cobertura ?? []}
               demo={!!demo}
               retryHref={`/avaliar/${token}`}
+              destinoPosResposta={destinoPosResposta}
             />
           )}
 

@@ -71,7 +71,6 @@ describe("rotaPessoas", () => {
         busca: "ana",
         cat: "mentorados",
         status: "nao_acessou",
-        trilha: "dpp",
         turma: "Turma 1",
         pendencias: true,
         ordem: "pendencias",
@@ -81,7 +80,6 @@ describe("rotaPessoas", () => {
     expect(p.get("busca")).toBe("ana");
     expect(p.get("cat")).toBe("mentorados");
     expect(p.get("status")).toBe("nao_acessou");
-    expect(p.get("trilha")).toBe("dpp");
     expect(p.get("turma")).toBe("Turma 1");
     expect(p.get("pendencias")).toBe("1");
     expect(p.get("ordem")).toBe("pendencias");

@@ -148,18 +148,40 @@ export const FACETAS_DIRETORIO: {
   { id: "equipe", rotulo: "Equipe" },
 ];
 
+/** O balde único onde uma linha do diretório mora — "todos" e "rede"
+ *  são lentes, não baldes, então nunca viram seção. */
+export type BaldeDiretorio = Exclude<FacetaDiretorio, "todos" | "rede">;
+
 /** O balde de uma linha do diretório — jovem é colega do programa (dentro
  *  ou fora da turma dele), o catálogo manda nos especialistas (inclusive
  *  o híbrido, cuja linha de catálogo vence o dedup), mentor DPP pelo
  *  papel projetado e o resto dos adultos é equipe. */
 export function baldeDaEntrada(
   e: Pick<JovemDiretorioEntry, "tipo" | "papel">
-): Exclude<FacetaDiretorio, "todos" | "rede"> {
+): BaldeDiretorio {
   if (e.tipo === "jovem") return "colegas";
   if (e.tipo === "especialista" || e.papel === "mentor_especialista")
     return "especialistas";
   if (e.papel === "mentor_dpp") return "mentores";
   return "equipe";
+}
+
+/** Seções do diretório — a leitura por papel que o jovem divide com a
+ *  staff (mesmo modelo mental do /pessoas): quem mentora vem primeiro
+ *  (mentor e especialista, as duplas dele), os colegas e a equipe do
+ *  programa por último. O rótulo sai de rotuloFaceta — pill do filtro e
+ *  título da seção falam a mesma palavra, nunca texto copiado. */
+export const GRUPOS_DIRETORIO: BaldeDiretorio[] = [
+  "mentores",
+  "especialistas",
+  "colegas",
+  "equipe",
+];
+
+/** Rótulo de uma faceta/balde — a fonte única (FACETAS_DIRETORIO) pra
+ *  pill, seção e URL falarem a mesma palavra. */
+export function rotuloFaceta(id: FacetaDiretorio): string {
+  return FACETAS_DIRETORIO.find((f) => f.id === id)?.rotulo ?? id;
 }
 
 /** A projeção pública de um tipo de entrada — pra ficha e pros cards. */

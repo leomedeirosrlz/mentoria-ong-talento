@@ -37,8 +37,10 @@ import {
   montarPlanoEmDia,
   rotuloRitmo,
 } from "@/lib/plano-em-dia";
+import { exigenciasDoCenario, simularCenariosPlano } from "@/lib/plano-cenarios";
 import { montarDocCombinado } from "@/lib/plano-roteiros";
 import { aceitesDoPlano } from "@/lib/plano-combinado";
+import type { DecisaoRecesso } from "@/lib/actions-plano";
 import {
   comDecisoesRecesso,
   contextoPlanoCom,
@@ -126,6 +128,7 @@ import { getIaConfig } from "./config";
 import { CacheTtl } from "./cache";
 import { buscarNosGuias, catalogoGuias } from "./guias";
 import { emitirProdutoEvento } from "../produto-eventos-server";
+import { agregarPessoasBi, getPessoasBiIa } from "./pessoas-bi";
 
 /** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário
  *  ('importacao' entrou na 0193: match semântico/revisão NL do import CSV;
@@ -331,7 +334,7 @@ const adocaoCoorteArgs = z
       .max(12)
       .optional()
       .describe(
-        "quantas coortes semanais recentes (padrão 8 — a RPC devolve no máx 12)"
+        "quantas coortes semanais recentes (padrão 8 — no máx 12)"
       ),
   })
   .strict();
@@ -509,12 +512,68 @@ type PlanoEmDiaArgs = {
   sem_grade?: boolean;
   fusao?: number[][];
   decisoes_recesso?: { ciclo_evento_id: string; usa: boolean }[];
+  cenarios?: boolean;
 };
 
 /** Args do plano_propor — o escopo sai do mesmo planner; as decisões de
  *  recesso são gravadas pela dupla na mesma proposta (snapshot no
- *  escopo.decisoes, como o wizard da aba Agora). */
+ *  escopo.decisoes, como o wizard da aba Agora). A equipe propõe sem
+ *  gravar decisão — manda suposição "proposta" no escopo (0245). */
 type PlanoProporArgs = PlanoEmDiaArgs;
+
+/** As decisões efetivas de uma proposta da EQUIPE pela Liza (0245 —
+ *  mesma régua da decisoesDaPropostaStaff do combinarPlano; a cópia
+ *  existe porque a action não exporta o privado e a tool não pode
+ *  importar server-action): staff nunca declara recesso — "propor não
+ *  é decidir pela dupla". Entrada que repete a resposta vigente viaja
+ *  como "dupla" (o snapshot ecoa a autoria real); entrada que diverge
+ *  dela é recusada, porque só a dupla troca a própria resposta; entrada
+ *  pra recesso ainda pendente e todo pendente que o input não cobriu
+ *  viram suposição "proposta" — o default conservador é `usa: true`
+ *  (pausa, o que o calendário já faz) e a RPC carimba `escopo.assumido`
+ *  pra dupla revisar no aceite. `pendentes` vem da simulação com as
+ *  entradas já aplicadas. */
+function decisoesDaPropostaStaffIa(
+  vigentes: readonly { ciclo_evento_id: string; usa: boolean }[],
+  input: readonly DecisaoRecesso[] | undefined,
+  pendentes: readonly { cicloEventoId: string }[]
+): { decisoes: DecisaoRecesso[] } | { erro: string } {
+  const decididos = new Map(vigentes.map((r) => [r.ciclo_evento_id, r.usa]));
+  const decisoes: DecisaoRecesso[] = [];
+  const cobertos = new Set<string>();
+  for (const d of input ?? []) {
+    if (cobertos.has(d.cicloEventoId)) continue;
+    const atual = decididos.get(d.cicloEventoId);
+    if (atual != null) {
+      if (atual !== d.usa)
+        return {
+          erro: "A dupla já decidiu esse recesso. Só ela pode trocar a resposta.",
+        };
+      decisoes.push({
+        cicloEventoId: d.cicloEventoId,
+        usa: d.usa,
+        origem: "dupla",
+      });
+    } else {
+      decisoes.push({
+        cicloEventoId: d.cicloEventoId,
+        usa: d.usa,
+        origem: "proposta",
+      });
+    }
+    cobertos.add(d.cicloEventoId);
+  }
+  for (const p of pendentes) {
+    if (cobertos.has(p.cicloEventoId)) continue;
+    decisoes.push({
+      cicloEventoId: p.cicloEventoId,
+      usa: true,
+      origem: "proposta",
+    });
+    cobertos.add(p.cicloEventoId);
+  }
+  return { decisoes };
+}
 
 /** Saída do resumo_semana a partir das duplas vivas — pura, pra a demo
  *  (/demo, dataset em memória) responder pelo MESMO caminho da tool. */
@@ -908,7 +967,7 @@ export const IA_TOOLS = {
   plano_em_dia: {
     nome: "plano_em_dia",
     descricao:
-      "Plano de recuperação de uma dupla DPP atrasada ('ficar em dia'): passo a passo determinístico com data sugerida por encontro, no ritmo mais leve que fecha antes do encerramento (1 por semana, até 2, até 3 ou até 1 por dia), respeitando os intervalos de prática/tarefa do guia, os recessos, os feriados nacionais, a grade de disponibilidade combinada da dupla (quando os dois lados já marcaram) e o encerramento do ciclo. Devolve o estado (em_dia, recuperacao ou conversa: nem 1 por dia fecha, o caminho é a coordenação), cada passo com a ação (agendar, remarcar ou já marcado; vence_no_caminho = oficial que vence enquanto a dupla recupera), pendências de registro que vêm antes de qualquer plano, os recessos ainda sem decisão que travam a proposta, o estado da grade dos dois lados, a data em que a dupla volta pro calendário oficial, quantos encontros cabem até o encerramento e o efeito de seguir no recesso. Os argumentos simulam o combinado SEM GRAVAR: ritmo pedido, sem_grade (combinar sem a disponibilidade), fusao (encontros juntos na mesma sessão) e decisoes_recesso ('e se a dupla decidir X?'). Use pra 'como a dupla X fica em dia?', 'ela começou atrasada, o que fazer?', 'monta um plano de recuperação', 'dá pra adiantar encontro?'. null quando a dupla não existe ou está fora do alcance do papel.",
+      "Plano de recuperação de uma dupla DPP atrasada ('ficar em dia'): passo a passo determinístico com data sugerida por encontro, no ritmo mais leve que fecha antes do encerramento (1 por semana, até 2, até 3 ou até 1 por dia), respeitando os intervalos de prática/tarefa do guia, os recessos, os feriados nacionais, a grade de disponibilidade combinada da dupla (quando os dois lados já marcaram) e o encerramento do ciclo. Devolve o estado (em_dia, recuperacao ou conversa: nem 1 por dia fecha, o caminho é a coordenação), cada passo com a ação (agendar, remarcar ou já marcado; vence_no_caminho = oficial que vence enquanto a dupla recupera), pendências de registro que vêm antes de qualquer plano, os recessos ainda sem decisão (travam a proposta da dupla; pra equipe viram suposição de pausa na proposta — a dupla confirma ou troca no aceite), o estado da grade dos dois lados, a data em que a dupla volta pro calendário oficial, quantos encontros cabem até o encerramento, o efeito de seguir no recesso e qual degrau da folga de prática 8→9 o plano usou (pratica_flex: oficial, 7 dias ou piso). alternativa_recesso é um caminho viável quando a data cabe antes do encerramento — apresente-o em vez de dizer que não fecha. O retorno SEMPRE traz a matriz de cenários (ritmo, fusão em pares, recesso seguir/pausar, 1 por dia) ordenada, com 'melhor' = data mais cedo e 'caminho' = o plano que fecha com menos mudanças (data, o que muda e os encontros): em 'como a dupla fica em dia?' responda pelo caminho; nas demais, abra por 'melhor'; cite as datas literais; só diga que não fecha quando 'melhor' for null. Quando houver mais de um cenário viável, não chame nenhum de único. Os argumentos simulam o combinado SEM GRAVAR: ritmo pedido, sem_grade (combinar sem a disponibilidade), fusao (encontros juntos na mesma sessão) e decisoes_recesso ('e se a dupla decidir X?'). Use pra 'como a dupla X fica em dia?', 'ela começou atrasada, o que fazer?', 'monta um plano de recuperação', 'dá pra adiantar encontro?'. null quando a dupla não existe ou está fora do alcance do papel.",
     schema: z
       .object({
         dupla_id: z.uuid().describe("id da dupla (uuid)"),
@@ -935,6 +994,12 @@ export const IA_TOOLS = {
           )
           .optional()
           .describe("simula 'e se a dupla decidir X sobre o recesso' sem gravar — recessos_pendentes lista os ids"),
+        cenarios: z
+          .boolean()
+          .optional()
+          .describe(
+            "compatibilidade: a matriz de cenários agora vem SEMPRE no retorno (cenarios + melhor)"
+          ),
       })
       .strict(),
     // DPP-only tool: especialista track has no official calendar to catch
@@ -1038,13 +1103,50 @@ export const IA_TOOLS = {
               ],
             })
           : null;
+      // sempre: o guarda numérico da resposta e a Liza precisam da matriz
+      // — deixar como opção era o que permitia responder "não fecha" sem
+      // testar fusão/recesso. O custo é aritmética pura, sem query.
+      const cenarios = simularCenariosPlano({
+        dupla: duplaSim,
+        eventos,
+        hoje: agora,
+        disponibilidade: a.sem_grade === true ? null : cx.combinada,
+      });
+      // caminho completo de menor fricção (1126): é a resposta de "como a
+      // dupla fica em dia?" — data, o que ele exige e TODOS os passos
+      const escolhido = cenarios.menorFriccao;
+      const caminho = escolhido
+        ? {
+            ...escolhido.cenario,
+            exigencias: exigenciasDoCenario(escolhido.cenario),
+            passos: escolhido.passos.map((p) => ({
+              numero: p.numero,
+              titulo: p.titulo,
+              acao: p.acao,
+              encontro_id: p.encontroId,
+              data_sugerida: p.data,
+              data_oficial: p.dataOficial,
+              vence_no_caminho: p.venceNoCaminho === true,
+              precondicao: p.precondicao ?? null,
+              aviso: p.aviso ?? null,
+              sessao: p.sessao ?? null,
+            })),
+          }
+        : null;
       return {
         dupla_id: a.dupla_id,
         trilha: d.trilha,
+        // quem perguntou (0245) — recesso pendente trava a proposta da
+        // dupla, mas pra equipe vira suposição de pausa que a dupla
+        // confirma ou troca no aceite; a guarda lê pra falar certo
+        lado: cx.lado,
+        caminho,
         // a dupla já vem carregada — o card nomeia sem nova query (026)
         mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
         mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
         aplicavel: true,
+        cenarios: cenarios.cenarios,
+        melhor: cenarios.melhor,
         em_dia: r.emDia,
         estado: r.estado,
         nivel: r.nivel,
@@ -1109,7 +1211,7 @@ export const IA_TOOLS = {
   plano_propor: {
     nome: "plano_propor",
     descricao:
-      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP (0219/0224): o escopo sai do mesmo planner do plano_em_dia — encontros devidos e os que vencem no caminho, janela até o encerramento, ritmo combinado e o nível calculado — e a proposta fica persistida pra dupla aceitar ou contestar. O aceite é ÚNICO: o primeiro lado da dupla que aceita já põe o plano pra valer (mentor ou jovem que propõe já conta como o aceite desse lado) e o outro é avisado. Sem ritmo, usa o mais leve que fecha; o banco só exige ritmo >= 1 encontro por semana. As decisões do combinado entram na proposta: decisoes_recesso declara cada recesso antes de propor (só a dupla declara — equipe com recesso pendente recebe a recusa do banco), sem_grade combina sem a disponibilidade e fusao junta encontros na mesma sessão. Dupla em dia ou em 'conversa' (nem 1 por dia fecha) não tem proposta: aí o caminho é a coordenação. Só um plano aberto por dupla — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
+      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP: o escopo sai do mesmo planner do plano_em_dia — encontros devidos e os que vencem no caminho, janela até o encerramento, ritmo combinado e o nível calculado — e a proposta fica persistida pra dupla aceitar ou contestar. O aceite é ÚNICO: o primeiro lado da dupla que aceita já põe o plano pra valer (mentor ou jovem que propõe já conta como o aceite desse lado) e o outro é avisado. Sem ritmo, usa o mais leve que fecha; o mínimo é 1 encontro por semana. As decisões do plano (recessos, grade, fusão) entram na proposta: decisoes_recesso leva a resposta sobre cada recesso pendente — pra mentor e jovem é a decisão autoral da dupla (grava junto), pra equipe é suposição e cada pendente sem resposta entra como pausa (usa=true), com a dupla confirmando ou trocando no aceite; sem_grade combina sem a disponibilidade e fusao junta encontros na mesma sessão. Dupla em dia ou em 'conversa' (nem 1 por dia fecha) não tem proposta: aí o caminho é a coordenação. Só um plano aberto por dupla — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -1136,11 +1238,12 @@ export const IA_TOOLS = {
             })
           )
           .optional()
-          .describe("decisão da dupla sobre cada recesso pendente — recessos_pendentes do plano_em_dia lista os ids; só a dupla declara"),
+          .describe("resposta sobre cada recesso pendente — recessos_pendentes do plano_em_dia lista os ids; pra mentor e jovem é a decisão autoral da dupla (grava junto), pra equipe é suposição que a dupla confirma ou troca no aceite"),
       })
       .strict(),
     // o jovem propõe pelo app (wizard da aba Agora) e pela RPC — paridade
-    // no chat (527); equipe propõe sem poder declarar recesso
+    // no chat (527); equipe propõe sem poder declarar recesso — manda
+    // suposição no escopo e a dupla confirma ou troca no aceite (0245)
     roles: ["coordenacao", "supervisor", "mentor_dpp", "mentorado"],
     escreve: true,
     resumo: async (a: { dupla_id: string; ritmo?: number }, supabase) => {
@@ -1162,28 +1265,66 @@ export const IA_TOOLS = {
         cicloEventoId: x.ciclo_evento_id,
         usa: x.usa,
       }));
-      // a decisão de recesso é só da dupla — o mesmo gesto do combinarPlano
-      // (518): só o que MUDOU viaja (a RPC é upsert cego e regravar a mesma
-      // resposta roubaria a autoria) e staff que tenta declarar recebe a
-      // recusa honesta do banco
-      for (const dec of recessosAlterados(cx.dupla.recessos ?? [], decisoes)) {
-        await rpcEscreve(ctx, "declarar_recesso", {
-          p_dupla: a.dupla_id,
-          p_evento: dec.cicloEventoId,
-          p_usa: dec.usa,
-        });
-      }
-      const dupla = comDecisoesRecesso(cx.dupla, decisoes);
       const agora = new Date();
-      const r = montarPlanoEmDia({
-        dupla,
+      const base = {
         eventos,
         ritmo: a.ritmo,
         disponibilidade: a.sem_grade === true ? null : cx.combinada,
         fusao: a.fusao,
         hoje: agora,
-      });
+      };
+      // a decisão de recesso é só da dupla (0245 — mesma régua do
+      // combinarPlano): a EQUIPE nunca declara — manda suposições no
+      // escopo (origem "proposta") e todo pendente que o input não
+      // cobriu entra com o default conservador "pausa"; a RPC carimba
+      // escopo.assumido e a dupla confirma ou troca no aceite. A DUPLA
+      // declara o que mudou (só o que MUDOU viaja — a RPC é upsert cego
+      // e regravar a mesma resposta roubaria a autoria) e a resposta
+      // viaja com origem "dupla", sem suposição automática: pendência
+      // que sobrar segue bloqueando a proposta.
+      let decisoesEscopo: DecisaoRecesso[];
+      if (cx.lado === "staff") {
+        // a pendência real sai da simulação — o primeiro passe com as
+        // entradas já aplicadas mede o que a equipe não cobriu
+        const pre = montarPlanoEmDia({
+          dupla: comDecisoesRecesso(cx.dupla, decisoes),
+          ...base,
+        });
+        if (!pre.aplicavel) throw new ErroTool(pre.motivo);
+        const mont = decisoesDaPropostaStaffIa(
+          cx.dupla.recessos ?? [],
+          decisoes,
+          pre.recessosPendentes
+        );
+        if ("erro" in mont) throw new ErroTool(mont.erro);
+        decisoesEscopo = mont.decisoes;
+      } else {
+        for (const dec of recessosAlterados(
+          cx.dupla.recessos ?? [],
+          decisoes
+        )) {
+          await rpcEscreve(ctx, "declarar_recesso", {
+            p_dupla: a.dupla_id,
+            p_evento: dec.cicloEventoId,
+            p_usa: dec.usa,
+          });
+        }
+        decisoesEscopo = decisoes.map(
+          (d): DecisaoRecesso => ({
+            cicloEventoId: d.cicloEventoId,
+            usa: d.usa,
+            origem: "dupla",
+          })
+        );
+      }
+      // a simulação final aplica as decisões efetivas: suposição usa=false
+      // da equipe destrava o recesso nas datas como a decisão da dupla
+      // faria
+      const dupla = comDecisoesRecesso(cx.dupla, decisoesEscopo);
+      const r = montarPlanoEmDia({ dupla, ...base });
       if (!r.aplicavel) throw new ErroTool(r.motivo);
+      // staff não cai aqui — as suposições default cobrem toda pendência;
+      // o bloqueio sobra pra dupla que tenta propor sem decidir tudo
       if (r.recessosPendentes.length) {
         throw new ErroTool("Falta a dupla confirmar o recesso.");
       }
@@ -1198,9 +1339,12 @@ export const IA_TOOLS = {
       const escopo = {
         ...e.escopo,
         // snapshot das decisões do gesto (518) — o aceite compara pra
-        // detectar "a resposta mudou depois da proposta"
+        // detectar "a resposta mudou depois da proposta". O snapshot leva
+        // a autoria de cada resposta (0245): "dupla" é o que a dupla
+        // declarou, "proposta" é suposição da equipe que o aceite
+        // confirma (a RPC usa pra carimbar escopo.assumido)
         decisoes: {
-          recessos: decisoes,
+          recessos: decisoesEscopo,
           sem_grade: a.sem_grade === true,
           ...(gs.grupos.length
             ? {
@@ -1226,6 +1370,9 @@ export const IA_TOOLS = {
           ritmo: escopo.ritmo,
           nivel: r.nivel,
           sem_grade: a.sem_grade === true,
+          // 0245: a proposta carregava suposição de recesso da equipe —
+          // a dupla confirma ou troca antes de o plano valer
+          recesso_assumido: decisoesEscopo.some((d) => d.origem === "proposta"),
         },
       });
       return res;
@@ -1275,7 +1422,7 @@ export const IA_TOOLS = {
   plano_aplicar_passo: {
     nome: "plano_aplicar_passo",
     descricao:
-      "Aplica um passo do plano 'ficar em dia' aceito: grava a data combinada do encontro do escopo e anota no ledger do plano — uma RPC só, atômica. Vale pro mentor e pro jovem (o combinado é dos dois). Só números do escopo, só data futura dentro da janela, remarcar pede motivo; repetir o mesmo passo devolve o que já existe (idempotente)." +
+      "Aplica um passo do plano 'ficar em dia' aceito: grava a data combinada do encontro do escopo e anota no histórico do plano — uma gravação só, atômica. Vale pro mentor e pro jovem (o combinado é dos dois). Só números do escopo, só data futura dentro da janela, remarcar pede motivo; repetir o mesmo passo devolve o que já existe (idempotente)." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -1329,7 +1476,7 @@ export const IA_TOOLS = {
   resumo_dupla: {
     nome: "resumo_dupla",
     descricao:
-      "Resumo consolidado da dupla, gerado pelo job diário (0221): semáforo, motivos e sinais, encontros feitos × esperados, próximos encontros, pendências de registro, perfil e interesses do jovem e o plano 'ficar em dia' vigente. A própria RPC recorta por papel — pro mentorado chega sem semáforo/motivos/sinais. null quando o job ainda não gerou. Use pra uma visão rápida e barata da dupla; ficha_dupla dá o detalhe vivo.",
+      "Resumo consolidado da dupla, gerado pelo resumo diário: semáforo, motivos e sinais, encontros feitos × esperados, próximos encontros, pendências de registro, perfil e interesses do jovem e o plano 'ficar em dia' vigente. O resultado já vem recortado por papel — pro mentorado chega sem semáforo/motivos/sinais. null quando o resumo diário ainda não rodou. Use pra uma visão rápida e barata da dupla; ficha_dupla dá o detalhe vivo.",
     schema: duplaIdArgs,
     roles: TODOS_PAPEIS,
     run: async ({ dupla_id }: z.infer<typeof duplaIdArgs>, ctx) => {
@@ -1342,7 +1489,7 @@ export const IA_TOOLS = {
   meu_plano: {
     nome: "meu_plano",
     descricao:
-      "O combinado do plano 'ficar em dia' da própria dupla do jovem (0219 — jovem_plano): status, versão, ritmo combinado, os passos com datas e os passos já aplicados. Sem semáforo nem motivos internos — só o que a dupla combinou. null quando não há plano.",
+      "O combinado do plano 'ficar em dia' da própria dupla do jovem: status, versão, ritmo combinado, os passos com datas e os passos já aplicados. Sem semáforo nem motivos internos — só o que a dupla combinou. null quando não há plano.",
     schema: semArgs,
     roles: ["mentorado"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
@@ -1355,7 +1502,7 @@ export const IA_TOOLS = {
   intervencao_sugerir: {
     nome: "intervencao_sugerir",
     descricao:
-      "Sugere uma intervenção estruturada na dupla (0220): troca_mentor, troca_mentorado, pausa, dpp_para_esp (encerrar a trilha DPP seguindo com a especialista) ou encerramento — com evidências e o destino ('auxiliar' = supervisor da dupla, 'coordenacao'). A Liza SUGERE, nunca executa: quem decide é a equipe, pela fila de intervenções na ficha da dupla (chamado ou mensagem)." +
+      "Sugere uma intervenção estruturada na dupla: troca_mentor, troca_mentorado, pausa, dpp_para_esp (encerrar a trilha DPP seguindo com a especialista) ou encerramento — com evidências e o destino ('auxiliar' = supervisor da dupla, 'coordenacao'). A Liza SUGERE, nunca executa: quem decide é a equipe, pela fila de intervenções na ficha da dupla (chamado ou mensagem)." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -1415,7 +1562,7 @@ export const IA_TOOLS = {
   guia_ajustar: {
     nome: "guia_ajustar",
     descricao:
-      "Personaliza o guia de um encontro da dupla (0220): lista de ajustes, cada um com sugestao e justificativa — o guia oficial continua sendo a base, os ajustes ficam ancorados a ele e aparecem na ficha e no preparo. Regravar o mesmo número substitui a lista inteira." +
+      "Personaliza o guia de um encontro da dupla: lista de ajustes, cada um com sugestao e justificativa — o guia oficial continua sendo a base, os ajustes ficam ancorados a ele e aparecem na ficha e no preparo. Regravar o mesmo número substitui a lista inteira." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -1469,7 +1616,7 @@ export const IA_TOOLS = {
   guia_limpar: {
     nome: "guia_limpar",
     descricao:
-      "Volta um encontro da dupla ao guia oficial (0220): apaga os ajustes personalizados daquele número — a ficha e o preparo passam a mostrar só o guia base." +
+      "Volta um encontro da dupla ao guia oficial: apaga os ajustes personalizados daquele número — a ficha e o preparo passam a mostrar só o guia base." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -2098,7 +2245,7 @@ export const IA_TOOLS = {
   instrumentos_da_dupla: {
     nome: "instrumentos_da_dupla",
     descricao:
-      "Os 4 instrumentos oficiais da jornada (Visão, Metas, PDM e Roda da Vida) de uma dupla: definição, links emitidos e as respostas já dadas — mesma leitura da RPC instrumentos_da_dupla, que decide o escopo (coord, mentor e supervisor da dupla e o próprio jovem).",
+      "Os 4 instrumentos oficiais da jornada (Visão, Metas, PDM e Roda da Vida) de uma dupla: definição, links emitidos e as respostas já dadas — já recortada pelo papel de quem lê (coord, mentor e supervisor da dupla e o próprio jovem).",
     schema: duplaIdArgs,
     roles: TODOS_PAPEIS,
     run: async ({ dupla_id }: z.infer<typeof duplaIdArgs>, ctx) => {
@@ -2128,7 +2275,7 @@ export const IA_TOOLS = {
   minha_dupla: {
     nome: "minha_dupla",
     descricao:
-      "A dupla do jovem que está falando: mentor, supervisor, trilha, turma e status — sem precisar de id, a view jovem_duplas já é escopada. Use pra 'quem é meu mentor?', 'minha dupla', 'com quem eu converso' e antes de abrir instrumentos da própria dupla (o dupla_id que ela devolve é bastidor: só em args de tool, nunca no texto).",
+      "A dupla do jovem que está falando: mentor, supervisor, trilha, turma e status — sem precisar de id, já vem escopada. Use pra 'quem é meu mentor?', 'minha dupla', 'com quem eu converso' e antes de abrir instrumentos da própria dupla (o dupla_id que ela devolve é bastidor: só em args de tool, nunca no texto).",
     schema: semArgs,
     roles: ["mentorado"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
@@ -2429,7 +2576,7 @@ export const IA_TOOLS = {
   comentar_chamado: {
     nome: "comentar_chamado",
     descricao:
-      "Escreve no chamado como a pessoa logada (autor vira mensagem pública; equipe vira nota ou resposta conforme a RPC decide)." +
+      "Escreve no chamado como a pessoa logada (autor vira mensagem pública; equipe vira nota ou resposta conforme o tipo de autor)." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -2451,7 +2598,7 @@ export const IA_TOOLS = {
   acrescentar_info_chamado: {
     nome: "acrescentar_info_chamado",
     descricao:
-      "Acrescenta informação ao próprio chamado aberto (só o autor; a RPC barra os demais)." +
+      "Acrescenta informação ao próprio chamado aberto (só o autor; os demais não podem)." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -2649,7 +2796,7 @@ export const IA_TOOLS = {
     roles: ["mentorado"],
     escreve: true,
     resumo: async (
-      a: { dupla_id: string; numero: number; data_hora: string },
+      a: { dupla_id: string; numero: number; data_hora: string; motivo_tardio?: string },
       supabase
     ) => {
       const dupla = await rotuloDupla(supabase, a.dupla_id);
@@ -2723,7 +2870,7 @@ export const IA_TOOLS = {
   jovem_registrar_retroativo: {
     nome: "jovem_registrar_retroativo",
     descricao:
-      "Declara que um encontro do guia já aconteceu sem agendamento prévio — a dupla se combinou por fora (retroativo). O passo fica realizado na hora, libera a avaliação do jovem e avisa o mentor pra contar como foi no registro dele. Também corrige a data de um retroativo que a própria pessoa criou (mesmo número, nova data). encontros_retroativo lista os passos elegíveis: só data oficial já vencida, nunca o último do ciclo (fechar a jornada segue registro do mentor) e nunca a trilha de especialista (as sessões dela são do especialista)." +
+      "Declara que um encontro do guia já aconteceu sem agendamento prévio — a dupla se combinou por fora (retroativo). O passo fica realizado na hora, libera a avaliação do jovem e avisa o mentor pra contar como foi no registro dele. Também corrige a data de um retroativo que a própria pessoa criou (mesmo número, nova data). encontros_retroativo lista os passos elegíveis: só data oficial já vencida, nunca o último do ciclo (fechar a jornada segue registro do mentor) e nunca a trilha de especialista (as sessões dela são do especialista). Se encontros_retroativo marcar exige_motivo, pergunte o motivo antes de confirmar e envie motivo_tardio." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -2741,25 +2888,36 @@ export const IA_TOOLS = {
           .describe(
             "data/hora ISO 8601 com fuso de quando aconteceu, ex. 2026-11-10T19:00:00-03:00"
           ),
+        motivo_tardio: z
+          .string()
+          .min(2)
+          .max(1000)
+          .optional()
+          .describe(
+            "obrigatório quando o passo venceu há mais de 7 dias; pergunte antes de confirmar"
+          ),
       })
       .strict(),
     roles: ["mentorado"],
     escreve: true,
     resumo: async (
-      a: { dupla_id: string; numero: number; data_hora: string },
+      a: { dupla_id: string; numero: number; data_hora: string; motivo_tardio?: string },
       supabase
     ) => {
       const dupla = await rotuloDupla(supabase, a.dupla_id);
       return `Registrar o ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} como realizado em ${formatDiaHora(a.data_hora)}`;
     },
     run: async (
-      a: { dupla_id: string; numero: number; data_hora: string },
+      a: { dupla_id: string; numero: number; data_hora: string; motivo_tardio?: string },
       ctx
     ) =>
       rpcEscreve(ctx, "registrar_retroativo_mentorado", {
         p_dupla: a.dupla_id,
         p_numero: a.numero,
         p_data_hora: a.data_hora,
+        ...(a.motivo_tardio?.trim()
+          ? { p_motivo_tardio: a.motivo_tardio.trim() }
+          : {}),
       }),
   },
 
@@ -2782,7 +2940,7 @@ export const IA_TOOLS = {
   declarar_recesso: {
     nome: "declarar_recesso",
     descricao:
-      "Declara a decisão da dupla sobre um recesso do calendário oficial: usa=true é 'vamos pausar os encontros' (também é o padrão quando nada foi declarado — o planner empurra sugestões pra depois da janela) e usa=false é 'vamos seguir nos encontrando' (aí a janela fica disponível pra dupla: o planner pode sugerir datas dentro dela e a agenda trata o período como combinado). A decisão é por dupla e por período de recesso; a última declaração vale, com a data da mudança. Sem ciclo_evento_id vale o recesso vigente ou o próximo do cronograma da dupla — ficha_dupla lista os recessos com os ids. Só a dupla declara (a RPC revalida): o mentor dela ou o jovem; a coordenação acompanha, não decide pela dupla." +
+      "Declara a decisão da dupla sobre um recesso do calendário oficial: usa=true é 'vamos pausar os encontros' (também é o padrão quando nada foi declarado — o planner empurra sugestões pra depois da janela) e usa=false é 'vamos seguir nos encontrando' (aí a janela fica disponível pra dupla: o planner pode sugerir datas dentro dela e a agenda trata o período como combinado). A decisão é por dupla e por período de recesso; a última declaração vale, com a data da mudança. Sem ciclo_evento_id vale o recesso vigente ou o próximo do cronograma da dupla — ficha_dupla lista os recessos com os ids. Só a dupla declara (a gravação revalida): o mentor dela ou o jovem; a coordenação acompanha, não decide pela dupla." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -3234,7 +3392,7 @@ export const IA_TOOLS = {
     roles: ["mentor_dpp", "mentor_especialista", "coordenacao"],
     escreve: true,
     resumo: async (
-      a: { dupla_id: string; numero: number; data_hora: string },
+      a: { dupla_id: string; numero: number; data_hora: string; motivo_tardio?: string },
       supabase
     ) => {
       const dupla = await rotuloDupla(supabase, a.dupla_id);
@@ -3262,6 +3420,93 @@ export const IA_TOOLS = {
           motivo_outro: ehPreset ? undefined : preset || undefined,
         })
       );
+    },
+  },
+
+
+  pessoas_agregado: {
+    nome: "pessoas_agregado",
+    descricao:
+      "Agrega pessoas do programa por estado (uf), gênero, faixa de idade, papel ou trilha, com filtros simples. Coordenação vê o programa todo; supervisor vê só o recorte que a RLS dele alcança. Gênero e idade são visão da coordenação. Retorna contagens, percentuais, top N com outros e no máximo 5 linhas de exemplo sem contato nem data de nascimento.",
+    schema: z
+      .object({
+        dimensao: z
+          .enum(["estado", "genero", "faixa_idade", "papel", "trilha"])
+          .describe("dimensão do agrupamento"),
+        papel: z
+          .enum(["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista", "mentorado"])
+          .optional()
+          .describe("filtra por papel efetivo"),
+        uf: z.string().trim().min(2).max(2).optional().describe("sigla do estado, ex.: SP"),
+        genero: z
+          .enum(["feminino", "masculino", "nao_binario", "outro", "prefiro_nao_dizer"])
+          .optional(),
+        faixa_idade: z
+          .enum(["ate_17", "18_24", "25_34", "35_mais"])
+          .optional(),
+        trilha: z.enum(["dpp", "especialista"]).optional(),
+        incluir_inativas: z
+          .boolean()
+          .default(false)
+          .describe("false conta só pessoas ativas; true inclui inativas, desistentes e concluídas"),
+        limite: z.number().int().min(1).max(20).default(8).describe("top N de grupos; o restante vira outros"),
+      })
+      .strict(),
+    roles: ["coordenacao", "supervisor"],
+    run: async (a: {
+      dimensao: "estado" | "genero" | "faixa_idade" | "papel" | "trilha";
+      papel?: AppRole;
+      uf?: string;
+      genero?: "feminino" | "masculino" | "nao_binario" | "outro" | "prefiro_nao_dizer";
+      faixa_idade?: "ate_17" | "18_24" | "25_34" | "35_mais";
+      trilha?: "dpp" | "especialista";
+      incluir_inativas: boolean;
+      limite: number;
+    }, ctx) => {
+      const sensivel =
+        a.dimensao === "genero" ||
+        a.dimensao === "faixa_idade" ||
+        a.genero != null ||
+        a.faixa_idade != null;
+      if (sensivel && ctx.papel !== "coordenacao") {
+        throw new ErroTool(
+          "Gênero e faixa de idade são visão da coordenação. Posso agregar por estado, papel ou trilha dentro do seu recorte."
+        );
+      }
+      const pessoas = await getPessoasBiIa(ctx.supabase, a.incluir_inativas);
+      const agregado = agregarPessoasBi(pessoas, a.dimensao, a, a.limite);
+      // a linha de exemplo também segue a fronteira: supervisor pode ver
+      // nome/papel/trilha/UF do recorte dele, mas não recebe nem o rótulo
+      // "não informado" de gênero/idade — a dimensão sensível não entra
+      // no payload fora da coordenação
+      const linhas =
+        ctx.papel === "coordenacao"
+          ? agregado.linhas
+          : agregado.linhas.map((l) => ({
+              nome: l.nome,
+              papel: l.papel,
+              trilhas: l.trilhas,
+              uf: l.uf,
+            }));
+      return {
+        ...agregado,
+        linhas,
+        filtros_aplicados: Object.fromEntries(
+          Object.entries({
+            papel: a.papel,
+            uf: a.uf?.toUpperCase(),
+            genero: a.genero,
+            faixa_idade: a.faixa_idade,
+            trilha: a.trilha,
+          }).filter(([, v]) => v != null)
+        ),
+        escopo:
+          ctx.papel === "coordenacao"
+            ? "programa inteiro, com a RLS da coordenação"
+            : "recorte visível ao supervisor, com a RLS da sessão",
+        privacidade:
+          "sem contato, data de nascimento, dados civis, cor/raça ou motivação; idade sai só em faixas",
+      };
     },
   },
 

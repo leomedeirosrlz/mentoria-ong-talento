@@ -291,7 +291,7 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     }
     await expect(linhaT2.getByRole("img")).toHaveAttribute(
       "aria-label",
-      /\d com registro, \d (agendadas|aguardando registro)/
+      /\d com registro(, [^·]+)? · total \d/
     );
 
     // a intro explicativa do Painel saiu com o polimento — o desencontro

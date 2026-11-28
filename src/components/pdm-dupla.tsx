@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import type { FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 import {
   Compass,
@@ -21,6 +26,8 @@ import {
 import { formatDate } from "@/lib/ciclo";
 import type { PdmDoc, PdmItemStatus, PdmNo } from "@/lib/pdm";
 import {
+  dedupePdmItens,
+  expandeOrdemComOcultos,
   metasAtivas,
   montaArvorePdm,
   PDM_AREAS_VIDA,
@@ -30,6 +37,7 @@ import {
   subitensAtivos,
 } from "@/lib/pdm";
 import { FormSurface } from "@/components/form-surface";
+import { InstrumentoResultado } from "@/components/instrumento-resultado";
 import { PdmArvore } from "@/components/pdm-arvore";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,20 +59,91 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  respostaOrigemDoItem,
+  type PdmInstrumentoOrigem,
+  type PdmOrigemResolvida,
+} from "@/lib/pdm-origem";
 import { cn } from "@/lib/utils";
 
 // "Plano de desenvolvimento" — o documento vivo da dupla (REALIZA-181).
 // Recebe o doc já resolvido pelo servidor (RPC pdm_da_dupla) e delega toda
-// escrita às RPCs escopadas via actions; depois de cada gesto,
-// router.refresh() traz o doc novo (a RPC é a fonte da verdade — sem
-// estado otimista a reconciliar). `podeEditar` = mentor/mentorado da dupla
-// viva; coord e supervisor recebem o mesmo bloco em leitura.
+// escrita às RPCs escopadas via actions. Status, título e prioridade pintam
+// primeiro numa camada local síncrona; a action chama refresh() no mesmo roundtrip,
+// então o estado otimista é substituído pelo documento servidor sem apagar
+// a árvore no meio do caminho. Erro encerra a transição e o React desfaz o
+// otimismo — é o rollback, com toast. `podeEditar` = mentor/mentorado da
+// dupla viva; coord e supervisor recebem o mesmo bloco em leitura.
+
+type MutacaoPdm =
+  | { tipo: "status"; itemId: string; status: PdmItemStatus }
+  | { tipo: "ordem"; ids: string[] }
+  | { tipo: "titulo"; itemId: string; titulo: string };
+
+function aplicaMutacaoPdm(doc: PdmDoc, mutacao: MutacaoPdm): PdmDoc {
+  if (mutacao.tipo === "status") {
+    return {
+      ...doc,
+      itens: doc.itens.map((item) =>
+        item.id === mutacao.itemId
+          ? {
+              ...item,
+              status: mutacao.status,
+              atingidaEm:
+                mutacao.status === "atingida"
+                  ? new Date().toISOString()
+                  : mutacao.status === "ativa"
+                    ? null
+                    : item.atingidaEm,
+              atualizadoEm: new Date().toISOString(),
+            }
+          : item
+      ),
+    };
+  }
+  if (mutacao.tipo === "ordem") {
+    const ordem = new Map(mutacao.ids.map((id, i) => [id, i + 1]));
+    return {
+      ...doc,
+      itens: doc.itens.map((item) =>
+        ordem.has(item.id) ? { ...item, ordem: ordem.get(item.id)! } : item
+      ),
+    };
+  }
+  return {
+    ...doc,
+    itens: doc.itens.map((item) =>
+      item.id === mutacao.itemId ? { ...item, titulo: mutacao.titulo } : item
+    ),
+  };
+}
+
+function restaurarFocoEPosicao(foco: string | null, scrollY: number) {
+  // dois frames: o refresh chega no mesmo Flight da action, mas o commit da
+  // árvore nova acontece depois da promise resolver. preventScroll evita o
+  // salto ao devolver o foco; a posição só é reposta se o navegador tiver
+  // caído pro topo (se a pessoa rolou nesse meio-tempo, a escolha é dela).
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      if (scrollY > 0 && window.scrollY === 0) {
+        window.scrollTo({ top: scrollY, behavior: "instant" });
+      }
+      if (!foco) return;
+      const seletor = `[data-pdm-focus="${CSS.escape(foco)}"]`;
+      const alvo = document.querySelector<HTMLElement>(seletor);
+      if (alvo && document.activeElement !== alvo) {
+        alvo.focus({ preventScroll: true });
+      }
+    })
+  );
+}
 
 export function PdmDupla({
   duplaId,
   doc,
   podeEditar,
   mentoradoNome,
+  instrumentosOrigem = [],
   className,
 }: {
   duplaId: string;
@@ -73,10 +152,26 @@ export function PdmDupla({
    *  pdm_pode_editar (a RPC revalida; aqui é só UI). */
   podeEditar: boolean;
   mentoradoNome: string;
+  /** instrumentos da dupla reduzidos às respostas respondidas — a ponte
+   *  item projetado → resposta, derivada por slot/título sem criar schema. */
+  instrumentosOrigem?: PdmInstrumentoOrigem[];
   className?: string;
 }) {
-  const router = useRouter();
-  const [salvando, setSalvando] = useState(false);
+  // O otimismo precisa pintar no mesmo gesto (<50ms): `useOptimistic` é
+  // agendado na prioridade da transition e, no gesto de clique, passava do
+  // orçamento. Então a camada imediata é local e síncrona; a transition só
+  // acompanha a action/refresh. `doc` novo limpa a camada; erro restaura o
+  // snapshot anterior sem clobberar um gesto mais novo já feito por cima.
+  const [docLocal, setDocLocal] = useState<PdmDoc | null>(null);
+  const docServidor = useRef(doc);
+  useEffect(() => {
+    if (docServidor.current !== doc) {
+      docServidor.current = doc;
+      setDocLocal(null);
+    }
+  }, [doc]);
+  const docOtimista = docLocal ?? doc;
+  const [salvando, startTransition] = useTransition();
   const [anuncio, setAnuncio] = useState("");
 
   // dialogs: visão · item (criar/editar) · confirmação de exclusão
@@ -88,9 +183,15 @@ export function PdmDupla({
     | null
   >(null);
   const [excluirItem, setExcluirItem] = useState<PdmNo | null>(null);
+  const [origemAberta, setOrigemAberta] = useState<PdmOrigemResolvida | null>(null);
 
-  const arvore = useMemo(() => montaArvorePdm(doc.itens), [doc.itens]);
-  const metas = useMemo(() => metasAtivas(doc.itens), [doc.itens]);
+  const dedupe = useMemo(
+    () => dedupePdmItens(docOtimista.itens),
+    [docOtimista.itens]
+  );
+  const itensVisiveis = dedupe.itens;
+  const arvore = useMemo(() => montaArvorePdm(itensVisiveis), [itensVisiveis]);
+  const metas = useMemo(() => metasAtivas(itensVisiveis), [itensVisiveis]);
   const metasDescartadas = useMemo(
     () =>
       arvore.filter((n) => n.status === "descartada"),
@@ -100,45 +201,73 @@ export function PdmDupla({
     () => arvore.filter((n) => n.status !== "descartada"),
     [arvore]
   );
-  const progresso = useMemo(() => progressoPdm(doc.itens), [doc.itens]);
-  const subsAtivos = subitensAtivos(doc.itens);
+  const progresso = useMemo(() => progressoPdm(itensVisiveis), [itensVisiveis]);
+  const subsAtivos = subitensAtivos(itensVisiveis);
   const cabeMeta = metas.length < PDM_MAX_METAS;
   const cabeSub = subsAtivos < PDM_MAX_SUBITENS;
   const tudoAtingido =
     progresso.total > 0 && progresso.atingidas === progresso.total;
 
+  useEffect(() => {
+    if (!origemAberta?.ancora) return;
+    const espera = window.setTimeout(() => {
+      document
+        .getElementById(origemAberta.ancora!)
+        ?.scrollIntoView({ block: "start" });
+    }, 80);
+    return () => window.clearTimeout(espera);
+  }, [origemAberta]);
+
   function executar(
     acao: () => Promise<{ error?: string } | { ok: true; data?: unknown }>,
-    okMsg: string
+    okMsg: string,
+    mutacao?: MutacaoPdm,
+    foco?: string
   ) {
-    setSalvando(true);
-    void (async () => {
+    const scrollY = window.scrollY;
+    const anterior = docOtimista;
+    const otimista = mutacao ? aplicaMutacaoPdm(anterior, mutacao) : null;
+    if (otimista) setDocLocal(otimista);
+    const desfaz = () => {
+      if (!otimista) return;
+      setDocLocal((atual) => (atual === otimista ? anterior : atual));
+    };
+    startTransition(async () => {
       try {
         const r = await acao();
         if ("error" in r && r.error) {
-          toast.error(r.error);
+          desfaz();
+          toast.error(
+            mutacao ? `${r.error} A alteração foi desfeita.` : r.error
+          );
           return;
         }
         setAnuncio(okMsg);
         toast.success(okMsg);
-        router.refresh();
       } catch {
-        toast.error("Sem conexão. Tente de novo.");
+        desfaz();
+        toast.error(
+          mutacao
+            ? "Sem conexão. A alteração foi desfeita."
+            : "Sem conexão. Tente de novo."
+        );
       } finally {
-        setSalvando(false);
+        restaurarFocoEPosicao(foco ?? null, scrollY);
       }
-    })();
+    });
   }
 
   const acoes = {
-    onStatus: (item: PdmNo, status: PdmItemStatus) =>
+    onStatus: (item: PdmNo, status: PdmItemStatus, origem = "status") =>
       executar(
         () => pdmStatusItem(duplaId, item.id, status),
         status === "atingida"
           ? `"${item.titulo}" marcada como atingida.`
           : status === "descartada"
             ? `"${item.titulo}" foi descartada. Segue no histórico.`
-            : `"${item.titulo}" voltou a ficar em andamento.`
+            : `"${item.titulo}" voltou a ficar em andamento.`,
+        { tipo: "status", itemId: item.id, status },
+        `${item.id}:${origem === "menu" ? "menu" : "status"}`
       ),
     onEditar: (item: PdmNo) => setItemDialog({ modo: "editar", item }),
     // renomeação inline da árvore: só o título muda, o resto do item
@@ -155,7 +284,9 @@ export function PdmDupla({
             areaVida: item.areaVida,
             prazoAlvo: item.prazoAlvo,
           }),
-        `Título atualizado: "${titulo}".`
+        `Título atualizado: "${titulo}".`,
+        { tipo: "titulo", itemId: item.id, titulo },
+        `${item.id}:titulo`
       ),
     onNovaSubmeta: (pai: PdmNo) =>
       setItemDialog({ modo: "nova-submeta", pai }),
@@ -168,14 +299,26 @@ export function PdmDupla({
       if (idx < 0 || alvo < 0 || alvo >= ativos.length) return;
       const nova = [...ativos];
       [nova[idx], nova[alvo]] = [nova[alvo], nova[idx]];
+      const idsVisiveis = nova.map((i) => i.id);
       executar(
-        () => pdmReordenar(duplaId, item.parentId, nova.map((i) => i.id)),
+        () =>
+          pdmReordenar(
+            duplaId,
+            item.parentId,
+            expandeOrdemComOcultos(idsVisiveis, dedupe.ocultosPorPrincipal)
+          ),
         direcao === -1
           ? `"${item.titulo}" subiu pra ${alvo + 1}ª prioridade.`
-          : `"${item.titulo}" desceu pra ${alvo + 1}ª prioridade.`
+          : `"${item.titulo}" desceu pra ${alvo + 1}ª prioridade.`,
+        { tipo: "ordem", ids: idsVisiveis },
+        `${item.id}:menu`
       );
     },
     onExcluir: (item: PdmNo) => setExcluirItem(item),
+    onVerOrigem: (item: PdmNo) => {
+      const resolvida = respostaOrigemDoItem(item, instrumentosOrigem);
+      if (resolvida) setOrigemAberta(resolvida);
+    },
   };
 
   return (
@@ -448,6 +591,34 @@ export function PdmDupla({
           }
         />
       )}
+
+      {/* ---------- resposta de origem ---------- */}
+      <Dialog
+        open={origemAberta != null}
+        onOpenChange={(v) => !v && setOrigemAberta(null)}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          {origemAberta && (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  Resposta do instrumento {origemAberta.instrumento.titulo}
+                </DialogTitle>
+                <DialogDescription>
+                  {origemAberta.certeza === "exata"
+                    ? "Este item confere com a resposta abaixo. A resposta original é imutável; o plano vivo pode continuar sendo editado."
+                    : "Este item foi editado depois da projeção. Esta é a resposta mais recente do instrumento que o projetou; a resposta original é imutável."}
+                </DialogDescription>
+              </DialogHeader>
+              <InstrumentoResultado
+                sistema={origemAberta.instrumento.sistema}
+                campos={origemAberta.instrumento.campos}
+                respostas={origemAberta.entrega.respostas}
+              />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

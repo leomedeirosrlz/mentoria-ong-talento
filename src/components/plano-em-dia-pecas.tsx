@@ -99,7 +99,7 @@ export function QuadradosPlano({
       </div>
       <ul
         aria-hidden
-        className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"
+        className="mt-2 hidden flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground sm:flex"
       >
         {presentes.map((e) => (
           <li key={e} className="inline-flex items-center gap-1.5">
@@ -162,7 +162,7 @@ export function AceitesPlano({
 export function QuadradosCombinado({ resumo }: { resumo: ResumoCombinado }) {
   return (
     <QuadradosPlano
-      rotulo={`${resumo.feitos} de ${resumo.total} encontros do plano feitos`}
+      rotulo={`${resumo.feitos} de ${resumo.total} feitos`}
       itens={resumo.passos.map((p) => ({
         numero: p.numero,
         estado:
@@ -199,7 +199,7 @@ export function fraseDoCombinado(
       // é o de quem lê (019); a equipe lê a mesma espera como "da dupla"
       // na fila (textoDoMotivo), não aqui
       pill: "Falta o seu aceite",
-      texto: `A equipe propôs um plano pra vocês ficarem em dia até ${diaMes(r.ate ?? "")}. Um aceite da dupla põe o combinado pra valer; o outro lado é avisado.`,
+      texto: `A equipe propôs um plano pra vocês ficarem em dia até ${diaMes(r.ate ?? "")}. Um aceite da dupla põe o plano pra valer; o outro lado é avisado.`,
       cta: "Ver e responder",
     };
   }
@@ -207,7 +207,7 @@ export function fraseDoCombinado(
     return {
       tom: "neutro",
       pill: `Falta ${outro} responder`,
-      texto: `Você já respondeu. Um aceite da dupla põe o combinado pra valer; ${outro} foi avisado.`,
+      texto: `Você já respondeu. Um aceite da dupla põe o plano pra valer; ${outro} foi avisado.`,
       cta: "Ver o plano",
     };
   }
@@ -216,20 +216,20 @@ export function fraseDoCombinado(
       tom: "atencao",
       pill: "Plano valendo",
       texto: `${outro} combinou um plano pra vocês ficarem em dia até ${diaMes(r.ate ?? "")}${r.propostoEm ? `. Você foi avisado em ${diaMes(r.propostoEm.slice(0, 10))}` : ""} Se não servir pra você, dá pra contestar.`,
-      cta: "Ver o combinado",
+      cta: "Ver o plano",
     };
   }
   if (r.proximo) {
     return {
       tom: "neutro",
-      pill: "Plano combinado",
-      texto: `Próximo: ${r.proximo.numero}º encontro, sugestão ${diaCurto(r.proximo.data)}. Confirmem a data pra seguir no plano.`,
+      pill: "Pra ficar em dia",
+      texto: `Próximo: ${r.proximo.numero}º encontro, sugestão ${diaCurto(r.proximo.data)}.`,
       cta: "Confirmar data",
     };
   }
   return {
     tom: "neutro",
-    pill: "Plano combinado",
+    pill: "Pra ficar em dia",
     texto: `Todos os encontros do plano têm data. Em dia em ${diaMes(r.ate ?? "")}.`,
     cta: "Ver o plano",
   };

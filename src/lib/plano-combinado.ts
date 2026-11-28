@@ -147,6 +147,18 @@ export type PlanoCombinado = {
   escopo?: {
     ritmo?: number | null;
     janela?: { inicio: string; fim: string } | null;
+    /** Carimbo da proposta com suposição de recesso (0245). */
+    assumido?: boolean;
+    /** Snapshot das decisões do gesto; recessos com origem "proposta"
+     *  ainda esperam a resposta autoral da dupla no aceite. */
+    decisoes?: {
+      recessos?: {
+        cicloEventoId: string;
+        usa: boolean;
+        origem?: "dupla" | "proposta";
+      }[];
+      [k: string]: unknown;
+    };
     passos?: {
       numero: number;
       data: string;
@@ -256,6 +268,17 @@ export function combinadoDoJovem(p: {
   proposto_via?: string | null;
   expira_em?: string;
   concluido_em?: string | null;
+  /** Recorte jsonb do escopo (0245) — a RPC do jovem passa a devolver
+   *  pra suposição de recesso chegar ao aceite dele também. */
+  decisoes?: {
+    recessos?: {
+      cicloEventoId: string;
+      usa: boolean;
+      origem?: "dupla" | "proposta";
+    }[];
+    [k: string]: unknown;
+  } | null;
+  assumido?: boolean | null;
   passos_aplicados?: { numero: number; data_nova: string }[] | null;
 }): PlanoCombinado {
   return {
@@ -273,6 +296,8 @@ export function combinadoDoJovem(p: {
     janela: p.janela ?? null,
     escopo: {
       ritmo: p.ritmo == null ? null : Number(p.ritmo) || null,
+      ...(p.assumido != null ? { assumido: p.assumido } : {}),
+      ...(p.decisoes ? { decisoes: p.decisoes } : {}),
       passos: (p.passos ?? []).map((s) => ({
         numero: s.numero,
         data: s.data,
@@ -315,6 +340,9 @@ export type PassoCombinado = {
   estado: "feito" | "marcado" | "pendente";
   /** ISO da data confirmada (passo aplicado) */
   marcadoEm: string | null;
+  /** Furou a fila do combinado (QA 25/11): um passo de número menor
+   *  segue por fazer com data depois — a data cruzou o número. */
+  adiantado: boolean;
 };
 
 /** A leitura do plano por quem abre a tela (518 — REALIZA-518, copy da
@@ -426,7 +454,22 @@ export function resumoCombinado(
           ? "marcado"
           : "pendente",
       marcadoEm: aplicados.get(p.numero) ?? null,
+      adiantado: false,
     }));
+  // "adiantado" (QA 25/11): passo a fazer de número menor com data
+  // DEPOIS — o marcado/pendente de número maior furou a fila do
+  // combinado. A data que vale é a confirmada quando já marcada.
+  const efetiva = (p: PassoCombinado): string =>
+    (p.marcadoEm ?? `${p.data}T00:00:00`).slice(0, 10);
+  for (const p of passos) {
+    if (p.estado === "feito") continue;
+    p.adiantado = passos.some(
+      (q) =>
+        q.numero < p.numero &&
+        q.estado !== "feito" &&
+        efetiva(q) > efetiva(p)
+    );
+  }
   const datas = passos.map((p) => p.data).filter(dataOk).sort();
   return {
     aberto: planoAberto(plano.status),
@@ -438,7 +481,14 @@ export function resumoCombinado(
     total: passos.length,
     marcados: passos.filter((p) => p.estado !== "pendente").length,
     feitos: passos.filter((p) => p.estado === "feito").length,
-    proximo: passos.find((p) => p.estado === "pendente") ?? null,
+    // o próximo a confirmar é o pendente mais próximo por DATA — a mesma
+    // régua das demais superfícies, nunca "o de menor número" (QA 25/11)
+    proximo:
+      passos
+        .filter((p) => p.estado === "pendente")
+        .sort(
+          (a, b) => a.data.localeCompare(b.data) || a.numero - b.numero
+        )[0] ?? null,
     ate: datas.at(-1) ?? null,
   };
 }

@@ -35,6 +35,7 @@ import {
   type AgendaSecao,
 } from "@/lib/agenda-minha";
 import { turmaCurta } from "@/lib/turma";
+import { ocupadosAgendados } from "@/lib/sugestoes-encontro";
 import type {
   CicloEvento,
   Cronograma,
@@ -130,6 +131,11 @@ function AcoesItem({
 }) {
   const [dialogo, setDialogo] = useState<DialogoItem | null>(null);
   const jovemNome = dupla ? primeiroNomeDaDupla(dupla) : undefined;
+  const ocupadosDupla = ocupadosAgendados(dupla?.encontros ?? [], (e) => {
+    const esp = dupla?.trilha === "especialista";
+    const n = esp ? `${e.numero}ª sessão` : `${e.numero}º encontro`;
+    return { rotulo: n, rotuloArtigo: esp ? `a ${n}` : `o ${n}` };
+  });
 
   // filtrada pelas mesmas condições que cada controle exigia solto —
   // a 1ª que sobra é a visível
@@ -232,6 +238,7 @@ function AcoesItem({
           e o foco volta pro ⋯ ao sair */}
       {item.acoes.includes("remarcar") && item.encontro && item.duplaId && (
         <AgendarEncontroDialog
+          ocupados={ocupadosDupla}
           duplaId={item.duplaId}
           numero={item.encontro.numero}
           atual={item.encontro}
@@ -404,6 +411,10 @@ function LinhaAviso({
           e o foco volta pro ⋯ ao sair */}
       {limbo && aviso.encontro && (
         <AgendarEncontroDialog
+          ocupados={ocupadosAgendados(dupla?.encontros ?? [], (e) => ({
+            rotulo: `${e.numero}º encontro`,
+            rotuloArtigo: `o ${e.numero}º encontro`,
+          }))}
           duplaId={aviso.duplaId}
           numero={aviso.encontro.numero}
           atual={aviso.encontro}

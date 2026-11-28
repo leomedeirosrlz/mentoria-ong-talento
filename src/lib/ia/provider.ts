@@ -534,6 +534,9 @@ export type ResultadoStream =
       fallback?: boolean;
       abortado?: boolean;
       dormindo?: boolean;
+      /** estourou o tempo (orçamento da rota ou timeout de rede) — a UI
+       *  troca "dormindo" por "demorou" e oferece tentar de novo */
+      demorou?: boolean;
     };
 
 /** Delta de tool_call como o OpenAI manda no stream: id/name vêm uma vez,
@@ -573,6 +576,9 @@ export async function chamarModeloStream(
     /** papéis do usuário — o payload de tools já sai filtrado por eles
      *  (REALIZA-333); ausente = todas (MCP/tests que não têm papel) */
     papeis?: AppRole[];
+    /** sem token novo por N ms, a tentativa é abortada e a cadeia segue
+     *  pro próximo modelo (provedor travado vira fallback, não erro) */
+    ociosidadeMs?: number;
   },
   continuacoesRestantes = MAX_CONTINUACOES
 ): Promise<ResultadoStream> {
@@ -597,6 +603,25 @@ export async function chamarModeloStream(
     }
     let mandarEsforco = Boolean(opts.esforco);
     for (;;) {
+    // vigia de ociosidade: provedor que para de mandar token não segura o
+    // orçamento inteiro — aborta a tentativa e a cadeia tenta o próximo.
+    // Antes de qualquer byte é retry limpo; depois, a rota refaz em JSON
+    // e reseta a bolha (o parcial não fica duplicado).
+    const ociosidade =
+      opts.ociosidadeMs ?? Number(process.env.IA_OCIOSIDADE_MS ?? 20_000);
+    const ctrlTentativa = new AbortController();
+    let estourouOcio = false;
+    let timerOcio: ReturnType<typeof setTimeout> | undefined;
+    const armarOcio = () => {
+      if (!(ociosidade > 0)) return;
+      if (timerOcio) clearTimeout(timerOcio);
+      timerOcio = setTimeout(() => {
+        estourouOcio = true;
+        ctrlTentativa.abort();
+      }, ociosidade);
+    };
+    armarOcio();
+    const sinalTentativa = AbortSignal.any([opts.signal, ctrlTentativa.signal]);
     // hoisted out of `try` so the catch can return the emitted partial —
     // a retry only happens before the stream opens (empty anyway)
     let content = "";
@@ -620,7 +645,7 @@ export async function chamarModeloStream(
           true,
           opts.papeis
         ),
-        signal: opts.signal,
+        signal: sinalTentativa,
       });
       const tipo = res.headers.get("content-type") ?? "";
       if (!res.ok || !res.body || !tipo.includes("text/event-stream")) {
@@ -699,6 +724,7 @@ export async function chamarModeloStream(
           saiuAlgo = true;
           aplicarDelta(delta.tool_calls);
         }
+        if (delta?.content || delta?.tool_calls?.length) armarOcio();
         return true;
       };
 
@@ -729,6 +755,7 @@ export async function chamarModeloStream(
           }
         }
       }
+      clearTimeout(timerOcio);
       decoder.decode(); // flush do restante multibyte
       const toolCalls = [...calls.entries()]
         .sort(([a], [b]) => a - b)
@@ -804,7 +831,19 @@ export async function chamarModeloStream(
           truncado: true,
         };
       }
+      clearTimeout(timerOcio);
       console.error(`chamarModeloStream: ${cadeia[i] ?? "env"}`, e);
+      // signal da rota abortado sem ser o cliente = orçamento estourado;
+      // erro de timeout do fetch também é demora, não provider fora
+      const nome = (e as { name?: string } | null)?.name;
+      const estourouTempo =
+        opts.signal.aborted || nome === "TimeoutError" || nome === "AbortError";
+      // travou (sem token por ociosidadeMs) e ainda há modelo na cadeia:
+      // vai pro próximo em vez de gastar o orçamento esperando
+      if (estourouOcio && !opts.signal.aborted && !saiuAlgo && !ultimo) {
+        esperaMs = 0;
+        break;
+      }
       // não avança quando: o signal da rota abortou sem ser o cliente
       // (timeout combinado — o orçamento acabou), é o último modelo da
       // cadeia, byte útil já saiu na tela (repetir duplicaria texto) ou
@@ -824,6 +863,7 @@ export async function chamarModeloStream(
           // são falha do provider; exceção não-transitória segue erro real
           dormindo:
             erroTransitorio(e) || opts.signal.aborted || undefined,
+          demorou: estourouTempo || estourouOcio || undefined,
         };
       }
       esperaMs = RETRY_BACKOFF_MS;

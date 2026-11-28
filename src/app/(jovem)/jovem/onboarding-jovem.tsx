@@ -105,7 +105,7 @@ const TOUR: RecursoTour[] = [
     texto:
       "Pedir ajuda quando precisar: a equipe recebe na hora e responde por aqui.",
     img: "mentorado-ajuda",
-    alt: "A seção Meus pedidos de ajuda do perfil do mentorado",
+    alt: "A seção Meus pedidos de ajuda da home do mentorado",
   },
   {
     icon: UserCircle,

@@ -23,6 +23,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FadeTroca } from "@/components/ui/etapa";
 import { cn } from "@/lib/utils";
+import {
+  CtaPosResposta,
+  type DestinoPosResposta,
+} from "@/components/cta-pos-resposta";
 import { useResposta } from "./use-resposta";
 import { RodaSvg } from "./roda-svg";
 import { RodaVida } from "./roda-vida";
@@ -60,6 +64,7 @@ export function InstrumentoFlow({
   destinatario,
   sistema,
   preview = false,
+  destinoPosResposta = null,
 }: {
   token: string;
   titulo: string;
@@ -69,6 +74,8 @@ export function InstrumentoFlow({
   sistema: InstrumentoSistema;
   /** prévia na ficha da coordenação — campos vivos, envio desligado */
   preview?: boolean;
+  /** saída contextual do sucesso — vem do server; anônimo fica sem botão */
+  destinoPosResposta?: DestinoPosResposta | null;
 }) {
   // o <form> vive num state local (ref={setFormEl}) — o hook lê o
   // honeypot e rola até o primeiro erro através dele; o elemento não
@@ -103,6 +110,7 @@ export function InstrumentoFlow({
           primeiroNome={primeiroNome}
           campos={campos}
           valores={api.valores}
+          destinoPosResposta={destinoPosResposta}
         />
       ) : (
         <div className="space-y-3">
@@ -276,12 +284,14 @@ function PainelSucesso({
   primeiroNome,
   campos,
   valores,
+  destinoPosResposta = null,
 }: {
   sistema: InstrumentoSistema;
   titulo: string;
   primeiroNome: string | null;
   campos: FormularioCampo[];
   valores: Record<string, RespostaValor>;
+  destinoPosResposta?: DestinoPosResposta | null;
 }) {
   const roda =
     sistema === "roda_vida" ? extraiRodaDaVida(campos, valores) : null;
@@ -301,7 +311,7 @@ function PainelSucesso({
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
             Obrigado{primeiroNome ? `, ${primeiroNome}` : ""}. É com esse
             retrato que você e seu(sua) mentor(a) vão escolher as áreas
-            prioritárias da jornada. Pode fechar esta página.
+            prioritárias da jornada.${destinoPosResposta ? "" : " Pode fechar esta página."}
           </p>
         </>
       ) : (
@@ -313,10 +323,11 @@ function PainelSucesso({
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
             Obrigado{primeiroNome ? `, ${primeiroNome}` : ""}. Sua resposta
             pra “{titulo}” foi registrada e já está com a equipe do
-            Realiza.vc. Pode fechar esta página.
+            Realiza.vc.${destinoPosResposta ? "" : " Pode fechar esta página."}
           </p>
         </>
       )}
+      <CtaPosResposta destino={destinoPosResposta} />
     </div>
   );
 }

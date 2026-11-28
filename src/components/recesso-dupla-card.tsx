@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Check, SunHorizon } from "@phosphor-icons/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { declararRecesso } from "@/lib/actions-recesso";
+import { toast } from "@/lib/toast";
 
 // REALIZA-462/518 — a decisão de recesso é da dupla e por período:
 // usa=true = os encontros pausam no período; usa=false = a dupla segue
@@ -118,25 +120,83 @@ export function RecessoDecisao({
   podeDeclarar: boolean;
   onDecisao?: (cicloEventoId: string, usa: boolean) => void;
 }) {
+  const router = useRouter();
   const [pendente, start] = useTransition();
-  const [erro, setErro] = useState<string | null>(null);
+  // respondido vira uma linha; o "Editar" reabre os dois botões
+  const [editando, setEditando] = useState<ReadonlySet<string>>(new Set());
+  // respostas dadas nesta sessão (QA 25/11): sem refresh o POST sumia —
+  // a linha trava no valor respondido até o revalidate chegar
+  const [respondido, setRespondido] = useState<Record<string, boolean>>({});
 
   const declarar = (cicloEventoId: string, usa: boolean) => {
-    setErro(null);
     start(async () => {
       const r = await declararRecesso(duplaId, cicloEventoId, usa);
       if ("error" in r) {
-        setErro(r.error);
+        toast.error(r.error);
         return;
       }
+      setRespondido((m) => ({ ...m, [cicloEventoId]: usa }));
+      setEditando((s) => {
+        const n = new Set(s);
+        n.delete(cicloEventoId);
+        return n;
+      });
       onDecisao?.(cicloEventoId, usa);
+      toast.success(
+        usa
+          ? "Decisão registrada: os encontros pausam no recesso."
+          : "Decisão registrada: vocês seguem se encontrando."
+      );
+      router.refresh();
     });
   };
 
   return (
     <>
       {recessos.map((r) => {
-        const decidido = r.declaradoEm != null && r.usa != null;
+        // a resposta local ganha da prop até o revalidate chegar
+        const usaAtual =
+          r.cicloEventoId in respondido ? respondido[r.cicloEventoId] : r.usa;
+        const decidido =
+          r.cicloEventoId in respondido ||
+          (r.declaradoEm != null && r.usa != null);
+        // o colapso só vale onde o "Editar" reabre a decisão — na versão
+        // só-leitura (card do plano, staff) ele esconderia a autoria pra
+        // sempre, então ali a linha segue expandida
+        const compacto =
+          decidido && podeDeclarar && !editando.has(r.cicloEventoId);
+        if (compacto) {
+          return (
+            <div
+              key={r.cicloEventoId}
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+            >
+              <Check size={14} aria-hidden className="shrink-0 text-[var(--ok-text)]" />
+              <span className="min-w-0 flex-1">
+                <span className="font-medium">
+                  {usaAtual ? "Pausar os encontros" : "Seguir nos encontrando"}
+                </span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {janela(r.inicio, r.fim)}
+                </span>
+              </span>
+              {podeDeclarar && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="min-h-9 px-2 text-muted-foreground"
+                  onClick={() =>
+                    setEditando((s) => new Set(s).add(r.cicloEventoId))
+                  }
+                >
+                  Editar
+                </Button>
+              )}
+            </div>
+          );
+        }
         return (
           <div
             key={r.cicloEventoId}
@@ -148,7 +208,7 @@ export function RecessoDecisao({
               </p>
               <p className="text-xs text-muted-foreground">
                 {decidido
-                  ? r.usa
+                  ? usaAtual
                     ? "vão pausar os encontros"
                     : "seguem se encontrando"
                   : "a dupla ainda não decidiu"}
@@ -166,11 +226,11 @@ export function RecessoDecisao({
                 <Button
                   type="button"
                   size="sm"
-                  variant={decidido && r.usa === true ? "default" : "outline"}
+                  variant={decidido && usaAtual === true ? "default" : "outline"}
                   disabled={pendente}
                   onClick={() => declarar(r.cicloEventoId, true)}
                 >
-                  {decidido && r.usa === true && (
+                  {decidido && usaAtual === true && (
                     <Check size={14} aria-hidden />
                   )}
                   Vamos pausar os encontros
@@ -178,11 +238,11 @@ export function RecessoDecisao({
                 <Button
                   type="button"
                   size="sm"
-                  variant={decidido && r.usa === false ? "default" : "outline"}
+                  variant={decidido && usaAtual === false ? "default" : "outline"}
                   disabled={pendente}
                   onClick={() => declarar(r.cicloEventoId, false)}
                 >
-                  {decidido && r.usa === false && (
+                  {decidido && usaAtual === false && (
                     <Check size={14} aria-hidden />
                   )}
                   Vamos seguir nos encontrando
@@ -192,11 +252,6 @@ export function RecessoDecisao({
           </div>
         );
       })}
-      {erro && (
-        <p role="status" className="text-xs text-[var(--warn-text)]">
-          {erro}
-        </p>
-      )}
     </>
   );
 }

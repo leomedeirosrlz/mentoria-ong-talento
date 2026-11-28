@@ -65,8 +65,11 @@ import { useDesktop } from "@/lib/use-desktop";
 // commit antes do "Combinar" final: as respostas viajam juntas pra
 // combinarPlano, que declara os recessos e propõe na mesma chamada.
 // Proposta de lado da dupla já nasce valendo; a da equipe espera um
-// aceite. A decisão de recesso é só da dupla — staff vê o estado e o
-// "Combinar" espera a resposta deles (a RPC recusa com o motivo honesto).
+// aceite. A decisão de recesso é só da dupla — staff vê o estado e
+// propõe mesmo assim: a proposta carrega a suposição (pausa, o padrão
+// do calendário, a menos que a dupla já tenha decidido seguir) e ela
+// confirma ou troca no aceite. Nada é escrito em nome da dupla na
+// proposta — a RPC valida a suposição no escopo.
 
 type PassoId = "ritmo" | "recesso" | "grade" | "sessao" | "confirmar";
 type Sim = Extract<SimulacaoPlano, { ok: true }>;
@@ -321,6 +324,15 @@ export function CombinarPlano({
   const pendentes =
     sim?.recessos.filter((r) => recessoUsa(r) == null) ?? [];
   const faltaDecisao = pendentes.length > 0;
+  // staff propõe com suposição quando falta a resposta da dupla: o
+  // pendente vira pausa (o padrão do calendário) e a decisão de seguir
+  // que ela já deu viaja junto — ela confirma ou troca antes de aceitar
+  const notaSuposicao = (() => {
+    if (lado !== "staff" || !faltaDecisao || sim == null) return null;
+    const recObj = pendentes.length > 1 ? "os recessos" : "o recesso";
+    const recLoc = pendentes.length > 1 ? "nos recessos" : "no recesso";
+    return `A dupla ainda não decidiu ${recObj}. Dá para enviar assim: a proposta considera pausa ${recLoc}, e ela confirma ou troca no aceite.`;
+  })();
   const algumaGrade = Boolean(sim?.grade.mentor || sim?.grade.jovem);
   // 519: "usar a grade" só existe quando os DOIS lados marcaram — com um
   // lado só não há "em comum" e a simulação já roda sem grade no servidor
@@ -357,7 +369,9 @@ export function CombinarPlano({
     !simulando &&
     !enviando &&
     ritmoNum != null &&
-    !faltaDecisao &&
+    // staff propõe com suposição (pausa) quando falta a resposta — pra
+    // dupla a decisão continua prévia ao combinado
+    (lado === "staff" || !faltaDecisao) &&
     (!gradePerguntada || semGrade != null) &&
     aplicavel != null &&
     !aplicavel.emDia &&
@@ -397,7 +411,7 @@ export function CombinarPlano({
           ? "Modo demo: nada é gravado de verdade."
           : r.status === "proposto"
             ? "Proposto. Falta um aceite da dupla."
-            : "Combinado valendo. O outro lado foi avisado."
+            : "Plano valendo. O outro lado foi avisado."
       );
       setOpen(false);
       onDone?.();
@@ -768,7 +782,7 @@ export function CombinarPlano({
         </p>
         <p className="text-sm text-muted-foreground">
           Dá pra compensar: a prática entra nas reflexões do registro e
-          do próprio combinado, na semana que sobrar.
+          do próprio plano, na semana que sobrar.
         </p>
         <Button
           type="button"
@@ -936,7 +950,7 @@ export function CombinarPlano({
         ))}
         {semGrade === true && (
           <li className="text-muted-foreground">
-            Combinado sem a grade. As datas podem cair fora dos períodos
+            Plano sem a grade. As datas podem cair fora dos períodos
             livres.
           </li>
         )}
@@ -959,13 +973,29 @@ export function CombinarPlano({
           </li>
         ))}
       </ul>
+      {faltaDecisao &&
+        (notaSuposicao ? (
+          <p
+            role="status"
+            className="animate-enter mt-2 text-sm text-muted-foreground"
+          >
+            {notaSuposicao}
+          </p>
+        ) : (
+          <p
+            role="status"
+            className="animate-enter mt-2 text-sm text-[var(--warn-text)]"
+          >
+            Falta a dupla confirmar o recesso.
+          </p>
+        ))}
       {/* o documento do combinado (020): a dupla lê por escrito o que
           vai propor — a mesma montagem do doc persistido, com o escopo
           projetado do wizard */}
       {docPreview && (
         <Collapsible.Root className="mt-3 rounded-lg border border-border/60 px-3.5 py-2.5">
           <Collapsible.Trigger className="flex w-full cursor-pointer items-center justify-between gap-2 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring [&[aria-expanded=true]>svg]:rotate-180">
-            Ler o documento do combinado
+            Ler o documento do plano
             <CaretDown
               aria-hidden
               className="size-3.5 shrink-0 transition-transform"
@@ -981,11 +1011,8 @@ export function CombinarPlano({
         </Collapsible.Root>
       )}
       {avisoPratica}
-      {faltaDecisao && (
-        <p role="status" className="animate-enter mt-2 text-sm text-[var(--warn-text)]">
-          Falta a dupla confirmar o recesso.
-        </p>
-      )}
+      {/* recesso sem resposta: staff lê a suposição como aviso calmo;
+          pra dupla a decisão continua prévia e o tom é de atenção */}
       {aplicavel && !aplicavel.emDia && aplicavel.dataRecuperacao == null && (
         <p role="status" className="animate-enter mt-2 text-sm text-[var(--warn-text)]">
           {ritmoNum != null
@@ -1120,7 +1147,7 @@ export function CombinarPlano({
         </span>
         <div>
           <p className="text-sm font-semibold">
-            Já existe um combinado valendo pra essa dupla.
+            Já existe um plano valendo pra essa dupla.
           </p>
           <p className="mt-0.5 text-sm text-muted-foreground">
             O plano novo entra como versão só quando o atual for
@@ -1272,7 +1299,7 @@ export function CombinarPlano({
         <DialogHeader>
           <DialogTitle>Combinar o plano</DialogTitle>
           <DialogDescription>
-            Uma pergunta por vez. O combinado só sai no último passo.
+            Uma pergunta por vez. O plano só sai no último passo.
           </DialogDescription>
         </DialogHeader>
         {corpo}
@@ -1291,7 +1318,7 @@ export function CombinarPlano({
         <div className="pr-8">
           <SheetTitle>Combinar o plano</SheetTitle>
           <p className="mt-1 text-sm text-muted-foreground">
-            Uma pergunta por vez. O combinado só sai no último passo.
+            Uma pergunta por vez. O plano só sai no último passo.
           </p>
         </div>
         {/* sem min-h-0 (526): a caixa encolhia pra área livre e o conteúdo

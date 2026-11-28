@@ -74,6 +74,9 @@ function supaFake({
   let auditAwaited = false;
 
   const builder = (tabela: string) => {
+    // a checagem de "outro encontro no dia" usa gte+lt; nos testes a faixa
+    // responde vazia — o cenário de colisão tem teste próprio
+    let faixaVazia = false;
     const rows = () => tabelas[tabela] ?? [];
     const b: Record<string, unknown> = {
       select: (sel?: unknown) => {
@@ -81,6 +84,7 @@ function supaFake({
         return b;
       },
       in: () => b,
+      or: () => b,
       eq: (campo: string, valor: unknown) => {
         eqCalls.push({ tabela, campo, valor });
         return b;
@@ -88,6 +92,10 @@ function supaFake({
       neq: () => b,
       gt: () => b,
       gte: () => b,
+      lt: () => {
+        faixaVazia = true;
+        return b;
+      },
       lte: () => b,
       order: (campo: string, op?: unknown) => {
         orderCalls.push({ tabela, campo, op });
@@ -234,6 +242,7 @@ describe("registry", () => {
         "mural_especialista",
         "operacional_insights",
         "pedir_reabertura_chamado",
+        "pessoas_agregado",
         "pessoas_busca",
         "plano_aplicar_passo",
         "plano_em_dia",
@@ -412,6 +421,164 @@ describe("executarTool — gate de papel", () => {
     const d = dadosDe(r) as { respostas: { pergunta: string }[] };
     expect(d.respostas.length).toBeGreaterThan(0);
     expect(fromCalls).toHaveLength(0);
+  });
+});
+
+// ---------- pessoas_agregado (BI demográfico, onda 5) ----------
+// Fixture que o PostgREST real devolveria: o .or() da query já tira a
+// conta de jovem (role=mentorado) e o .eq("ativo") filtra inativas — o
+// fake não aplica filtro, então a semente já vem com o recorte aplicado.
+const TABELAS_BI = {
+  profiles: [
+    {
+      id: "p-1",
+      nome: "Ana Híbrida",
+      nome_social: null,
+      role: "mentor_dpp",
+      ativo: true,
+      uf: "sp",
+      profile_papeis: [
+        { papel: "mentor_dpp" },
+        { papel: "mentor_especialista" },
+      ],
+    },
+    {
+      id: "p-2",
+      nome: "Beto Coord",
+      nome_social: null,
+      role: "coordenacao",
+      ativo: true,
+      uf: "RJ",
+      profile_papeis: [{ papel: "coordenacao" }],
+    },
+  ],
+  mentorados: [
+    { id: "m-1", nome: "Caio", nome_social: null, situacao: "ativo", uf: "SP", profile_id: null },
+    { id: "m-2", nome: "Duda", nome_social: null, situacao: "ativo", uf: "SP", profile_id: "p-9" },
+  ],
+  profiles_pessoal: [
+    { id: "p-1", data_nascimento: "1990-01-01", genero: "feminino" },
+    { id: "p-2", data_nascimento: "1980-05-05", genero: "masculino" },
+  ],
+  mentorados_pessoal: [
+    { id: "m-1", data_nascimento: "2008-04-12", genero: "feminino" },
+    { id: "m-2", data_nascimento: "2009-08-30", genero: "masculino" },
+  ],
+  duplas: [
+    { mentor_id: "p-1", mentorado_id: "m-1", trilha: "dpp", status: "ativa" },
+    { mentor_id: "p-1", mentorado_id: "m-2", trilha: "especialista", status: "pausada" },
+  ],
+};
+
+describe("executarTool — pessoas_agregado", () => {
+  it("coord recebe grupos por estado, título e recorte, sem nascimento no payload", async () => {
+    const { supabase } = supaFake({ tabelas: TABELAS_BI });
+    const r = await executarTool(
+      "pessoas_agregado",
+      { dimensao: "estado" },
+      supabase,
+      "chat"
+    );
+    const d = dadosDe(r) as {
+      titulo: string;
+      total_pessoas: number;
+      grupos: { chave: string; rotulo: string; pessoas: number }[];
+      linhas: Record<string, unknown>[];
+    };
+    expect(d.titulo).toBe("Pessoas por estado (UF)");
+    expect(d.total_pessoas).toBe(4);
+    expect(d.grupos.find((g) => g.chave === "SP")?.pessoas).toBe(3);
+    expect(d.grupos.find((g) => g.chave === "RJ")?.pessoas).toBe(1);
+    // nascimento só virou faixa no servidor — nunca data exata; e a
+    // allowlist do select nem pede cor/raça, civis, motivação ou intake
+    expect(JSON.stringify(d)).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    for (const campo of [
+      "cor_raca",
+      "dados_civis",
+      "motivacao",
+      "form_bruto",
+      "whatsapp",
+      "email",
+      "cpf",
+    ])
+      expect(JSON.stringify(d)).not.toContain(campo);
+  });
+
+  it("trilha conta participação (híbrido nas duas linhas) e marca o flag", async () => {
+    const { supabase } = supaFake({ tabelas: TABELAS_BI });
+    const r = await executarTool(
+      "pessoas_agregado",
+      { dimensao: "trilha" },
+      supabase,
+      "chat"
+    );
+    const d = dadosDe(r) as {
+      participacao_multipla: boolean;
+      grupos: { chave: string; pessoas: number }[];
+    };
+    expect(d.participacao_multipla).toBe(true);
+    expect(d.grupos.find((g) => g.chave === "dpp")?.pessoas).toBe(2);
+    expect(d.grupos.find((g) => g.chave === "especialista")?.pessoas).toBe(2);
+    expect(d.grupos.find((g) => g.chave === "sem_trilha")?.pessoas).toBe(1);
+  });
+
+  it("o select das views sensíveis pede só id, nascimento e gênero", async () => {
+    const { supabase, selectCalls } = supaFake({ tabelas: TABELAS_BI });
+    await executarTool(
+      "pessoas_agregado",
+      { dimensao: "estado" },
+      supabase,
+      "chat"
+    );
+    for (const s of selectCalls.filter(
+      (c) => c.tabela === "profiles_pessoal" || c.tabela === "mentorados_pessoal"
+    )) {
+      expect(s.sel).toBe("id, data_nascimento, genero");
+    }
+  });
+
+  it("mentor e jovem não chamam — o gate sai antes de ler", async () => {
+    for (const papel of ["mentor_dpp", "mentor_especialista", "mentorado"] as const) {
+      const { supabase, fromCalls } = supaFake({ papel });
+      const r = await executarTool(
+        "pessoas_agregado",
+        { dimensao: "estado" },
+        supabase,
+        "chat"
+      );
+      expect(r.ok).toBe(false);
+      expect(fromCalls).toHaveLength(0);
+    }
+  });
+
+  it("supervisor agrega estado/papel/trilha; gênero e idade são da coordenação", async () => {
+    const a = supaFake({ papel: "supervisor", tabelas: TABELAS_BI });
+    const ok = await executarTool(
+      "pessoas_agregado",
+      { dimensao: "estado" },
+      a.supabase,
+      "chat"
+    );
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      const d = ok.dados as { linhas: Record<string, unknown>[] };
+      for (const l of d.linhas) {
+        expect(l).not.toHaveProperty("genero");
+        expect(l).not.toHaveProperty("faixa_idade");
+      }
+    }
+
+    for (const args of [
+      { dimensao: "genero" },
+      { dimensao: "faixa_idade" },
+      { dimensao: "estado", genero: "feminino" },
+      { dimensao: "estado", faixa_idade: "ate_17" },
+    ] as const) {
+      const b = supaFake({ papel: "supervisor", tabelas: TABELAS_BI });
+      const r = await executarTool("pessoas_agregado", args, b.supabase, "chat");
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.erro).toContain("coordenação");
+    }
   });
 });
 

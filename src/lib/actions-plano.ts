@@ -62,6 +62,7 @@ function revalidarPlano(duplaId?: string) {
   revalidatePath("/");
   revalidatePath("/jovem");
   revalidatePath("/jovem/agenda");
+  revalidatePath("/agenda");
 }
 
 // ---------- aviso externo (518 FR-006) ----------
@@ -72,8 +73,17 @@ function revalidarPlano(duplaId?: string) {
 
 async function avisoPlanoEmail(
   ctx: { emails: { mentor: string | null; jovem: string | null } },
-  duplaId: string
+  duplaId: string,
+  /** 0245: a proposta da equipe pode nascer com suposição de recesso — o
+   *  e-mail diz o que foi assumido (pausa ou seguir) e o CTA pede a
+   *  revisão da dupla antes do aceite. */
+  suposicao?: { pausa: boolean; mista?: boolean }
 ): Promise<{ enviados: number; falhas: string[] }> {
+  const frase = suposicao?.mista
+    ? "A proposta considera uma escolha para cada recesso; confirme ou troque antes de aceitar."
+    : `A proposta considera ${suposicao?.pausa ? "pausa" : "seguir"} no recesso; confirme ou troque antes de aceitar.`;
+  const aviso = suposicao ? `<p>${frase}</p>` : "";
+  const cta = suposicao ? "Revisar o plano" : "Abrir o Realiza";
   const mensagens = [
     { to: ctx.emails.mentor, link: `/duplas/${duplaId}#plano-em-dia` },
     { to: ctx.emails.jovem, link: `/jovem/agenda#plano` },
@@ -81,8 +91,8 @@ async function avisoPlanoEmail(
     .filter((m): m is { to: string; link: string } => Boolean(m.to))
     .map((m) => ({
       to: m.to,
-      subject: "Tem um combinado pra você no Realiza",
-      html: `<p>Tem um combinado pra você no Realiza.</p><p><a href="${SITE_URL}${m.link}">Abrir o Realiza</a></p>`,
+      subject: "Tem um plano pra você no Realiza",
+      html: `<p>Tem um plano pra você no Realiza.</p>${aviso}<p><a href="${SITE_URL}${m.link}">${cta}</a></p>`,
     }));
   if (!mensagens.length) return { enviados: 0, falhas: [] };
   try {
@@ -96,7 +106,68 @@ async function avisoPlanoEmail(
 
 // ---------- a superfície "Combinar o plano" (518) ----------
 
-export type DecisaoRecesso = { cicloEventoId: string; usa: boolean };
+export type DecisaoRecesso = {
+  cicloEventoId: string;
+  usa: boolean;
+  /** Autoria da decisão (0245): "dupla" = a dupla respondeu e a action
+   *  declarou de verdade; "proposta" = suposição da equipe que viaja no
+   *  escopo e só vira decisão se a dupla confirmar no aceite. A action
+   *  sempre marca — nunca confia na `origem` que a entrada trouxer. */
+  origem?: "dupla" | "proposta";
+};
+
+/** As decisões efetivas de uma proposta da EQUIPE (0245): staff nunca
+ *  declara recesso — "propor não é decidir pela dupla". Entrada que
+ *  repete a resposta vigente viaja como "dupla" (o snapshot ecoa a
+ *  autoria real); entrada que diverge dela é recusada, porque só a dupla
+ *  troca a própria resposta; entrada pra recesso ainda pendente e todo
+ *  pendente que o input não cobriu viram suposição "proposta" — o
+ *  default conservador é `usa: true` (pausa, o que o calendário já faz)
+ *  e a RPC carimba `escopo.assumido` pra dupla revisar no aceite.
+ *  `pendentes` vem da simulação com as entradas já aplicadas. */
+function decisoesDaPropostaStaff(
+  vigentes: readonly { ciclo_evento_id: string; usa: boolean }[],
+  input: readonly DecisaoRecesso[] | undefined,
+  pendentes: readonly { cicloEventoId: string }[]
+): { decisoes: DecisaoRecesso[] } | { erro: string } {
+  const decididos = new Map(
+    vigentes.map((r) => [r.ciclo_evento_id, r.usa])
+  );
+  const decisoes: DecisaoRecesso[] = [];
+  const cobertos = new Set<string>();
+  for (const d of input ?? []) {
+    if (cobertos.has(d.cicloEventoId)) continue;
+    const atual = decididos.get(d.cicloEventoId);
+    if (atual != null) {
+      if (atual !== d.usa)
+        return {
+          erro: "A dupla já decidiu esse recesso. Só ela pode trocar a resposta.",
+        };
+      decisoes.push({
+        cicloEventoId: d.cicloEventoId,
+        usa: d.usa,
+        origem: "dupla",
+      });
+    } else {
+      decisoes.push({
+        cicloEventoId: d.cicloEventoId,
+        usa: d.usa,
+        origem: "proposta",
+      });
+    }
+    cobertos.add(d.cicloEventoId);
+  }
+  for (const p of pendentes) {
+    if (cobertos.has(p.cicloEventoId)) continue;
+    decisoes.push({
+      cicloEventoId: p.cicloEventoId,
+      usa: true,
+      origem: "proposta",
+    });
+    cobertos.add(p.cicloEventoId);
+  }
+  return { decisoes };
+}
 
 /** Resultado da simulação sob demanda — o que a superfície mostra enquanto
  *  a dupla responde. O PlanoEmDia é serializável (só dados). */
@@ -302,37 +373,71 @@ export async function combinarPlano(
   const eventos = await getCicloEventos();
   const ctx = await contextoPlano(duplaId, eventos);
   if ("error" in ctx) return ctx;
-  // a decisão de recesso é só da dupla — declarar antes da proposta, na
-  // mesma RPC que a 0225 restringiu a mentor/mentorado; staff que tenta
-  // declarar recebe o erro honesto do banco. 519: só o que MUDOU viaja —
-  // a RPC é upsert cego e regravar a mesma resposta sobrescreveria
-  // declarado_por/em, roubando a autoria original
-  const mudaram = recessosAlterados(
-    ctx.dupla.recessos ?? [],
-    input.decisoes ?? []
-  );
-  for (const d of mudaram) {
-    const { data: rd, error: re } = await supabase.rpc("declarar_recesso", {
-      p_dupla: duplaId,
-      p_evento: d.cicloEventoId,
-      p_usa: d.usa,
-    });
-    const r = lerRpc(rd, re);
-    if ("error" in r) return r;
-  }
-  // depois das declarações a leitura já reflete o banco — comDecisoes
-  // cobre a janela de consistência do re-read
-  const dupla = comDecisoesRecesso(ctx.dupla, input.decisoes);
   const agora = new Date();
-  const plano = montarPlanoEmDia({
-    dupla,
+  const base = {
     eventos,
     ritmo: input.ritmo,
     disponibilidade: input.semGrade ? null : ctx.combinada,
     fusao: input.fusao,
     hoje: agora,
-  });
+  };
+  // a decisão de recesso é só da dupla (0245): a EQUIPE não chama
+  // declarar_recesso — manda suposições no escopo (origem "proposta") e
+  // todo pendente que o input não cobriu entra com o default conservador
+  // "pausa"; a RPC carimba escopo.assumido e a dupla confirma ou troca no
+  // aceite. A DUPLA declara o que mudou (a 0225 revalida) e a resposta
+  // viaja com origem "dupla", sem suposição automática: pendência que
+  // sobrar segue bloqueando a proposta.
+  let decisoesEscopo: DecisaoRecesso[];
+  if (ctx.lado === "staff") {
+    // a pendência real sai da simulação — o primeiro passe com as
+    // entradas já aplicadas mede o que a equipe não cobriu
+    const pre = montarPlanoEmDia({
+      dupla: comDecisoesRecesso(ctx.dupla, input.decisoes),
+      ...base,
+    });
+    if (!pre.aplicavel) return { error: pre.motivo };
+    const mont = decisoesDaPropostaStaff(
+      ctx.dupla.recessos ?? [],
+      input.decisoes,
+      pre.recessosPendentes
+    );
+    if ("erro" in mont) return { error: mont.erro };
+    decisoesEscopo = mont.decisoes;
+  } else {
+    // 519: só o que MUDOU viaja — a RPC é upsert cego e regravar a mesma
+    // resposta sobrescreveria declarado_por/em, roubando a autoria original
+    const mudaram = recessosAlterados(
+      ctx.dupla.recessos ?? [],
+      input.decisoes ?? []
+    );
+    for (const d of mudaram) {
+      const { data: rd, error: re } = await supabase.rpc(
+        "declarar_recesso",
+        {
+          p_dupla: duplaId,
+          p_evento: d.cicloEventoId,
+          p_usa: d.usa,
+        }
+      );
+      const r = lerRpc(rd, re);
+      if ("error" in r) return r;
+    }
+    decisoesEscopo = (input.decisoes ?? []).map(
+      (d): DecisaoRecesso => ({
+        cicloEventoId: d.cicloEventoId,
+        usa: d.usa,
+        origem: "dupla",
+      })
+    );
+  }
+  // a simulação final aplica as decisões efetivas: suposição usa=false da
+  // equipe destrava o recesso nas datas como a decisão da dupla faria
+  const dupla = comDecisoesRecesso(ctx.dupla, decisoesEscopo);
+  const plano = montarPlanoEmDia({ dupla, ...base });
   if (!plano.aplicavel) return { error: plano.motivo };
+  // staff não cai aqui — as suposições default cobrem toda pendência;
+  // o bloqueio sobra pra dupla que tenta propor sem decidir tudo
   if (plano.recessosPendentes.length)
     return { error: "Falta a dupla confirmar o recesso." };
   // 018: a fusão só vale nos passos que o combinado controla (travado
@@ -350,7 +455,10 @@ export async function combinarPlano(
     // 518: as decisões do gesto viajam no jsonb do escopo — snapshot que
     // o aceite compara pra detectar "a resposta mudou depois" (sem DDL)
     decisoes: {
-      recessos: input.decisoes ?? [],
+      // 0245: o snapshot leva a autoria de cada resposta — "dupla" é o
+      // que a dupla declarou, "proposta" é suposição da equipe que o
+      // aceite confirma (a RPC usa pra carimbar escopo.assumido)
+      recessos: decisoesEscopo,
       sem_grade: input.semGrade === true,
       ...(gs.grupos.length
         ? {
@@ -370,7 +478,20 @@ export async function combinarPlano(
   });
   const r = lerRpc(data, error);
   if ("error" in r) return r;
-  const aviso = await avisoPlanoEmail(ctx, duplaId);
+  // proposta com suposição avisa no e-mail o que foi assumido — a dupla
+  // revisa antes de aceitar ("seguir" só quando toda suposição usa=false)
+  const suposicoes = decisoesEscopo.filter((d) => d.origem === "proposta");
+  const aviso = await avisoPlanoEmail(
+    ctx,
+    duplaId,
+    suposicoes.length
+      ? {
+          pausa: suposicoes.every((d) => d.usa),
+          mista:
+            suposicoes.some((d) => d.usa) && suposicoes.some((d) => !d.usa),
+        }
+      : undefined
+  );
   await emitirProdutoEvento(supabase, {
     superficie: "ficha_dupla",
     acao: "plano_proposto",
@@ -379,6 +500,7 @@ export async function combinarPlano(
       ritmo: escopo.ritmo,
       nivel: plano.nivel,
       sem_grade: input.semGrade === true,
+      assumido: suposicoes.length > 0,
       aviso_email: aviso.enviados,
     },
   });
@@ -413,27 +535,17 @@ export async function responderPlanoComRecesso(
   // pode escrever decisão autoral no ledger da dupla
   if (acao === "contestar")
     return responderPlano(planoId, acao, undefined, duplaId);
+  // sem duplaId não dá pra re-simular — mas as respostas ainda valem no
+  // aceite: a RPC persiste as pendentes com a autoria de quem respondeu
   if (!duplaId || !decisoes?.length)
-    return responderPlano(planoId, acao, undefined, duplaId);
+    return responderPlano(planoId, acao, undefined, duplaId, decisoes);
 
   const eventos = await getCicloEventos();
   const ctx = await contextoPlano(duplaId, eventos);
   if ("error" in ctx) return ctx;
-  // 519: só a decisão que MUDOU é declarada — regravar a mesma resposta
-  // sobrescreveria declarado_por/em e roubaria a autoria original
-  const mudaram = recessosAlterados(ctx.dupla.recessos ?? [], decisoes);
-  for (const d of mudaram) {
-    const { data: rd, error: re } = await supabase.rpc("declarar_recesso", {
-      p_dupla: duplaId,
-      p_evento: d.cicloEventoId,
-      p_usa: d.usa,
-    });
-    const r = lerRpc(rd, re);
-    if ("error" in r) return r;
-  }
   const planoAtual = (ctx.dupla.planos ?? []).find((p) => p.id === planoId);
   if (!planoAtual?.escopo)
-    return responderPlano(planoId, acao, undefined, duplaId);
+    return responderPlano(planoId, acao, undefined, duplaId, decisoes);
   const agora = new Date();
   // 018: a recalculada herda as sessões combinadas do escopo vigente —
   // a fusão é decisão da dupla e não se perde numa versão nova
@@ -445,9 +557,12 @@ export async function responderPlanoComRecesso(
   const semGradeAnterior =
     planoAtual.escopo.decisoes?.sem_grade === true;
   // re-simula com o MESMO ritmo do combinado — o que muda é só a decisão
-  // de recesso nova; se as datas recalculadas forem as mesmas, é aceite
+  // de recesso nova. 0245: ela aplica EM MEMÓRIA — ctx.dupla é leitura
+  // anterior ao gesto e ainda não a carrega; a decisão só grava quando o
+  // desfecho pede (a plano_responder no aceite, ou declarar_recesso na
+  // recalculada que já nasce aceita)
   const plano = montarPlanoEmDia({
-    dupla: ctx.dupla,
+    dupla: comDecisoesRecesso(ctx.dupla, decisoes),
     eventos,
     ritmo: Number(planoAtual.escopo.ritmo) || undefined,
     disponibilidade: semGradeAnterior ? null : ctx.combinada,
@@ -455,18 +570,54 @@ export async function responderPlanoComRecesso(
     hoje: agora,
   });
   if (!plano.aplicavel || plano.dataRecuperacao == null)
-    return responderPlano(planoId, acao, undefined, duplaId);
+    return responderPlano(planoId, acao, undefined, duplaId, decisoes);
   const e = escopoDaProposta(plano, toDateStr(agora));
   if ("erro" in e)
-    return responderPlano(planoId, acao, undefined, duplaId);
-  // a decisão nova não muda nenhuma data — aceite normal, sem versão nova
+    return responderPlano(planoId, acao, undefined, duplaId, decisoes);
+  // a decisão nova não muda nenhuma data — aceite normal, sem versão
+  // nova: as respostas viajam no p_decisoes e a RPC as persiste com a
+  // autoria de quem aceitou (nada de declarar_recesso antes)
   if (mesmaDatas(planoAtual.escopo, e.escopo))
-    return responderPlano(planoId, acao, undefined, duplaId);
+    return responderPlano(planoId, acao, undefined, duplaId, decisoes);
+
+  // a 0225 só admite UM plano aberto por dupla — fechar a antiga é a
+  // única porta pra versão nova. Então TODA recusa que a RPC daria é
+  // provada antes de contestar: se qualquer uma falha, cai no aceite
+  // normal e a vigente continua de pé (antes desta revisão a dupla
+  // podia ficar sem plano nenhum quando a proposta quebrava)
+  if (plano.recessosPendentes.length)
+    return responderPlano(planoId, acao, undefined, duplaId, decisoes);
+  const numerosNovos = new Set(e.escopo.numeros);
+  if (
+    (ctx.dupla.encontros ?? []).some(
+      (enc) => enc.status === "realizado" && numerosNovos.has(enc.numero)
+    )
+  )
+    return responderPlano(planoId, acao, undefined, duplaId, decisoes);
+
+  // mudou: a recalculada nasce aceita pelo lado que responde e a decisão
+  // é autoral da dupla — declara de verdade ANTES de substituir (519: só
+  // o que mudou viaja, o upsert cego não rouba declarado_por/em de quem
+  // decidiu antes)
+  const mudaram = recessosAlterados(ctx.dupla.recessos ?? [], decisoes);
+  for (const d of mudaram) {
+    const { data: rd, error: re } = await supabase.rpc("declarar_recesso", {
+      p_dupla: duplaId,
+      p_evento: d.cicloEventoId,
+      p_usa: d.usa,
+    });
+    const r = lerRpc(rd, re);
+    if ("error" in r) return r;
+  }
 
   const escopo: EscopoProposta = {
     ...e.escopo,
     decisoes: {
-      recessos: decisoes,
+      recessos: decisoes.map((d) => ({
+        cicloEventoId: d.cicloEventoId,
+        usa: d.usa,
+        origem: "dupla" as const,
+      })),
       sem_grade: semGradeAnterior,
       ajuste_no_aceite: true,
       ...(fusaoAnterior.length
@@ -481,24 +632,9 @@ export async function responderPlanoComRecesso(
     },
   };
 
-  // a 0225 só admite UM plano aberto por dupla — fechar a antiga é a
-  // única porta pra versão nova. Então TODA recusa que a RPC daria é
-  // provada antes de contestar: se qualquer uma falha, cai no aceite
-  // normal e a vigente continua de pé (antes desta revisão a dupla
-  // podia ficar sem plano nenhum quando a proposta quebrava)
-  if (plano.recessosPendentes.length)
-    return responderPlano(planoId, acao, undefined, duplaId);
-  const numerosNovos = new Set(e.escopo.numeros);
-  if (
-    (ctx.dupla.encontros ?? []).some(
-      (enc) => enc.status === "realizado" && numerosNovos.has(enc.numero)
-    )
-  )
-    return responderPlano(planoId, acao, undefined, duplaId);
-
-  // mudou: fecha a versão antiga e propõe a recalculada na MESMA
-  // transação (0236) — se a proposta falhar, o fechamento desfaz e a
-  // versão vigente continua de pé. Proposta de lado nasce aceita: é o
+  // fecha a versão antiga e propõe a recalculada na MESMA transação
+  // (0236) — se a proposta falhar, o fechamento desfaz e a versão
+  // vigente continua de pé. Proposta de lado nasce aceita: é o
   // "aprovar no mesmo gesto" da spec.
   const { data, error } = await supabase.rpc("plano_substituir", {
     p_plano: planoId,
@@ -533,7 +669,12 @@ export async function responderPlano(
   planoId: string,
   acao: "aceitar" | "contestar",
   motivo?: string,
-  duplaId?: string
+  duplaId?: string,
+  /** Respostas de recesso dadas no aceite (0245): a RPC persiste as que
+   *  ainda estavam pendentes — suposições da equipe inclusas — com a
+   *  autoria de quem aceitou. Só viaja quando presente: chamadas antigas
+   *  mandam exatamente o payload de antes. */
+  decisoes?: DecisaoRecesso[]
 ): Promise<Resultado> {
   if (await demoAtivo()) return { ok: true, demo: true };
   const supabase = await createClient();
@@ -541,6 +682,15 @@ export async function responderPlano(
     p_plano: planoId,
     p_acao: acao,
     p_motivo: motivo ?? null,
+    // `origem` é marca do escopo, não entra no payload da RPC
+    ...(decisoes?.length
+      ? {
+          p_decisoes: decisoes.map((d) => ({
+            cicloEventoId: d.cicloEventoId,
+            usa: d.usa,
+          })),
+        }
+      : {}),
   });
   const r = lerRpc(data, error);
   if ("error" in r) return r;

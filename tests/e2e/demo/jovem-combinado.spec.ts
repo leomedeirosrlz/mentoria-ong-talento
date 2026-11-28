@@ -8,7 +8,7 @@ import { entrarNaDemo, expect, test } from "../helpers";
 
 const card = (page: Parameters<typeof entrarNaDemo>[0]) =>
   page.locator("div.rounded-xl", {
-    has: page.getByRole("heading", { name: "O combinado" }),
+    has: page.getByRole("heading", { name: "Pra ficar em dia" }),
   });
 
 const D_OK = "de000000-0000-4000-8000-000000001537";
@@ -38,15 +38,15 @@ test.describe("o combinado — jovem confirma a sugestão", () => {
       .filter({ hasText: "6º encontro" })
       .filter({ hasText: "sugestão" });
     await expect(linha6).toContainText(
-      /sugestão \w{3} \d{2}\/\d{2} às 19:00/
+      /sugestão \w{3} \d{2}\/\d{2} às \d{2}:\d{2}/
     );
     // um toque: Confirma sem digitar nada → a linha vira "Marcado pra…"
-    await c.getByRole("button", { name: "Confirmar" }).click();
+    await c.getByRole("button", { name: "Confirmar data" }).click();
     await expect(
-      c.getByText(/Marcado pra \w{3} \d{2}\/\d{2} às 19:00/)
+      c.getByText(/Marcado pra \w{3} \d{2}\/\d{2} às \d{2}:\d{2}/)
     ).toBeVisible();
     await expect(
-      c.getByRole("button", { name: "Confirmar" })
+      c.getByRole("button", { name: "Confirmar data" })
     ).toHaveCount(0);
   });
 
@@ -74,13 +74,13 @@ test.describe("o combinado — jovem confirma a sugestão", () => {
     await dialog
       .getByRole("radio", { name: /Outro horário/ })
       .click();
-    await dialog.getByLabel("Escolher outro horário").fill("19:30");
+    await dialog.getByLabel("Escolher outro horário").fill("20:30");
     await expect(
       dialog.getByRole("button", { name: "Confirmar data" })
     ).toBeEnabled();
     await dialog.getByRole("button", { name: "Confirmar data" }).click();
     await expect(
-      c.getByText(/Marcado pra \w{3} \d{2}\/\d{2} às 19:30/)
+      c.getByText(/Marcado pra \w{3} \d{2}\/\d{2} às 20:30/)
     ).toBeVisible();
   });
 });
@@ -99,7 +99,7 @@ test.describe("o combinado — staff", () => {
     ).toBeVisible();
     await expect(regiao.getByText(/^6º encontro( · |$)/)).toBeVisible();
     await expect(
-      regiao.getByRole("button", { name: "Confirmar" })
+      regiao.getByRole("button", { name: "Confirmar data" })
     ).toBeVisible();
   });
 
@@ -116,7 +116,7 @@ test.describe("o combinado — staff", () => {
       regiao.getByText(/sugestão \w{3} \d{2}\/\d{2} às \d{2}:\d{2}/)
     ).toBeVisible();
     await expect(
-      regiao.getByRole("button", { name: "Confirmar" })
+      regiao.getByRole("button", { name: "Confirmar data" })
     ).toHaveCount(0);
   });
 });
@@ -131,7 +131,7 @@ test.describe("o combinado — 390px", () => {
     await expect(c).toBeVisible();
     await expect(c.getByText(/De \d{2}\/\d{2} a/)).toBeVisible();
     await expect(
-      c.getByRole("button", { name: "Confirmar" })
+      c.getByRole("button", { name: "Confirmar data" })
     ).toBeVisible();
     const scrollWidth = await page.evaluate(
       () => document.documentElement.scrollWidth

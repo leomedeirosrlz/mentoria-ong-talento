@@ -1,14 +1,20 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { createClient } from "./supabase/server";
 import { demoAtivo } from "./demo/mode";
-import { PDM_MAX_METAS, PDM_MAX_SUBITENS } from "@/lib/pdm";
+import {
+  itemMesmoTitulo,
+  PDM_MAX_METAS,
+  PDM_MAX_SUBITENS,
+  type PdmDoc,
+} from "@/lib/pdm";
 
 // Server actions do PDM vivo (REALIZA-181): casca fina sobre as RPCs
 // escopadas — quem decide permissão, caps e carimbos é o banco; aqui só a
 // higiene dos parâmetros e o erro amigável, no padrão das outras actions.
-// A dupla revalida via router.refresh() no cliente (mesmo padrão das
-// seções da ficha — sem cache de página explícito).
+// Em sucesso `refresh()` volta no mesmo roundtrip da action: o cliente pode
+// pintar a mudança otimista sem apagar e repintar a árvore no meio do caminho.
 
 const DEMO_MSG = "No modo demonstração as alterações não são salvas.";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -47,6 +53,7 @@ export async function pdmSalvarVisao(
     p_visao: visao,
   });
   if (error) return { error: erroAmigavel(error) };
+  refresh();
   return { ok: true };
 }
 
@@ -69,9 +76,23 @@ export async function pdmSalvarItem(
   if (!UUID_RE.test(duplaId)) return { error: "Dupla inválida." };
   if (!input.titulo.trim()) return { error: "O item precisa de um título." };
   const supabase = await createClient();
+  let itemId = input.itemId;
+  // criação com o mesmo título normalizado de uma linha ativa do mesmo nível
+  // vira edição da linha existente. Em manual × projetada a projetada é a
+  // principal: `origem`/`origemCampo` sobrevivem e a resposta de origem não
+  // se perde; reenviar o mesmo cadastro converge no mesmo item.
+  if (itemId == null) {
+    const { data: docData, error: docError } = await supabase.rpc("pdm_da_dupla", {
+      p_dupla_id: duplaId,
+    });
+    if (docError) return { error: erroAmigavel(docError) };
+    const doc = docData as PdmDoc | null;
+    itemId =
+      itemMesmoTitulo(doc?.itens ?? [], input.parentId, input.titulo)?.id ?? null;
+  }
   const { data, error } = await supabase.rpc("pdm_salvar_item", {
     p_dupla_id: duplaId,
-    p_item_id: input.itemId,
+    p_item_id: itemId,
     p_parent_id: input.parentId,
     p_titulo: input.titulo,
     p_porque: input.porque,
@@ -80,6 +101,7 @@ export async function pdmSalvarItem(
     p_prazo_alvo: input.prazoAlvo,
   });
   if (error) return { error: erroAmigavel(error) };
+  refresh();
   return { ok: true, data: data as string };
 }
 
@@ -100,6 +122,7 @@ export async function pdmStatusItem(
     p_status: status,
   });
   if (error) return { error: erroAmigavel(error) };
+  refresh();
   return { ok: true };
 }
 
@@ -117,6 +140,7 @@ export async function pdmRemoverItem(
     p_item_id: itemId,
   });
   if (error) return { error: erroAmigavel(error) };
+  refresh();
   return { ok: true };
 }
 
@@ -137,5 +161,6 @@ export async function pdmReordenar(
     p_item_ids: itemIds,
   });
   if (error) return { error: erroAmigavel(error) };
+  refresh();
   return { ok: true };
 }

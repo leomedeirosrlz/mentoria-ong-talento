@@ -395,7 +395,7 @@ function Cabecalho({
             className="size-1.5 rounded-full bg-[var(--ok-text)]"
           />
         </p>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground sm:text-[11px]">
           {jovem ? "Sua mentoria e os guias" : "Operação e guias do programa"}
         </p>
       </div>

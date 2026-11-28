@@ -7,6 +7,7 @@ import {
   eventosDoCronograma,
 } from "@/lib/ciclo";
 import type { CicloEvento, Dupla, DuplaPlano } from "@/lib/types";
+import { encontrosPrevistos } from "@/lib/proximo-encontro";
 
 /** Resumo determinístico da dupla pra Liza (0221 — REALIZA-459): o que a
  *  tool `resumo_dupla` e a página consolidam sem recomputar saúde/plano.
@@ -28,6 +29,8 @@ export type ResumoDupla = {
       titulo: string;
       data: string | null;
       status: string;
+      /** número maior marcado antes de um pendente menor (QA 25/11). */
+      adiantado: boolean;
     }[];
     pendentes_registro: number[];
   };
@@ -79,19 +82,20 @@ export function montarResumoDupla(
   // na lista de quem deve registro
   const cobertos = cobertosDaDupla(dupla.encontros);
 
-  const proximos = dupla.encontros
-    .filter(
-      (e) =>
-        (e.status === "agendado" || e.status === "remarcado") &&
-        (e.data_hora == null || new Date(e.data_hora).getTime() >= ref.getTime())
-    )
-    .sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0))
+  // a régua única do "próximo" (QA 25/11): por data — o resumo não pode
+  // discordar da home/agenda, e o adiantado sai marcado em vez de ler
+  // como lista fora de ordem
+  const proximos = encontrosPrevistos(dupla.encontros, ref, {
+    numerosOficiais: () =>
+      dupla.trilha === "especialista" ? [] : passos.map((p) => p.numero),
+  })
     .slice(0, 4)
     .map((e) => ({
       numero: e.numero,
       titulo: tituloPorNumero.get(e.numero ?? -1) ?? `Encontro ${e.numero}`,
       data: e.data_hora,
       status: e.status,
+      adiantado: e.adiantado,
     }));
 
   const resumo: ResumoDupla = {

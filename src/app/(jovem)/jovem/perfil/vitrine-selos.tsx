@@ -37,11 +37,14 @@ export function VitrineSelos({
   escolhidas: string[];
   nivel: NiveisJornada | null;
 }) {
+  // Fora do fluxo, ancorado no topo-direita do bloco: a vitrine não empurra
+  // foto, nome nem botão. `-me-1` fecha a tinta da última peça na linha do
+  // padding.
   return (
     <div
       role="group"
       aria-label="Selos do perfil"
-      className="ml-auto flex items-center gap-0.5"
+      className="absolute top-0 right-0 -me-1 flex flex-nowrap items-start gap-0.5"
     >
       {pecas.map((p) => (
         <Dialog key={p.chave}>
@@ -49,12 +52,13 @@ export function VitrineSelos({
             aria-label={`${
               p.origem === "nivel" ? p.faixa.titulo : p.conquista.titulo
             }. Abrir detalhe`}
-            className="rounded-xl p-0.5 outline-none transition-transform duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+            className="grid size-12 place-items-center rounded-xl outline-none transition-transform duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none sm:size-14"
           >
             <ConquistaEmblema
               glifo={p.origem === "nivel" ? p.faixa.glifo : p.conquista.glifo}
               tom={p.origem === "nivel" ? p.faixa.tom : p.conquista.tom}
-              size={64}
+              size={48}
+              sizeClassName="size-12! sm:size-14!"
               movimento="vivo"
             />
           </DialogTrigger>
@@ -134,7 +138,7 @@ export function EscolherSelos({
               variant="ghost"
               size="icon-sm"
               aria-label="Escolher os selos do perfil"
-              className="text-muted-foreground"
+              className="ms-2 size-11! self-end text-muted-foreground"
             />
           }
         >
@@ -189,13 +193,14 @@ export function EscolherSelos({
                     <ConquistaEmblema
                       glifo={o.glifo}
                       tom={o.tom}
-                      size={52}
+                      size={48}
+                      sizeClassName="size-12! sm:size-14!"
                       movimento="quieto"
                     />
                     <span className="line-clamp-2 text-xs leading-tight font-medium">
                       {o.titulo}
                     </span>
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground sm:text-[11px]">
                       {o.linha}
                     </span>
                     {marcado && (

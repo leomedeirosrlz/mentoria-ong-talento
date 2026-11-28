@@ -8,6 +8,7 @@ import {
   agrupaEmSecoes,
   extraiGruposMeta,
   idsEmGruposMeta,
+  montaRascunhoPdm,
   type BlocoSecao,
 } from "@/lib/forms/instrumentos";
 import { campoRespondido } from "@/lib/forms/resposta";
@@ -15,6 +16,8 @@ import {
   camposPerguntas,
   type FormularioCampo,
 } from "@/lib/forms/schema";
+import { PdmArvore, type PdmArvoreAcoes } from "@/components/pdm-arvore";
+import type { PdmNo } from "@/lib/pdm";
 import { T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +50,18 @@ import {
 
 const META_RE = /^meta_\d+$/;
 const SUBMETAS_RE = /^submetas_(\d+)$/;
+
+/** Ações vazias da prévia — a árvore em modo leitura nunca as dispara
+ *  (podeEditar=false desliga status/renomear/menu e podeAdicionarSub=false
+ *  some o "nova submeta"), mas o tipo pede o conjunto completo. */
+const ACOES_PREVIEW: PdmArvoreAcoes = {
+  onStatus: () => {},
+  onEditar: () => {},
+  onRenomear: () => {},
+  onNovaSubmeta: () => {},
+  onMover: () => {},
+  onExcluir: () => {},
+};
 
 export function Pdm({
   campos,
@@ -299,6 +314,14 @@ function FichasPdm({
     campoRespondido(g.meta, api.valores[g.meta.id])
   ).length;
 
+  // a prévia do documento vivo se monta do mesmo mapa de respostas que
+  // alimenta o submit — a árvore atualiza a cada tecla, sem action e sem
+  // id de banco (os slots meta_N/sub_N_i carregam a identidade)
+  const rascunho = useMemo(
+    () => montaRascunhoPdm(grupos, api.valores),
+    [grupos, api.valores]
+  );
+
   function remover(n: number) {
     const g = grupos.find((x) => x.n === n);
     if (!g) return;
@@ -409,7 +432,34 @@ function FichasPdm({
       {soltos.map((c) => (
         <CampoDoc key={c.id} campo={c} api={api} numeroPorId={numeroPorId} />
       ))}
+
+      {/* a prévia só aparece quando já há o que mostrar — a primeira
+          meta com título acende o painel, sem caixa vazia antes disso */}
+      {rascunho.length > 0 && <PreviewPlano nos={rascunho} />}
     </>
+  );
+}
+
+/** O documento se formando, dentro da captura: a mesma árvore do PDM da
+ *  ficha, em leitura, sobre o rascunho dos campos. Nada aqui é controle
+ *  — expandir/recolher é o único gesto e fica no estado local da árvore. */
+function PreviewPlano({ nos }: { nos: PdmNo[] }) {
+  return (
+    <section className="rounded-lg border border-dashed border-border/80 bg-muted/30 p-4">
+      <h3 className="text-sm font-semibold">Seu plano está ficando assim</h3>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        É assim que suas metas e submetas aparecem no Plano de
+        desenvolvimento da dupla.
+      </p>
+      <div className="mt-2">
+        <PdmArvore
+          nos={nos}
+          podeEditar={false}
+          podeAdicionarSub={false}
+          acoes={ACOES_PREVIEW}
+        />
+      </div>
+    </section>
   );
 }
 

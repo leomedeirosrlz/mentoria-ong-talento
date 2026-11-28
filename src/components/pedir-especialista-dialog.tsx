@@ -730,7 +730,7 @@ export function JovemEspSlots({
               aria-hidden
               className="inline-block size-2 shrink-0 rounded-full bg-[var(--ok)]"
             />
-            Em lima: encaixam na sua disponibilidade
+            Em verde: encaixam na sua disponibilidade
           </p>
         )}
       </div>

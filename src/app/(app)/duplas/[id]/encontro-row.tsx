@@ -86,6 +86,7 @@ export function EncontroRow({
   linkAvaliacao,
   estrelaJovem,
   piso,
+  ocupadosAgenda,
   ehEsp,
   urlBase,
   jovemNome,
@@ -141,6 +142,7 @@ export function EncontroRow({
   estrelaJovem: number | null;
   /** YYYY-MM-DD do início da dupla — piso de data do dialog de remarcar. */
   piso?: string;
+  ocupadosAgenda?: import("@/lib/sugestoes-encontro").OcupadoRotulado[];
   /** Trilha especialista — o remarcar da linha se lê "sessão de especialista". */
   ehEsp: boolean;
   /** Origem pública (NEXT_PUBLIC_SITE_URL) — monta o /avaliar/<token>. */
@@ -482,6 +484,7 @@ export function EncontroRow({
                 atual={encontro}
                 piso={piso}
                 jovemNome={jovemNome}
+                ocupados={ocupadosAgenda}
                 rotulo={ehEsp ? "sessão de especialista" : undefined}
                 trigger={
                   <Button
@@ -524,6 +527,7 @@ export function EncontroRow({
                   }
                   piso={piso}
                   jovemNome={jovemNome}
+                  ocupados={ocupadosAgenda}
                   rotulo={ehEsp ? "sessão de especialista" : undefined}
                   trigger={
                     <Button
@@ -537,7 +541,7 @@ export function EncontroRow({
                   }
                 />
                 {lacunaAnterior != null && (
-                  <span className="max-w-56 text-right text-[11px] leading-snug text-muted-foreground">
+                  <span className="max-w-56 text-right text-xs leading-snug text-muted-foreground sm:text-[11px]">
                     o {lacunaAnterior}º ainda está pendente, mas você pode agendar
                     este mesmo assim
                   </span>

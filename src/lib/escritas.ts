@@ -120,6 +120,31 @@ export async function agendarEncontroCore(
     return { error: "Confira o link: precisa ser um endereço completo (https://…)." };
   }
 
+  // um encontro por dia por dupla: dois no mesmo dia confundem a agenda da
+  // dupla e furam o intervalo de prática do guia. A fusão (dois passos numa
+  // sessão) é outra RPC, que minta o sessao_id — aqui não passa.
+  const diaLocal = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(quando);
+  const inicioDia = new Date(`${diaLocal}T00:00:00-03:00`);
+  const fimDia = new Date(inicioDia.getTime() + 24 * 60 * 60 * 1000);
+  const { data: noDia } = await supabase
+    .from("encontros")
+    .select("numero, status")
+    .eq("dupla_id", dupla_id)
+    .in("status", ["agendado", "remarcado", "realizado"])
+    .gte("data_hora", inicioDia.toISOString())
+    .lt("data_hora", fimDia.toISOString());
+  const outroNoDia = (noDia ?? []).find((e) => e.numero !== numero);
+  if (outroNoDia) {
+    return {
+      error: `Essa dupla já tem o ${outroNoDia.numero}º encontro nesse dia. Dois encontros no mesmo dia só com fusão — escolha outro dia.`,
+    };
+  }
+
   // number ceiling per track — specialist counts ATTEMPTS (the CHECK takes
   // up to 24); DPP measures against THE DUO's calendar (0061), never global
   const maxNum =

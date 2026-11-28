@@ -358,7 +358,7 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
       esp.getByText("Horários de Esp", { exact: true })
     ).toBeVisible();
     await expect(
-      esp.getByText(/Sessões de 1h · escolhe um horário/)
+      esp.getByText(/Sessões de 1h\. Escolha um horário/)
     ).toBeVisible();
     // desde a 507 os chips agrupam por dia ("terça 24/11" + hora solta); o
     // rótulo completo "terça 24/11 às 20:00" vive no title do botão
@@ -400,15 +400,15 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
       linhaEsp.getByRole("button", { name: "Desmarcar" })
     ).toBeVisible();
     await expect(
-      linhaEsp.getByRole("button", { name: "Ações do encontro" })
+      linhaEsp.getByRole("button", { name: /^Ações do/ })
     ).toHaveCount(0);
     await expect(
-      page.getByRole("menuitem", { name: "Remarcar" })
+      page.getByRole("menuitem", { name: /^(Remarcar|Outra data)/ })
     ).toHaveCount(0);
 
     // contraste: a linha DPP na mesma lista segue com o gesto — primário
     const linhaDpp = proximos
-      .getByText("8º encontro", { exact: true })
+      .getByText(new RegExp("^8º encontro"))
       .locator("xpath=../..");
     await expect(
       linhaDpp.getByRole("button", { name: "Remarcar" })

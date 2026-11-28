@@ -596,6 +596,59 @@ export type OcupadoRotulado = {
   rotuloArtigo: string;
 };
 
+/** Sugestão visível fora do plano (hero/cartão de agendar) que reserva o
+ *  instante enquanto está na tela. `numero` permite excluir o próprio passo:
+ *  o 7º pode confirmar a sugestão do 7º; o 6º não pode tomá-la. */
+export type ReservaSugestao = {
+  numero: number;
+  data: string;
+  hora: string;
+};
+
+export function instanteReservaSugestao(r: ReservaSugestao): string {
+  return `${r.data}T${r.hora}:00-03:00`;
+}
+
+/** Forma rotulada única da reserva — plano, seletor e chips leem a mesma
+ *  entrada em vez de cada superfície montar ISO/rótulo do seu jeito. */
+export function ocupadoReservaSugestao(
+  r: ReservaSugestao | null | undefined,
+  excluirNumero?: number | null
+): OcupadoRotulado[] {
+  if (!r || r.numero === excluirNumero) return [];
+  return [
+    {
+      inicio: instanteReservaSugestao(r),
+      rotulo: `sugestão do ${r.numero}º encontro`,
+      rotuloArtigo: `a sugestão do ${r.numero}º encontro`,
+    },
+  ];
+}
+
+/** Instantes já comprometidos por rows agendadas/remarcadas — a forma
+ *  canônica que os seletores de mentor, ficha e agenda consomem. O rótulo
+ *  é responsabilidade do caller porque a trilha muda a gramática
+ *  ("6º encontro" × "sessão"). */
+export function ocupadosAgendados<T extends { data_hora: string | null; status: string }>(
+  encontros: readonly T[],
+  rotuloDe: (e: T) => { rotulo: string; rotuloArtigo?: string }
+): OcupadoRotulado[] {
+  return encontros
+    .filter(
+      (e) =>
+        (e.status === "agendado" || e.status === "remarcado") &&
+        e.data_hora != null
+    )
+    .map((e) => {
+      const r = rotuloDe(e);
+      return {
+        inicio: e.data_hora!,
+        rotulo: r.rotulo,
+        rotuloArtigo: r.rotuloArtigo ?? r.rotulo,
+      };
+    });
+}
+
 const inicioDo = (o: string | OcupadoRotulado): string =>
   typeof o === "string" ? o : o.inicio;
 

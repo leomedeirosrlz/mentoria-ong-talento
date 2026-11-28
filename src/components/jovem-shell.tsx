@@ -7,6 +7,7 @@ import { motion } from "motion/react";
 import {
   CalendarDots,
   FolderOpen,
+  Handshake,
   House,
   List,
   Question,
@@ -31,7 +32,7 @@ import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Lado do jovem (REALIZA-108) — shell próprio, não o AppShell filtrado:
- *  sete destinos fixos e nada de navegação de staff. O acento da nav é o
+ *  oito destinos fixos e nada de navegação de staff. O acento da nav é o
  *  amarelo --role-mentorado (o verde fica pros adultos) — a mesma cor do
  *  avatar-iniciais do jovem no resto do app. */
 const NAV = [
@@ -40,8 +41,11 @@ const NAV = [
   // FR-007 (010): o destino se chama Materiais — rótulo e ícone vestem
   // o que a página entrega (a estante de instrumentos + o Acervo)
   { href: "/jovem/materiais", label: "Materiais", icon: FolderOpen },
-  { href: "/jovem/especialistas", label: "Especialistas", icon: Sparkle },
+  // "Especialistas" não cabe na célula da bottom nav a 12px em 320px —
+  // `curto` vale só pra ela; sidebar, menu e aria-label seguem completos
+  { href: "/jovem/especialistas", label: "Especialistas", curto: "Espec.", icon: Sparkle },
   { href: "/jovem/pessoas", label: "Pessoas", icon: Users },
+  { href: "/jovem/minha-dupla", label: "Minha dupla", icon: Handshake },
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },
   // REALIZA-345: a Ajuda do jovem — fora do MOBILE_PRIMEIRO, mora no Menu
   { href: "/jovem/ajuda", label: "Ajuda", icon: Question },
@@ -50,8 +54,8 @@ const NAV = [
 /** Bottom nav: 4 destinos fixos + Menu (REALIZA-221), na mesma prioridade
  *  da sidebar. Primárias = o que ela mais usa: home, a agenda, a jornada
  *  (é onde moram os links dos forms e o acervo) e o catálogo de
- *  especialistas. Pessoas e Perfil ficam no menu lateral, que tem a
- *  navegação inteira. */
+ *  especialistas. Pessoas, Minha dupla, Perfil e Ajuda ficam no menu
+ *  lateral, que tem a navegação inteira. */
 const MOBILE_PRIMEIRO = [
   "/jovem",
   "/jovem/agenda",
@@ -123,8 +127,10 @@ export function JovemShell({
           Pular pro conteúdo
         </a>
 
-        {/* top bar mobile: logo + nome + sino + sair (o header pede o nome
-            do jovem e a saída à mão — o avatar mora no item Perfil) */}
+        {/* top bar mobile: logo + nome + sino + avatar→perfil — a mesma
+            anatomia do AppShell do mentor (rodada 1125b, item 22). O Sair
+            saiu daqui: a 320px o quarteto avatar+sino+sair+pill da demo
+            não cabia; a saída mora no Menu, logo abaixo do bloco de perfil */}
         <header className="sticky top-0 z-40 flex min-h-14 items-center justify-between border-b border-border bg-background/95 pt-[env(safe-area-inset-top)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] backdrop-blur md:hidden">
           <div className="flex min-w-0 items-center gap-3">
             <Link
@@ -145,15 +151,24 @@ export function JovemShell({
           </div>
           <div className="flex items-center gap-1">
             <NotificacoesBell side="bottom" align="end" />
-            <SignOutButton
-              somenteIcone
-              label="Sair"
-              className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-            />
+            <Link
+              href="/jovem/perfil"
+              aria-label="Meu perfil"
+              aria-current={ativo(pathname, "/jovem/perfil") ? "page" : undefined}
+              className="grid size-11 place-items-center rounded-lg transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <Avatar
+                nome={nomeTela}
+                papel="mentorado"
+                src={fotoUrl}
+                fallbackSrc={gravatarUrl}
+                size={28}
+              />
+            </Link>
           </div>
         </header>
 
-        {/* sidebar desktop — mesma linguagem do AppShell, sete destinos */}
+        {/* sidebar desktop — mesma linguagem do AppShell, oito destinos */}
         <aside className="hidden md:flex w-56 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex-col fixed inset-y-0">
           <div className="px-5 pt-6 pb-8">
             <Link href="/jovem" className="inline-block" aria-label="Início">
@@ -173,7 +188,7 @@ export function JovemShell({
                   href={item.href}
                   aria-current={at ? "page" : undefined}
                   className={cn(
-                    "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                    "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                     at
                       ? "text-[var(--destaque-foreground)] font-semibold"
                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -248,7 +263,7 @@ export function JovemShell({
             AppShell; 6 labels a 375px colidiam) */}
         <nav
           aria-label="Navegação principal"
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:hidden"
         >
           <div className="flex">
             {visiveis.map((item) => {
@@ -258,12 +273,13 @@ export function JovemShell({
                   key={item.href}
                   href={item.href}
                   aria-current={at ? "page" : undefined}
+                  aria-label={"curto" in item ? item.label : undefined}
                   className={cn(
                     "relative flex flex-1 flex-col items-center gap-1 whitespace-nowrap py-2.5 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                     at
                       ? "font-semibold text-sidebar-foreground"
                       : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground",
-                    "text-[11px]"
+                    "text-xs"
                   )}
                 >
                   {at && (
@@ -275,7 +291,7 @@ export function JovemShell({
                     />
                   )}
                   <item.icon size={20} weight={at ? "fill" : "regular"} aria-hidden />
-                  {item.label}
+                  {"curto" in item ? item.curto : item.label}
                 </Link>
               );
             })}
@@ -287,7 +303,7 @@ export function JovemShell({
                   menuAtivo
                     ? "font-semibold text-sidebar-foreground"
                     : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground",
-                  "text-[11px]"
+                  "text-xs"
                 )}
               >
                 {/* a rota atual mora no menu → o indicador viaja pra
@@ -341,7 +357,32 @@ export function JovemShell({
                   })}
                 </nav>
                 <div className="border-t border-sidebar-border px-3 pt-3 pb-4">
-                  <SignOutButton className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50" />
+                  {/* bloco de perfil do rodapé, igual ao do AppShell: o item
+                      "Perfil" continua na lista acima e aqui a zona de usuário
+                      (avatar + nome + papel) ancora a saída — com o Sair fora
+                      do topo, o Menu é o caminho sempre visível pra ela */}
+                  <Link
+                    href="/jovem/perfil"
+                    aria-current={ativo(pathname, "/jovem/perfil") ? "page" : undefined}
+                    className="flex min-h-11 items-center gap-3 rounded-lg px-2 py-2 transition-colors outline-none hover:bg-sidebar-accent focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    <Avatar
+                      nome={nomeTela}
+                      papel="mentorado"
+                      src={fotoUrl}
+                      fallbackSrc={gravatarUrl}
+                      size={32}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium" title={nomeTela}>
+                        {nomeTela}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        Mentorado
+                      </span>
+                    </span>
+                  </Link>
+                  <SignOutButton className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50" />
                 </div>
               </SheetContent>
             </Sheet>

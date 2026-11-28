@@ -852,7 +852,7 @@ export const getAgendaPeriodoIa = cache(
       .gte("data_hora", desdeIso)
       .lte("data_hora", ateIso)
       .order("data_hora", { ascending: true })
-      .limit(80);
+      .limit(200);
     if (error) throw error;
     return (data ?? []) as unknown as {
       numero: number;
@@ -1301,24 +1301,31 @@ export async function getJovemAgendaIa(
   supabase: SupabaseClient,
   limite = 8
 ): Promise<{ proximos: JovemEncontroIa[]; passados: JovemEncontroIa[] }> {
+  // QA 25/11: asc + limit mordia os futuros — os feitos antigos comiam
+  // o teto e a Liza respondia "não há encontro marcado" com a agenda
+  // cheia. desc pega os mais novos; em JS os futuros voltam a subir.
+  // O teto de 60 cobre a trilha inteira com folga.
   const { data, error } = await supabase
     .from("encontros")
     .select("id, dupla_id, numero, data_hora, realizado_em, duracao_min, status, link")
-    .order("data_hora", { ascending: true, nullsFirst: false })
-    .limit(40);
+    .order("data_hora", { ascending: false, nullsFirst: false })
+    .limit(60);
   if (error) throw error;
   const todos = (data ?? []) as JovemEncontroIa[];
   const agora = new Date().toISOString();
   // agendado + remarcado contam como futuros — mesma conjunção de
   // estado-encontro.ts e das outras leituras de agenda do app
-  const futuros = todos.filter(
-    (e) =>
-      (e.status === "agendado" || e.status === "remarcado") &&
-      (e.data_hora == null || e.data_hora >= agora)
-  );
+  const futuros = todos
+    .filter(
+      (e) =>
+        (e.status === "agendado" || e.status === "remarcado") &&
+        (e.data_hora == null || e.data_hora >= agora)
+    )
+    .sort((a, b) =>
+      String(a.data_hora ?? "9999").localeCompare(String(b.data_hora ?? "9999"))
+    );
   const feitos = todos
     .filter((e) => e.status === "realizado")
-    .sort((a, b) => String(b.data_hora).localeCompare(String(a.data_hora)))
     .slice(0, 3);
   return { proximos: futuros.slice(0, limite), passados: feitos };
 }
@@ -1437,7 +1444,14 @@ export async function getJovemRetroativoIa(supabase: SupabaseClient) {
     // (fechar a jornada segue registro do mentor, mesma régua da 0208)
     elegiveis: cron
       .filter((p) => p.numero < maxNum && p.data <= hoje && !porNumero.has(p.numero))
-      .map((p) => ({ numero: p.numero, data_oficial: p.data })),
+      .map((p) => ({
+        numero: p.numero,
+        data_oficial: p.data,
+        exige_motivo:
+          new Date(`${hoje}T00:00:00Z`).getTime() -
+            new Date(`${p.data}T00:00:00Z`).getTime() >
+          7 * 24 * 60 * 60 * 1000,
+      })),
     criados_por_voce: encs
       .filter(
         (e) => e.status === "realizado" && meuId != null && e.created_by === meuId

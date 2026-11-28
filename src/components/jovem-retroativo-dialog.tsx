@@ -7,6 +7,7 @@ import { registrarRetroativoJovem } from "@/lib/actions-jovem";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { elementoReal } from "@/lib/elemento-lazy";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -185,7 +186,8 @@ export function JovemRetroativoDialog({
         aviso={aviso}
         onAviso={setAviso}
         onConfirmar={confirmar}
-      />
+      >
+      </SeletorDiaHora>
     </>
   );
 }

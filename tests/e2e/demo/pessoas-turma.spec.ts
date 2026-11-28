@@ -1,4 +1,4 @@
-import { entrarNaDemo, expect, test } from "../helpers";
+import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
 
 // REALIZA-376 em modo demo — /pessoas volta ao modelo de produção:
 // agrupamento por CARGO como padrão, turma como pill primária na barra
@@ -85,7 +85,12 @@ test.describe("demo — /pessoas por cargo + pills de turma", () => {
     await page.goto("/pessoas");
 
     const pills = page.getByRole("group", { name: "Filtrar por turma" });
-    await pills.getByRole("button", { name: /Sem turma/ }).click();
+    const semTurma = pills.getByRole("button", { name: /Sem turma/ });
+    // clique pré-hidratação é no-op: repete até o estado do chip confirmar
+    await agirComConfirma(
+      () => semTurma.click(),
+      async () => (await semTurma.getAttribute("aria-pressed")) === "true"
+    );
     await expect(page).toHaveURL(/turma=sem-turma/);
 
     // Marina (coordenação global) e Renata (pré-cadastro sem papel) não
@@ -174,81 +179,29 @@ test.describe("demo — /pessoas por cargo + pills de turma", () => {
     ).toBeVisible();
   });
 
-  test("pills de trilha: catálogo de especialistas num tap", async ({
+  test("o filtro de trilha saiu de vez; busca e categoria seguem como compensação", async ({
     page,
   }) => {
     await entrarNaDemo(page, "coordenacao");
     await page.goto("/pessoas");
 
-    // trilha é pill na barra (um tap pro catálogo) — não mora mais no modal
-    const trilha = page.getByRole("group", {
-      name: "Filtrar por trilha de mentor",
-    });
+    // nem régua na barra nem fieldset escondido no modal — o recorte de
+    // trilha não tem segunda via (onda 4)
     await expect(
-      trilha.getByRole("button", { name: "Todas trilhas" })
-    ).toHaveAttribute("aria-pressed", "true");
-    for (const rotulo of [/^DPP/, /^Especialista/]) {
-      await expect(
-        trilha.getByRole("button", { name: rotulo })
-      ).toBeVisible();
-    }
-
-    // Especialista isola as quatro do pool + híbridos; DPP puro sai de cena
-    await trilha.getByRole("button", { name: /^Especialista/ }).click();
-    await expect(page).toHaveURL(/trilha=especialista/);
-    for (const nome of [
-      "Sofia Nogueira",
-      "Helena Prado",
-      "Marcos Vinícius",
-      "Camila Ferraz",
-    ]) {
-      await expect(
-        page.getByRole("link", { name: `Abrir perfil de ${nome}` })
-      ).toBeVisible();
-    }
-    await expect(
-      page.getByRole("link", { name: "Abrir perfil de Fernanda Alves" })
+      page.getByRole("group", { name: "Filtrar por trilha de mentor" })
     ).toHaveCount(0);
-
-    // toggle off volta pro conjunto inteiro (mesmo gesto da pill de turma)
-    await trilha.getByRole("button", { name: "Todas trilhas" }).click();
-    await expect(
-      page.getByRole("link", { name: "Abrir perfil de Fernanda Alves" })
-    ).toBeVisible();
-  });
-
-  test("pill de trilha compõe com a categoria do modal", async ({ page }) => {
-    await entrarNaDemo(page, "coordenacao");
-    await page.goto("/pessoas");
-
     await page.getByRole("button", { name: "Filtros", exact: true }).click();
     const dialog = page.getByRole("dialog");
-    // o radio fica sr-only — quem recebe o clique é a label que o envolve
-    await dialog.locator("label", { hasText: "Mentores" }).click();
-    await dialog.getByRole("button", { name: /^Aplicar/ }).click();
+    await expect(dialog.locator("fieldset", { hasText: "Trilha" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
 
-    await page
-      .getByRole("group", { name: "Filtrar por trilha de mentor" })
-      .getByRole("button", { name: /^Especialista/ })
-      .click();
-
-    await expect(page).toHaveURL(/cat=mentores/);
-    await expect(page).toHaveURL(/trilha=especialista/);
-    // o selo conta só os filtros do modal — trilha é pill própria
-    await expect(
-      page.getByRole("button", { name: /Filtros, 1 ativo/ })
-    ).toBeVisible();
-    // especialista pura fica, DPP puro some
+    // a compensação é a busca: a coordenação ainda acha a especialista
+    // pelo nome sem precisar de um eixo redundante de filtro
+    await page.getByRole("searchbox", { name: "Buscar pessoa" }).fill("Sofia");
     await expect(
       page.getByRole("link", { name: "Abrir perfil de Sofia Nogueira" })
     ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Abrir perfil de Fernanda Alves" })
-    ).toHaveCount(0);
-    // e nenhum grupo de outro papel sobra
-    await expect(
-      page.getByRole("heading", { name: /Mentorados/ })
-    ).toHaveCount(0);
+    await expect(page).toHaveURL(/busca=Sofia/);
   });
 
   test("fila e arquivo existem, mas não são chips de filtro; linhas sem seleção", async ({
@@ -314,14 +267,21 @@ test.describe("demo — /pessoas por cargo + pills de turma", () => {
       ).toBeVisible();
     }
 
-    // trilha e tema são facetas do staff todo — trilha distingue mentor
-    // DPP de especialista e os chips vêm do que as linhas já exibem
+    // a régua de trilha saiu de vez — os chips de tema seguem faceta do
+    // staff todo
     await expect(
       page.getByRole("group", { name: "Filtrar por trilha de mentor" })
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       page.getByRole("group", { name: "Filtrar por área" })
     ).toBeVisible();
+
+    // ordem de uso: Especialistas (o catálogo) antes de Mentores DPP
+    const rotulos = await cats.getByRole("button").allTextContents();
+    const iEsp = rotulos.findIndex((t) => t.includes("Especialistas"));
+    const iDpp = rotulos.findIndex((t) => t.includes("Mentores DPP"));
+    expect(iEsp).toBeGreaterThanOrEqual(0);
+    expect(iEsp).toBeLessThan(iDpp);
   });
 
   test("faceta Especialistas do diretório abre o catálogo rico", async ({
@@ -373,26 +333,15 @@ test.describe("demo — /pessoas por cargo + pills de turma", () => {
     ).toHaveCount(0);
   });
 
-  test("facetas do diretório compõem: tema e trilha recortam o catálogo", async ({
+  test("faceta Especialistas compõe com o chip de tema", async ({
     page,
   }) => {
     await entrarNaDemo(page, "supervisor");
-    await page.goto("/pessoas?cat=especialistas&trilha=dpp");
+    await page.goto("/pessoas?cat=especialistas");
 
     const sec = page.locator("section", {
       has: page.getByRole("heading", { name: /Especialistas/ }),
     });
-    // trilha=dpp dentro da faceta deixa só os híbridos
-    await expect(
-      sec.getByRole("link", { name: "Abrir perfil de Ricardo Tavares" })
-    ).toBeVisible();
-    await expect(
-      sec.getByRole("link", { name: "Abrir perfil de André Rocha" })
-    ).toBeVisible();
-    await expect(
-      sec.getByRole("link", { name: "Abrir perfil de Sofia Nogueira" })
-    ).toHaveCount(0);
-
     // o chip de tema recorta pelo que o card oferece — Ricardo não tem
     // areas cadastradas e sai do recorte de "finanças"
     await page
@@ -406,5 +355,40 @@ test.describe("demo — /pessoas por cargo + pills de turma", () => {
     await expect(
       sec.getByRole("link", { name: "Abrir perfil de Ricardo Tavares" })
     ).toHaveCount(0);
+  });
+
+  test("deep-link antigo ?trilha= mapeia pra faceta equivalente", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "supervisor");
+
+    // trilha=dpp → Mentores DPP: quem tem o papel DPP (os híbridos
+    // Ricardo e André incluídos), as especialistas puras fora
+    await page.goto("/pessoas?trilha=dpp");
+    const cats = page.getByRole("group", { name: "Filtrar por categoria" });
+    await expect(
+      cats.getByRole("button", { name: /Mentores DPP/ })
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page).toHaveURL(/cat=mentores_dpp/);
+    await expect(page).not.toHaveURL(/trilha=/);
+    await expect(
+      page.getByRole("link", { name: "Abrir perfil de Ricardo Tavares" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Abrir perfil de Fernanda Alves" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Abrir perfil de Sofia Nogueira" })
+    ).toHaveCount(0);
+
+    // trilha=especialista → a faceta do catálogo; e ?trilha= com um cat
+    // explícito deixa a faceta vencer (o recorte degrada seguro)
+    await page.goto("/pessoas?cat=especialistas&trilha=dpp");
+    await expect(
+      cats.getByRole("button", { name: /Especialistas/ })
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByRole("link", { name: "Abrir perfil de Sofia Nogueira" })
+    ).toBeVisible();
   });
 });

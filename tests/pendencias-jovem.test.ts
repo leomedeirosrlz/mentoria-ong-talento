@@ -327,7 +327,7 @@ describe("derivarPendencias — avaliações, sugestão, aviso, chamado", () => 
     expect(porTipo.chamado.titulo).toBe("Marina respondeu seu pedido");
     expect(porTipo.chamado.acao).toMatchObject({
       tipo: "abrir_chamado",
-      href: "/jovem/perfil?c=ch1",
+      href: "/jovem?c=ch1#apoio",
     });
   });
 });
@@ -371,7 +371,7 @@ describe("chamadoPendencia — projeção linha do chamado (504)", () => {
     expect(lista[0].acao).toMatchObject({
       tipo: "abrir_chamado",
       rotulo: "Ver andamento",
-      href: "/jovem/perfil?c=c2",
+      href: "/jovem?c=c2#apoio",
     });
   });
 
@@ -403,7 +403,7 @@ describe("chamadoPendencia — projeção linha do chamado (504)", () => {
     expect(lista[0].titulo).toBe("Marina respondeu seu pedido");
     expect(lista[0].acao).toMatchObject({
       rotulo: "Ver resposta",
-      href: "/jovem/perfil?c=c4",
+      href: "/jovem?c=c4#apoio",
     });
   });
 

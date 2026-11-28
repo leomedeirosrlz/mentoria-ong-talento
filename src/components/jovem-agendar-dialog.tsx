@@ -170,7 +170,7 @@ export function JovemAgendarDialog({
     // de hoje já passado ainda passa; a RPC recusa, o aviso antecipa
     if (local <= paraInputLocal(new Date())) {
       setAviso(
-        "Agendar é sempre pra frente — escolha uma data e horário futuros."
+        "Agendar é sempre pra frente. Escolha uma data e horário futuros."
       );
       return;
     }
@@ -288,7 +288,7 @@ export function JovemAgendarDialog({
             ref={linkRef}
             id="link"
             type="url"
-            placeholder="https://meet.google.com/…"
+            placeholder="Meet, Teams, Zoom…"
             defaultValue={atual?.link ?? ""}
           />
         </div>

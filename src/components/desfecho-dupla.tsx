@@ -17,7 +17,7 @@ function BlocoEntrega({ e }: { e: DesfechoEntrega }) {
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           {MOMENTO_LABEL[e.momento]}
         </p>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground sm:text-[11px]">
           {e.status === "respondido" && e.respondido_em
             ? `respondido em ${formatDate(e.respondido_em)}`
             : e.status === "pendente"

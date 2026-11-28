@@ -427,7 +427,7 @@ export function precisaDeVoce(input: {
         : atencao.motivo.tipo === "contestado"
           ? { href: `${ficha}#acordos`, acao: "Retomar o plano" }
           : atencao.motivo.tipo === "passo_vencido"
-            ? { href: `${ficha}#acordos`, acao: "Ver o combinado" }
+            ? { href: `${ficha}#acordos`, acao: "Ver o plano" }
             : { href: `${ficha}#acordos`, acao: "Ver a proposta" };
 
     itens.push({

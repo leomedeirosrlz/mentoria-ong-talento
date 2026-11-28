@@ -7,12 +7,19 @@
 //     formam o grupo de uma meta; submetas_N é o desdobramento do PDM.
 
 import {
+  montaArvorePdm,
+  parseSubmetasLinhas,
+  type PdmItem,
+  type PdmNo,
+} from "@/lib/pdm";
+import {
   INSTRUMENTOS_DUPLA_SISTEMA,
   INSTRUMENTOS_SISTEMA,
   type FormularioCampo,
   type FormularioSistema,
   type InstrumentoDuplaSistema,
   type InstrumentoSistema,
+  type RespostaValor,
 } from "./schema";
 
 /** O sistema é um dos 4 instrumentos de jornada (0080) com experiência
@@ -290,4 +297,84 @@ export function idsEmGruposMeta(grupos: GrupoMetaCampos[]): Set<string> {
         .map((c) => c.id)
     )
   );
+}
+
+// ---------- rascunho do documento vivo (preview da captura guiada) ----------
+
+/** Texto do mapa de respostas — trimado, null quando vazio ou de outro
+ *  tipo (o mapa guarda o RespostaValor de qualquer campo, não só texto). */
+function textoDoMapa(v: RespostaValor | undefined): string | null {
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+/** "YYYY-MM-DD" ou null — a régua do cast ::date da projeção: valor mal
+ *  formado vira null em vez de derrubar a linha. */
+function dataDoMapa(v: RespostaValor | undefined): string | null {
+  const t = textoDoMapa(v);
+  return t && /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null;
+}
+
+/** Item de rascunho: linha projetada do instrumento PDM, id = slot
+ *  (mesmo contrato do origem_campo no banco). Só leitura — nenhuma
+ *  action encosta nele. */
+function itemRascunho(slot: string, parcial: Partial<PdmItem>): PdmItem {
+  return {
+    id: slot,
+    parentId: null,
+    titulo: "",
+    porque: null,
+    indicador: null,
+    areaVida: null,
+    prazoAlvo: null,
+    status: "ativa",
+    atingidaEm: null,
+    ordem: 0,
+    origem: "pdm",
+    origemCampo: slot,
+    criadoPor: null,
+    atualizadoPor: null,
+    atualizadoEm: null,
+    ...parcial,
+  };
+}
+
+/** A árvore que a resposta em digitação já formaria no documento vivo —
+ *  o "Seu plano está ficando assim" da captura guiada. Espelha a regra
+ *  de pdm_projeta_resposta: meta sem título não projeta (e leva o grupo
+ *  inteiro junto, submetas incluídas), submeta só existe sob a meta do
+ *  slot e os ids são os próprios slots (meta_N, sub_N_i) — estáveis por
+ *  construção e nunca do banco. A saída passa por montaArvorePdm pra
+ *  valer a mesma leitura do documento real (ordem, dedupe, órfãos). */
+export function montaRascunhoPdm(
+  grupos: GrupoMetaCampos[],
+  valores: Record<string, RespostaValor>
+): PdmNo[] {
+  const itens: PdmItem[] = [];
+  for (const g of grupos) {
+    const titulo = textoDoMapa(valores[g.meta.id]);
+    if (!titulo) continue;
+    const slotMeta = `meta_${g.n}`;
+    itens.push(
+      itemRascunho(slotMeta, {
+        titulo,
+        porque: g.porque ? textoDoMapa(valores[g.porque.id]) : null,
+        indicador: g.is ? textoDoMapa(valores[g.is.id]) : null,
+        prazoAlvo: g.prazo ? dataDoMapa(valores[g.prazo.id]) : null,
+        ordem: g.n,
+      })
+    );
+    const sub = g.submetas ? valores[g.submetas.id] : null;
+    const linhas = parseSubmetasLinhas(typeof sub === "string" ? sub : null);
+    linhas.forEach((linha, i) => {
+      const slotSub = `sub_${g.n}_${i + 1}`;
+      itens.push(
+        itemRascunho(slotSub, {
+          parentId: slotMeta,
+          titulo: linha,
+          ordem: i + 1,
+        })
+      );
+    });
+  }
+  return montaArvorePdm(itens);
 }

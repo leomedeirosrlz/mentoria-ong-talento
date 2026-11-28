@@ -126,6 +126,11 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
   const combinados = page.locator(
     'section[aria-labelledby="combinados-titulo"]'
   );
+  // a seção é recolhível na home nova — abre pelo header (a pendência do
+  // combinado segue visível no "Para fazer agora" mesmo fechada)
+  await combinados
+    .getByRole("button", { name: "Meus combinados" })
+    .click();
   await expect(
     combinados.getByText("Resolver os 10 exercícios de fração da lista")
   ).toBeVisible();

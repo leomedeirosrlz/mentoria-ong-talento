@@ -35,13 +35,23 @@ test.describe("guarda — Enviar formulário não oferece instrumentos da jornad
     // o Enviar formulário virou item do ⋯ em todo viewport (review 21/11,
     // #9 — a 343 punha em linha no desktop) e abre o dialog controlado.
     // O gesto composto é seguro de repetir
+    // a barra mostra até duas rotinas em linha; o envio de formulário fica
+    // em linha quando cabe e no ⋯ quando as vagas estão ocupadas
+    const inline = page.getByRole("button", {
+      name: "Enviar formulário",
+      exact: true,
+    });
     const mais = page.getByRole("button", { name: "Mais ações da dupla" });
-    const item = page.getByRole("menuitem", { name: "Enviar formulário", exact: true });
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
       async () => {
-        await mais.click();
-        await item.click();
+        if (await inline.count()) await inline.first().click();
+        else {
+          await mais.click();
+          await page
+            .getByRole("menuitem", { name: "Enviar formulário", exact: true })
+            .click();
+        }
       },
       () => dialog.isVisible()
     );

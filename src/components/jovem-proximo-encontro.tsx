@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { PencilSimple, Sparkle, VideoCamera } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOut, PencilSimple, Sparkle, VideoCamera } from "@phosphor-icons/react/dist/ssr";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
 import { JovemAgendarSugestao } from "@/components/jovem-agendar-sugestao";
@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
  *  agendar) são os que já existem em /jovem/agenda. */
 export function ProximoEncontro({
   proximo,
+  adiantado = false,
   rotulo,
   sessao = false,
   hoje,
@@ -35,6 +36,9 @@ export function ProximoEncontro({
 }: {
   /** Próximo encontro agendado/remarcado com data futura; null = nenhum. */
   proximo: JovemEncontro | null;
+  /** A data cruzou o número (QA 25/11): o encontro foi marcado antes de
+   *  um passo menor ainda pendente — a tag explica a ordem. */
+  adiantado?: boolean;
   /** "6º encontro com Ricardo" ou "Sessão 3 com Sofia", montado na página. */
   rotulo: string | null;
   /** O próximo é sessão de especialista (ou a única trilha viva é a esp) —
@@ -79,17 +83,25 @@ export function ProximoEncontro({
         titulo={sessao ? "Sua próxima sessão" : "Seu próximo encontro"}
         plano={plano}
       >
-        <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
-          {rotulo ?? (sessao ? `Sessão ${proximo.numero}` : `${proximo.numero}º encontro`)}
-        </p>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
+          <p className="text-xl font-semibold tracking-tight text-balance">
+            {rotulo ?? (sessao ? `Sessão ${proximo.numero}` : `${proximo.numero}º encontro`)}
+          </p>
+          {adiantado && (
+            <span className="text-xs font-medium text-muted-foreground">
+              adiantado
+            </span>
+          )}
+        </div>
         <p className="mt-1 text-sm">
           {quando}
           {remarcado}
         </p>
         <Acoes>
           {/* QW5: "Entrar" preenchido só na janela da chamada (30 min
-              antes → 2 h depois). Fora dela o link segue à mão, discreto;
-              sem link, a saída honesta é a agenda */}
+              antes → 2 h depois). Fora dela o link segue à mão — mas é a
+              ação primária mesmo assim (QA 25/11): cor de marca, o
+              provedor no rótulo e ícone de externo */}
           {link && podeEntrarAgora(proximo.data_hora) ? (
             <a
               href={link}
@@ -106,13 +118,11 @@ export function ProximoEncontro({
               href={link}
               target="_blank"
               rel="noopener noreferrer"
-              className={cn(
-                buttonVariants({ variant: "outline", size: "lg" }),
-                "w-full bg-background sm:w-auto"
-              )}
+              className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}
             >
               <VideoCamera size={18} aria-hidden />
-              Link da chamada
+              Abrir a chamada
+              <ArrowSquareOut size={16} aria-hidden />
               <span className="sr-only"> (abre em nova aba)</span>
             </a>
           ) : (

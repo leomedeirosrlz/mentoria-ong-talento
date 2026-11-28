@@ -9,10 +9,13 @@ import {
 } from "./ciclo";
 import { parseDataHora } from "./escritas";
 import { getSlotsLivres } from "./queries-especialista";
+import { getJovemJornada } from "./queries-jovem";
+import { avaliarRetroativo } from "./retroativo-guarda";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { erroAmigavel as erroAmigavelBase } from "./utils";
 import type { Disponibilidade, SolicitacaoEspecialistaStatus } from "./types";
+import type { Database } from "./database.types";
 
 // Writes do jovem (REALIZA-112 PR2) — o pedido de especialista vai direto
 // por RPC definer: a 0074 já valida tudo no servidor (teto de trilhas,
@@ -339,7 +342,8 @@ function retornoRpc(data: unknown): {
 export async function registrarRetroativoJovem(
   duplaId: string,
   numero: number,
-  dataHora: string
+  dataHora: string,
+  _motivoTardio?: string | null
 ): Promise<{ error?: string; ok?: boolean; encontroId?: string }> {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -352,11 +356,27 @@ export async function registrarRetroativoJovem(
   }
   const quando = parseDataHora(dataHora);
   if (!quando) return { error: "Confira a data." };
-  const { data, error } = await supabase.rpc("registrar_retroativo_mentorado", {
+  const jornada = await getJovemJornada();
+  const oficial = jornada?.dupla_id === duplaId
+    ? (jornada.cronograma ?? []).find(
+        (e) => e.tipo === "encontro" && e.numero === numero
+      )?.data ?? null
+    : null;
+  const hojeStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const regra = avaliarRetroativo({ base: oficial, hoje: hojeStr });
+  if (regra.bloqueado) return { error: regra.bloqueado };
+  // atraso não pede justificativa (a maioria registra depois da data
+  // oficial) — a RPC continua aceitando o campo, que vai nulo
+  // a 0242 adiciona p_motivo_tardio; database.types só reflete a coluna/
+  // argumento depois que o lead aplica e regenera. O cast preserva o contrato
+  // antigo localmente sem apagar o campo que a RPC nova espera.
+  const rpcArgs = {
     p_dupla: duplaId,
     p_numero: numero,
     p_data_hora: quando.toISOString(),
-  });
+    p_motivo_tardio: undefined,
+  } as Database["public"]["Functions"]["registrar_retroativo_mentorado"]["Args"];
+  const { data, error } = await supabase.rpc("registrar_retroativo_mentorado", rpcArgs);
   if (error) return { error: erroAmigavel(error) };
   const ret = retornoRpc(data);
   if (ret.error) return { error: ret.error };

@@ -7,6 +7,7 @@ import {
   jwtDoUsuario,
   limparEncontrosDaDupla,
   limparViaServiceRole,
+  loginComSenha,
   restComoUsuario,
   test,
 } from "../helpers";
@@ -24,6 +25,13 @@ import {
 //     carimbo do proponente; a da equipe nasce "proposto" e o primeiro
 //     aceite da dupla a põe pra valer — o outro lado é avisado, não
 //     fica devendo aceite;
+//   · 0245 "propor não é decidir pela dupla": a EQUIPE cobre recesso
+//     pendente com suposição origem 'proposta' no escopo (pausa por
+//     default) sem escrever dupla_recessos — membro que tenta suposição
+//     é recusado. No aceite a RPC resolve cada suposição (decisão do
+//     gesto quando veio, senão a própria) com a autoria de quem
+//     respondeu e revalida as datas ANTES de escrever — troca que muda
+//     data morre na RPC em vez de gravar combinado inválido;
 //   · contestar é terminal — plano novo nasce versão+1, nunca reabre;
 //   · plano_aplicar_passo é definer com guard de membro: só escopo, só
 //     futuro dentro da janela, idempotente no par (plano, numero) e
@@ -40,6 +48,7 @@ const JOVEM_EMAIL = process.env.E2E_JOVEM_EMAIL ?? "jovem-e2e@realiza.test";
 const COORD_EMAIL = process.env.E2E_COORD_EMAIL ?? "e2e-coord@realiza.test";
 const SENHA = process.env.E2E_MENTOR_PASSWORD ?? "";
 const COORD_SENHA = process.env.E2E_COORD_PASSWORD ?? "";
+const MENTOR_PROFILE = "e2e00000-0000-4000-8000-000000000010";
 
 const hoje = (maisDias = 0) => {
   // mesma régua do servidor: dia civil em America/Sao_Paulo (toDateStr).
@@ -86,11 +95,20 @@ const rpc = (jwt: string, fn: string, body: unknown) =>
 const propor = (jwt: string, dupla = DUPLA, esc = escopo([3, 4])) =>
   rpc(jwt, "plano_propor", { p_dupla: dupla, p_escopo: esc, p_via: "app" });
 
-const responder = (jwt: string, plano: string, acao: string, motivo?: string) =>
+const responder = (
+  jwt: string,
+  plano: string,
+  acao: string,
+  motivo?: string,
+  // 0245: o aceite pode levar a decisão repensada da dupla — a RPC a
+  // persiste com a autoria de quem respondeu
+  decisoes?: { cicloEventoId: string; usa: boolean }[]
+) =>
   rpc(jwt, "plano_responder", {
     p_plano: plano,
     p_acao: acao,
     p_motivo: motivo ?? null,
+    p_decisoes: decisoes ?? null,
   });
 
 const aplicar = (
@@ -141,6 +159,82 @@ async function planoVivo() {
   return p ?? null;
 }
 
+const addDias = (ymd: string, n: number) => {
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+type RecessoEvento = { id: string; data: string; data_fim: string | null };
+type PeriodoRecesso = { ini: string; fim: string };
+
+/** Recessos do cronograma e2e e a janela que a suposição precisa pra
+ *  existir: `pendentes` são os períodos ainda abertos (fim ≥ amanhã, a
+ *  mesma régua dos recessosPendentes do planner); `fimJanela` leva o
+ *  escopo até depois do último, pra pendência cruzar a janela em
+ *  qualquer época — a fixture clona o dez–jan do calendário real e
+ *  cobre boa parte do ano (a sazonalidade do piso). */
+async function recessosDoCronograma() {
+  const evs = await buscarViaServiceRole<RecessoEvento[]>(
+    "ciclo_eventos",
+    `cronograma_id=eq.${CRON}&tipo=eq.recesso&data=not.is.null&select=id,data,data_fim&order=data`
+  );
+  const pendentes = evs.filter((ev) => (ev.data_fim ?? ev.data) >= hoje(1));
+  const periodos: PeriodoRecesso[] = pendentes.map((ev) => ({
+    ini: ev.data,
+    fim: ev.data_fim ?? ev.data,
+  }));
+  const fimJanela = addDias(
+    [...periodos.map((p) => p.fim)].sort().at(-1) ?? hoje(30),
+    14
+  );
+  return { pendentes, periodos, fimJanela };
+}
+
+type Reces = Awaited<ReturnType<typeof recessosDoCronograma>>;
+
+/** Data fora de todo período: caiu dentro, pula pro dia seguinte ao fim
+ *  e repete — suposição de pausa não deixa passo dentro do recesso. */
+function dataForaDoRecesso(ymd: string, periodos: readonly PeriodoRecesso[]) {
+  let d = ymd;
+  for (;;) {
+    const dentro = periodos.find((p) => d >= p.ini && d <= p.fim);
+    if (!dentro) return d;
+    d = addDias(dentro.fim, 1);
+  }
+}
+
+/** Escopo da EQUIPE com suposição (0245): `decisoes.recessos` cobre cada
+ *  recesso PENDENTE com origem 'proposta' — `usa` é a suposição (pausa
+ *  por default) e nada vira dupla_recessos na proposta. As datas dos
+ *  passos ficam fora de período em pausa; `dentroId` marca o recesso
+ *  assumido "seguir" que recebe um passo dentro dele — o cenário da
+ *  troca que mudaria a data combinada no aceite. */
+function escopoSuposicao(
+  { pendentes, periodos, fimJanela }: Reces,
+  dentroId?: string
+) {
+  const alvo = pendentes.find((ev) => ev.id === dentroId);
+  // fim ≥ amanhã pelo filtro: max(ini, amanhã) sempre cabe no período
+  const dentro = alvo ? (alvo.data >= hoje(1) ? alvo.data : hoje(1)) : null;
+  const d1 = dentro ?? dataForaDoRecesso(hoje(3), periodos);
+  return {
+    ...escopo([3, 4]),
+    janela: { inicio: hoje(1), fim: fimJanela },
+    passos: [
+      { numero: 3, data: d1, acao: "agendar" },
+      { numero: 4, data: dataForaDoRecesso(addDias(d1, 4), periodos), acao: "agendar" },
+    ],
+    decisoes: {
+      recessos: pendentes.map((ev) => ({
+        cicloEventoId: ev.id,
+        usa: ev.id !== dentroId,
+        origem: "proposta",
+      })),
+    },
+  };
+}
+
 test.describe("plano ficar em dia persistido (459)", () => {
   test.skip(!appEnvOk(), "spec app — precisa das envs E2E_*");
 
@@ -150,10 +244,13 @@ test.describe("plano ficar em dia persistido (459)", () => {
     await limparEncontrosDaDupla(DUPLA);
     await convergirDuplaAtiva(DUPLA);
     // o calendário e2e tem recesso (dez–jan) que cruza a janela hoje+30 boa
-    // parte do ano: sem a decisão da dupla, plano_propor devolve 'falta a
-    // dupla confirmar o recesso' — flake sazonal, mesmo defeito do hoje()
-    // em UTC. O piso registra "vamos seguir nos encontrando" (usa=false libera a data na
-    // RPC); a cobertura do recesso em si é do recesso.spec, mesma dupla
+    // parte do ano: a proposta da DUPLA segue exigindo a decisão real —
+    // a 0245 só destrava pendência coberta por suposição da EQUIPE no
+    // escopo — e sem a row a proposta ouve 'falta a dupla confirmar o
+    // recesso', flake sazonal, mesmo defeito do hoje() em UTC. O piso
+    // registra "vamos seguir nos encontrando" (usa=false libera a data na
+    // RPC); a proposta da equipe SEM decisão é cenário próprio que limpa
+    // o piso, e a cobertura do recesso em si é do recesso.spec, mesma dupla
     await limparViaServiceRole("dupla_recessos", `dupla_id=eq.${DUPLA}`);
     const evs = await buscarViaServiceRole<{ id: string }[]>(
       "ciclo_eventos",
@@ -448,5 +545,145 @@ test.describe("plano ficar em dia persistido (459)", () => {
       `dupla_id=eq.${DUPLA}&versao=eq.9`
     );
     expect(linhas).toHaveLength(0);
+  });
+
+  test("a equipe propõe com recesso pendente — suposição no escopo, aceite grava a decisão", async ({
+    page,
+  }) => {
+    // 0245 "propor não é decidir pela dupla": o piso do arquivo grava a
+    // decisão real pra fluir a proposta da DUPLA; aqui o cenário é a
+    // pendência — a equipe cobre com suposição origem 'proposta' (pausa
+    // por default) e nada entra em dupla_recessos até o aceite
+    await limparViaServiceRole("dupla_recessos", `dupla_id=eq.${DUPLA}`);
+    const reces = await recessosDoCronograma();
+    // a suposição só destrava pendência que cruza a janela — com o
+    // recesso da fixture já encerrado não há o que assumir (a mesma
+    // sazonalidade do piso: dez–jan cobre boa parte do ano)
+    test.skip(
+      reces.pendentes.length === 0,
+      "recesso da fixture já passou — sem pendência a proposta não carrega suposição"
+    );
+
+    const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
+    const jwtCoord = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
+
+    const esc = escopoSuposicao(reces);
+
+    // pra dupla a decisão continua prévia: membro cobrindo pendência por
+    // suposição é recusado, e sem suposição nem a equipe propõe — a
+    // folga é prerrogativa de quem não decide
+    expect((await propor(jwtMentor, DUPLA, esc)).error).toMatch(
+      /decisão do recesso é da dupla|Declare o recesso/i
+    );
+    const semSuposicao = { ...esc, decisoes: {} };
+    expect((await propor(jwtCoord, DUPLA, semSuposicao)).error).toMatch(
+      /falta a dupla confirmar o recesso/i
+    );
+
+    // a equipe propõe — nasce "proposto" e NENHUMA linha entra em
+    // dupla_recessos: decidir segue sendo gesto da dupla
+    const prop = await propor(jwtCoord, DUPLA, esc);
+    expect(prop).toMatchObject({ ok: true, status: "proposto" });
+    expect(
+      await buscarViaServiceRole(
+        "dupla_recessos",
+        `dupla_id=eq.${DUPLA}&select=id`
+      )
+    ).toHaveLength(0);
+
+    // a RPC carimba a suposição no escopo e já avisa a dupla no sino com
+    // o que a proposta considera — copy sem travessão
+    const [gravado] = await buscarViaServiceRole<
+      { escopo: { assumido?: boolean } }[]
+    >("dupla_planos", `id=eq.${prop.id!}&select=escopo`);
+    expect(gravado.escopo.assumido).toBe(true);
+    const [sino] = await buscarViaServiceRole<{ corpo: string }[]>(
+      "notificacoes",
+      "tipo=eq.plano_proposto&order=created_at.desc&limit=1&select=corpo"
+    );
+    expect(sino.corpo).toMatch(/A proposta considera pausa/i);
+    expect(sino.corpo).toMatch(/confirme ou troque antes de aceitar/i);
+
+    // a dupla lê a mesma frase no card do combinado — com as duas
+    // respostas à mão pra confirmar ou repensar antes do aceite
+    await loginComSenha(page, MENTOR_EMAIL, SENHA);
+    await page.goto(`/duplas/${DUPLA}`);
+    const card = page.getByRole("region", {
+      name: "Plano pra ficar em dia",
+    });
+    await expect(
+      card.getByText(/A proposta considera pausa/i)
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      card.getByText(/confirme ou troque antes de aceitar/i)
+    ).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: "Vamos seguir nos encontrando" })
+    ).toBeVisible();
+
+    // aceitar sem repensar confirma a suposição: cada pendência grava
+    // dupla_recessos com a autoria de quem aceitou e o combinado entra
+    // em vigor
+    await card.getByRole("button", { name: "Aceitar" }).click();
+    await expect
+      .poll(async () => (await planoVivo())?.status, { timeout: 15_000 })
+      .toBe("aceito");
+    const decisoes = await buscarViaServiceRole<
+      { ciclo_evento_id: string; usa: boolean; declarado_por: string | null }[]
+    >("dupla_recessos", `dupla_id=eq.${DUPLA}`);
+    expect(decisoes).toHaveLength(reces.pendentes.length);
+    for (const d of decisoes) {
+      expect(d.usa).toBe(true);
+      expect(d.declarado_por).toBe(MENTOR_PROFILE);
+    }
+  });
+
+  test("trocar a suposição que muda as datas morre no aceite — a RPC revalida antes de gravar", async () => {
+    // a decisão repensada no aceite viaja em p_decisoes (0245): quando
+    // ela invalida uma data combinada a saída é contestar + recalcular,
+    // nunca gravar combinado que já não vale — a revalidação roda antes
+    // do primeiro write
+    await limparViaServiceRole("dupla_recessos", `dupla_id=eq.${DUPLA}`);
+    const reces = await recessosDoCronograma();
+    test.skip(
+      reces.pendentes.length === 0,
+      "recesso da fixture já passou — sem pendência não há troca pra medir"
+    );
+
+    const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
+    const jwtCoord = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
+
+    // suposição "seguir" deixa um passo DENTRO do período — trocar pra
+    // pausa no aceite mudaria a data combinada
+    const ev = reces.pendentes[0];
+    const esc = escopoSuposicao(reces, ev.id);
+    const prop = await propor(jwtCoord, DUPLA, esc);
+    expect(prop).toMatchObject({ ok: true, status: "proposto" });
+
+    const troca = await responder(jwtMentor, prop.id!, "aceitar", undefined, [
+      { cicloEventoId: ev.id, usa: true },
+    ]);
+    expect(troca.error).toMatch(/muda as datas/i);
+    // revalidação antes da escrita: nada gravou e o plano segue
+    // esperando a dupla
+    expect(
+      await buscarViaServiceRole(
+        "dupla_recessos",
+        `dupla_id=eq.${DUPLA}&select=id`
+      )
+    ).toHaveLength(0);
+    expect((await planoVivo())?.status).toBe("proposto");
+
+    // confirmando a suposição o aceite grava cada pendência com a
+    // autoria de quem respondeu — seguir no período do passo, pausa nos
+    // demais
+    const ace = await responder(jwtMentor, prop.id!, "aceitar");
+    expect(ace).toMatchObject({ ok: true, status: "aceito" });
+    const rows = await buscarViaServiceRole<
+      { ciclo_evento_id: string; usa: boolean; declarado_por: string | null }[]
+    >("dupla_recessos", `dupla_id=eq.${DUPLA}`);
+    expect(rows).toHaveLength(reces.pendentes.length);
+    expect(rows.find((r) => r.ciclo_evento_id === ev.id)?.usa).toBe(false);
+    expect(rows.every((r) => r.declarado_por === MENTOR_PROFILE)).toBe(true);
   });
 });

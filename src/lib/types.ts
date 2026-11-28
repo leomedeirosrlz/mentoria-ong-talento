@@ -497,6 +497,11 @@ export type Encontro = {
   link: string | null;
   /** Por que a dupla remarcou (label do preset ou texto livre) — só escrito quando a data muda. */
   motivo_reagendamento: string | null;
+  /** Motivo do registro retroativo tardio (0242) — auditável; opcional até
+   *  a migration aplicada regenerar o contrato de leitura. */
+  motivo_retroativo?: string | null;
+  /** true quando o registro retroativo passou de 7 dias do vencimento oficial. */
+  retroativo_tardio?: boolean;
   /** Sessão combinada (0226): uuid compartilhado por todos os encontros que
    *  aconteceram numa sessão só — mesmo sessao_id = mesma sessão física.
    *  null = encontro de sessão própria (o comum). */
@@ -597,12 +602,22 @@ export type DuplaPlanoEscopo = {
     /** Duração da sessão combinada em min — 120 (2h) é o padrão. */
     duracao_min?: number;
   }[];
+  /** Carimbo da RPC (0245): a proposta carregava suposição de recesso da
+   *  equipe — quem aceita confirma ou troca antes de o plano valer. */
+  assumido?: boolean;
   /** Snapshot das decisões do gesto (518: recessos e grade; 018:
    *  fusão) — viaja no jsonb do escopo sem DDL. `fusao` registra o
    *  aceite consciente do aviso de prática (avisa sempre, bloqueia
    *  nunca). */
   decisoes?: {
-    recessos?: { cicloEventoId: string; usa: boolean }[];
+    recessos?: {
+      cicloEventoId: string;
+      usa: boolean;
+      /** Autoria da decisão (0245): "dupla" = a dupla respondeu;
+       *  "proposta" = suposição da equipe que espera confirmação no
+       *  aceite. Ausente em escopos antigos, todos "dupla". */
+      origem?: "dupla" | "proposta";
+    }[];
     sem_grade?: boolean;
     ajuste_no_aceite?: boolean;
     fusao?: {

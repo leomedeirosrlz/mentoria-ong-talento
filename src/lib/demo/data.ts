@@ -2290,7 +2290,7 @@ function build(): DemoData {
   // texto no passo, no evento, na row (motivo_reagendamento) e na
   // remarcação do trigger; aqui a const segura a mesma amarra
   const MOTIVO_PASSO_5 =
-    "A terça encavalou de novo, a quinta fecha o ritmo do combinado";
+    "A terça encavalou de novo, a quinta fecha o ritmo do plano";
   // E o mesmo instante vai na row (data_hora = em(dia, "19:00") do
   // `agendado`), no passo (data_nova) e no evento (meta.data_nova)
   const DATA_NOVA_5 = em(addDias(diaEncontro(5), 9), "19:00");
@@ -3307,7 +3307,20 @@ function build(): DemoData {
   // d-t2b · Luiza × Laura — o "segundo ciclo" que a bio dela anuncia: depois
   // de concluir a jornada com a Isabela, voltou mentora na turma nova
   const encT2b: Encontro[] = [
-    agendado(uid(D.t2b), 1, diaE1T2, { link: MEET }),
+    // a terça já passou? então o 1º rolou e tem registro; senão fica
+    // agendado — a dupla "em dia" conta a mesma história em qualquer dia
+    e1T2Passou
+      ? comRegistro(
+          realizado(uid(D.t2b), 1, diaE1T2, { duracao: 60 }),
+          luiza, "Laura", "dpp",
+          {
+            reflexoes:
+              "Primeiro encontro da T2 com a Laura — retomada da jornada depois do ciclo anterior. Alinhamos expectativas e o combinado de participação.",
+            observacoes:
+              "Combinado: ela organiza a agenda da semana e traz as metas do ciclo novo no próximo encontro.",
+          }
+        )
+      : agendado(uid(D.t2b), 1, diaE1T2, { link: MEET }),
     agendado(uid(D.t2b), 2, diaEncontroT2(2), {}),
   ];
 
@@ -3760,7 +3773,7 @@ function build(): DemoData {
     { id: uid(0x2037), titulo: "Cronograma do programa — Turma 1", descricao: null, tipo: "conteudo", url: null, path: "doc:ciclo-cronograma", audiencia: "dpp", encontro_num: null, ordem: 26 },
     { id: uid(0x2038), titulo: "Cronograma do programa — Turma 2", descricao: null, tipo: "conteudo", url: null, path: "doc:ciclo-turma2-cronograma", audiencia: "dpp", encontro_num: null, ordem: 27 },
     { id: uid(0x2039), titulo: "Plataforma de mentoria", descricao: "Onde os encontros oficiais são agendados e avaliados.", tipo: "link", url: "https://mentoria.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 28 },
-    { id: uid(0x203a), titulo: "Formação EaD gratuita", descricao: "Trilha opcional com certificado para mentores.", tipo: "link", url: "https://ead.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 29 },
+    { id: uid(0x203a), titulo: "Formação EaD gratuita", descricao: "Curso gratuito com certificado.", tipo: "link", url: "https://ead.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 29 },
     { id: uid(0x203b), titulo: "Checklist de competências do mentor", descricao: "As 10 competências do guia para marcar antes do ciclo e no 16º encontro.", tipo: "template", url: null, path: "doc:checklist-competencias", audiencia: "dpp", encontro_num: null, ordem: 30 },
   ];
   // audiências da 0167: material de mentor serve o supervisor, Feedback

@@ -13,7 +13,7 @@ import type { CicloEvento, Dupla } from "@/lib/types";
  *  dupla vem da view jovem_duplas (a RLS corta qualquer outra). */
 
 export async function generateMetadata(): Promise<Metadata> {
-  return { title: "O combinado" };
+  return { title: "O plano" };
 }
 
 export default async function JovemCombinadoPage({
@@ -51,9 +51,9 @@ export default async function JovemCombinadoPage({
 
   return (
     <RoteiroDoc
-      kicker="Combinado da dupla"
+      kicker="Pra ficar em dia"
       titulo={doc.titulo}
-      destaque="O que vocês combinaram, por escrito. Muda quando a versão muda."
+      destaque="Aqui ficam o ritmo dos encontros, as datas combinadas e o que faz cada passo valer. Toda mudança vira uma versão nova."
       meta={doc.meta}
       blocos={doc.blocos}
       voltar={{ href: "/jovem/agenda#plano", rotulo: "Voltar pra agenda" }}

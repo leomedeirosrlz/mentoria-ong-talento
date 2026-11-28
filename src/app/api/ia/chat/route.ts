@@ -53,6 +53,11 @@ import {
   type ResultadoTool,
 } from "@/lib/ia/tools";
 import { STATUS_TOOL, uiDaTool, uiDosInstrumentos } from "@/lib/ia/ui";
+import {
+  fatosParaCorrecao,
+  respostaDeterministica,
+  validarRespostaPlano,
+} from "@/lib/ia/plano-guarda";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -297,18 +302,80 @@ export async function POST(req: Request) {
       // provider — vai na telemetria do 'resposta' pra medir quanto o
       // teto de tokens ainda aperta
       let truncouFinal = false;
-      const sendErro = (e: string, dormindo?: boolean) => {
-        // dormindo: falha do provider (429/cota/5xx/timeout) → o cliente
-        // mostra a Liza dormindo em vez do erro genérico (REALIZA-363)
-        send({ type: "error", e, ...(dormindo ? { dormindo: true } : {}) });
+      const sendErro = (e: string, dormindo?: boolean, demorou?: boolean) => {
+        // dormindo: falha do provider (429/cota/5xx) → o cliente mostra a
+        // Liza dormindo; demorou: estourou o tempo → "demorou para
+        // responder" com tentar de novo (não é cota)
+        send({
+          type: "error",
+          e,
+          ...(dormindo ? { dormindo: true } : {}),
+          ...(demorou ? { demorou: true } : {}),
+        });
         erroEmitido = true;
       };
       // o último resultado do provider decide a cara do erro de orçamento
       // esgotado: provider lento/atolado dorme, ferramenta nossa lenta não
       let dormindoUltimo = false;
+      let demorouUltimo = false;
       let guiaChamado = false;
+      // o modelo inventou uma ferramenta: se ele já tinha respondido na
+      // mesma rodada, outra rodada só repete o texto (visto no panorama)
+      let toolInventada = false;
+      // payloads de plano_em_dia desta resposta: viram a única fonte de
+      // data permitida no texto (guarda numérica)
+      const planos: Record<string, unknown>[] = [];
+      // todo resultado de tool desta resposta: entra na whitelist de datas
+      // (a resposta pode citar a agenda, o card da dupla etc.)
+      const resultadosTool: unknown[] = [];
       const prazo = Date.now() + STREAM_BUDGET_MS;
       let iteracoes = 0;
+
+      // guarda numérico do plano: se o texto inventa data (ou chama de
+      // "único" uma lista com vários caminhos), refaz a redação uma vez
+      // com os FATOS na mão; se ainda assim escorregar, entrega a versão
+      // determinística do payload — nunca a data errada
+      const garantirRespostaPlano = async (texto: string): Promise<string> => {
+        const ultimo = planos[planos.length - 1];
+        const fatos = { ...ultimo, payloads: [...planos, ...resultadosTool] };
+        if (validarRespostaPlano(texto, fatos).ok) return texto;
+        const restante = Math.min(prazo - Date.now() - 1_500, 12_000);
+        if (restante > 3_000) {
+          try {
+            const pedido: MsgChat = {
+              role: "user",
+              content: [
+                "Sua resposta sobre o plano cita números que não existem no payload.",
+                "Reescreva no mesmo tom, usando SÓ as datas dos FATOS abaixo (dd/mm/aaaa), sem recalcular nada e sem chamar ferramentas.",
+                "Não chame nenhum caminho de 'único' se houver mais de um viável; não diga que não fecha se houver caminho viável; não diga que dois caminhos dão a mesma data se as datas forem diferentes.",
+                "",
+                "FATOS:",
+                fatosParaCorrecao(fatos),
+                "",
+                "Resposta a corrigir:",
+                texto,
+              ].join("\n"),
+            };
+            const alt = await chamarModelo([...historico, pedido], sessao, {
+              modelo: chamada.modelo,
+              esforco: "baixo",
+              fallbacks: chamada.fallbacks,
+              papeis: [],
+              timeoutMs: restante,
+            });
+            if (alt.ok) {
+              somarUso(alt.usage, alt.modelo);
+              const corrigido = alt.mensagem.content?.trim();
+              if (corrigido && validarRespostaPlano(corrigido, fatos).ok) {
+                return corrigido;
+              }
+            }
+          } catch {
+            // sem orçamento/provider: cai na resposta determinística
+          }
+        }
+        return respostaDeterministica(fatos);
+      };
 
       for (let i = 0; i < MAX_ITERACOES && !req.signal.aborted && !fechado; i++) {
         iteracoes = i + 1;
@@ -321,6 +388,10 @@ export async function POST(req: Request) {
           AbortSignal.timeout(Math.min(timeoutRound, restante)),
         ]);
         let emitido = 0; // tokens da rodada que já saíram pro cliente
+        // com um plano na mesa, a resposta é segurada até o guarda
+        // numérico conferir: data que não está no payload não vaza
+        const segurar = planos.length > 0;
+        const buffer: string[] = [];
         // o provider cortou no teto de tokens mesmo depois da continuação
         // interna — se esta rodada vira a resposta final, o cliente ganha
         // o chip "continuar" em vez de um texto quebrado em silêncio
@@ -329,7 +400,8 @@ export async function POST(req: Request) {
           signal,
           onToken: (t) => {
             emitido += t.length;
-            send({ type: "token", c: t });
+            if (segurar) buffer.push(t);
+            else send({ type: "token", c: t });
           },
           clienteAbortou: () => req.signal.aborted,
           ...chamada,
@@ -348,6 +420,7 @@ export async function POST(req: Request) {
           break; // usuário fechou/stop — sai do loop sem erro
         } else if (r.fallback) {
           dormindoUltimo = Boolean(r.dormindo);
+          demorouUltimo = Boolean(r.demorou);
           // provider recusou SSE ou o stream morreu no meio: a rodada
           // refaz em JSON — mas é uma GERAÇÃO NOVA, sem prefixo comum com
           // o que já saiu. Se algo já foi emitido, `reset` manda a bolha
@@ -369,11 +442,16 @@ export async function POST(req: Request) {
           truncadoMsg = Boolean(alt.truncado);
           msg = alt.mensagem;
           if (msg.content) {
-            if (emitido > 0) send({ type: "reset" });
-            send({ type: "token", c: msg.content });
+            if (segurar) {
+              buffer.length = 0;
+              buffer.push(msg.content);
+            } else {
+              if (emitido > 0) send({ type: "reset" });
+              send({ type: "token", c: msg.content });
+            }
           }
         } else {
-          sendErro(r.erro, r.dormindo);
+          sendErro(r.erro, r.dormindo, r.demorou);
           break;
         }
 
@@ -381,7 +459,20 @@ export async function POST(req: Request) {
         const calls = (msg.tool_calls ?? []).filter(
           (c) => c.type === "function"
         );
+        // preâmbulo segurado (o modelo falou antes de chamar outra tool):
+        // libera na ordem, sem perder texto
+        if (calls.length && buffer.length) {
+          send({ type: "token", c: buffer.join("") });
+          buffer.length = 0;
+        }
         if (!calls.length) {
+          // resposta final com plano na mesa: o guarda confere datas e
+          // afirmações contra o payload antes de qualquer coisa aparecer
+          if (segurar) {
+            let final = (msg.content ?? buffer.join("")).trim();
+            if (final && !truncadoMsg) final = await garantirRespostaPlano(final);
+            if (final) send({ type: "token", c: final });
+          }
           // saiu cortada: em vez de um texto quebrado no ar, o chip
           // ```sugestoes oferece retomar — o histórico já carrega o
           // parcial, então a próxima rodada continua de onde parou
@@ -463,6 +554,9 @@ export async function POST(req: Request) {
               .finally(() => clearTimeout(timerPrazo));
             if (res === null) break;
             const resTool = res as ResultadoTool;
+            if (!resTool.ok && /desconhecida/i.test(resTool.erro ?? "")) {
+              toolInventada = true;
+            }
             if (resTool.ok) {
               // escrita em prévia (REALIZA-126): o envelope vai pro card
               // do usuário — a única via de approve — e o tool-result que
@@ -512,8 +606,11 @@ export async function POST(req: Request) {
                 if (bloco) send({ type: "ui", b: bloco });
               }
             }
+            if (tc.function.name === "plano_em_dia" && resTool.ok) {
+              const dados = resTool.dados as Record<string, unknown> | null;
+              if (dados && dados.aplicavel !== false) planos.push(dados);
+            }
             if (tc.function.name === "guia_consulta") {
-              // envelope ResultadoTool — os dados moram em .dados; só
               // marca guiaChamado quando a busca rodou (falha permite
               // re-tentativa com args corrigidos em vez de travar a tool)
               const r = res as
@@ -530,6 +627,7 @@ export async function POST(req: Request) {
           // listava o nome cru da função que falhou (REALIZA-333)
           const env = res as { ok?: boolean } | null;
           if (!env || env.ok !== false) toolsUsadas.push(tc.function.name);
+          resultadosTool.push(res);
           historico.push({
             role: "tool",
             tool_call_id: tc.id,
@@ -539,6 +637,18 @@ export async function POST(req: Request) {
         }
         if (erroEmitido || req.signal.aborted || fechado) break;
         if (Date.now() >= prazo) break;
+        // respondeu e ainda inventou uma ferramenta: o resultado dela não
+        // muda o texto que já saiu, e a próxima rodada reescreveria a
+        // mesma resposta (duplicava o panorama no chat) — fecha aqui
+        if (toolInventada && (msg.content?.trim().length ?? 0) > 0) {
+          send({
+            type: "done",
+            tools: toolsUsadas,
+            fontes: fontes.size ? [...fontes.values()] : undefined,
+          });
+          concluido = true;
+          break;
+        }
         // nudge: a partir da 2ª rodada, força o modelo a responder com o
         // que já tem em vez de seguir chamando ferramentas
         if (i >= 1 && !concluido) {
@@ -551,7 +661,7 @@ export async function POST(req: Request) {
       }
 
       if (!concluido && !erroEmitido && !req.signal.aborted && !fechado) {
-        sendErro(MSG_FALHA, dormindoUltimo);
+        sendErro(MSG_FALHA, dormindoUltimo, demorouUltimo);
       }
 
       // evento-resumo da request (sdd D4): um 'resposta' por mensagem com

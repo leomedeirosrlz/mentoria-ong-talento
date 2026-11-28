@@ -4,7 +4,8 @@ import { ArrowLeft, Compass } from "@phosphor-icons/react/dist/ssr";
 import { PdmDupla } from "@/components/pdm-dupla";
 import { buttonVariants } from "@/components/ui/button";
 import { getMe } from "@/lib/queries";
-import { getJovemDuplas } from "@/lib/queries-jovem";
+import { getJovemDuplas, getJovemJornada } from "@/lib/queries-jovem";
+import { instrumentosOrigemPdm } from "@/lib/pdm-origem";
 import { getPdmDaDupla } from "@/lib/queries-pdm";
 
 export const metadata: Metadata = { title: "Meu plano de desenvolvimento" };
@@ -16,7 +17,11 @@ export const metadata: Metadata = { title: "Meu plano de desenvolvimento" };
 // da jornada, onde as estações explicam o que falta chegar.
 
 export default async function JovemPdm() {
-  const [me, duplas] = await Promise.all([getMe(), getJovemDuplas()]);
+  const [me, duplas, jornada] = await Promise.all([
+    getMe(),
+    getJovemDuplas(),
+    getJovemJornada(),
+  ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
   const dupla =
@@ -47,6 +52,7 @@ export default async function JovemPdm() {
           doc={pdm}
           mentoradoNome={me.nome_social || me.nome}
           podeEditar
+          instrumentosOrigem={instrumentosOrigemPdm(jornada?.instrumentos ?? [])}
         />
       ) : (
         <div className="flex flex-col items-center gap-2 rounded-xl bg-card px-5 py-12 text-center shadow-[var(--shadow-border)]">

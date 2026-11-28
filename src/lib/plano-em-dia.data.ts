@@ -69,6 +69,13 @@ export const GAP_DIAS_EXIGE: Record<
  *  spacing the official double weeks use. */
 export const GAP_MINIMO_DIAS = 2;
 
+/** Folga entre o 8º e o 9º: o calendário oficial da Turma 1 deixa duas
+ *  semanas (8º 27/10 → 9º 10/11) para a prática das submetas antes da
+ *  revisão de meio de percurso. A recuperação desce em degraus quando o
+ *  calendário não fecha: oficial → 7 dias → piso da semana dupla. */
+export const GAP_89_OFICIAL = 14;
+export const GAP_89_DEGRAUS = [GAP_89_OFICIAL, 7, GAP_MINIMO_DIAS] as const;
+
 /** Ritmos que o plano sonda pra NOMEAR o nível de flexibilização, do mais
  *  leve ao mais pesado (encontros por semana): o de sempre, a semana dupla,
  *  a semana tripla e, no topo, 1 por dia. É a escada de nomeação, não o

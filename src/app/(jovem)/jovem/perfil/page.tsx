@@ -23,8 +23,6 @@ import {
 } from "@/lib/selos-perfil";
 import { papelLabel } from "@/lib/ciclo";
 import { getMe } from "@/lib/queries";
-import { getChamados, getChamadoDetalhe } from "@/lib/queries-chamados";
-import { JovemChamados } from "@/components/jovem-chamados";
 import { ConquistasCard } from "./conquistas-card";
 import { VitrineSelos } from "./vitrine-selos";
 import { NivelNotifier } from "@/components/nivel-notifier";
@@ -67,14 +65,13 @@ export default async function JovemPerfil({
   searchParams: Promise<{ c?: string }>;
 }) {
   const { c } = await searchParams;
-  const cSel = c && UUID_RE.test(c) ? c : null;
-  // detalhe junto com a lista: getChamadoDetalhe reaproveita a linha do
-  // getChamados (React.cache) em vez de esperar a lista terminar
+  // compat 0084: o detalhe do pedido morava aqui e migrou pra home — links
+  // antigos (/jovem/perfil?c=<id>, e-mails e notificações do banco) pousam
+  // na âncora #apoio sem quebrar
+  if (c && UUID_RE.test(c)) redirect(`/jovem?c=${c}#apoio`);
   const [
     me,
     perfil,
-    meusChamados,
-    detalhe,
     duplas,
     contatosRede,
     encontros,
@@ -85,8 +82,6 @@ export default async function JovemPerfil({
   ] = await Promise.all([
     getMe(),
     getJovemPerfil(),
-    getChamados(),
-    cSel ? getChamadoDetalhe(cSel) : Promise.resolve(null),
     // jornada/conquistas: mesmas leituras cacheadas da home
     getJovemDuplas(),
     // "Sua rede" (023): os adultos das duplas — REALIZA-525 tirou os
@@ -195,11 +190,11 @@ export default async function JovemPerfil({
           areas={me.interesses}
           seed={me.id}
         />
-        <div className="px-4 pb-5 sm:px-6 sm:pb-6">
-          {/* justify-start + wrap: com a foto o ghost fica colado no
-              avatar e os selos (ml-auto) caem pra linha de baixo em vez de
-              espremer em 390px — em uma linha só quando cabe */}
-          <div className="flex flex-wrap items-end justify-start gap-3">
+        <div className="relative px-4 pb-5 sm:px-6 sm:pb-6">
+          {/* wrap só entre blocos: o grupo de selos é flex-nowrap e, quando
+              não cabe ao lado da foto, desce inteiro pra borda esquerda do
+              bloco — nunca quebra peça por linha nem invade a câmera */}
+          <div className="flex flex-wrap items-end justify-start gap-x-4 gap-y-3">
             <FotoPerfil
               nome={nomeTela}
               pasta={me.id}
@@ -326,25 +321,6 @@ export default async function JovemPerfil({
               escolhidas={chavesNoPerfil}
             />
           )}
-
-          {/* 0084: "Meus pedidos" do jovem mora no perfil — trilha pública
-              dos chamados dele, sem comentário interno nem vitrine pro
-              mentor */}
-          <JovemChamados
-            itens={meusChamados.itens}
-            meuId={me.id}
-            meuNome={me.nome_social || me.nome}
-            cSel={cSel}
-            detalhe={
-              detalhe?.chamado
-                ? {
-                    chamado: detalhe.chamado,
-                    timeline: detalhe.timeline,
-                    equipe: detalhe.equipe,
-                  }
-                : null
-            }
-          />
         </div>
 
         <div className="min-w-0 space-y-6">

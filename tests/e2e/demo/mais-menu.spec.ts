@@ -30,13 +30,6 @@ const DUPLA_OK = "de000000-0000-4000-8000-000000001537";
 // já agendada — a remarcação dela é "sessão", não "encontro"
 const DUPLA_ESP1 = "de000000-0000-4000-8000-000000001542";
 
-// coordenação em dupla ativa: quatro itens, nesta ordem no popup
-const ITENS = [
-  "Enviar formulário",
-  "Solicitar mentor especialista",
-  "Editar dupla",
-  "Remanejar dupla",
-] as const;
 
 test.describe("demo — ações de segunda ordem da ficha", () => {
   test("desktop: uma primária + ⋯ com os quatro itens, dialog abre e foco volta", async ({
@@ -46,12 +39,11 @@ test.describe("demo — ações de segunda ordem da ficha", () => {
     await entrarNaDemo(page, "coordenacao");
     await page.goto(`/duplas/${DUPLA_SEM_PEDIDO}`);
 
-    // nada em linha: os itens só existem como menuitem do ⋯ — nenhum
-    // botão solto no cabeçalho (review #9)
-    for (const nome of ITENS)
+    // rotinas contextuais ficam em linha (até duas); a gestão vai pro ⋯
+    for (const nome of ["Enviar formulário", "Solicitar mentor especialista"])
       await expect(
         page.getByRole("button", { name: nome, exact: true })
-      ).toHaveCount(0);
+      ).toBeVisible();
 
     const mais = page.getByRole("button", { name: "Mais ações da dupla" });
     await expect(mais).toBeVisible();
@@ -60,11 +52,9 @@ test.describe("demo — ações de segunda ordem da ficha", () => {
     await expect(popup).toBeVisible();
     const itens = popup.getByRole("menuitem");
     // contagem e ORDEM — toHaveText normaliza o espaço de cada item
-    await expect(itens).toHaveText([...ITENS]);
+    await expect(itens).toHaveText(["Editar dupla", "Remanejar dupla"]);
 
-    await popup
-      .getByRole("menuitem", { name: "Enviar formulário" })
-      .click();
+    await popup.getByRole("menuitem", { name: "Editar dupla" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await page.keyboard.press("Escape");
@@ -84,7 +74,7 @@ test.describe("demo — ações de segunda ordem da ficha", () => {
     const popup = page.locator('[data-slot="dropdown-menu-content"]');
     await expect(popup).toBeVisible();
     const itens = popup.getByRole("menuitem");
-    await expect(itens).toHaveText([...ITENS]);
+    await expect(itens).toHaveText(["Editar dupla", "Remanejar dupla"]);
 
     // assert positivo do REALIZA-157: cada item é a linha inteira do popup —
     // p-1 do container desconta os 8px de respiro lateral. A medição é uma
@@ -99,12 +89,10 @@ test.describe("demo — ações de segunda ordem da ficha", () => {
         )
       )
     );
-    expect(diffs).toHaveLength(ITENS.length);
+    expect(diffs).toHaveLength(2);
     for (const d of diffs) expect(d).toBeLessThan(2);
 
-    await popup
-      .getByRole("menuitem", { name: "Enviar formulário" })
-      .click();
+    await popup.getByRole("menuitem", { name: "Editar dupla" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await page.keyboard.press("Escape");
@@ -113,7 +101,7 @@ test.describe("demo — ações de segunda ordem da ficha", () => {
 
     // reabrir mostra o mesmo menu — o estado dos dialogs não vaza
     await mais.click();
-    await expect(popup.getByRole("menuitem")).toHaveCount(ITENS.length);
+    await expect(popup.getByRole("menuitem")).toHaveCount(2);
   });
 
   test("mentor: a primária é o registrar e o pedido mora só no card", async ({
@@ -146,14 +134,16 @@ test.describe("demo — ações de segunda ordem da ficha", () => {
     await expect(
       popup.getByRole("menuitem", { name: /Solicitar mentor especialista/ })
     ).toHaveCount(0);
-    await expect(popup.locator('[role="menuitem"][aria-disabled="true"]')).toHaveCount(0);
-    // as ações de segunda ordem do mentor estão lá
     await expect(
-      popup.getByRole("menuitem", { name: "Pedir apoio" })
-    ).toBeVisible();
+      popup.locator('[role="menuitem"][aria-disabled="true"]')
+    ).toHaveCount(0);
+    // "Pedir apoio" é rotina em linha; no ⋯ fica só a gestão do mentor
     await expect(
-      popup.getByRole("menuitem", { name: /especialista pro jovem/ })
+      page.getByRole("button", { name: "Pedir apoio", exact: true })
     ).toBeVisible();
+    await expect(popup.getByRole("menuitem")).toHaveText([
+      "Sugerir especialista pro jovem",
+    ]);
     await page.keyboard.press("Escape");
   });
 
@@ -167,16 +157,9 @@ test.describe("demo — ações de segunda ordem da ficha", () => {
     await entrarNaDemo(page, "mentor_dpp");
     await page.goto(`/duplas/${DUPLA_OK}`);
 
-    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
-    await expect(mais).toBeVisible();
-    await mais.click();
-    const popup = page.locator('[data-slot="dropdown-menu-content"]');
-    await expect(popup).toBeVisible();
-    // nº e data variam com o dia do run (5º ou 6º) — o que não muda é a
-    // gramática "Remarcar Nº · <dia> <dd/mm> às <hh:mm>"
-    const item = popup.getByRole("menuitem", {
-      name: /^Remarcar \d+º · \S+ \d{2}\/\d{2} às \d{2}:\d{2}$/,
-    });
+    // a remarcação é rotina em linha (barra: primária + até duas), com o
+    // rótulo curto "Remarcar Nº" — o slot cheio fica no title do dialog
+    const item = page.getByRole("button", { name: /^Remarcar \d+º$/, exact: true });
     await expect(item).toBeVisible();
 
     await item.click();
@@ -199,12 +182,8 @@ test.describe("demo — ações de segunda ordem da ficha", () => {
     await entrarNaDemo(page, "mentor_especialista");
     await page.goto(`/duplas/${DUPLA_ESP1}`);
 
-    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
-    await expect(mais).toBeVisible();
-    await mais.click();
-    const popup = page.locator('[data-slot="dropdown-menu-content"]');
-    await expect(popup).toBeVisible();
-    const item = popup.getByRole("menuitem", { name: "Remarcar sessão" });
+    // "Remarcar sessão" também é rotina em linha
+    const item = page.getByRole("button", { name: "Remarcar sessão", exact: true });
     await expect(item).toBeVisible();
 
     await item.click();

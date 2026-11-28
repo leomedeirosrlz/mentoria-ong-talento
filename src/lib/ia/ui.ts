@@ -158,6 +158,30 @@ export type UiPessoas = {
   pessoas: { id: string; nome: string; papel: AppRole | null }[];
 };
 
+/** BI demográfico da coordenação/auxiliar (onda 5): contagens por
+ *  estado, gênero, faixa de idade, papel ou trilha, no recorte que a
+ *  sessão já lê por RLS. O card é a própria resposta — o modelo narra,
+ *  o número sai daqui. `chave` guarda o valor de máquina pro grupo
+ *  "não informado" desenhar hatch (o buraco nomeado, nunca escondido). */
+export type UiAgregado = {
+  kind: "agregado";
+  /** "Pessoas por estado (UF)" — o título pronto vem do payload */
+  titulo: string;
+  /** filtros aplicados como a equipe os lê ("Mentorado · SP") —
+   *  null quando a pergunta não filtrou (programa todo) */
+  recorte: string | null;
+  /** pessoas que passaram nos filtros — o denominador de cada barra */
+  total: number;
+  /** "pessoas ativas" | "pessoas cadastradas" — o universo honesto */
+  universo: string;
+  itens: { chave: string; rotulo: string; n: number; pct: number }[];
+  /** cauda dobrada fora do top N — null quando o top cobriu tudo */
+  outros: { pessoas: number; grupos: number } | null;
+  /** papel/trilha contam participação: uma pessoa entra em mais de uma
+   *  linha e a soma dos pct pode passar de 100 — o card avisa */
+  participacao_multipla: boolean;
+};
+
 export type UiChamados = {
   kind: "chamados";
   aberto: number;
@@ -257,6 +281,48 @@ export type UiPlano = {
    *  fecha antes do encerramento, o card não promete a data. */
   estado: "em_dia" | "recuperacao" | "conversa" | null;
   sugestao: string | null;
+  /** Motor de cenários (1126): o caminho viável mais cedo quando a
+   *  simulação base não fecha. O card abre por ele em vez de dizer que só
+   *  a coordenação resolve. */
+  melhor: {
+    id: string;
+    rotulo: string;
+    data: string | null;
+    sessoes: number;
+    decisao_recesso: "pausa" | "segue" | null;
+    fusao: number[][];
+  } | null;
+  /** os outros caminhos viáveis (sem repetir o melhor) — até 3 */
+  alternativas: { rotulo: string; data: string | null }[];
+  /** Caminho completo de menor fricção (1126): quando a simulação base é
+   *  "conversa", o card mostra ESTE caminho, com todos os passos dele. */
+  caminho: {
+    rotulo: string;
+    data: string | null;
+    sessoes: number;
+    ritmo: number;
+    fusao: number[][];
+    decisao_recesso: "pausa" | "segue" | null;
+    /** o que a dupla precisa aceitar pra esse caminho fechar */
+    exigencias: string[];
+    passos: UiPlano["passos"];
+    /** recesso que a proposta precisa declarar junto (quando há) */
+    recesso: { ciclo_evento_id: string; usa: boolean } | null;
+  } | null;
+  /** TODOS os cenários do motor (1126) — a interface do simulador: cada
+   *  opção tem data, sessões, ritmo e o que precisa ser decidido pra
+   *  propor aquele caminho. */
+  cenarios: {
+    id: string;
+    rotulo: string;
+    viavel: boolean;
+    data: string | null;
+    sessoes: number;
+    ritmo: number;
+    fusao: number[][];
+    decisao_recesso: "pausa" | "segue" | null;
+    recesso: { ciclo_evento_id: string; usa: boolean } | null;
+  }[];
   /** Plano persistido vivo (0219) — quando existe, o card mostra o
    *  combinado (status/versão/quem aprovou) em vez de só a proposta. */
   plano: {
@@ -368,6 +434,7 @@ export type UiBloco =
   | UiFila
   | UiCapacidade
   | UiPessoas
+  | UiAgregado
   | UiChamados
   | UiInstrumentos
   | UiFontes
@@ -392,12 +459,13 @@ export const STATUS_TOOL: Record<string, string> = {
   plano_responder: "Preparando a resposta do plano…",
   plano_aplicar_passo: "Preparando o passo do plano…",
   resumo_dupla: "Lendo o resumo consolidado da dupla…",
-  meu_plano: "Vendo o combinado do plano…",
+  meu_plano: "Vendo o seu plano…",
   intervencao_sugerir: "Preparando a sugestão de intervenção…",
   guia_ajustar: "Preparando o ajuste do guia…",
   guia_limpar: "Preparando pra voltar ao guia…",
   aguardando_par: "Olhando a fila de pareamento…",
   capacidade_mentores: "Conferindo as vagas dos mentores…",
+  pessoas_agregado: "Contando as pessoas do programa…",
   adocao_por_superficie: "Lendo a adoção por superfície…",
   adocao_por_dia: "Lendo a série diária de gestos…",
   adocao_caminhos: "Lendo os caminhos de navegação…",
@@ -580,19 +648,56 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
     }
     case "plano_em_dia": {
       if (!str(d.dupla_id) || d.aplicavel !== true) return null;
-      const passos = arr(d.passos)
-        .map((p) => ({
-          numero: num(p.numero),
-          titulo: String(p.titulo ?? ""),
-          acao: p.acao as UiPlano["passos"][number]["acao"],
-          encontro_id: str(p.encontro_id),
-          data: String(p.data_sugerida ?? ""),
-          data_oficial: String(p.data_oficial ?? ""),
-          vence_no_caminho: p.vence_no_caminho === true,
-          precondicao: str(p.precondicao),
-          aviso: str(p.aviso),
-        }))
-        .filter((p) => p.numero > 0);
+      const mapaPasso = (p: Record<string, unknown>) => ({
+        numero: num(p.numero),
+        titulo: String(p.titulo ?? ""),
+        acao: p.acao as UiPlano["passos"][number]["acao"],
+        encontro_id: str(p.encontro_id),
+        data: String(p.data_sugerida ?? ""),
+        data_oficial: String(p.data_oficial ?? ""),
+        vence_no_caminho: p.vence_no_caminho === true,
+        precondicao: str(p.precondicao),
+        aviso: str(p.aviso),
+      });
+      const passos = arr(d.passos).map(mapaPasso).filter((p) => p.numero > 0);
+      // caminho completo de menor fricção (1126): quando a simulação base
+      // é "conversa", o card mostra ESTE caminho — data, exigências e todos
+      // os passos dele
+      const caminhoBruto = obj(d.caminho);
+      const caminho = caminhoBruto
+        ? {
+            rotulo: String(caminhoBruto.rotulo ?? ""),
+            data: str(caminhoBruto.data),
+            sessoes: num(caminhoBruto.sessoes),
+            ritmo: num(caminhoBruto.ritmo),
+            fusao: (Array.isArray(caminhoBruto.fusao)
+              ? caminhoBruto.fusao
+              : []) as number[][],
+            decisao_recesso: (caminhoBruto.decisaoRecesso === "pausa" ||
+            caminhoBruto.decisaoRecesso === "segue"
+              ? caminhoBruto.decisaoRecesso
+              : null) as "pausa" | "segue" | null,
+            exigencias: (Array.isArray(caminhoBruto.exigencias)
+              ? caminhoBruto.exigencias
+              : []
+            ).map((x) => String(x)),
+            passos: arr(caminhoBruto.passos)
+              .map(mapaPasso)
+              .filter((p) => p.numero > 0),
+            recesso: (() => {
+              const rec = obj(caminhoBruto.recesso);
+              return rec
+                ? {
+                    ciclo_evento_id: String(rec.cicloEventoId ?? ""),
+                    usa: rec.usa === true,
+                  }
+                : null;
+            })(),
+          }
+        : null;
+      const usaCaminho =
+        d.estado === "conversa" && (caminho?.passos.length ?? 0) > 0;
+      const passosEfetivos = usaCaminho ? caminho!.passos : passos;
       const pendencias = arr(d.pendencias_registro).map((p) => ({
         numero: num(p.numero),
         estado: (str(p.estado) === "limbo" ? "limbo" : "pendente_registro") as
@@ -603,7 +708,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
       // travados): o veredito positivo ainda vira card — o silêncio lia
       // como card quebrado (026)
       if (
-        !passos.length &&
+        !passosEfetivos.length &&
         !pendencias.length &&
         d.em_dia !== true &&
         d.estado !== "em_dia"
@@ -620,24 +725,76 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           ? nivelStr
           : null;
       const cabem = obj(d.cabem_ate_encerramento);
+      // motor de cenários (1126): melhor caminho viável + alternativas
+      const melhorBruto = obj(d.melhor);
+      const melhor =
+        melhorBruto && melhorBruto.viavel === true
+          ? {
+              id: String(melhorBruto.id ?? ""),
+              rotulo: String(melhorBruto.rotulo ?? ""),
+              data: str(melhorBruto.data),
+              sessoes: num(melhorBruto.sessoes),
+              decisao_recesso: (melhorBruto.decisaoRecesso === "pausa" ||
+              melhorBruto.decisaoRecesso === "segue"
+                ? melhorBruto.decisaoRecesso
+                : null) as "pausa" | "segue" | null,
+              fusao: (Array.isArray(melhorBruto.fusao)
+                ? melhorBruto.fusao
+                : []) as number[][],
+            }
+          : null;
+      const alternativas = arr(d.cenarios)
+        .filter(
+          (c) =>
+            c.viavel === true &&
+            (!melhorBruto || c.id !== melhorBruto.id) &&
+            str(c.data) != null
+        )
+        .slice(0, 3)
+        .map((c) => ({ rotulo: String(c.rotulo ?? ""), data: str(c.data) }));
+      const cenarios = arr(d.cenarios).map((c) => {
+        const rec = obj(c.recesso);
+        return {
+          id: String(c.id ?? ""),
+          rotulo: String(c.rotulo ?? ""),
+          viavel: c.viavel === true,
+          data: str(c.data),
+          sessoes: num(c.sessoes),
+          ritmo: num(c.ritmo),
+          fusao: (Array.isArray(c.fusao) ? c.fusao : []) as number[][],
+          decisao_recesso: (c.decisaoRecesso === "pausa" ||
+          c.decisaoRecesso === "segue"
+            ? c.decisaoRecesso
+            : null) as "pausa" | "segue" | null,
+          recesso: rec
+            ? {
+                ciclo_evento_id: String(rec.cicloEventoId ?? ""),
+                usa: rec.usa === true,
+              }
+            : null,
+        };
+      });
       return {
         kind: "plano",
         dupla_id: String(d.dupla_id),
         mentor: str(d.mentor),
         mentorado: str(d.mentorado),
         em_dia: d.em_dia === true,
-        data_recuperacao: str(d.data_recuperacao),
+        data_recuperacao: usaCaminho
+          ? caminho!.data
+          : str(d.data_recuperacao),
         data_projetada: str(d.data_projetada),
         cabem_ate_encerramento: cabem
           ? { cabem: num(cabem.cabem), faltam: num(cabem.faltam) }
           : null,
         encerramento: str(d.encerramento),
-        ritmo:
-          num(d.ritmo) ||
-          (nivel ? RITMO_DO_NIVEL[nivel] : 0) ||
-          (plano ? num(plano.ritmo) : 0) ||
-          null,
-        passos,
+        ritmo: usaCaminho
+          ? caminho!.ritmo
+          : num(d.ritmo) ||
+            (nivel ? RITMO_DO_NIVEL[nivel] : 0) ||
+            (plano ? num(plano.ritmo) : 0) ||
+            null,
+        passos: passosEfetivos,
         pendencias,
         recessos_pendentes: arr(d.recessos_pendentes)
           .map((r) => ({
@@ -659,14 +816,19 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
         avisos: (Array.isArray(d.avisos) ? d.avisos : [])
           .map((a) => str(a))
           .filter((a): a is string => a != null),
-        nivel,
-        estado:
-          d.estado === "em_dia" ||
-          d.estado === "recuperacao" ||
-          d.estado === "conversa"
+        nivel: usaCaminho ? null : nivel,
+        estado: usaCaminho
+          ? "recuperacao"
+          : d.estado === "em_dia" ||
+              d.estado === "recuperacao" ||
+              d.estado === "conversa"
             ? d.estado
             : null,
         sugestao: str(d.sugestao),
+        melhor,
+        alternativas,
+        cenarios,
+        caminho,
         plano: plano
           ? {
               id: String(plano.id ?? ""),
@@ -787,6 +949,30 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           nome: String(p.nome_social ?? p.nome ?? ""),
           papel: (str(p.papel) as AppRole | null) ?? null,
         })),
+      };
+    }
+    case "pessoas_agregado": {
+      const grupos = arr(d.grupos);
+      if (!grupos.length) return null;
+      const outros = obj(d.outros);
+      return {
+        kind: "agregado",
+        titulo: str(d.titulo) ?? "Pessoas",
+        recorte: str(d.recorte) || null,
+        total: num(d.total_pessoas),
+        universo: str(d.universo) ?? "pessoas",
+        // a tool já ordena e capa no top — o card não reordena (a ordem
+        // é semântica: faixa segue a idade, "não informado" fecha a lista)
+        itens: grupos.map((g) => ({
+          chave: String(g.chave),
+          rotulo: String(g.rotulo ?? g.chave),
+          n: num(g.pessoas),
+          pct: num(g.percentual),
+        })),
+        outros: outros
+          ? { pessoas: num(outros.pessoas), grupos: num(outros.grupos) }
+          : null,
+        participacao_multipla: d.participacao_multipla === true,
       };
     }
     case "chamados_resumo": {

@@ -188,10 +188,24 @@ test.describe("mentorado — shell /jovem", () => {
   test("home lista o combinado do jovem e esconde o do mentor", async ({
     page,
   }) => {
-    await page.goto("/jovem");
+    // a seção nasce recolhida — a âncora abre ao hidratar (mesmo caminho
+    // das pendências do "Para fazer agora")
+    await page.goto("/jovem#combinados-titulo");
     const combinados = page.locator(
       'section[aria-labelledby="combinados-titulo"]'
     );
+    // a seção nasce recolhida (hash abre; se o roteador reescrever antes da
+    // hidratação, o trigger é o caminho)
+    const itemCombinado = combinados.getByText(COMBINADO_JOVEM);
+    // o hash abre a seção; só clica no trigger se ela estiver FECHADA
+    // (clicar numa seção aberta pelo hash fecha)
+    const gatilhoCombinados = combinados.getByRole("button", {
+      name: /Meus combinados/,
+    });
+    if ((await gatilhoCombinados.getAttribute("aria-expanded")) === "false") {
+      await gatilhoCombinados.click();
+    }
+    await expect(itemCombinado).toBeVisible({ timeout: 15_000 });
     await expect(combinados.getByText(COMBINADO_JOVEM)).toBeVisible();
     // o filtro é da view (responsavel='mentorado'): nem no DOM entra
     await expect(combinados.getByText(COMBINADO_MENTOR)).toHaveCount(0);
@@ -200,7 +214,7 @@ test.describe("mentorado — shell /jovem", () => {
   test("home mostra o próximo encontro e os documentos pendentes", async ({
     page,
   }) => {
-    await page.goto("/jovem");
+    await page.goto("/jovem#docs-titulo");
     // o hero "Seu próximo encontro" (redesign) é o card de abertura — a
     // home mostra só o PRÓXIMO encontro (futuros[0]); em run paralelo a
     // trilha esp ou outro spec pode pôr um mais perto, então o assert é
@@ -228,7 +242,9 @@ test.describe("mentorado — shell /jovem", () => {
   test("marcar combinado persiste via RPC marcar_combinado", async ({
     page,
   }) => {
-    await page.goto("/jovem");
+    // âncora abre a seção recolhida (o reload adiante mantém o hash e
+    // reabre sozinha — prova o caminho que uma pendência usa)
+    await page.goto("/jovem#combinados-titulo");
     const combinados = page.locator(
       'section[aria-labelledby="combinados-titulo"]'
     );
@@ -236,16 +252,33 @@ test.describe("mentorado — shell /jovem", () => {
     // Checkbox é controlado: um clique pré-hidratação fica só no DOM e o
     // React desfaz ao ligar — repete até a action disparar o toast. O
     // click tem teto: o input desabilita enquanto a action roda
-    await agirComConfirma(
-      () =>
-        combinados
-          .locator("label", { hasText: COMBINADO_JOVEM })
-          .click({ timeout: 5_000 }),
-      () => page.getByText("Combinado marcado como feito.").isVisible()
-    );
-    await expect(
-      page.getByText("Combinado marcado como feito.")
-    ).toBeVisible({ timeout: 15_000 });
+    // espera a hidratação: clique antes dela é desfeito pelo React
+    await expect(combinados.getByText(COMBINADO_JOVEM)).toBeVisible({
+      timeout: 15_000,
+    });
+    // a confirmação é a mudança de estado (o item sai dos abertos e
+    // recolhe em "Ver N feitos"); o toast é passageiro e o refresh pode
+    // recolher a seção junto
+    const reabreCombinados = async () => {
+      const gatilho = combinados.getByRole("button", {
+        name: /Meus combinados/,
+      });
+      if ((await gatilho.getAttribute("aria-expanded")) === "false") {
+        await gatilho.click();
+      }
+    };
+    await expect(async () => {
+      // abre antes (o refresh pode recolher), clica se o item está à vista
+      await reabreCombinados();
+      const alvo = combinados.locator("label", { hasText: COMBINADO_JOVEM });
+      if (await alvo.isVisible().catch(() => false)) {
+        await alvo.click({ timeout: 5_000 }).catch(() => {});
+      }
+      await reabreCombinados();
+      expect(
+        await combinados.getByRole("button", { name: /Ver \d+ feito/ }).count()
+      ).toBeGreaterThan(0);
+    }).toPass({ timeout: 25_000 });
     // checked vem do server (RPC + router.refresh) — preview frio leva
     // mais que os 5s default; a suite já usa 15s pra roundtrip assim.
     // Redesign: o item sai da lista de abertos e recolhe em "Ver N feitos"
@@ -267,16 +300,23 @@ test.describe("mentorado — shell /jovem", () => {
     const recarregados = page.locator(
       'section[aria-labelledby="combinados-titulo"]'
     );
+    // depois do reload a seção pode nascer fechada (hash) — abre antes
+    const gatilhoReload = recarregados.getByRole("button", {
+      name: /Meus combinados/,
+    });
+    await expect(gatilhoReload).toBeVisible({ timeout: 15_000 });
+    if ((await gatilhoReload.getAttribute("aria-expanded")) === "false") {
+      await gatilhoReload.click();
+    }
+    const verFeitos = recarregados.getByRole("button", {
+      name: /Ver \d+ feito/,
+    });
+    await expect(verFeitos).toBeVisible({ timeout: 15_000 });
+    await verFeitos.click();
     const checkboxReload = recarregados
       .locator("label", { hasText: COMBINADO_JOVEM })
       .getByRole("checkbox");
-    await agirComConfirma(
-      () =>
-        recarregados
-          .getByRole("button", { name: /Ver \d+ feito/ })
-          .click({ timeout: 5_000 }),
-      () => checkboxReload.isVisible()
-    );
+    await expect(checkboxReload).toBeVisible({ timeout: 15_000 });
     await expect(checkboxReload).toBeChecked({ timeout: 15_000 });
   });
 
@@ -284,13 +324,15 @@ test.describe("mentorado — shell /jovem", () => {
     page,
   }) => {
     await page.goto("/jovem");
-    // o botão solto virou a linha discreta "Precisa de ajuda?" — abre o
-    // mesmo diálogo de chamado (0084)
+    // o botão solto virou a linha discreta de ajuda — sem pedido vivo o
+    // trigger cheio é "Pedir ajuda / Precisa de ajuda? Fale com a equipe";
+    // com pedido em curso (o teste pode herdar um de runs anteriores) o
+    // gesto encolhe no ghost "Pedir ajuda". Os dois abrem o mesmo chamado.
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
       () =>
         page
-          .getByRole("button", { name: "Precisa de ajuda? Fale com a equipe" })
+          .getByRole("button", { name: /Pedir ajuda|Precisa de ajuda/ })
           .click(),
       () => dialog.isVisible()
     );
@@ -347,7 +389,9 @@ test.describe("mentorado — shell /jovem", () => {
     });
     // .first: a trilha esp (e specs paralelos) põe outro "Agendado" na
     // mesma lista — o assert é "o encontro existe com o badge", não "1 só"
-    await expect(proximos.getByText("Agendado").first()).toBeVisible();
+    await expect(
+      proximos.getByText("Agendado").filter({ visible: true }).first()
+    ).toBeVisible();
   });
 
   // WP7 (REALIZA-140) + FR-007 (010) — /jovem/materiais é o hub de

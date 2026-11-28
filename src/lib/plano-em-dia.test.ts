@@ -553,7 +553,7 @@ describe("montarPlanoEmDia + escopoDaProposta — a marca sessao (018)", () => {
     expect(p.passos.every((x) => x.sessao == null)).toBe(true);
   });
 
-  it("a entrada fusao marca os passos do grupo sem mexer nas datas", () => {
+  it("a entrada fusao marca os passos do grupo e junta a sessão na data mais cedo", () => {
     const sem = montarPlanoEmDia({
       dupla: dupla(),
       eventos: eventos3(),
@@ -578,8 +578,11 @@ describe("montarPlanoEmDia + escopoDaProposta — a marca sessao (018)", () => {
       "a",
       null,
     ]);
-    // a caminhada não muda: cada passo segue na sua data
-    expect(com.passos.map((x) => x.data)).toEqual(
+    // a sessão junta o grupo na data mais cedo e encurta a projeção:
+    // o intervalo de prática passa a contar uma vez depois do grupo
+    expect(com.passos[0].data).toBe(sem.passos[0].data);
+    expect(com.passos[1].data).toBe(com.passos[0].data);
+    expect(com.passos.map((x) => x.data)).not.toEqual(
       sem.passos.map((x) => x.data)
     );
   });

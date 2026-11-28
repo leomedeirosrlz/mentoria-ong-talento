@@ -77,6 +77,9 @@ type Msg = {
   /** falha do provider (evento error da rota com `dormindo`): a bolha
    *  mostra a LizaDormindo em vez de texto de erro — REALIZA-363 */
   dormindo?: boolean;
+  /** estourou o tempo (não é cota): a bolha mostra "demorou" + tentar
+   *  de novo, sem a cara de dormindo */
+  demorou?: boolean;
 };
 
 /** Opções do envio: `origem` marca gestos que não vieram do composer
@@ -192,7 +195,7 @@ function agruparConversas(lista: Conversa[]) {
 }
 
 const DEMO_FALLBACK =
-  "Na demonstração a Liza tem respostas de exemplo. No ambiente real ela responde com os seus dados e os guias oficiais.";
+  "Na demonstração a Liza tem respostas de exemplo. Com os seus dados ela responde com eles e com os guias oficiais.";
 
 const FALHA =
   "Não consegui responder agora. Tente de novo em instantes.";
@@ -202,19 +205,19 @@ const FALHA =
 const DEMO_RESPOSTAS: [RegExp, string][] = [
   [
     /resumo|semana/i,
-    "Na demonstração o resumo sai de exemplo: há duplas em dia, uma pedindo apoio e outra com encontro atrasado. No ambiente real esta resposta vem dos seus dados.",
+    "Na demonstração o resumo sai de exemplo: há duplas em dia, uma pedindo apoio e outra com encontro atrasado. Com os seus dados esta resposta vem deles.",
   ],
   [
     /aguardando|par|fila/i,
-    "Na demonstração a fila mostra um jovem esperando par e uma mentora com vaga livre. No ambiente real é a fila de verdade.",
+    "Na demonstração a fila mostra um jovem esperando par e uma mentora com vaga livre. Com os seus dados é a fila de verdade.",
   ],
   [
     /capacidade|mentores/i,
-    "Na demonstração cada mentor ativo tem 1 ou 2 vagas conforme a trilha. No ambiente real a ocupação sai do cadastro.",
+    "Na demonstração cada mentor ativo tem 1 ou 2 vagas conforme a trilha. Com os seus dados a ocupação sai do cadastro.",
   ],
   [
     /dupla|encontro|registro|agenda/i,
-    "Na demonstração a sua dupla de exemplo tem encontros marcados e registros em dia. No ambiente real o assistente consulta a sua dupla.",
+    "Na demonstração a sua dupla de exemplo tem encontros marcados e registros em dia. Com os seus dados o assistente consulta a sua dupla.",
   ],
 ];
 
@@ -435,7 +438,7 @@ export function AssistenteConversa({
       ? "consultando"
       : "escrevendo"
     : ultimaMsg?.estado === "erro"
-      ? ultimaMsg.dormindo
+      ? ultimaMsg.dormindo && !ultimaMsg.demorou
         ? "sonolento"
         : "erro"
       : "parado";
@@ -763,6 +766,7 @@ export function AssistenteConversa({
       fontes?: FonteIa[];
       reqId?: string;
       dormindo?: boolean;
+      demorou?: boolean;
     }
   ) {
     const pend = tokensRef.current;
@@ -794,6 +798,7 @@ export function AssistenteConversa({
       fontes?: FonteIa[];
       reqId?: string;
       dormindo?: boolean;
+      demorou?: boolean;
     },
     pend = ""
   ) {
@@ -809,11 +814,13 @@ export function AssistenteConversa({
             // dormindo keeps only the real partial text — the error
             // string is replaced by the LizaDormindo card, not shown
             // as prose inside the bubble (REALIZA-363)
-            content: extra?.dormindo
-              ? content
-              : content || extra?.erro || FALHA,
+            content:
+              extra?.dormindo || extra?.demorou
+                ? content
+                : content || extra?.erro || FALHA,
             estado: "erro",
             dormindo: extra?.dormindo || undefined,
+            demorou: extra?.demorou || undefined,
             ui: ultima.ui,
           },
         ];
@@ -907,8 +914,10 @@ export function AssistenteConversa({
       let tools: string[] | undefined;
       let fontes: FonteIa[] | undefined;
       let falha: string | null = null;
-      // a rota marca erro do provider com `dormindo` (REALIZA-363)
+      // a rota marca erro do provider com `dormindo` (REALIZA-363) e
+      // estouro de tempo com `demorou` (não é cota: dá pra tentar de novo)
       let falhaDormindo = false;
+      let falhaDemorou = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -936,15 +945,24 @@ export function AssistenteConversa({
               fontes = d.fontes;
             }
             else if (ev.type === "error") {
-              const d = ev as { e: string; dormindo?: boolean };
+              const d = ev as {
+                e: string;
+                dormindo?: boolean;
+                demorou?: boolean;
+              };
               falha = d.e;
               falhaDormindo = d.dormindo === true;
+              falhaDemorou = d.demorou === true;
             }
           }
         }
       }
       if (falha)
-        finalizar("erro", { erro: falha, dormindo: falhaDormindo || undefined });
+        finalizar("erro", {
+          erro: falha,
+          dormindo: falhaDormindo || undefined,
+          demorou: falhaDemorou || undefined,
+        });
       // stream fechou sem done (rede caiu no fim): finaliza com o que tem
       else finalizar("ok", { tools, fontes, reqId });
     } catch (e) {
@@ -1321,9 +1339,11 @@ export function AssistenteConversa({
                 ? ultimaMsg.estado === "erro"
                   ? // frase fixa: no erro o content pode ser a resposta
                     // parcial inteira, longa demais pra um anúncio
-                    ultimaMsg.dormindo
-                    ? "A Liza está dormindo e volta mais tarde."
-                    : "A Liza não conseguiu responder."
+                    ultimaMsg.demorou
+                    ? "A Liza demorou para responder. Tente de novo."
+                    : ultimaMsg.dormindo
+                      ? "A Liza está dormindo e volta mais tarde."
+                      : "A Liza não conseguiu responder."
                   : "A Liza respondeu."
                 : ""}
           </div>
@@ -1415,6 +1435,32 @@ export function AssistenteConversa({
                 ) : null}
                 {esperando ? (
                   indicador
+                ) : m.estado === "erro" && m.demorou ? (
+                  // estourou o tempo: não é cota — o parcial fica e a
+                  // saída é tentar de novo, sem a cara de dormindo
+                  <>
+                    {m.content ? (
+                      <RespostaMd analise={analise} ctx={ctx} />
+                    ) : null}
+                    <div className="mt-1 rounded-xl border border-border/70 bg-card px-3 py-2.5">
+                      <p className="text-sm font-semibold">
+                        A Liza demorou para responder.
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        A consulta passou do tempo limite. Tente de novo.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={tentarDeNovo}
+                        className="mt-2 min-h-11 md:min-h-9"
+                      >
+                        <ArrowClockwise size={14} aria-hidden />
+                        Tentar de novo
+                      </Button>
+                    </div>
+                  </>
                 ) : m.estado === "erro" && m.dormindo ? (
                   // provider dormiu: o pedaço real que chegou fica legível
                   // e o card leva o "volte mais tarde" — sem texto de erro
@@ -1615,7 +1661,7 @@ export function AssistenteConversa({
                           {copiado === i ? "Copiado" : "Copiar"}
                         </button>
                       )}
-                      {m.estado === "erro" && (
+                      {m.estado === "erro" && !m.demorou && (
                         <button
                           type="button"
                           onClick={tentarDeNovo}

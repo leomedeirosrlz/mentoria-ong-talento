@@ -102,7 +102,7 @@ export function EncaminhamentosList({
                   </span>
                 )}
                 {criadoNo != null && (
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground sm:text-[11px]">
                     {sessao
                       ? ` · criado na sessão ${criadoNo}`
                       : ` · criado no ${criadoNo}º encontro`}

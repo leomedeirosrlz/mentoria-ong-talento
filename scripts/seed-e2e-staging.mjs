@@ -208,7 +208,12 @@ const patch = (path, body) =>
   rest(path, { method: "PATCH", body: JSON.stringify(body), headers: { Prefer: "return=minimal" } });
 
 // ---- cronograma existente (o seed.sql do domínio já criou um) ----
-const [cron] = await rest("cronogramas?select=id,turma&order=inicio_em&limit=1");
+// Exclui o cronograma E2E da fonte: ele copia o mesmo inicio_em do domínio
+// e, sem o filtro, o order by podia escolher o próprio E2E vazio — o clone
+// dele sobre ele mesmo saía com zero eventos e a dupla ficava sem calendário.
+const [cron] = await rest(
+  `cronogramas?select=id,turma,inicio_em,fim_em,encontros_esperados&id=neq.${IDS.cronogramaE2e}&order=inicio_em&limit=1`
+);
 if (!cron) {
   console.error("nenhum cronograma no staging — rode `supabase db push` (migrations + seed) antes");
   process.exit(1);
@@ -348,7 +353,12 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
   await del(`especialista_excecoes?profile_id=eq.${IDS.hibProfile}`);
   // cronogramas criados pelo spec de turmas — eventos primeiro: a FK
   // ciclo_eventos.cronograma_id (0061) não tem ON DELETE CASCADE
-  const crons = await rest(`cronogramas?select=id&turma=like.${encodeURIComponent(TURMA_E2E_PREFIX)}*`);
+  // o cronograma FIXTURE tem turma "E2E Rename Destino" (casa o prefixo) e é
+  // referenciado pelas duplas: o sweep derrubava o próprio seed com 409 na
+  // segunda rodada. Ele é gerenciado pelo bloco dedicado, não pela limpeza.
+  const crons = await rest(
+    `cronogramas?select=id&turma=like.${encodeURIComponent(TURMA_E2E_PREFIX)}*&id=neq.${IDS.cronogramaE2e}`
+  );
   if (crons?.length) {
     const ids = crons.map((c) => c.id).join(",");
     await del(`ciclo_eventos?cronograma_id=in.(${ids})`);
@@ -358,7 +368,7 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
 }
 
 // ---- profile do mentor (precisa existir ANTES do auth user pro trigger vincular) ----
-let [mentor] = await rest(`profiles?select=id,user_id&email=eq.${EMAIL}`);
+let [mentor] = await rest(`profiles?select=id,user_id,role&email=eq.${EMAIL}`);
 if (!mentor) {
   [mentor] = await rest("profiles", {
     method: "POST",
@@ -372,6 +382,10 @@ if (!mentor) {
     }),
   });
   console.log("profile mentor criado");
+} else if (mentor.role !== "mentor_dpp") {
+  await patch(`profiles?id=eq.${mentor.id}`, { role: "mentor_dpp" });
+  mentor.role = "mentor_dpp";
+  console.log("profile mentor convergido (role)");
 } else {
   console.log("profile mentor já existe");
 }
@@ -445,7 +459,7 @@ if (!mentor.user_id) {
 }
 
 // ---- profile da coordenação + auth user (login próprio dos specs de coord) ----
-let [coord] = await rest(`profiles?select=id,user_id&email=eq.${COORD_EMAIL}`);
+let [coord] = await rest(`profiles?select=id,user_id,role&email=eq.${COORD_EMAIL}`);
 if (!coord) {
   [coord] = await rest("profiles", {
     method: "POST",
@@ -459,6 +473,10 @@ if (!coord) {
     }),
   });
   console.log("profile coord criado");
+} else if (coord.role !== "coordenacao") {
+  await patch(`profiles?id=eq.${coord.id}`, { role: "coordenacao" });
+  coord.role = "coordenacao";
+  console.log("profile coord convergido (role)");
 } else {
   console.log("profile coord já existe");
 }
@@ -495,24 +513,32 @@ if (!coord.user_id) {
   const evE2e = await rest(
     `ciclo_eventos?select=id&cronograma_id=eq.${IDS.cronogramaE2e}`
   );
-  if (!evE2e?.length) {
-    const evDom = await rest(
-      `ciclo_eventos?select=*&cronograma_id=eq.${cron.id}&order=data`
-    );
-    for (const [i, e] of (evDom ?? []).entries()) {
-      const resto = { ...e };
-      delete resto.id;
-      await rest("ciclo_eventos", {
-        method: "POST",
-        body: JSON.stringify({
-          id: `e2e00000-0000-4000-8000-0000000002${String(i).padStart(2, "0")}`,
-          ...resto,
-          cronograma_id: IDS.cronogramaE2e,
-        }),
-      });
-    }
-    console.log(`ciclo_eventos E2E: ${evDom?.length ?? 0} eventos clonados`);
+  const evDom = await rest(
+    `ciclo_eventos?select=*&cronograma_id=eq.${cron.id}&order=ordem`
+  );
+  if (!evDom?.length) {
+    throw new Error(`cronograma do domínio ${cron.id} sem ciclo_eventos — seed incompleto`);
   }
+  // Upsert por id fixo: cobre o cronograma E2E vazio, completa um run que
+  // morreu no meio e reexecuta sem duplicar as 25 linhas. O conteúdo segue
+  // verbatim o domínio — datas/títulos/contagens não são recalculados aqui.
+  const eventos = evDom.map((e, i) => {
+    const resto = { ...e };
+    delete resto.id;
+    return {
+      id: `e2e00000-0000-4000-8000-0000000002${String(i).padStart(2, "0")}`,
+      ...resto,
+      cronograma_id: IDS.cronogramaE2e,
+    };
+  });
+  await rest("ciclo_eventos?on_conflict=id", {
+    method: "POST",
+    body: JSON.stringify(eventos),
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+  });
+  console.log(
+    `ciclo_eventos E2E: ${eventos.length} eventos sincronizados (${evE2e?.length ?? 0} já existiam)`
+  );
 }
 
 // ---- mentor reserva: tem a 2ª dupla e LOGA ----

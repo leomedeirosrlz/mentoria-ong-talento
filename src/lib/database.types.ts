@@ -3407,9 +3407,11 @@ export type Database = {
           id: string
           link: string | null
           motivo_reagendamento: string | null
+          motivo_retroativo: string | null
           numero: number
           origem: string
           realizado_em: string | null
+          retroativo_tardio: boolean
           sessao_id: string | null
           status: Database["public"]["Enums"]["encontro_status"]
         }
@@ -3422,9 +3424,11 @@ export type Database = {
           id?: string
           link?: string | null
           motivo_reagendamento?: string | null
+          motivo_retroativo?: string | null
           numero: number
           origem?: string
           realizado_em?: string | null
+          retroativo_tardio?: boolean
           sessao_id?: string | null
           status?: Database["public"]["Enums"]["encontro_status"]
         }
@@ -3437,9 +3441,11 @@ export type Database = {
           id?: string
           link?: string | null
           motivo_reagendamento?: string | null
+          motivo_retroativo?: string | null
           numero?: number
           origem?: string
           realizado_em?: string | null
+          retroativo_tardio?: boolean
           sessao_id?: string | null
           status?: Database["public"]["Enums"]["encontro_status"]
         }
@@ -8910,7 +8916,12 @@ export type Database = {
         Returns: Json
       }
       plano_responder: {
-        Args: { p_acao: string; p_motivo?: string; p_plano: string }
+        Args: {
+          p_acao: string
+          p_decisoes?: Json
+          p_motivo?: string
+          p_plano: string
+        }
         Returns: Json
       }
       plano_substituir: {
@@ -9019,7 +9030,12 @@ export type Database = {
         Returns: Json
       }
       registrar_retroativo_mentorado: {
-        Args: { p_data_hora: string; p_dupla: string; p_numero: number }
+        Args: {
+          p_data_hora: string
+          p_dupla: string
+          p_motivo_tardio?: string
+          p_numero: number
+        }
         Returns: Json
       }
       relatorio_ia_card_registrar: {

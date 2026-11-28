@@ -55,7 +55,13 @@ function Tile({
   return (
     <Dialog>
       <DialogTrigger className="group flex h-full w-full flex-col items-center gap-1.5 rounded-lg px-1.5 py-3 text-center outline-none transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring">
-        <ConquistaEmblema glifo={glifo} tom={tom} size={56} estado={estado} />
+        <ConquistaEmblema
+          glifo={glifo}
+          tom={tom}
+          size={48}
+          sizeClassName="size-12! sm:size-14!"
+          estado={estado}
+        />
         <span className="text-xs leading-tight font-medium">{titulo}</span>
         {linha}
       </DialogTrigger>

@@ -14,6 +14,7 @@ import { toast } from "@/lib/toast";
 import { registrarEncontroRetroativo } from "@/lib/actions";
 import { formatDate, toDateStr, type EncontroFaltante } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { elementoReal } from "@/lib/elemento-lazy";
 import { SeletorDiaHora } from "@/components/seletor-dia-hora";
 
@@ -204,7 +205,8 @@ export function RegistrarRetroativoDialog({
         aviso={aviso}
         onAviso={setAviso}
         onConfirmar={confirmar}
-      />
+      >
+      </SeletorDiaHora>
     </>
   );
 }

@@ -8,6 +8,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import { Collapsible } from "@base-ui/react/collapsible";
+import { CaretDown } from "@phosphor-icons/react";
+import { cn } from "@/lib/utils";
 
 /** Assina as três formas de o hash mudar: hashchange nativo, popstate e o
  *  `realiza:hash` que quem navega por pushState dispara. */
@@ -124,5 +126,96 @@ export function EncontroDisclosure({
         {children}
       </Collapsible.Panel>
     </Collapsible.Root>
+  );
+}
+
+/** Seção recolhível da home do jovem: nasce fechada (a pendência crítica já
+ *  está no "Para fazer agora") e abre sozinha quando a âncora dela chega na
+ *  URL — `/jovem#combinados-titulo` vindo de pendência, e-mail ou notificação
+ *  nunca cai num painel trancado. Mesma máquina de estado do
+ *  EncontroDisclosure: hash assina hashchange/popstate/realiza:hash e a
+ *  escolha local (abrir/fechar no dedo) vale até o hash mudar. O clique num
+ *  `<a href="…#ancora">` também abre — a navegação de fragmento do router
+ *  não dispara hashchange (o motivo de existir o realiza:hash). */
+export function JovemSecaoRecolhivel({
+  ancora,
+  titulo,
+  icone,
+  resumo,
+  children,
+  className,
+}: {
+  /** id da âncora e do h2 da seção (ex.: "combinados-titulo"). */
+  ancora: string;
+  titulo: React.ReactNode;
+  icone?: React.ReactNode;
+  /** Resumo sempre visível no header — "3 em aberto", "1 pendente". */
+  resumo?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const alvo = `#${ancora}`;
+  const [forcado, setForcado] = useState<boolean | null>(null);
+  const hashBate = useSyncExternalStore(
+    assinarHash,
+    () => window.location.hash === alvo,
+    () => false
+  );
+  useEffect(() => {
+    // hash novo zera a escolha local e devolve o controle ao hash
+    const desinscreve = assinarHash(() => setForcado(null));
+    const porLink = (e: MouseEvent) => {
+      const a = (e.target as Element | null)?.closest?.("a[href]");
+      if (a?.getAttribute("href")?.endsWith(alvo)) setForcado(true);
+    };
+    document.addEventListener("click", porLink);
+    return () => {
+      desinscreve();
+      document.removeEventListener("click", porLink);
+    };
+  }, [alvo]);
+  // o refresh depois de um gesto (marcar combinado, avaliar) não pode
+  // fechar a seção que o hash abriu: uma vez aberta por âncora, fica aberta
+  const [jaAbriu, setJaAbriu] = useState(false);
+  useEffect(() => {
+    // abre por âncora no load: fixa fora do ciclo de render (microtask)
+    if (window.location.hash === alvo) queueMicrotask(() => setJaAbriu(true));
+  }, [alvo]);
+  const aberto = forcado ?? (hashBate || jaAbriu);
+
+  return (
+    <section aria-labelledby={ancora} className={className}>
+      <Collapsible.Root open={aberto} onOpenChange={setForcado}>
+        <h2 id={ancora} className="scroll-mt-20 font-semibold">
+          <Collapsible.Trigger className="group flex min-h-11 w-full items-center gap-2 rounded-md text-left outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50">
+            {icone}
+            <span>{titulo}</span>
+            {resumo != null && (
+              <span className="ms-auto shrink-0 text-sm font-normal text-muted-foreground">
+                {resumo}
+              </span>
+            )}
+            <CaretDown
+              size={16}
+              aria-hidden
+              className={cn(
+                "shrink-0 text-muted-foreground transition-transform group-aria-expanded:rotate-180",
+                resumo == null && "ms-auto"
+              )}
+            />
+          </Collapsible.Trigger>
+        </h2>
+        {/* hiddenUntilFound: montado com hidden="until-found" — o painel
+            fechado segue achável por busca na página e por fragmento
+            interno (spec 028: a transição de height é a exceção
+            documentada do Collapsible) */}
+        <Collapsible.Panel
+          hiddenUntilFound
+          className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden"
+        >
+          {children}
+        </Collapsible.Panel>
+      </Collapsible.Root>
+    </section>
   );
 }

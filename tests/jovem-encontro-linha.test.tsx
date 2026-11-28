@@ -77,8 +77,8 @@ describe("agendado vencido (507)", () => {
       />
     );
     const rotulos = botoes(alvo);
-    // a decisiva da linha é o Aconteceu — direto, sem menu no caminho
-    expect(rotulos).toContain("Aconteceu");
+    // a decisiva da linha é o registro — direto, sem menu no caminho
+    expect(rotulos).toContain("Já aconteceu");
     // o resto do trio mora no ⋯, não solto na fileira
     expect(rotulos.some((t) => t?.includes("Remarcar"))).toBe(false);
     expect(gatilhoMenu(alvo)).not.toBeNull();
@@ -110,7 +110,7 @@ describe("agendado vencido (507)", () => {
         rotulo="Sessão 2 com Sofia"
       />
     );
-    expect(botoes(alvo)).toContain("Aconteceu");
+    expect(botoes(alvo)).toContain("Já aconteceu");
     const itens = await itensDoMenu(alvo);
     expect(itens).toContain("Não aconteceu");
     expect(itens).not.toContain("Remarcar");

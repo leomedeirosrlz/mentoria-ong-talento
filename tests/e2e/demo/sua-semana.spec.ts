@@ -20,14 +20,14 @@ test.describe("Sua semana — jovem", () => {
     // "este é o Nº" só aparece quando o encontro em destaque é passo do
     // plano (exercido no card do mentor). Aqui ficam status, ritmo,
     // progresso e os gestos no mesmo lugar do hero
-    await expect(page.getByText("Plano combinado")).toBeVisible();
+    await expect(page.getByText("Pra ficar em dia")).toBeVisible();
     await expect(
       page.getByText("até 2 encontros por semana")
     ).toBeVisible();
     await expect(
       page.getByText(/Próximo: \d+º encontro, sugestão/)
     ).toBeVisible();
-    const ver = page.getByRole("link", { name: "Ver o combinado" });
+    const ver = page.getByRole("link", { name: "Ver o plano" });
     await expect(ver).toHaveAttribute("href", "/jovem/combinado");
     // janela de contestação aberta (nenhum passo feito depois da proposta)
     await expect(
@@ -44,18 +44,18 @@ test.describe("Sua semana — mentor", () => {
     await page.goto("/");
     // a seção do card que tem o combinado é a da d-ok (única com plano)
     const semana = page.locator("section", {
-      has: page.getByRole("link", { name: "Ver o combinado" }),
+      has: page.getByRole("link", { name: "Ver o plano" }),
     });
     await expect(
       semana.getByRole("heading", { name: "Sua semana" })
     ).toBeVisible();
-    await expect(semana.getByText("Plano combinado")).toBeVisible();
+    await expect(semana.getByText("Pra ficar em dia")).toBeVisible();
     // o mentor propôs — "você combinou", nunca o próprio nome
     await expect(
-      semana.getByText(/encontro do plano que você combinou\./)
+      semana.getByText(/encontro é passo do plano com você\./)
     ).toBeVisible();
     await expect(
-      semana.getByRole("link", { name: "Ver o combinado" })
+      semana.getByRole("link", { name: "Ver o plano" })
     ).toHaveAttribute("href", `/duplas/${D_OK}/combinado`);
     // passo pendente → o CTA leva direto pro lugar de confirmar
     await expect(

@@ -452,7 +452,7 @@ export function PessoaActions({
             {pessoa.ativo ? "Desativar" : "Reativar"}
           </DropdownMenuItem>
           {/* efeito declarado antes do clique — ação reversível mas de alto impacto */}
-          <p className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
+          <p className="px-2 pb-1 text-xs leading-snug text-muted-foreground sm:text-[11px]">
             {pessoa.ativo
               ? "Corta o acesso à plataforma na hora; a pessoa pode ser reativada depois."
               : "Devolve o acesso na hora."}
@@ -466,7 +466,7 @@ export function PessoaActions({
             <Trash size={16} data-icon="inline-start" aria-hidden /> Excluir
           </DropdownMenuItem>
           {!podeExcluir && (
-            <p className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
+            <p className="px-2 pb-1 text-xs leading-snug text-muted-foreground sm:text-[11px]">
               {pessoa.user_id
                 ? "Já entrou na plataforma. Desative em vez de excluir."
                 : "Tem dupla vinculada. Desative em vez de excluir."}

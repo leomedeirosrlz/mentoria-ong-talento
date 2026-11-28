@@ -27,12 +27,22 @@ import {
 } from "@/lib/plano-combinado";
 import { DURACAO_SESSAO_MIN } from "@/lib/plano-em-dia.data";
 import {
+  ocupadoEmChoque,
+  ocupadoReservaSugestao,
   partesSP,
   type OcupadoRotulado,
 } from "@/lib/sugestoes-encontro";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AcoesMenu } from "@/components/acoes-menu";
 import {
   SeletorDiaHora,
@@ -80,6 +90,7 @@ export function PlanoAcordosCard({
   realizados = [],
   recessos = [],
   sugestoes,
+  reservaHero,
   combinadoHref,
   whatsappHref,
 }: {
@@ -108,6 +119,9 @@ export function PlanoAcordosCard({
   /** Pacote do motor (perfil/grade/ocupados) — alimenta a sugestão da
    *  linha e os chips do "Outra data". Sem ele, date+time de step 900. */
   sugestoes?: SeletorSugestoes | null;
+  /** Sugestão exposta no cartão "Agendar encontro" — enquanto visível,
+   *  reserva o instante pros passos do plano (menos pro próprio nº). */
+  reservaHero?: { numero: number; data: string; hora: string } | null;
   /** Rota do documento do combinado (020) — "Ler o combinado" no card */
   combinadoHref?: string;
   /** deep link wa.me com template dinâmico (518) — sem provider */
@@ -139,8 +153,17 @@ export function PlanoAcordosCard({
   const [decisaoLocal, setDecisaoLocal] = useState<Record<string, boolean>>(
     {}
   );
+  // aceite/contestação encerram a proposta — trava a fileira de resposta
+  // no mesmo instante em vez de esperar o revalidate (QA 25/11)
+  const [respondido, setRespondido] = useState(false);
+  const [confirmandoContestacao, setConfirmandoContestacao] = useState(false);
   const resumo = resumoCombinado(plano, realizados);
   const aberto = resumo.aberto;
+  // a data do passo cruzou o número (QA 25/11): a tag explica a ordem
+  // em vez de ler como lista fora de ordem
+  const adiantadoPorNumero = new Map(
+    resumo.passos.map((x) => [x.numero, x.adiantado])
+  );
   const aplicados = new Map(
     (plano.passos ?? []).map((p) => [p.numero, p])
   );
@@ -174,6 +197,45 @@ export function PlanoAcordosCard({
   const contestavel = planoContestavel(plano.escopo?.passos, realizados);
   const propostaPor =
     plano.proposto_via === "liza" ? "A Liza" : "A equipe";
+  // suposição de recesso da equipe (0245): viaja no jsonb do escopo
+  // (origem "proposta", ou o carimbo `assumido` nos itens sem origem) —
+  // nunca em nome da dupla. A projeção mínima não declara os campos, a
+  // leitura tolera as duas formas e só conta recesso visível no card
+  const escopoMarcado = plano.escopo as
+    | {
+        assumido?: boolean;
+        decisoes?: {
+          recessos?: {
+            cicloEventoId: string;
+            usa: boolean;
+            origem?: "dupla" | "proposta";
+          }[];
+        };
+      }
+    | null
+    | undefined;
+  const recessosVisiveis = new Set(recessos.map((r) => r.cicloEventoId));
+  const assumidos = (escopoMarcado?.decisoes?.recessos ?? []).filter(
+    (d) =>
+      recessosVisiveis.has(d.cicloEventoId) &&
+      (d.origem === "proposta" ||
+        (d.origem == null && escopoMarcado?.assumido === true))
+  );
+  const suposicaoAceite = (() => {
+    if (assumidos.length === 0) return null;
+    const recTxt = assumidos.length > 1 ? "nos recessos" : "no recesso";
+    const pausaN = assumidos.filter((d) => d.usa).length;
+    const segueN = assumidos.length - pausaN;
+    const considera =
+      segueN === 0
+        ? `pausa ${recTxt}`
+        : pausaN === 0
+          ? `seguir ${recTxt}`
+          : `pausa em ${pausaN === 1 ? "um recesso" : `${pausaN} recessos`} e seguir ${
+              segueN === 1 ? "no outro" : "nos demais"
+            }`;
+    return `A proposta considera ${considera}; confirme ou troque antes de aceitar.`;
+  })();
   const statusTexto: Record<string, string> = {
     proposto: "Proposto, falta um aceite da dupla",
     aceito: "Valendo",
@@ -210,16 +272,71 @@ export function PlanoAcordosCard({
           : await responderPlano(plano.id, acao, undefined, duplaId);
       if ("error" in r) {
         setErro(r.error);
+        toast.error(r.error);
         return;
       }
+      setRespondido(true);
       if (r.novaVersao)
         toast.success("Versão recalculada já vale.");
+      else
+        toast.success(
+          acao === "aceitar"
+            ? "Plano aceito."
+            : "Contestação enviada. A equipe foi avisada."
+        );
       router.refresh();
     });
   };
 
+  // a sugestão dos outros passos pendentes reserva o instante (QA 25/11):
+  // o chip marca indisponível no seletor e o Confirmar avisa em vez de
+  // gravar em cima do que a tela ofereceu a outro passo
+  const ocupadosSugs = (excluir: readonly number[]): OcupadoRotulado[] =>
+    [...sugs.entries()]
+      .filter(([n, s]) => s != null && !excluir.includes(n))
+      .map(([n, s]) => ({
+        inicio: `${s!.data}T${s!.hora}:00-03:00`,
+        rotulo: `sugestão do ${n}º encontro`,
+        rotuloArtigo: `a sugestão do ${n}º encontro`,
+      }));
+
+  // choque com os passos do próprio plano e com a agenda (QA 25/11): o
+  // seletor marca o slot ocupado, mas o Confirmar direto e o par
+  // date+time aceitavam o instante oferecido a outro passo sem aviso.
+  // `numeros` = quem está sendo marcado (a sessão combina o grupo).
+  const choquePasso = (
+    numeros: readonly number[],
+    data: string,
+    hora: string,
+    duracaoMin?: number
+  ): string | null => {
+    const c = ocupadoEmChoque(
+      new Date(`${data}T${hora}:00-03:00`),
+      [
+        ...ocupadosRotulados,
+        ...ocupadoReservaSugestao(
+          reservaHero,
+          numeros.includes(reservaHero?.numero ?? -1)
+            ? reservaHero?.numero
+            : null
+        ),
+        ...ocupadosSugs(numeros),
+      ],
+      duracaoMin ?? 60
+    );
+    if (!c) return null;
+    return c.rotuloArtigo
+      ? `Esse horário choca com ${c.rotuloArtigo}. Escolha outra data ou horário.`
+      : "Esse horário já está ocupado. Escolha outra data ou horário.";
+  };
+
   const aplicar = (numero: number, data: string, hora: string) => {
     setErroPasso(null);
+    const choque = choquePasso([numero], data, hora, sugestoes?.duracaoMin);
+    if (choque) {
+      setErroPasso({ numero, texto: choque });
+      return;
+    }
     iniciar(async () => {
       const r = await aplicarPassoPlano(
         plano.id,
@@ -244,6 +361,11 @@ export function PlanoAcordosCard({
   // ganham a mesma data/hora e o mesmo sessao_id numa RPC
   const aplicarSessao = (numeros: number[], data: string, hora: string) => {
     setErroPasso(null);
+    const choque = choquePasso(numeros, data, hora, DURACAO_SESSAO_MIN);
+    if (choque) {
+      setErroPasso({ numero: numeros[0], texto: choque });
+      return;
+    }
     iniciar(async () => {
       const r = await aplicarSessaoPlano(
         plano.id,
@@ -308,7 +430,11 @@ export function PlanoAcordosCard({
         janela,
         perfil: sugestoes?.perfil,
         disponibilidade: sugestoes?.disponibilidade,
-        ocupados: [...ocupadosBase, ...sugeridos],
+        ocupados: [
+          ...ocupadosBase,
+          ...ocupadoReservaSugestao(reservaHero, p.numero).map((o) => o.inicio),
+          ...sugeridos,
+        ],
         duracaoMin: sessao
           ? (p.duracao_min ?? DURACAO_SESSAO_MIN)
           : sugestoes?.duracaoMin,
@@ -341,59 +467,73 @@ export function PlanoAcordosCard({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <span className="rounded-full bg-[var(--destaque)]/15 px-2.5 py-0.5 text-xs font-semibold">
           {statusTexto[plano.status] ?? plano.status}
         </span>
         {plano.versao > 1 && (
-          <span className="text-xs text-muted-foreground">
-            versão {plano.versao}
-          </span>
+          <>
+            <span aria-hidden className="h-3 w-px bg-foreground/15" />
+            <span className="text-xs text-muted-foreground">
+              versão {plano.versao}
+            </span>
+          </>
         )}
         {plano.escopo?.ritmo != null && (
-          <span className="text-xs text-muted-foreground">
-            {plano.escopo.ritmo === 1
-              ? "1 encontro por semana"
-              : `até ${plano.escopo.ritmo} encontros por semana`}
-          </span>
+          <>
+            <span aria-hidden className="h-3 w-px bg-foreground/15" />
+            <span className="text-xs text-muted-foreground">
+              {plano.escopo.ritmo === 1
+                ? "1 encontro por semana"
+                : `até ${plano.escopo.ritmo} encontros por semana`}
+            </span>
+          </>
         )}
         {janela && (
-          <span className="text-xs text-muted-foreground">
-            De {ddmm(janela.inicio)} a {ddmm(janela.fim)}
-          </span>
-        )}
-        {combinadoHref && (
-          <Link
-            href={combinadoHref}
-            className="inline-flex items-center gap-1 rounded-sm text-xs font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <BookOpenText size={13} aria-hidden />
-            Ler o combinado
-          </Link>
-        )}
-        {whatsappHref && (
-          <a
-            href={whatsappHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center gap-1 rounded-sm text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8"
-          >
-            Avisar por WhatsApp
-          </a>
+          <>
+            <span aria-hidden className="h-3 w-px bg-foreground/15" />
+            <span className="text-xs text-muted-foreground">
+              De {ddmm(janela.inicio)} a {ddmm(janela.fim)}
+            </span>
+          </>
         )}
       </div>
+
+      {(combinadoHref || whatsappHref) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {combinadoHref && (
+            <Link
+              href={combinadoHref}
+              className="inline-flex items-center gap-1 rounded-sm text-xs font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <BookOpenText size={13} aria-hidden />
+              Ler o plano
+            </Link>
+          )}
+          {whatsappHref && (
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center gap-1 rounded-sm text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8"
+            >
+              Avisar por WhatsApp
+            </a>
+          )}
+        </div>
+      )}
 
       {/* a leitura da proposta muda por lado: quem ainda não respondeu
           vê o pedido; quem já carimbou vê que um aceite da dupla basta */}
       {estado === "proposto_staff_falta_meu" && (
         <p className="text-sm text-muted-foreground">
           {propostaPor} propôs esse plano. Um aceite da dupla põe o
-          combinado pra valer. O outro lado recebe o aviso.
+          plano pra valer. O outro lado recebe o aviso.
         </p>
       )}
       {estado === "proposto_staff_falta_outro" && meuLado != null && (
         <p className="text-sm text-muted-foreground">
-          Você já respondeu. Um aceite da dupla põe o combinado pra
+          Você já respondeu. Um aceite da dupla põe o plano pra
           valer.
         </p>
       )}
@@ -440,6 +580,11 @@ export function PlanoAcordosCard({
                       ? `${p.numero}º encontro · ${p.titulo}`
                       : `${p.numero}º encontro`}
                 </span>
+                {adiantadoPorNumero.get(p.numero) && (
+                  <span className="text-xs text-muted-foreground">
+                    adiantado
+                  </span>
+                )}
                 {aplicado ? (
                   <span className="text-muted-foreground">
                     · {tagSessao ? `${tagSessao} · ` : ""}marcado pra{" "}
@@ -484,7 +629,7 @@ export function PlanoAcordosCard({
                             }
                           >
                             <CalendarPlus aria-hidden />
-                            {ehAncora ? "Marcar sessão" : "Confirmar"}
+                            {ehAncora ? "Marcar sessão" : "Confirmar data"}
                           </Button>
                           {/* 526: um CTA à vista; trocar a data é exceção e
                               mora no ⋯ (mesmo AcoesMenu dos cards) */}
@@ -596,7 +741,9 @@ export function PlanoAcordosCard({
 
       {/* repensar o recesso antes do aceite (518, US3.5): a decisão é
           da dupla, e se a resposta nova mudar as datas o combinado
-          recalcula no mesmo gesto */}
+          recalcula no mesmo gesto. Quando a proposta saiu com suposição
+          da equipe (0245), a frase diz o que ela considera — o aceite
+          confirma ou troca, nada vale como resposta dela antes */}
       {aberto &&
         podeResponder &&
         meuLado != null &&
@@ -609,9 +756,15 @@ export function PlanoAcordosCard({
                 ? "Os recessos no caminho"
                 : "O recesso no caminho"}
             </p>
+            {suposicaoAceite && (
+              <p className="text-xs font-medium text-foreground">
+                {suposicaoAceite}
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
-              Podem repensar a resposta antes de aceitar. Se as datas
-              mudarem, o combinado recalcula junto.
+              {suposicaoAceite
+                ? "Se as datas mudarem, o plano recalcula junto."
+                : "Podem repensar a resposta antes de aceitar. Se as datas mudarem, o plano recalcula junto."}
             </p>
             <RecessoDecisao
               duplaId={duplaId}
@@ -630,7 +783,7 @@ export function PlanoAcordosCard({
         </p>
       )}
 
-      {aberto && podeResponder && estado === "proposto_staff_falta_meu" && (
+      {aberto && podeResponder && !respondido && estado === "proposto_staff_falta_meu" && (
         <div className="flex flex-wrap gap-2 pt-1">
           <Button size="sm" disabled={pendente} onClick={() => responder("aceitar")}>
             <Check aria-hidden />
@@ -641,7 +794,7 @@ export function PlanoAcordosCard({
               size="sm"
               variant="outline"
               disabled={pendente}
-              onClick={() => responder("contestar")}
+              onClick={() => setConfirmandoContestacao(true)}
             >
               <X aria-hidden />
               Não serve pra mim
@@ -649,7 +802,7 @@ export function PlanoAcordosCard({
           )}
         </div>
       )}
-      {aberto && podeResponder && estado === "ativo_sem_minha_ciencia" && (
+      {aberto && podeResponder && !respondido && estado === "ativo_sem_minha_ciencia" && (
         <div className="flex flex-wrap gap-2 pt-1">
           <Button size="sm" disabled={pendente} onClick={() => responder("aceitar")}>
             <Check aria-hidden />
@@ -660,7 +813,7 @@ export function PlanoAcordosCard({
               size="sm"
               variant="outline"
               disabled={pendente}
-              onClick={() => responder("contestar")}
+              onClick={() => setConfirmandoContestacao(true)}
             >
               <X aria-hidden />
               Não serve pra mim
@@ -668,23 +821,58 @@ export function PlanoAcordosCard({
           )}
         </div>
       )}
-      {aberto && podeResponder && estado === "ativo" && contestavel && (
+      {aberto && podeResponder && !respondido && estado === "ativo" && contestavel && (
         <div className="space-y-2 pt-1">
           <Button
             size="sm"
             variant="outline"
             disabled={pendente}
-            onClick={() => responder("contestar")}
+            onClick={() => setConfirmandoContestacao(true)}
           >
             <X aria-hidden />
             Não serve pra mim
           </Button>
           <p className="text-xs text-muted-foreground">
-            O combinado vale. Se algo mudou, ainda dá pra
+            O plano vale. Se algo mudou, ainda dá pra
             contestar antes do próximo encontro.
           </p>
         </div>
       )}
+
+      {/* QA 25/11: contestar encerra o plano — confirmação explícita
+          antes do POST, no padrão dos diálogos do app */}
+      <Dialog
+        open={confirmandoContestacao}
+        onOpenChange={setConfirmandoContestacao}
+      >
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>O plano não serve pra você?</DialogTitle>
+          </DialogHeader>
+          <DialogDescription className="leading-relaxed">
+            A contestação encerra esse plano. A equipe é avisada e um
+            plano novo pode nascer da conversa de vocês.
+          </DialogDescription>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmandoContestacao(false)}
+            >
+              Voltar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={pendente}
+              onClick={() => {
+                setConfirmandoContestacao(false);
+                responder("contestar");
+              }}
+            >
+              Sim, não serve pra mim
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {seletor && passoSeletor && sugSeletor && sugestoes && (
         <SeletorDiaHora
@@ -697,7 +885,7 @@ export function PlanoAcordosCard({
           descricao={
             seletor.grupo
               ? `${listaEncontros(seletor.grupo)} encontros · sessão combinada de ${rotuloDuracao(passoSeletor.duracao_min ?? DURACAO_SESSAO_MIN)}`
-              : `${passoSeletor.numero}º encontro · passo do combinado`
+              : `${passoSeletor.numero}º encontro · passo do plano`
           }
           rotuloConfirmar={seletor.grupo ? "Marcar sessão" : "Confirmar data"}
           inicial={{
@@ -722,7 +910,11 @@ export function PlanoAcordosCard({
                 ? (passoSeletor.duracao_min ?? DURACAO_SESSAO_MIN)
                 : sugestoes.duracaoMin,
             }),
-            ocupados: ocupadosRotulados,
+            ocupados: [
+              ...ocupadosRotulados,
+              ...ocupadoReservaSugestao(reservaHero, passoSeletor.numero),
+              ...ocupadosSugs(seletor.grupo ?? [passoSeletor.numero]),
+            ],
             janela,
           }}
           pending={pendente}

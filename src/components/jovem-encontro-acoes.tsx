@@ -39,7 +39,7 @@ export function AconteceuJovem({
             const res = await marcarAconteceuJovem(encontroId);
             if (res?.error) toast.error(res.error);
             else {
-              toast.success("Encontro confirmado. Conta pra gente como foi.");
+              toast.success("Encontro registrado. Conta pra gente como foi.");
               router.refresh();
             }
           } catch {
@@ -48,7 +48,7 @@ export function AconteceuJovem({
         })
       }
     >
-      {pending ? "Salvando…" : "Aconteceu"}
+      {pending ? "Salvando…" : "Já aconteceu"}
     </Button>
   );
 }

@@ -326,7 +326,7 @@ export function AppShell({
       </div>
 
       {/* bottom nav — só mobile */}
-      <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:hidden">
+      <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:hidden">
         <div className="flex">
           {visiveis.map((item) => {
             const ativo = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -336,7 +336,7 @@ export function AppShell({
                 href={item.href}
                 aria-current={ativo ? "page" : undefined}
                 className={cn(
-                  "group relative flex flex-1 flex-col items-center gap-1 whitespace-nowrap py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
+                  "group relative flex flex-1 flex-col items-center gap-1 whitespace-nowrap py-2.5 text-xs transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                   ativo ? "font-semibold text-sidebar-foreground" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
                 )}
               >
@@ -372,7 +372,7 @@ export function AppShell({
                 chamadosForaDaBarra ? `${chamadosSemDono} chamados na fila` : null,
               ].filter(Boolean).join(", ")}
               className={cn(
-                "group relative flex flex-1 flex-col items-center gap-1 whitespace-nowrap py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
+                "group relative flex flex-1 flex-col items-center gap-1 whitespace-nowrap py-2.5 text-xs transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                 menuAtivo ? "font-semibold text-sidebar-foreground" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
               )}
             >

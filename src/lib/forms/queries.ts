@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { demoRole } from "../demo/mode";
 import { getDemoData } from "../demo/data";
 import { demoFormularioPorToken } from "../demo/queries";
@@ -384,6 +385,35 @@ export type FormularioTokenResult =
  *  definer (anon não tem grant de tabela). Sem sessão funciona igual: o
  *  createClient cai no papel anon e o grant de execute cobre. cache():
  *  generateMetadata e a página dividem a mesma chamada no request. */
+/** Metadados mínimos do link pra montar a saída contextual de quem está
+ *  autenticado — leitura service role, server only, no mesmo padrão do
+ *  linkAvaliacaoMeta. A RPC pública não devolve ids internos de propósito;
+ *  aqui eles nunca vão pro client anônimo: a página só vira href depois de
+ *  reconhecer a sessão. */
+export const linkFormularioMeta = cache(
+  async (
+    token: string
+  ): Promise<{ formulario_id: string; dupla_id: string | null } | null> => {
+    if (await demoRole()) {
+      const link = getDemoFormularios().links.find((l) => l.token === token);
+      return link
+        ? { formulario_id: link.formulario_id, dupla_id: link.dupla_id }
+        : null;
+    }
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("formulario_links")
+      .select("formulario_id, dupla_id")
+      .eq("token", token)
+      .maybeSingle();
+    if (error) {
+      console.error("linkFormularioMeta:", error);
+      return null;
+    }
+    return (data as { formulario_id: string; dupla_id: string | null } | null) ?? null;
+  }
+);
+
 export const formularioPorToken = cache(
   async (token: string): Promise<FormularioTokenResult> => {
     // demo: o /f/<token> abre em leitura sobre os links do fixture — todos

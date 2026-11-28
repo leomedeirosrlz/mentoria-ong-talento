@@ -60,6 +60,7 @@ export function AgendarEncontroDialog({
   proposta,
   piso,
   jovemNome,
+  ocupados,
   rotulo,
   trigger,
   onCreated,
@@ -82,6 +83,9 @@ export function AgendarEncontroDialog({
   piso?: string;
   /** Primeiro nome do mentorado — sai no aviso de horário sobreposto. */
   jovemNome?: string;
+  /** Instantes já reservados bloqueados no seletor — mesma fonte das
+   *  agendas/plano, mesmo quando o dialog segue em modo manual. */
+  ocupados?: import("@/lib/sugestoes-encontro").OcupadoRotulado[];
   /** Como o encontro aparece no título/toasts — default "Nº encontro". Na
    *  trilha especialista a remarcação é de uma sessão que nasceu de pedido:
    *  o rótulo diz isso ("sessão de especialista") sem número de passo. */
@@ -247,7 +251,7 @@ export function AgendarEncontroDialog({
     // remarcação é sempre pra frente — mover agendado pro passado
     // esconderia atraso (o retroativo é só pra encontro novo)
     if (atual && local <= agoraFresco) {
-      setAviso("Remarcar é sempre pra frente — escolha uma data futura.");
+      setAviso("Remarcar é sempre pra frente. Escolha uma data futura.");
       return;
     }
     const retroativo = !atual && local <= agoraFresco;
@@ -454,6 +458,7 @@ export function AgendarEncontroDialog({
         pending={pending}
         aviso={aviso}
         onAviso={setAviso}
+        ocupadosExtra={ocupados?.filter((o) => o.inicio !== atual?.data_hora)}
         onMudanca={mudaSel}
         onConfirmar={confirmar}
       >
@@ -516,7 +521,7 @@ export function AgendarEncontroDialog({
               ref={linkRef}
               id="link"
               type="url"
-              placeholder="https://meet.google.com/…"
+              placeholder="Meet, Teams, Zoom…"
               defaultValue={atual?.link ?? ""}
             />
           </div>

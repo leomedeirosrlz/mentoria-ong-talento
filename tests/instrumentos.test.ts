@@ -6,6 +6,7 @@ import {
   extraiGruposMeta,
   idsEmGruposMeta,
   lePonteiro,
+  montaRascunhoPdm,
   pontoEixo,
   pontosPoligono,
   quebraRotuloEixo,
@@ -20,7 +21,7 @@ import {
   leDeValores,
   validaRespostas,
 } from "@/lib/forms/resposta";
-import type { FormularioCampo } from "@/lib/forms/schema";
+import type { FormularioCampo, RespostaValor } from "@/lib/forms/schema";
 
 const campo = (over: Partial<FormularioCampo> = {}): FormularioCampo => ({
   id: "f1",
@@ -304,6 +305,83 @@ describe("idsEmGruposMeta — o dedupe do capítulo legado", () => {
     // submetas_2 é órfão (sem meta_2 no template) — o capítulo vive pra
     // renderizá-lo como editor de linhas comum
     expect(restantes[1].map((c) => c.id)).toEqual(["submetas_2"]);
+  });
+});
+
+// ---------- rascunho do documento vivo (preview da captura) ----------
+
+// A árvore "Seu plano está ficando assim" se monta dos mesmos valores do
+// submit, com a régua da projeção: meta sem título não entra (e leva o
+// grupo junto), submeta vira filha do slot e o id é o próprio slot —
+// estável por construção, nunca do banco.
+describe("montaRascunhoPdm — a prévia do PDM em digitação", () => {
+  const def: FormularioCampo[] = [
+    campo({ id: "meta_1", obrigatorio: true }),
+    campo({ id: "is_1" }),
+    campo({ id: "prazo_1", tipo: "data" }),
+    campo({ id: "submetas_1", tipo: "texto_longo" }),
+    campo({ id: "meta_2" }),
+    campo({ id: "porque_2", tipo: "texto_longo" }),
+    campo({ id: "submetas_2", tipo: "texto_longo" }),
+  ];
+  const rascunho = (valores: Record<string, RespostaValor>) =>
+    montaRascunhoPdm(extraiGruposMeta(def), valores);
+
+  it("sem nenhuma meta com título, a prévia fica vazia", () => {
+    expect(rascunho({})).toEqual([]);
+    expect(rascunho({ meta_1: "   ", is_1: "algo" })).toEqual([]);
+  });
+
+  it("meta vazia fica fora — e leva o grupo inteiro junto", () => {
+    const nos = rascunho({
+      meta_1: "Conseguir jovem aprendiz",
+      submetas_2: "linha órfã de meta",
+    });
+    // submetas_2 sem meta_2 preenchida não projeta nada (a projeção pula
+    // o grupo inteiro quando o título da meta está vazio)
+    expect(nos.map((n) => n.id)).toEqual(["meta_1"]);
+    expect(nos[0].filhos).toEqual([]);
+  });
+
+  it("cada linha de submetas_N vira uma submeta no slot da meta", () => {
+    const nos = rascunho({
+      meta_1: "Conseguir jovem aprendiz",
+      submetas_1: "1. Montar currículo\n- Treinar entrevista",
+    });
+    expect(nos[0].filhos.map((f) => f.id)).toEqual(["sub_1_1", "sub_1_2"]);
+    expect(nos[0].filhos.map((f) => f.titulo)).toEqual([
+      "Montar currículo",
+      "Treinar entrevista",
+    ]);
+    expect(nos[0].filhos[0].parentId).toBe("meta_1");
+  });
+
+  it("indicador, prazo e porquê do grupo entram no nó da meta", () => {
+    const nos = rascunho({
+      meta_1: "Conseguir jovem aprendiz",
+      is_1: "Assinar o contrato",
+      prazo_1: "2027-03-31",
+      meta_2: "Guardar 200 por mês",
+      porque_2: "Pagar o curso técnico",
+    });
+    expect(nos[0].indicador).toBe("Assinar o contrato");
+    expect(nos[0].prazoAlvo).toBe("2027-03-31");
+    expect(nos[1].porque).toBe("Pagar o curso técnico");
+  });
+
+  it("o id é o slot: meta_2 segue meta_2 mesmo com meta_1 vazia", () => {
+    const nos = rascunho({ meta_2: "Guardar 200 por mês" });
+    expect(nos).toHaveLength(1);
+    expect(nos[0].id).toBe("meta_2");
+    expect(nos[0].origem).toBe("pdm");
+    expect(nos[0].origemCampo).toBe("meta_2");
+    expect(nos[0].ordem).toBe(2);
+  });
+
+  it("prazo mal formado vira null em vez de derrubar a linha", () => {
+    const nos = rascunho({ meta_1: "Meta", prazo_1: "31/03/2027" });
+    expect(nos[0].prazoAlvo).toBeNull();
+    expect(nos[0].titulo).toBe("Meta");
   });
 });
 

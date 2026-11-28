@@ -10,7 +10,8 @@ vi.mock("next/headers", () => ({
 }));
 
 import { responderDemoIa } from "./ia";
-import type { UiBloco, UiPlano } from "@/lib/ia/ui";
+import { demoJovemPlano } from "./queries";
+import type { UiBloco, UiPlano, UiPlanoJovem } from "@/lib/ia/ui";
 
 beforeEach(() => {
   demo.role = "mentor_dpp";
@@ -21,6 +22,53 @@ const blocoJson = (content: string, tag: string) =>
 
 const planoDe = (ui: UiBloco[]): UiPlano | null =>
   ui.find((b): b is UiPlano => b.kind === "plano") ?? null;
+
+const planoJovemDe = (ui: UiBloco[]): UiPlanoJovem | null =>
+  ui.find((b): b is UiPlanoJovem => b.kind === "plano_jovem") ?? null;
+
+// QA 25/11: nenhuma resposta da demo pode vazar implementação — o texto
+// honesto fala "na demonstração" / "com os seus dados", nunca RPC, nome
+// de função, rota ou "ambiente real"
+const MECANICA = /\bRPC\b|jovem_\w+|ambiente real|rota real|mesmo motor|\bview\b|\btabela\b|\bfunção\b/i;
+
+describe("responderDemoIa — sem vazamento de implementação (QA 25/11)", () => {
+  const perguntas: [string, string][] = [
+    ["mentor_dpp", "e a adesão?"],
+    ["mentor_dpp", "resumo da semana"],
+    ["mentor_dpp", "próximos encontros"],
+    ["coordenacao", "como a dupla do Caio vai ficar em dia?"],
+    ["mentor_dpp", "escreva um lembrete pra dupla"],
+    ["mentorado", "como tá minha jornada?"],
+    ["mentorado", "o que tenho pra fazer?"],
+    ["mentorado", "quando é o próximo encontro?"],
+    ["mentorado", "quem é meu mentor?"],
+    ["mentorado", "meu plano"],
+    ["mentorado", "o que é o PDM?"],
+    ["mentorado", "nos encontramos sem agendar"],
+    ["mentorado", "quais meus pedidos de especialista?"],
+  ];
+  for (const [role, pergunta] of perguntas) {
+    it(`[${role}] "${pergunta}"`, async () => {
+      demo.role = role;
+      const r = await responderDemoIa(pergunta);
+      if (r) expect(r.content).not.toMatch(MECANICA);
+    });
+  }
+
+  it("meu_plano projeta o plano do dataset, não um payload fixo", async () => {
+    demo.role = "mentorado";
+    const r = await responderDemoIa("meu plano");
+    const card = planoJovemDe(r!.ui);
+    const esperado = demoJovemPlano("mentorado");
+    expect(card).not.toBeNull();
+    expect(esperado).not.toBeNull();
+    expect(card!.status).toBe(esperado!.status);
+    expect(card!.versao).toBe(esperado!.versao);
+    expect(card!.passos_aplicados.length).toBe(
+      esperado!.passos_aplicados.length
+    );
+  });
+});
 
 describe("responderDemoIa — aderência (REALIZA-465)", () => {
   it("responde 'e a adesão' com número e próximo passo, não o fallback", async () => {
@@ -80,6 +128,67 @@ describe("responderDemoIa — templates do cap. 14 (REALIZA-388)", () => {
   });
 });
 
+describe("responderDemoIa — BI de pessoas (onda 5)", () => {
+  const agregadoDe = (ui: UiBloco[]) =>
+    ui.find((b): b is Extract<UiBloco, { kind: "agregado" }> => b.kind === "agregado") ?? null;
+
+  it("coord pergunta por estado e recebe o card agregado do dataset", async () => {
+    demo.role = "coordenacao";
+    const r = await responderDemoIa("quantas pessoas por estado?");
+    expect(r).not.toBeNull();
+    expect(r!.content).toContain("Na demonstração");
+    expect(r!.content).toContain("ficha de mentorado");
+    const card = agregadoDe(r!.ui);
+    expect(card).not.toBeNull();
+    expect(card!.titulo).toBe("Pessoas por estado (UF)");
+    expect(card!.total).toBeGreaterThan(0);
+    expect(card!.itens.length).toBeGreaterThan(0);
+  });
+
+  it("coord pergunta por gênero e o card sai — é o recorte dela", async () => {
+    demo.role = "coordenacao";
+    const r = await responderDemoIa("quantos jovens por gênero?");
+    expect(r).not.toBeNull();
+    const card = agregadoDe(r!.ui);
+    expect(card).not.toBeNull();
+    // o filtro "jovens" chega nomeado no recorte do card
+    expect(card!.recorte).toContain("Mentorado");
+    expect(r!.content).not.toContain("coordenação");
+  });
+
+  it("jovem e mentor ouvem a recusa honesta, sem card", async () => {
+    for (const role of ["mentorado", "mentor_dpp"] as const) {
+      demo.role = role;
+      const r = await responderDemoIa("quantas pessoas por estado?");
+      expect(r).not.toBeNull();
+      expect(r!.content).toContain("visão é da coordenação");
+      expect(r!.ui).toEqual([]);
+    }
+  });
+
+  it("auxiliar agrega estado no recorte dele mas não gênero", async () => {
+    demo.role = "supervisor";
+    const ok = await responderDemoIa("quantas pessoas por estado?");
+    expect(ok).not.toBeNull();
+    expect(agregadoDe(ok!.ui)).not.toBeNull();
+
+    const nao = await responderDemoIa("quantos jovens por gênero?");
+    expect(nao).not.toBeNull();
+    expect(nao!.content).toContain("visão da coordenação");
+    expect(nao!.ui).toEqual([]);
+  });
+
+  it("pergunta por trilha agrega sem vazar mecânica nem travessão", async () => {
+    demo.role = "coordenacao";
+    const r = await responderDemoIa("quantas pessoas por trilha?");
+    expect(r).not.toBeNull();
+    expect(r!.content).not.toMatch(MECANICA);
+    expect(r!.content).not.toContain("—");
+    const card = agregadoDe(r!.ui);
+    expect(card!.participacao_multipla).toBe(true);
+  });
+});
+
 describe("responderDemoIa — ficar em dia (026/FR-016)", () => {
   // uids do dataset evergreen: faixa 0x06xx vira sufixo decimal —
   // 1537 = Ricardo×Bia, 1538 = Carlos×Caio (atrasadas), 1549 = Ricardo×
@@ -115,7 +224,7 @@ describe("responderDemoIa — ficar em dia (026/FR-016)", () => {
     expect(r).not.toBeNull();
     const plano = planoDe(r!.ui);
     expect(plano?.dupla_id).toBe("de000000-0000-4000-8000-000000001537");
-    expect(r!.content).toContain("mesmo motor da ficha");
+    expect(r!.content).toContain("mesma conta da ficha");
   });
 
   it("dupla em dia nomeada ganha resposta honesta, não o plano de outra", async () => {

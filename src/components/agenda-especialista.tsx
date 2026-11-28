@@ -37,7 +37,9 @@ import type {
   GradeJanela,
 } from "@/lib/types";
 import { AgendaEspHorarios } from "@/components/agenda-especialista-horarios";
+import { SessaoEspAcoes } from "@/components/agenda-especialista-sessao-acoes";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import { ocupadosAgendados } from "@/lib/sugestoes-encontro";
 import { Avatar } from "@/components/avatar";
 import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -178,7 +180,7 @@ export function AgendaEspecialista({
               titulo: `Sessão ${passo} com ${r.nome} ficou sem confirmação`,
               detalhe: `Estava marcada para ${formatDiaHora(
                 e.data_hora
-              )}. Aconteceu? Confirme ou remarque na ficha.`,
+              )}. Aconteceu? Registre como foi ou remarque na ficha.`,
               href: `/duplas/${d.id}#registrar-${e.id}`,
               rotuloAcao: "Registrar sessão",
             }
@@ -443,6 +445,10 @@ function LinhaSessao({
                 </a>
               ) : (
                 <AgendarEncontroDialog
+                  ocupados={ocupadosAgendados(dupla.encontros, (x) => ({
+                    rotulo: `sessão ${passoEsp(x, dupla.encontros)}`,
+                    rotuloArtigo: `a sessão ${passoEsp(x, dupla.encontros)}`,
+                  }))}
                   duplaId={dupla.id}
                   numero={e.numero}
                   atual={e}
@@ -456,6 +462,11 @@ function LinhaSessao({
                     </Button>
                   }
                 />
+              )}
+              {/* QA 25/11: paridade com a sessão de mentor — trocar só o
+                  link mora no ⋯ */}
+              {(e.status === "agendado" || e.status === "remarcado") && (
+                <SessaoEspAcoes encontroId={e.id} linkAtual={e.link} />
               )}
             </div>
           )}

@@ -270,8 +270,8 @@ export function FotoPerfil({
   }
 
   return (
-    <>
-      <div className="relative z-10 -mt-10 shrink-0 sm:-mt-12">
+    <div className="flex shrink-0 flex-col items-start gap-1">
+      <div className="relative z-10 -mt-10 sm:-mt-12">
         <Avatar
           nome={nome}
           papel="mentorado"
@@ -312,7 +312,7 @@ export function FotoPerfil({
           Remover foto
         </Button>
       )}
-    </>
+    </div>
   );
 }
 

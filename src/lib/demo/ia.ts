@@ -10,13 +10,26 @@
 import { projetarFicha, projetarResumo } from "@/lib/ia/tools";
 import type { DuplaIa } from "@/lib/ia/queries";
 import {
+  agregarPessoasBi,
+  type DimensaoPessoasBi,
+  type FiltrosPessoasBi,
+  type PessoaBi,
+} from "@/lib/ia/pessoas-bi";
+import {
   escopoDaProposta,
   montarPlanoEmDia,
   type PlanoAplicavel,
 } from "@/lib/plano-em-dia";
+import { exigenciasDoCenario, simularCenariosPlano } from "@/lib/plano-cenarios";
 import { montarDocCombinado } from "@/lib/plano-roteiros";
 import { gradeCombinada, toDateStr } from "@/lib/ciclo";
-import type { Disponibilidade, Dupla, DuplaPlanoEscopo } from "@/lib/types";
+import type {
+  AppRole,
+  Disponibilidade,
+  Dupla,
+  DuplaPlanoEscopo,
+  Trilha,
+} from "@/lib/types";
 import { uiDaTool, type UiBloco } from "@/lib/ia/ui";
 import { leituraAderencia } from "@/lib/relatorios/leituras-aderencia";
 import { resumoAderencia } from "@/lib/relatorios/operacional";
@@ -31,6 +44,10 @@ import {
   demoJovemDuplas,
   demoJovemEncaminhamentos,
   demoJovemEncontros,
+  demoJovemPlano,
+  demoMentorados,
+  demoPessoalMap,
+  demoPessoas,
   demoSolicitacoesVisiveis,
 } from "./queries";
 
@@ -113,6 +130,66 @@ function resolverDuplaNomeada(
   );
 }
 
+/** Universo do BI no recorte que a persona enxerga — a mesma montagem do
+ *  getPessoasBiIa real, só que sobre as queries demo (que já escopam por
+ *  papel e devolvem o mapa pessoal vazio fora da coordenação). O jovem
+ *  conta pela ficha de mentorado, nunca pela conta de login. */
+function pessoasBiDemo(role: AppRole): PessoaBi[] {
+  const pessoalProf = demoPessoalMap(role, "profiles_pessoal");
+  const pessoalMent = demoPessoalMap(role, "mentorados_pessoal");
+  const trilhas = new Map<string, Set<Trilha>>();
+  const add = (id: string | null | undefined, t: Trilha | null | undefined) => {
+    if (!id || (t !== "dpp" && t !== "especialista")) return;
+    const s = trilhas.get(id) ?? new Set<Trilha>();
+    s.add(t);
+    trilhas.set(id, s);
+  };
+  for (const d of demoDuplas(role)) {
+    if (d.status !== "ativa" && d.status !== "pausada") continue;
+    add(d.mentor?.id, d.trilha);
+    add(d.mentorado?.id, d.trilha);
+  }
+  const pessoas: PessoaBi[] = [];
+  for (const p of demoPessoas(role)) {
+    // conta de jovem fora — ela existe só porque a ficha em mentorados a
+    // representa; inativas ficam pro filtro incluir_inativas (a demo não
+    // pergunta por elas)
+    if (p.role === "mentorado" || !p.ativo) continue;
+    const efetivos = new Set(
+      [p.role, ...(p.papeis ?? [])].filter((r): r is AppRole => r != null)
+    );
+    const vivas = new Set<Trilha>(trilhas.get(p.id) ?? []);
+    if (efetivos.has("mentor_dpp")) vivas.add("dpp");
+    if (efetivos.has("mentor_especialista")) vivas.add("especialista");
+    const sens = pessoalProf.get(p.id);
+    pessoas.push({
+      id: p.id,
+      nome: (p.nome_social || p.nome || "Sem nome").trim(),
+      papel: p.role,
+      papeis: [...efetivos],
+      trilhas: [...vivas],
+      uf: p.uf?.toUpperCase() ?? null,
+      genero: sens?.genero ?? null,
+      data_nascimento: sens?.data_nascimento ?? null,
+    });
+  }
+  for (const m of demoMentorados(role)) {
+    if ((m.situacao ?? "ativo") !== "ativo") continue;
+    const sens = pessoalMent.get(m.id);
+    pessoas.push({
+      id: m.id,
+      nome: (m.nome_social || m.nome || "Sem nome").trim(),
+      papel: "mentorado",
+      papeis: ["mentorado"],
+      trilhas: [...(trilhas.get(m.id) ?? [])],
+      uf: m.uf?.toUpperCase() ?? null,
+      genero: sens?.genero ?? null,
+      data_nascimento: sens?.data_nascimento ?? null,
+    });
+  }
+  return pessoas;
+}
+
 export async function responderDemoIa(
   pergunta: string
 ): Promise<RespostaDemo | null> {
@@ -153,7 +230,7 @@ export async function responderDemoIa(
     if (!d) {
       return {
         content:
-          `Na demonstração a Liza perguntaria qual dupla antes de montar o texto, igual à rota real.\n\n` +
+          `Na demonstração a Liza perguntaria qual dupla antes de montar o texto, como faria com os seus dados.\n\n` +
           `\`\`\`escolha\n${JSON.stringify({
             pergunta: `Pra qual dupla eu monto a ${rotuloTemplate}?`,
             opcoes: duplas.slice(0, 5).map((x) => ({
@@ -212,7 +289,7 @@ export async function responderDemoIa(
           : `${jovemPrimeiro},\n\nGostei muito da nossa conversa. A sua abertura vai fazer diferença no nosso trabalho.\n\nSempre que a conversa gerar alguma reflexão, anote e traga no próximo encontro. Se for algo urgente, me chame antes.\n\nPróxima tarefa: ${pendente?.descricao ?? "revisar os combinados do último encontro"}. Prazo: ${fmtDia(pendente?.prazo) ?? "até o próximo encontro"}.\n\nNosso próximo encontro: ${fmtDiaHora(proximo?.data_hora) ?? "a combinar"}, já agendado na plataforma.\n\nAbraço!`;
     return {
       content:
-        `Na demonstração os dados são de exemplo: no ambiente real a Liza puxa nomes, contatos${slugDemo === "mensagem-indicadas" ? " e os links de cada indicada" : ", tarefas e agenda"} da própria plataforma.\n\n` +
+        `Na demonstração os dados são de exemplo: com os seus dados a Liza usa nomes, contatos${slugDemo === "mensagem-indicadas" ? " e os links de cada indicada" : ", tarefas e agenda"} da própria plataforma.\n\n` +
         `\`\`\`rascunho\n${JSON.stringify({
           canal: "whatsapp",
           para:
@@ -290,6 +367,14 @@ export async function responderDemoIa(
     };
     const uiPlano = (d: DuplaIa, r: PlanoAplicavel) => {
       const g = gradeDe(d);
+      // mesma matriz de cenários da rota real: o card do demo abre pelo
+      // caminho viável em vez de mandar pra coordenação (1126)
+      const matriz = simularCenariosPlano({
+        dupla: d as unknown as Dupla,
+        eventos,
+        hoje: new Date(),
+        disponibilidade: g.combinada,
+      });
       const hojeStr = toDateStr(new Date());
       const e =
         r.estado === "recuperacao" ? escopoDaProposta(r, hojeStr) : null;
@@ -297,11 +382,24 @@ export async function responderDemoIa(
         r.recessosPendentes.map((x) => x.cicloEventoId)
       );
       const evPorId = new Map(eventos.map((ev) => [ev.id, ev]));
+      const passoPayload = (p2: (typeof r.passos)[number]) => ({
+        numero: p2.numero,
+        titulo: p2.titulo,
+        acao: p2.acao,
+        encontro_id: p2.encontroId,
+        data_sugerida: p2.data,
+        data_oficial: p2.dataOficial,
+        vence_no_caminho: p2.venceNoCaminho === true,
+        precondicao: p2.precondicao ?? null,
+        aviso: p2.aviso ?? null,
+      });
       return uiDaTool("plano_em_dia", {
         dupla_id: d.id,
         mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
         mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
         trilha: d.trilha,
+        // quem pergunta (0245) — o mesmo campo que a tool real devolve
+        lado: STAFF.includes(role) ? "staff" : "mentor",
         aplicavel: true,
         em_dia: r.emDia,
         estado: r.estado,
@@ -362,17 +460,16 @@ export async function responderDemoIa(
           estado: p2.estado,
           data_hora: p2.dataHora,
         })),
-        passos: r.passos.map((p2) => ({
-          numero: p2.numero,
-          titulo: p2.titulo,
-          acao: p2.acao,
-          encontro_id: p2.encontroId,
-          data_sugerida: p2.data,
-          data_oficial: p2.dataOficial,
-          vence_no_caminho: p2.venceNoCaminho === true,
-          precondicao: p2.precondicao ?? null,
-          aviso: p2.aviso ?? null,
-        })),
+        passos: r.passos.map(passoPayload),
+        cenarios: matriz.cenarios,
+        melhor: matriz.melhor,
+        caminho: matriz.menorFriccao
+          ? {
+              ...matriz.menorFriccao.cenario,
+              exigencias: exigenciasDoCenario(matriz.menorFriccao.cenario),
+              passos: matriz.menorFriccao.passos.map(passoPayload),
+            }
+          : null,
         data_recuperacao: r.dataRecuperacao,
         data_projetada: r.dataProjetada,
         cabem_ate_encerramento: r.cabemAteEncerramento,
@@ -382,7 +479,7 @@ export async function responderDemoIa(
         avisos: r.avisos,
       });
     };
-    const textoPlano = `Na demonstração o plano é de exemplo, calculado pelo mesmo motor da ficha da dupla. A sequência com as datas sugeridas tá acima: dois encontros por semana quando couber, respeitando os intervalos do guia. Quem agenda é a dupla, na ficha.${sugestoes(["Resumo da semana", "Escreva um lembrete pra dupla"])}`;
+    const textoPlano = `Na demonstração o plano é de exemplo, calculado pela mesma conta da ficha da dupla. A sequência com as datas sugeridas tá acima: dois encontros por semana quando couber, respeitando os intervalos do guia. Quem agenda é a dupla, na ficha.${sugestoes(["Resumo da semana", "Escreva um lembrete pra dupla"])}`;
     let ui: UiBloco | null = null;
     let content: string;
     const nomeada = resolverDuplaNomeada(pergunta, duplas);
@@ -396,7 +493,7 @@ export async function responderDemoIa(
       if (!r.aplicavel) {
         // trilha de especialista, pausa ou falta de calendário: o motivo
         // do planner já é a resposta honesta da rota real
-        content = `Na demonstração a resposta é a mesma da rota real: ${r.motivo}${sugestoes(["Resumo da semana"])}`;
+        content = `Na demonstração vale o mesmo motivo que a ficha mostraria: ${r.motivo}${sugestoes(["Resumo da semana"])}`;
       } else {
         ui = uiPlano(nomeada, r);
         const jovem = (
@@ -408,11 +505,19 @@ export async function responderDemoIa(
           jovem === "a dupla"
             ? jovem
             : `d${jovem.endsWith("a") ? "a" : "o"} ${jovem}`;
+        const matriz = simularCenariosPlano({
+          dupla: nomeada as unknown as Dupla,
+          eventos,
+          disponibilidade: gradeDe(nomeada).combinada,
+          hoje: new Date(),
+        });
         content = r.emDia
-          ? `Na demonstração a dupla ${rotulo} já está em dia, então não existe plano de recuperação pra ela.${ui ? " O card acima sai do mesmo motor da ficha e mostra os encontros marcados." : " No ambiente real o mesmo motor da ficha faz essa conta."}${sugestoes(["Resumo da semana"])}`
-          : ui
-            ? textoPlano
-            : `Na demonstração a conta da dupla ${rotulo} não fecha antes do encerramento. ${r.sugestao ?? "Nem com 1 encontro por dia o plano fecha."}${sugestoes(["Resumo da semana"])}`;
+          ? `Na demonstração a dupla ${rotulo} já está em dia, então não existe plano de recuperação pra ela.${ui ? " O card acima faz a mesma conta da ficha e mostra os encontros marcados." : " Com os seus dados a ficha faz essa mesma conta."}${sugestoes(["Resumo da semana"])}`
+          : r.estado === "conversa" && matriz.menorFriccao
+            ? `Na demonstração a dupla ${rotulo} fica em dia em ${matriz.menorFriccao.cenario.data ? new Date(`${matriz.menorFriccao.cenario.data}T12:00:00`).toLocaleDateString("pt-BR") : "data a definir"} ${matriz.menorFriccao.cenario.rotulo}. O card acima mostra o que muda e os ${matriz.menorFriccao.passos.length} encontros.${sugestoes(["Resumo da semana"])}`
+            : ui
+              ? textoPlano
+              : `Na demonstração a conta da dupla ${rotulo} não fecha antes do encerramento. ${r.sugestao ?? "Nem com 1 encontro por dia o plano fecha."}${sugestoes(["Resumo da semana"])}`;
       }
     } else {
       for (const d of duplas) {
@@ -429,7 +534,7 @@ export async function responderDemoIa(
       }
       content = ui
         ? textoPlano
-        : `Na demonstração nenhuma dupla está atrasada o bastante pra um plano de recuperação. No ambiente real a Liza monta o plano com o mesmo motor do card "Para ficar em dia".${sugestoes(["Resumo da semana"])}`;
+        : `Na demonstração nenhuma dupla está atrasada o bastante pra um plano de recuperação. Com os seus dados a Liza monta o plano pela mesma conta do card "Para ficar em dia".${sugestoes(["Resumo da semana"])}`;
     }
     return { content, ui: ui ? [ui] : [] };
   }
@@ -485,35 +590,23 @@ export async function responderDemoIa(
       const ui = uiAjuda(p);
       return {
         content: ui
-          ? `Na demonstração a resposta sai da ajuda oficial, igual ao card acima. No ambiente real a Liza também consulta os guias do programa.${sugestoes(["Como tá minha jornada?", "O que tenho pra fazer?"])}`
-          : `Na demonstração a Liza responde dúvidas do programa com a ajuda oficial. No ambiente real ela também consulta os guias.${sugestoes(["Quem é meu mentor?"])}`,
+          ? `Na demonstração a resposta sai da ajuda oficial, igual ao card acima. Com os seus dados a Liza também consulta os guias do programa.${sugestoes(["Como tá minha jornada?", "O que tenho pra fazer?"])}`
+          : `Na demonstração a Liza responde dúvidas do programa com a ajuda oficial. Com os seus dados ela também consulta os guias.${sugestoes(["Quem é meu mentor?"])}`,
         ui: ui ? [ui] : [],
       };
     }
     // o combinado do plano "ficar em dia" (459): a rota real chama
-    // meu_plano (jovem_plano, recorte sem semáforo) — a demo devolve um
-    // plano aceito de exemplo na MESMA projeção
+    // meu_plano (o recorte do jovem, sem semáforo) — a demo projeta o
+    // MESMO card a partir do plano do dataset, não de um payload fixo
     // "combinado" sozinho continua caindo nos combinados/tarefas — o
     // branch dele vem depois; aqui só plano/ficar em dia
     if (/plano|ficar em dia/.test(p)) {
-      const hoje = Date.now();
-      const em = (dias: number) => new Date(hoje + dias * 86_400_000).toISOString();
-      const ui = uiDaTool("meu_plano", {
-        status: "aceito",
-        versao: 1,
-        ritmo: "2",
-        aprovado_lado: "mentor",
-        expira_em: em(14),
-        passos: [
-          { numero: 4, data: em(3).slice(0, 10), acao: "remarcar" },
-          { numero: 5, data: em(10).slice(0, 10), acao: "remarcar" },
-        ],
-        passos_aplicados: [
-          { numero: 4, data_nova: em(3), aplicado_em: new Date(hoje).toISOString() },
-        ],
-      });
+      const plano = demoJovemPlano(role);
+      const ui = plano ? uiDaTool("meu_plano", plano) : null;
       return {
-        content: `Na demonstração o combinado é de exemplo. No ambiente real ele sai da RPC jovem_plano — o recorte do jovem do plano "ficar em dia", sem os detalhes internos da equipe. Aceitar e confirmar datas valem pra você e pro seu mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`,
+        content: plano
+          ? `Na demonstração o plano é de exemplo — é o recorte do "ficar em dia" que o jovem vê, sem os detalhes internos da equipe. Aceitar e confirmar datas valem pra você e pro seu mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`
+          : `Na demonstração a dupla ainda não tem um plano "ficar em dia". Ele aparece quando a equipe propõe e alguém da dupla aceita.${sugestoes(["Como tá minha jornada?"])}`,
         ui: ui ? [ui] : [],
       };
     }
@@ -526,7 +619,7 @@ export async function responderDemoIa(
       )
     ) {
       return {
-        content: `Na demonstração a Liza perguntaria qual encontro do guia a sessão cobriu e prepararia o registro pra você confirmar no card — ele já nasce realizado e o seu mentor é avisado pra contar como foi. No ambiente real vale pra passo oficial que já venceu; o último encontro e os da trilha de especialista seguem com o mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`,
+        content: `Na demonstração a Liza perguntaria qual encontro do guia a sessão cobriu e prepararia o registro pra você confirmar no card — ele já nasce realizado e o seu mentor é avisado pra contar como foi. Com os seus dados vale pra passo oficial que já venceu; o último encontro e os da trilha de especialista seguem com o mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`,
         ui: [],
       };
     }
@@ -682,6 +775,58 @@ export async function responderDemoIa(
         ui: ui ? [ui] : [],
       };
     }
+  }
+
+  // BI demográfico (onda 5): a demo agrega o dataset evergreen pelo
+  // mesmo caminho da tool (pessoasBiDemo → agregarPessoasBi → uiDaTool),
+  // então o card sai igual ao da rota real
+  const perguntaBi = /quantas pessoas|quantos jovens|por estado|por sexo|por g[êe]nero|faixa de idade|por idade|por papel|por trilha/.test(p);
+  if (perguntaBi && !STAFF.includes(role)) {
+    return {
+      content: `Essa visão é da coordenação. Eu não mostro contagem de pessoas por estado, gênero ou idade pra outros papéis.${sugestoes(role === "mentorado" ? ["Quem é meu mentor?"] : ["Como está minha dupla?"])}`,
+      ui: [],
+    };
+  }
+  if (perguntaBi) {
+    // mesma fronteira da tool real: gênero e idade são visão da
+    // coordenação; o auxiliar agrega estado, papel e trilha no recorte dele
+    if (role !== "coordenacao" && /sexo|g[êe]nero|idade/.test(p)) {
+      return {
+        content: `Na demonstração os números são de exemplo. Gênero e faixa de idade são visão da coordenação; no seu recorte eu consigo agregar por estado, papel ou trilha.${sugestoes(["Quantas pessoas por estado?", "Como está minha dupla?"])}`,
+        ui: [],
+      };
+    }
+    const dimensao: DimensaoPessoasBi = /estado|\buf\b/.test(p)
+      ? "estado"
+      : /sexo|g[êe]nero/.test(p)
+        ? "genero"
+        : /idade/.test(p)
+          ? "faixa_idade"
+          : /trilha/.test(p)
+            ? "trilha"
+            : // "quantas pessoas/jovens" genérico lê a composição por papel
+              "papel";
+    const filtros: FiltrosPessoasBi = {};
+    if (/jovens|mentorad/.test(p)) filtros.papel = "mentorado";
+    const ufM = p.match(
+      /\b(sp|rj|mg|es|ba|pr|rs|sc|pe|ce|df|go|mt|ms|ma|pb|rn|al|se|pi|pa|am|to|ro|ac|ap|rr)\b/
+    );
+    if (ufM) filtros.uf = ufM[1].toUpperCase();
+    const out = agregarPessoasBi(pessoasBiDemo(role), dimensao, filtros, 8);
+    const ui = uiDaTool("pessoas_agregado", out);
+    const top = out.grupos
+      .slice(0, 3)
+      .map((g) => `${g.rotulo} com ${g.pessoas}`)
+      .join(", ");
+    const content = `Na demonstração os números são de exemplo, contando só pessoas ativas${out.recorte ? ` no recorte ${out.recorte}` : ""}. ${
+      top
+        ? `${out.titulo}: ${top}${out.outros ? ` e mais ${out.outros.pessoas}` : ""}.`
+        : "Ninguém entra nesse recorte."
+    } Jovens contam pela ficha de mentorado, sem duplicar a conta de login. Idade sai só em faixas; contato, data de nascimento e dados civis não entram na resposta.`;
+    return {
+      content: content + sugestoes(["Quantas pessoas por trilha?", "Resumo da semana"]),
+      ui: ui ? [ui] : [],
+    };
   }
 
   // leitura de aderência (REALIZA-465): "e a adesão?" também na demo, com

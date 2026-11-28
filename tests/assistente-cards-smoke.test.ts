@@ -104,6 +104,20 @@ const BLOCOS: UiBloco[] = [
     pessoas: [{ id: "p1", nome: "Ana Souza", papel: "mentor_dpp" }],
   },
   {
+    kind: "agregado",
+    titulo: "Pessoas por estado (UF)",
+    recorte: "Mentorado",
+    total: 24,
+    universo: "pessoas ativas",
+    participacao_multipla: false,
+    itens: [
+      { chave: "SP", rotulo: "SP", n: 12, pct: 50 },
+      { chave: "RJ", rotulo: "RJ", n: 5, pct: 21 },
+      { chave: "__nao_informado", rotulo: "Não informado", n: 3, pct: 12 },
+    ],
+    outros: { pessoas: 4, grupos: 2 },
+  },
+  {
     kind: "chamados",
     aberto: 2,
     em_atendimento: 1,
@@ -226,6 +240,29 @@ describe("UiCard: conteúdo", () => {
     expect(out).toContain("Fazer um acompanhamento mais próximo");
   });
 
+  it("agregado: título do recorte, n·pct por linha e cauda honesta", () => {
+    const out = html(de("agregado"));
+    expect(out).toContain("Pessoas por estado (UF)");
+    expect(out).toContain("Recorte: Mentorado");
+    expect(out).toContain("Não informado");
+    expect(out).toContain("outros: 4 pessoas em 2 grupos");
+    expect(out).toContain("só pessoas ativas");
+    expect(out).toContain('href="/pessoas"');
+    // a barra da fatia "não informado" sai do ciclo de cores — hatch neutro
+    expect(out).toContain("viz-hatch");
+  });
+
+  it("agregado com participação múltipla avisa que soma passa de 100%", () => {
+    const b = {
+      ...(de("agregado") as Extract<UiBloco, { kind: "agregado" }>),
+      participacao_multipla: true,
+      outros: null,
+    };
+    const out = html(b);
+    expect(out).toContain("uma pessoa pode contar em mais de uma linha");
+    expect(out).not.toContain("outros:");
+  });
+
   it("fila, capacidade, pessoas, chamados, instrumentos, fontes", () => {
     expect(html(de("fila"))).toContain("Esperando há 12 dias");
     expect(html(de("fila"))).toContain("Nenhum mentor com vaga livre");
@@ -245,5 +282,117 @@ describe("UiCard: conteúdo", () => {
     // chunk e lia como página inexistente no documento
     expect(fontes).not.toContain("pág.");
     expect(fontes).toContain('aria-expanded="false"');
+  });
+});
+
+// 1126: o card do plano não manda pra coordenação quando o motor de
+// cenários achou caminho viável — ele abre pelo caminho e mostra a data
+describe("UiCard: plano com caminho viável (1126)", () => {
+  const futuro = (dias: number) =>
+    new Date(Date.now() + dias * 86_400_000).toISOString().slice(0, 10);
+  const bloco = (extra: Partial<Extract<UiBloco, { kind: "plano" }>> = {}) =>
+    ({
+      kind: "plano",
+      dupla_id: "d1",
+      mentor: "Rogério",
+      mentorado: "Jhonatan",
+      em_dia: false,
+      data_recuperacao: null,
+      data_projetada: futuro(60),
+      cabem_ate_encerramento: { cabem: 11, faltam: 12 },
+      encerramento: futuro(50),
+      ritmo: 7,
+      passos: [
+        {
+          numero: 5,
+          titulo: "Acompanhamento das primeiras submetas",
+          acao: "agendar",
+          encontro_id: null,
+          data: futuro(1),
+          data_oficial: futuro(-20),
+          vence_no_caminho: false,
+          precondicao: null,
+          aviso: null,
+        },
+      ],
+      pendencias: [],
+      recessos_pendentes: [],
+      grade: null,
+      doc: null,
+      avisos: [],
+      nivel: "conversa_coord",
+      estado: "conversa",
+      sugestao: "O caminho é conversar com a coordenação para revisar o ciclo.",
+      melhor: {
+        rotulo: "recesso: seguir · fusão em pares",
+        data: futuro(30),
+        sessoes: 6,
+        decisao_recesso: "segue",
+        fusao: [[6, 7]],
+      },
+      alternativas: [{ rotulo: "fusão em pares", data: futuro(38) }],
+      cenarios: [],
+      caminho: null,
+      plano: null,
+      ...extra,
+    }) as Extract<UiBloco, { kind: "plano" }>;
+
+  it("abre pelo caminho que fecha em vez da coordenação", () => {
+    const out = html(bloco());
+    expect(out).toContain("recesso: seguir · fusão em pares");
+    expect(out).toContain("Seguindo no recesso");
+    expect(out).toContain("Também fecha:");
+    expect(out).not.toContain("Conversa com a coordenação");
+    expect(out).not.toContain("conversar com a coordenação");
+  });
+
+  it("caminho completo de menor fricção: exigências e todos os passos", () => {
+    const passos = Array.from({ length: 8 }, (_, i) => ({
+      numero: i + 5,
+      titulo: `Encontro ${i + 5}`,
+      acao: "agendar" as const,
+      encontro_id: null,
+      data: futuro(30 + i),
+      data_oficial: futuro(-20 + i),
+      vence_no_caminho: false,
+      precondicao: null,
+      aviso: null,
+    }));
+    const out = html(
+      bloco({
+        melhor: null,
+        alternativas: [{ rotulo: "1 por dia", data: futuro(10) }],
+        caminho: {
+          rotulo: "fusão em 2 pares",
+          data: futuro(30),
+          sessoes: 8,
+          ritmo: 1,
+          fusao: [
+            [6, 7],
+            [8, 9],
+          ],
+          decisao_recesso: null,
+          exigencias: ["juntar 2 pares (6+7, 8+9)"],
+          passos,
+          recesso: null,
+        },
+        passos,
+      })
+    );
+    expect(out).toContain("Em dia em");
+    expect(out).toContain("O que muda");
+    expect(out).toContain("juntar 2 pares (6+7, 8+9)");
+    expect(out).toContain("Enviar o plano");
+    expect(out).toContain("Ver os 8 encontros");
+    // o detalhe fica fechado: o card não despeja 8 linhas de cara
+    expect(out).not.toContain("Encontro 5");
+    expect(out).not.toContain("Caminho de menor fricção");
+    expect(out).not.toContain("conversar com a coordenação");
+  });
+
+  it("sem caminho viável, continua apontando a coordenação", () => {
+    const out = html(bloco({ melhor: null, alternativas: [] }));
+    expect(out).toContain("Conversa com a coordenação");
+    expect(out).toContain("conversar com a coordenação");
   });
 });

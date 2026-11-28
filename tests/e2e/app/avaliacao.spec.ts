@@ -281,6 +281,8 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     await page.waitForURL((u) => u.pathname === "/jovem", { timeout: 15_000 });
 
+    // a seção nasce recolhida na home nova — a âncora abre ao hidratar
+    await page.goto("/jovem#avaliacoes-titulo");
     const secao = page.locator('section[aria-labelledby="avaliacoes-titulo"]');
     await expect(
       secao.getByRole("heading", { name: "Suas avaliações" })
@@ -377,6 +379,7 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     await page.waitForURL((u) => u.pathname === "/jovem", { timeout: 15_000 });
 
+    await page.goto("/jovem#avaliacoes-titulo");
     const secao = page.locator('section[aria-labelledby="avaliacoes-titulo"]');
     await secao
       .locator("li", { hasText: "15º encontro" })

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import {
   ArrowDown,
   ArrowUp,
@@ -18,6 +19,7 @@ import {
   Trash,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
+import { T } from "@/components/motion";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +51,11 @@ import { cn } from "@/lib/utils";
 // bloco dela — o menu segue pra prioridade, descarte e exclusão.
 
 export type PdmArvoreAcoes = {
-  onStatus: (item: PdmNo, status: PdmItemStatus) => void;
+  onStatus: (
+    item: PdmNo,
+    status: PdmItemStatus,
+    origem?: "status" | "menu"
+  ) => void;
   onEditar: (item: PdmNo) => void;
   /** Renomeação inline — o pai persiste o título novo com os demais
    *  campos do item intactos. */
@@ -57,6 +63,9 @@ export type PdmArvoreAcoes = {
   onNovaSubmeta: (pai: PdmNo) => void;
   onMover: (item: PdmNo, direcao: -1 | 1, irmaos: PdmNo[]) => void;
   onExcluir: (item: PdmNo) => void;
+  /** Abre a resposta que projetou o item (quando a página consegue
+   *  resolver a proveniência sem schema novo). */
+  onVerOrigem?: (item: PdmNo) => void;
 };
 
 const NIVEL_MAX_RECUO = 3; // a partir do 4º nível: recuo fixo + chip
@@ -130,6 +139,9 @@ function NoPdm({
   acoes: PdmArvoreAcoes;
   irmaos: PdmNo[];
 }) {
+  // motion.layout é FLIP: mede antes/depois e anima só transform. Com
+  // reduced-motion a reordenação continua acontecendo, só sem deslocamento.
+  const reducedMotion = useReducedMotion();
   const [aberto, setAberto] = useState(nivel === 0);
   const [renomeando, setRenomeando] = useState(false);
   const [novoTitulo, setNovoTitulo] = useState("");
@@ -214,7 +226,9 @@ function NoPdm({
   );
 
   return (
-    <li
+    <motion.li
+      layout={reducedMotion ? false : "position"}
+      transition={T.pill}
       role="treeitem"
       aria-expanded={temFilhos ? aberto : undefined}
       aria-selected={false}
@@ -247,6 +261,7 @@ function NoPdm({
             onClick={() =>
               acoes.onStatus(no, atingida ? "ativa" : "atingida")
             }
+            data-pdm-focus={`${no.id}:status`}
             className={cn(
               "grid size-11 shrink-0 place-items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8",
               atingida
@@ -320,6 +335,7 @@ function NoPdm({
                       ? `Recolher subitens de "${no.titulo}"`
                       : `Expandir ${filhosVisiveis.length} subitens de "${no.titulo}"`
                   }
+                  data-pdm-focus={`${no.id}:titulo`}
                   className="block w-full rounded-md px-1 py-0.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {linhaTitulo}
@@ -331,6 +347,7 @@ function NoPdm({
                   onClick={iniciarRenome}
                   title="Renomear"
                   aria-label={`Renomear "${no.titulo}"`}
+                  data-pdm-focus={`${no.id}:titulo`}
                   className="block w-full rounded-md px-1 py-0.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {linhaTitulo}
@@ -352,9 +369,20 @@ function NoPdm({
               </Badge>
             )}
             {no.origem !== "manual" && ORIGEM_INSTRUMENTO[no.origem] && (
-              <span className="inline-flex items-center gap-1 italic">
-                vinda do instrumento {ORIGEM_INSTRUMENTO[no.origem]}
-              </span>
+              acoes.onVerOrigem ? (
+                <button
+                  type="button"
+                  onClick={() => acoes.onVerOrigem?.(no)}
+                  aria-label={`Ver a resposta do instrumento ${ORIGEM_INSTRUMENTO[no.origem]} que projetou "${no.titulo}"`}
+                  className="inline-flex items-center gap-1 rounded-sm italic underline decoration-muted-foreground/45 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  vinda do instrumento {ORIGEM_INSTRUMENTO[no.origem]} · ver resposta
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1 italic">
+                  vinda do instrumento {ORIGEM_INSTRUMENTO[no.origem]}
+                </span>
+              )
             )}
             {no.indicador && (
               <span className="inline-flex min-w-0 max-w-full items-center gap-1">
@@ -404,6 +432,7 @@ function NoPdm({
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label={`Ações de "${no.titulo}"`}
+              data-pdm-focus={`${no.id}:menu`}
               className={cn(
                 buttonVariants({ variant: "ghost", size: "icon" }),
                 "size-11 shrink-0 sm:size-8"
@@ -447,7 +476,7 @@ function NoPdm({
               <DropdownMenuSeparator />
               {!atingida && !descartada && (
                 <DropdownMenuItem
-                  onClick={() => acoes.onStatus(no, "atingida")}
+                  onClick={() => acoes.onStatus(no, "atingida", "menu")}
                 >
                   <Flag size={16} aria-hidden data-icon="inline-start" />
                   Marcar como atingida
@@ -455,14 +484,14 @@ function NoPdm({
               )}
               {descartada ? (
                 <DropdownMenuItem
-                  onClick={() => acoes.onStatus(no, "ativa")}
+                  onClick={() => acoes.onStatus(no, "ativa", "menu")}
                 >
                   <CheckCircle size={16} aria-hidden data-icon="inline-start" />
                   Retomar
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem
-                  onClick={() => acoes.onStatus(no, "descartada")}
+                  onClick={() => acoes.onStatus(no, "descartada", "menu")}
                 >
                   <Prohibit size={16} aria-hidden data-icon="inline-start" />
                   Descartar (fica no histórico)
@@ -513,7 +542,7 @@ function NoPdm({
           <BotaoNovaSubmeta pai={no} onNovaSubmeta={acoes.onNovaSubmeta} />
         </div>
       )}
-    </li>
+    </motion.li>
   );
 }
 

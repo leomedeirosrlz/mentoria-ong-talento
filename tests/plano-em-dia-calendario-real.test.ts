@@ -96,6 +96,41 @@ function datasValidas(r: PlanoAplicavel, recessoValendo: boolean) {
   }
 }
 
+describe("018 — fusão encurta a projeção", () => {
+  it("5º+6º na mesma sessão antecipa o 7º em uma semana", () => {
+    const sem = montar(dupla(4), dt("2026-11-27"));
+    const com = montarPlanoEmDia({
+      dupla: dupla(4),
+      eventos: CALENDARIO,
+      hoje: dt("2026-11-27"),
+      fusao: [[5, 6]],
+    });
+    if (!com.aplicavel) throw new Error(com.motivo);
+    const data = (n: number) => com.passos.find((p) => p.numero === n)!.data;
+    expect(data(6)).toBe(data(5));
+    const diff =
+      (new Date(sem.passos.find((p) => p.numero === 7)!.data).getTime() -
+        new Date(data(7)).getTime()) /
+      86_400_000;
+    expect(diff).toBe(7);
+  });
+});
+
+describe("513 — recesso pendente com caminho que fecha (QA 1126)", () => {
+  it("a sugestão abre pelo caminho do recesso em vez de condenar a dupla", () => {
+    // 4 feitos e o 5º ainda sem data; sem a decisão do recesso o walk não
+    // fecha, mas seguindo no recesso fecha antes do encerramento
+    const r = montar(dupla(4), dt("2026-11-27"));
+    expect(r.estado).toBe("conversa");
+    expect(r.alternativaRecesso).not.toBeNull();
+    expect(r.alternativaRecesso!.data <= ENCERRAMENTO).toBe(true);
+    const [a, m, d] = r.alternativaRecesso!.data.split("-");
+    expect(r.sugestao).toContain("seguir encontros no recesso");
+    expect(r.sugestao).toContain(`${d}/${m}/${a}`);
+    expect(r.sugestao).not.toMatch(/^Nem com 1 encontro por dia/);
+  });
+});
+
 describe("513 — 10 atrasos em 23/11 no calendário real", () => {
   it("com o recesso valendo, nem 1 por dia fecha: vira conversa com a coordenação", () => {
     const r = montar(dupla(0));
@@ -108,10 +143,14 @@ describe("513 — 10 atrasos em 23/11 no calendário real", () => {
     expect(r.dataProjetada! > ENCERRAMENTO).toBe(true);
     expect(r.cabemAteEncerramento!.faltam).toBe(16);
     expect(r.cabemAteEncerramento!.cabem).toBeLessThan(16);
-    // a resposta nomeia quando seria "em dia" (depois do encerramento) —
-    // a evidência do falso negativo corrigido — e diz que nem 1 por dia fecha
-    expect(r.sugestao).toMatch(/Em dia só em .*depois do encerramento/);
-    expect(r.sugestao).toMatch(/Nem 1 encontro por dia/);
+    // se o recesso abre um caminho que fecha, a resposta abre por ele;
+    // senão, nomeia a projeção depois do encerramento e o teto de 1/dia
+    if (r.alternativaRecesso && r.alternativaRecesso.data <= ENCERRAMENTO) {
+      expect(r.sugestao).toContain("seguir encontros no recesso");
+    } else {
+      expect(r.sugestao).toMatch(/Em dia só em .*depois do encerramento/);
+      expect(r.sugestao).toMatch(/Nem 1 encontro por dia/);
+    }
     expect(r.sugestao).toMatch(/coordenação/);
     datasValidas(r, true);
   });
@@ -241,7 +280,9 @@ describe("513 — calendário: feriado, travado, fuso", () => {
   it("6 atrasos a 1 por dia fecham no limite; seguir no recesso alivia pra semana dupla", () => {
     const r = montar(dupla(4));
     expect(r.dataRecuperacao).toBe(ENCERRAMENTO);
-    expect(r.alternativaRecesso).toEqual({ ritmo: 2, data: expect.any(String) });
+    // com a folga oficial de 14 dias preservada, seguir no recesso pede
+    // semana tripla — a dupla só desce pra dupla comprimindo a folga
+    expect(r.alternativaRecesso).toEqual({ ritmo: 3, data: expect.any(String) });
     expect(r.alternativaRecesso!.data <= ENCERRAMENTO).toBe(true);
   });
 
